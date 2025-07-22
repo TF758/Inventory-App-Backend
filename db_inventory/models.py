@@ -79,7 +79,7 @@ class Location(models.Model):
     room = models.CharField(max_length=255, blank=True, default='')
     area = models.CharField(max_length=100, blank=True, default='')
     section = models.CharField(max_length=100, blank=True, default='')
-    department = models.ForeignKey(Department, on_delete=models.PROTECT)
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True)
    
 
     def __str__(self):

@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation
-from .serializers import ConsumableSerializer, UserSerializerPrivate, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer,UserDepartmentSerializer, UserLocationSerializer
+from .serializers import ConsumableSerializer, UserSerializerPrivate, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer, UserLocationSerializer
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import RetrieveUpdateAPIView
 

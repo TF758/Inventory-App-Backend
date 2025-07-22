@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Department, Location, Equipment, Component, Accessory, UserDepartment, Consumable
+from .models import User, Department, Location, Equipment, Component, Accessory, UserLocation, Consumable
 
 class UserSerializerPrivate(serializers.ModelSerializer):
     class Meta:
@@ -45,7 +45,7 @@ class UserLocationSerializer(serializers.ModelSerializer):
     department = DepartmentNameSerializer()
 
     class Meta:
-        model = UserDepartment
+        model = UserLocation
         fields = ['id', 'user', 'location', 'date_joined']
 
 
