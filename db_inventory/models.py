@@ -74,34 +74,35 @@ class Department(models.Model):
         verbose_name = 'Department'
         verbose_name_plural = 'Departments'
 
-
-class UserDepartment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='departments')
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='users')
-    date_joined = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        unique_together = ('user', 'department')
-        verbose_name = 'User Department'
-        verbose_name_plural = 'User Departments'
-    
-    def __str__(self):
-        return f"{self.user.get_full_name()} - {self.department.name}"
-
-
 class Location(models.Model):
-    address1 = models.CharField(max_length=255, blank=True, default='')
-    address2 = models.CharField(max_length=255, blank=True, default='')
-    city = models.CharField(max_length=100, blank=True, default='')
-    country = models.CharField(max_length=100, blank=True, default='')
+    name = models.CharField(max_length=255, blank=True, default='')
+    room = models.CharField(max_length=255, blank=True, default='')
+    area = models.CharField(max_length=100, blank=True, default='')
+    section = models.CharField(max_length=100, blank=True, default='')
+    department = models.ForeignKey(Department, on_delete=models.PROTECT)
    
 
     def __str__(self):
-        return self.address1 + ', ' + self.city if self.address1 or self.city else 'Unnamed Location'
+        return self.name
 
     class Meta:
         verbose_name = 'Location'
         verbose_name_plural = 'Locations'
+
+
+class UserLocation(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+    date_joined = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('user', 'location')
+        verbose_name = 'User Location'
+        verbose_name_plural = 'User Locations'
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.location.name}"
+
 
 class Equipment(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -109,8 +110,7 @@ class Equipment(models.Model):
     model = models.CharField(max_length=100, blank=True, default='')
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     identifier = models.CharField(max_length=255, unique=True, editable=False, blank=True)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='equipments', null=True, blank=True)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='equipments', null=True, blank=True)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -156,7 +156,7 @@ class Component(models.Model):
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
     identifier = models.CharField(max_length=255, unique=True, editable=False, blank=True)
-    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name='components', null=True, blank=True)
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -198,7 +198,7 @@ class Accessory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='accessories', null=True, blank=True)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -212,8 +212,8 @@ class Consumable(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default='')
     quantity = models.IntegerField(default=0)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='consumables', null=True, blank=True)
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='consumables', null=True, blank=True)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
+    
 
 
 
