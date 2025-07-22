@@ -28,4 +28,8 @@ urlpatterns = [
 
     path('accessories/', accessory_list_create_view, name='accessories'),
     path('accessories/<int:id>/', accessory_id_detail_view, name='accessory-detail'),
+
+    path('consumables/', consumable_list_create_view, name="consumables"),
+    path('consumables/<int:id>/', consumable_id_detail_view, name='consumable-detail'),
+
 ]

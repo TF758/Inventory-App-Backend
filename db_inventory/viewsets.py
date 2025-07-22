@@ -51,3 +51,11 @@ accessory_id_detail_view = api_views.AccessoryModelViewSet.as_view({
     'patch': 'partial_update',
     'delete': 'destroy'
 })
+
+consumable_list_create_view = api_views.ConsumableModelViewSet.as_view({'get': 'list', 'post':'create'})
+consumable_id_detail_view = api_views.ConsumableModelViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy'
+})

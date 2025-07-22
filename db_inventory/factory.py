@@ -73,6 +73,7 @@ class ComponentFactory(factory.django.DjangoModelFactory):
     brand = fake.company()
     model = fake.word()
     serial_number = factory.Sequence(lambda n: 'SN%d' % n)
+    quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=40))
     
     equipment = factory.Iterator(Equipment.objects.all())
 

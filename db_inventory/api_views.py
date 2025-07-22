@@ -1,8 +1,8 @@
 from django.shortcuts import render
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import User, Department, Location, Equipment, Component, Accessory, UserDepartment
-from .serializers import UserSerializer, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer,UserDepartmentSerializer
+from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserDepartment
+from .serializers import ConsumableSerializer, UserSerializer, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer,UserDepartmentSerializer
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import RetrieveUpdateAPIView
 
@@ -15,20 +15,20 @@ class UserModelViewSet(viewsets.ModelViewSet):
     """ViewSet for managing User objects.
 This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for User objects."""
 
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by('-id')
     serializer_class = UserSerializer
     lookup_field = 'id'
 
-    def get_permissions(self):
-        if self.action == 'create':
-            permission_classes = [IsAuthenticated]
-        elif self.action == 'list':
-            permission_classes = [AllowAny]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            permission_classes = [IsAuthenticated]
-        else:
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     if self.action == 'create':
+    #         permission_classes = [IsAuthenticated]
+    #     elif self.action == 'list':
+    #         permission_classes = [AllowAny]
+    #     elif self.action in ['update', 'partial_update', 'destroy']:
+    #         permission_classes = [IsAuthenticated]
+    #     else:
+    #         permission_classes = [IsAuthenticated]
+    #     return [permission() for permission in permission_classes]
 
 class DepartmentModelViewSet(viewsets.ModelViewSet):
 
@@ -130,4 +130,13 @@ class AccessoryModelViewSet(viewsets.ModelViewSet):
 
     queryset = Accessory.objects.all()
     serializer_class = AccessorySerializer
+    lookup_field = 'id'
+
+
+class ConsumableModelViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing Consumable objects.
+    This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Consumable objects."""
+    
+    queryset = Consumable.objects.all()
+    serializer_class = ConsumableSerializer
     lookup_field = 'id'
