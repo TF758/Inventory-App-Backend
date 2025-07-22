@@ -22,7 +22,7 @@ class EquipmentAdmin(admin.ModelAdmin):
 class ComponentAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'model', 'identifier')
     readonly_fields = ('identifier',)
-    fields = ('name', 'brand', 'serial_number', 'model', 'identifier', 'equipment')
+    fields = ('name', 'brand', 'quantity', 'serial_number', 'model', 'identifier', 'equipment')
 
 
 admin.site.register(Consumable)
