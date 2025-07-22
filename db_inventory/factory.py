@@ -53,6 +53,7 @@ class LocationFactory(factory.django.DjangoModelFactory):
     room  = f"{fake.color_name()} {fake.word().capitalize()} Room"
     area = f"{fake.color_name()} {fake.word().capitalize()} Area"
     section =  f"{fake.color_name()} {fake.word().capitalize()} Section"
+    department = factory.Iterator (Department.objects.all())
 
 
 class EquipmentFactory(factory.django.DjangoModelFactory):

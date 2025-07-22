@@ -51,7 +51,7 @@ class UserLocationSerializer(serializers.ModelSerializer):
 
 class EquipmentSerializer(serializers.ModelSerializer):
  
-    location = LocationSerializer()
+    location = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
 
     class Meta:
         model = Equipment
