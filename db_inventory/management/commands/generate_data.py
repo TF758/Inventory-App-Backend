@@ -13,7 +13,7 @@ from django.core.management.base import BaseCommand
 from db_inventory.factory import (
     UserFactory, AdminUserFactory,
     DepartmentFactory,
-    UserDepartmentFactory,
+    UserLocationFactory,
     LocationFactory,
     EquipmentFactory,
     ComponentFactory,
@@ -44,16 +44,17 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Created {len(admin_user)} admin user.'))
 
         # Generate Departments
-        departments = DepartmentFactory.create_batch(7)
+        departments = DepartmentFactory.create_batch(10)
         self.stdout.write(self.style.SUCCESS(f'Created {len(departments)} departments.'))
 
-        # Generate UserDepartments
-        user_departments = UserDepartmentFactory.create_batch(50)
-        self.stdout.write(self.style.SUCCESS(f'Created {len(user_departments)} user-department relationships.'))
-
         # Generate Locations
-        locations = LocationFactory.create_batch(5)
+        locations = LocationFactory.create_batch(20)
         self.stdout.write(self.style.SUCCESS(f'Created {len(locations)} locations.'))
+
+
+        # Generate User Locations
+        user_locations = UserLocationFactory.create_batch(50)
+        self.stdout.write(self.style.SUCCESS(f'Created {len(user_locations)} user-location relationships.'))
 
         # Generate Equipment
         equipment = EquipmentFactory.create_batch(20)
