@@ -1,95 +1,84 @@
 from rest_framework import serializers
 from .models import User, Department, Location, Equipment, Component, Accessory, UserDepartment, Consumable
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializerPrivate(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-             'email', 'fname', 'lname', 'job_title',]
+           'id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'role']
         
-        # read_only_fields = ['id']
+        ordering = ['-id']
+        
+
+class UserSerializerPublic(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'email', 'fname', 'lname', 'job_title']
+        
+        ordering = ['-id']
+        
 
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
         fields = [ 'name', 'description']
-        # read_only_fields = ['id']
+
+
+class DepartmentNameSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Department
+        fields = [ 'name']
+
 
 class LocationSerializer(serializers.ModelSerializer):
+    department = DepartmentNameSerializer()
+    
     class Meta:
         model = Location
-        fields = [ 'address1', 'address2', 'city', 'country']
-        # read_only_fields = ['id']
+        fields = [ 'name', 'room', 'area', 'section', 'department']
 
-class UserDepartmentSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    department = DepartmentSerializer(read_only=True)
+
+class UserLocationSerializer(serializers.ModelSerializer):
+    user = UserSerializerPublic()
+    department = DepartmentNameSerializer()
 
     class Meta:
         model = UserDepartment
-        fields = ['id', 'user', 'department', 'date_joined']
-        read_only_fields = ['id', 'user', 'department']
+        fields = ['id', 'user', 'location', 'date_joined']
+
 
 class EquipmentSerializer(serializers.ModelSerializer):
-    department = DepartmentSerializer(read_only=True)
-    location = LocationSerializer(read_only=True)
-
-    identifier = serializers.CharField(read_only=True)
+ 
+    location = LocationSerializer()
 
     class Meta:
         model = Equipment
-        fields = [ 'identifier', 'name', 'brand', 'model', 'serial_number', 'department', 'location']
-        read_only_fields = [ 'department', 'location', 'identifier']
+        fields = [ 'identifier', 'name', 'brand', 'model', 'serial_number', 'location']
+
 
 class ComponentSerializer(serializers.ModelSerializer):
     equipment = EquipmentSerializer(read_only=True)
 
-    identifier = serializers.CharField(read_only=True)
-
     class Meta:
         model = Component
-        fields = [ 'identifier','name', 'brand', 'model', 'serial_number', 'equipment']
+        fields = [ 'identifier','name', 'brand', 'quantity', 'model', 'serial_number', 'equipment']
         read_only_fields = [ 'equipment' , 'identifier']
 
 
-class ComponentQuantitySerializer(serializers.ModelSerializer):
-    component = ComponentSerializer(read_only=True)
-
-    class Meta:
-        model = Component
-        fields = ['id', 'name', 'quantity']
-        read_only_fields = ['id']
-
 class AccessorySerializer(serializers.ModelSerializer):
-    department = DepartmentSerializer(read_only=True)
+    location = LocationSerializer()
 
     class Meta:
         model = Accessory
-        fields = ['id', 'name', 'serial_number', 'department']
-        read_only_fields = ['id', 'department']
+        fields = ['id', 'name', 'serial_number', 'quantity', 'location']
+
 
 class ConsumableSerializer(serializers.ModelSerializer):
-    location = LocationSerializer(read_only=True)
-    department = DepartmentSerializer(read_only=True)
+    location = LocationSerializer()
 
     class Meta:
         model = Consumable
-        fields = ['id', 'name', 'description', 'location', 'department' ]
-        read_only_fields = ['id', 'location', 'department']
-
-class ConsumableQuantitySerializer(serializers.ModelSerializer):
-    consumable = ConsumableSerializer(read_only=True)
-
-    class Meta:
-        model = Consumable
-        fields = ['id', 'name', 'quantity']
-        read_only_fields = ['id']
-
-class UserDepartmentSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    department = DepartmentSerializer(read_only=True)
-
-    class Meta:
-        model = UserDepartment
-        fields = ['id', 'user', 'department', 'date_joined']
-        read_only_fields = ['id', 'user', 'department']
+        fields = ['id', 'name', 'quantity', 'description', 'location',  ]
+ 

@@ -11,7 +11,7 @@ urlpatterns = [
     path('departments/', department_list_create_view, name='departments'),
     path('departments/<int:id>/', department_id_detail_view, name='department-detail'),
 
-    path('departments/<int:id>/users/', api_views.DepartmentUsersView.as_view(), name='department-users'),
+    path('departments/<int:id>/users/', api_views.UsersLocationView.as_view(), name='department-users'),
     path('departments/<int:id>/equipment/', api_views.DepartmentEquipmentsView.as_view(), name='department-equipments'),
 
 

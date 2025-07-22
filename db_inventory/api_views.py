@@ -1,8 +1,8 @@
 from django.shortcuts import render
 from rest_framework import viewsets, generics
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserDepartment
-from .serializers import ConsumableSerializer, UserSerializer, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer,UserDepartmentSerializer
+from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation
+from .serializers import ConsumableSerializer, UserSerializerPrivate, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer,UserDepartmentSerializer, UserLocationSerializer
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import RetrieveUpdateAPIView
 
@@ -16,7 +16,7 @@ class UserModelViewSet(viewsets.ModelViewSet):
 This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for User objects."""
 
     queryset = User.objects.all().order_by('-id')
-    serializer_class = UserSerializer
+    serializer_class = UserSerializerPrivate
     lookup_field = 'id'
 
     # def get_permissions(self):
@@ -39,15 +39,15 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     lookup_field = 'id'
 
-class DepartmentUsersView(generics.ListAPIView): 
-    """
-    View to list all users in a specific department.
-    """
-    serializer_class = UserDepartmentSerializer
+# class UsersLocationView(generics.ListAPIView): 
+#     """
+#     View to list all users in a specific department.
+#     """
+#     serializer_class = UserLocationSerializer
 
-    def get_queryset(self):
-        department_id = self.kwargs['id']
-        return UserDepartment.objects.filter(department__id=department_id)
+#     def get_queryset(self):
+#         department_id = self.kwargs['id']
+#         return UserLocation.objects.filter(department__id=department_id)
 
 
 class LocationModelViewSet(viewsets.ModelViewSet):
@@ -60,15 +60,15 @@ class LocationModelViewSet(viewsets.ModelViewSet):
     lookup_field = 'id'
 
 
-class LocationEquipmentsView(generics.ListAPIView):
-    """
-    View to list all equipments in a specific location.
-    """
-    serializer_class = EquipmentSerializer
+# class LocationEquipmentsView(generics.ListAPIView):
+#     """
+#     View to list all equipments in a specific location.
+#     """
+#     serializer_class = EquipmentSerializer
 
-    def get_queryset(self):
-        location_id = self.kwargs['id']
-        return Equipment.objects.filter(location__id=location_id)
+#     def get_queryset(self):
+#         location_id = self.kwargs['id']
+#         return Equipment.objects.filter(location__id=location_id)
 
 
 class EquipmentModelViewSet(viewsets.ModelViewSet):
@@ -80,28 +80,6 @@ class EquipmentModelViewSet(viewsets.ModelViewSet):
     serializer_class = EquipmentSerializer
     lookup_field = 'id'
 
-class DepartmentEquipmentsView(generics.ListAPIView):
-    """
-    View to list all equipments in a specific department.
-    """
-    serializer_class = EquipmentSerializer
-
-    def get_queryset(self):
-        department_id = self.kwargs['id']
-        return Equipment.objects.filter(department__id=department_id)
-
-
-class ListCreateUserDepartments(generics.ListCreateAPIView):
-    """
-    List all UserDepartment objects or create a new one.
-    """
-    queryset = UserDepartment.objects.all()
-    serializer_class = UserDepartmentSerializer
-    lookup_field = 'id'
-
-    # def perform_create(self, serializer):
-    #     serializer.save(user=self.request.user)  # Automatically set the user to the current authenticated user
-
 
 class ComponentModelViewSet(viewsets.ModelViewSet):
 
@@ -112,15 +90,15 @@ class ComponentModelViewSet(viewsets.ModelViewSet):
     serializer_class = ComponentSerializer
     lookup_field = 'id'
 
-class ComponentEquipmentsView(generics.ListAPIView):
-    """
-    View to list all equipments associated with a specific component.
-    """
-    serializer_class = EquipmentSerializer
+# class ComponentEquipmentsView(generics.ListAPIView):
+#     """
+#     View to list all equipments associated with a specific component.
+#     """
+#     serializer_class = EquipmentSerializer
 
-    def get_queryset(self):
-        component_id = self.kwargs['id']
-        return Equipment.objects.filter(components__id=component_id)
+#     def get_queryset(self):
+#         component_id = self.kwargs['id']
+#         return Equipment.objects.filter(components__id=component_id)
 
 
 class AccessoryModelViewSet(viewsets.ModelViewSet):
