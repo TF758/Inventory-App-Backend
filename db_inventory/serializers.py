@@ -37,7 +37,7 @@ class LocationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Location
-        fields = [ 'name', 'room', 'area', 'section', 'department']
+        fields = [ 'id', 'name', 'room', 'area', 'section', 'department']
 
 
 class UserLocationSerializer(serializers.ModelSerializer):
@@ -50,12 +50,21 @@ class UserLocationSerializer(serializers.ModelSerializer):
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
- 
     location = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
+    location_detail = LocationSerializer(source="location", read_only=True)
 
     class Meta:
         model = Equipment
-        fields = [ 'identifier', 'name', 'brand', 'model', 'serial_number', 'location']
+        fields = [
+            'id',
+            "identifier",
+            "name",
+            "brand",
+            "model",
+            "serial_number",
+            "location",        
+            "location_detail"   
+        ]
 
 
 class ComponentSerializer(serializers.ModelSerializer):
