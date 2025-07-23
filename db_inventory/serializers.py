@@ -68,11 +68,12 @@ class EquipmentSerializer(serializers.ModelSerializer):
 
 
 class ComponentSerializer(serializers.ModelSerializer):
-    equipment = EquipmentSerializer(read_only=True)
+    equipment = serializers.PrimaryKeyRelatedField(queryset = Equipment.objects.all())
+    equipment_detail = EquipmentSerializer(source = "equipment", read_only = True)
 
     class Meta:
         model = Component
-        fields = [ 'identifier','name', 'brand', 'quantity', 'model', 'serial_number', 'equipment']
+        fields = [ 'id', 'identifier','name', 'brand', 'quantity', 'model', 'serial_number', 'equipment', 'equipment_detail']
         read_only_fields = [ 'equipment' , 'identifier']
 
 
