@@ -33,11 +33,12 @@ class DepartmentNameSerializer(serializers.ModelSerializer):
 
 
 class LocationSerializer(serializers.ModelSerializer):
-    department = DepartmentNameSerializer()
-    
+    department =serializers.PrimaryKeyRelatedField(queryset = Department.objects.all())
+    department_detail = DepartmentNameSerializer(source = "department", read_only= True)
+
     class Meta:
         model = Location
-        fields = [ 'id', 'name', 'room', 'area', 'section', 'department']
+        fields = [ 'id', 'name', 'room', 'area', 'section', 'department', 'department_detail']
 
 
 class UserLocationSerializer(serializers.ModelSerializer):
