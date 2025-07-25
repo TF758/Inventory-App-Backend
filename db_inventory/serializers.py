@@ -22,7 +22,7 @@ class UserSerializerPublic(serializers.ModelSerializer):
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
-        fields = [ 'name', 'description']
+        fields = ['id', 'name', 'description']
 
 
 class DepartmentNameSerializer(serializers.ModelSerializer):
@@ -79,11 +79,13 @@ class ComponentSerializer(serializers.ModelSerializer):
 
 
 class AccessorySerializer(serializers.ModelSerializer):
-    location = LocationSerializer()
+    location = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
+    location_detail = LocationSerializer(source="location", read_only=True)
 
+    
     class Meta:
         model = Accessory
-        fields = ['id', 'name', 'serial_number', 'quantity', 'location']
+        fields = ['id', 'name', 'serial_number', 'quantity',  "location","location_detail"   ]
 
 
 class ConsumableSerializer(serializers.ModelSerializer):
