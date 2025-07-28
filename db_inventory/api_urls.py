@@ -17,7 +17,7 @@ urlpatterns = [
 
 
     path('equipments/', equipment_list_create_view, name='equipments'),
-    path('equipments/<int:id>/', equipment_id_detail_view, name='equipment-detail'),
+    path('equipment/<int:id>/', equipment_id_detail_view, name='equipment-detail'),
 
     path('components/', component_list_create_view, name='components'), 
     path('components/<int:id>/', component_id_detail_view, name='component-detail'),

@@ -75,7 +75,7 @@ class ComponentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Component
         fields = [ 'id', 'identifier','name', 'brand', 'quantity', 'model', 'serial_number', 'equipment', 'equipment_detail']
-        read_only_fields = [ 'equipment' , 'identifier']
+  
 
 
 class AccessorySerializer(serializers.ModelSerializer):
@@ -89,9 +89,10 @@ class AccessorySerializer(serializers.ModelSerializer):
 
 
 class ConsumableSerializer(serializers.ModelSerializer):
-    location = LocationSerializer()
+    location = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
+    location_detail = LocationSerializer(source="location", read_only=True)
 
     class Meta:
         model = Consumable
-        fields = ['id', 'name', 'quantity', 'description', 'location',  ]
+        fields = ['id', 'name', 'quantity', 'description', "location","location_detail" ]
  
