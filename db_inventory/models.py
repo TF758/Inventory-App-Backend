@@ -184,7 +184,7 @@ class Component(models.Model):
                 super().save(update_fields=["identifier"])
         else:
             # For updates, prevent identifier from changing
-            old = Equipment.objects.filter(pk=self.pk).first()
+            old = Component.objects.filter(pk=self.pk).first()
             if old and old.identifier != self.identifier:
                 raise ValidationError("Identifier is immutable and cannot be changed.")
             super().save(*args, **kwargs)
