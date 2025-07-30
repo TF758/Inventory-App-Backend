@@ -1,10 +1,13 @@
 from django.shortcuts import render
-from rest_framework import viewsets, generics
+from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation
 from .serializers import ConsumableSerializer, UserSerializerPrivate, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer, UserLocationSerializer
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import RetrieveUpdateAPIView
+from .filters import EquipmentFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
 
 
 
@@ -79,6 +82,11 @@ class EquipmentModelViewSet(viewsets.ModelViewSet):
     queryset = Equipment.objects.all()
     serializer_class = EquipmentSerializer
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = EquipmentFilter
 
 
 class ComponentModelViewSet(viewsets.ModelViewSet):
