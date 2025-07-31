@@ -12,7 +12,19 @@ class EquipmentFilter(django_filters.FilterSet):
     location_name = django_filters.CharFilter(
         field_name='location__name', lookup_expr='icontains'
     )
+    department= django_filters.CharFilter(
+    field_name="location__department__name",
+    lookup_expr='icontains'
+)
 
     class Meta:
         model = Equipment
-        fields = []  
+        fields = fields = [
+        'name',
+        'brand',
+        'model',
+        'serial_number',
+        'identifier',
+        'location_name',
+        'department',
+    ]
