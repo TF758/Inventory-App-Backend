@@ -5,7 +5,7 @@ from .models import Consumable, User, Department, Location, Equipment, Component
 from .serializers import ConsumableSerializer, UserSerializerPrivate, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer, UserLocationSerializer
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import RetrieveUpdateAPIView
-from .filters import EquipmentFilter, LocationFilter, ComponentFilter
+from .filters import EquipmentFilter, LocationFilter, ComponentFilter, AccessoryFilter, ConsumableFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
@@ -129,6 +129,11 @@ class AccessoryModelViewSet(viewsets.ModelViewSet):
     serializer_class = AccessorySerializer
     lookup_field = 'id'
 
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = AccessoryFilter
+
 
 class ConsumableModelViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Consumable objects.
@@ -137,3 +142,8 @@ class ConsumableModelViewSet(viewsets.ModelViewSet):
     queryset = Consumable.objects.all()
     serializer_class = ConsumableSerializer
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = ConsumableFilter

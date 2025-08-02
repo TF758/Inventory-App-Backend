@@ -64,3 +64,41 @@ class ComponentFilter(django_filters.FilterSet):
             'identifier',
             'equipment',
         ]
+
+
+class AccessoryFilter(django_filters.FilterSet):
+    name= django_filters.CharFilter(lookup_expr='icontains')
+    serial_number=django_filters.CharFilter(lookup_expr='icontains')
+    location_name = django_filters.CharFilter(
+        field_name='location__name', lookup_expr='icontains'
+    )
+    location_room = django_filters.CharFilter(
+        field_name='location__room', lookup_expr='icontains'
+    )
+
+    class Meta:
+        model = Accessory
+        fields = [
+            'name',
+            'serial_number',
+            'location_name',
+            'location_room',
+        ]
+
+
+class ConsumableFilter(django_filters.FilterSet):
+    name= django_filters.CharFilter(lookup_expr='icontains')
+    location_name = django_filters.CharFilter(
+        field_name='location__name', lookup_expr='icontains'
+    )
+    location_room = django_filters.CharFilter(
+        field_name='location__room', lookup_expr='icontains'
+    )
+
+    class Meta:
+        model = Consumable
+        fields = [
+            'name',
+            'location_name',
+            'location_room',
+        ]
