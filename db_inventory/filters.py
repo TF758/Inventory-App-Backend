@@ -1,5 +1,5 @@
 import django_filters
-from .models import User, Department, Location, Equipment, Component, Accessory, UserLocation, Consumable
+from .models import *
 
 
 
@@ -9,13 +9,10 @@ class EquipmentFilter(django_filters.FilterSet):
     model = django_filters.CharFilter(lookup_expr='icontains')
     serial_number = django_filters.CharFilter(lookup_expr='icontains')
     identifier = django_filters.CharFilter(lookup_expr='icontains')
-    location_name = django_filters.CharFilter(
-        field_name='location__name', lookup_expr='icontains'
+    room = django_filters.CharFilter(
+        field_name='room__name', lookup_expr='icontains'
     )
-    department= django_filters.CharFilter(
-    field_name="location__department__name",
-    lookup_expr='icontains'
-)
+
 
     class Meta:
         model = Equipment
@@ -25,19 +22,32 @@ class EquipmentFilter(django_filters.FilterSet):
         'model',
         'serial_number',
         'identifier',
-        'location_name',
-        'department',
+        'room',
+       
     ]
         
 class LocationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
-    room = django_filters.CharFilter(lookup_expr='icontains')
-    area = django_filters.CharFilter(lookup_expr='icontains')
-    section = django_filters.CharFilter(lookup_expr='icontains')
     department = django_filters.CharFilter(lookup_expr='icontains', field_name="department__name")
 
     class Meta:
         model = Location
+        fields = [
+            'name',
+            'department',
+        ]
+
+class RoomFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(lookup_expr='icontains')
+    room = django_filters.CharFilter(lookup_expr='icontains')
+    area = django_filters.CharFilter(lookup_expr='icontains')
+    section = django_filters.CharFilter(lookup_expr='icontains')
+    location = django_filters.CharFilter(lookup_expr='icontains', field_name="location__name")
+    department =  django_filters.CharFilter(lookup_expr='icontains', field_name="location__department__name")
+
+
+    class Meta:
+        model = Room
         fields = [
             'name',
             'room',
@@ -69,11 +79,8 @@ class ComponentFilter(django_filters.FilterSet):
 class AccessoryFilter(django_filters.FilterSet):
     name= django_filters.CharFilter(lookup_expr='icontains')
     serial_number=django_filters.CharFilter(lookup_expr='icontains')
-    location_name = django_filters.CharFilter(
-        field_name='location__name', lookup_expr='icontains'
-    )
-    location_room = django_filters.CharFilter(
-        field_name='location__room', lookup_expr='icontains'
+    room_name = django_filters.CharFilter(
+        field_name='room__name', lookup_expr='icontains'
     )
 
     class Meta:
@@ -81,24 +88,20 @@ class AccessoryFilter(django_filters.FilterSet):
         fields = [
             'name',
             'serial_number',
-            'location_name',
-            'location_room',
+            'room_name',
         ]
 
 
 class ConsumableFilter(django_filters.FilterSet):
     name= django_filters.CharFilter(lookup_expr='icontains')
-    location_name = django_filters.CharFilter(
-        field_name='location__name', lookup_expr='icontains'
-    )
-    location_room = django_filters.CharFilter(
-        field_name='location__room', lookup_expr='icontains'
+    room_name = django_filters.CharFilter(
+        field_name='room__name', lookup_expr='icontains'
     )
 
     class Meta:
         model = Consumable
         fields = [
             'name',
-            'location_name',
-            'location_room',
+            'room_name',
+          
         ]
