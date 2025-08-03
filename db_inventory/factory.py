@@ -1,5 +1,5 @@
 import factory
-from db_inventory.models import User, Department, Location, Equipment, Component, Accessory, Consumable, UserLocation
+from db_inventory.models import User, Department, Location, Equipment, Component, Accessory, Consumable, UserLocation, Room
 
 from faker import Faker
 fake = Faker()
@@ -50,10 +50,17 @@ class LocationFactory(factory.django.DjangoModelFactory):
         model = Location
 
     name = factory.LazyFunction(fake.company)
-    room  = f"{fake.color_name()} {fake.word().capitalize()} Room"
-    area = f"{fake.color_name()} {fake.word().capitalize()} Area"
-    section =  f"{fake.color_name()} {fake.word().capitalize()} Section"
     department = factory.Iterator (Department.objects.all())
+
+
+class RoomFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Room
+
+    location = factory.Iterator (Location.objects.all())
+    name = factory.LazyFunction(fake.color_name)
+    area = factory.LazyFunction(fake.company)
+    section =  f"{fake.color_name()} Section"
 
 
 class EquipmentFactory(factory.django.DjangoModelFactory):
@@ -64,7 +71,7 @@ class EquipmentFactory(factory.django.DjangoModelFactory):
     brand = fake.company()
     model = fake.word()
     serial_number = factory.Sequence(lambda n: 'SN%d' % n)
-    location = factory.Iterator(Location.objects.all())
+    room = factory.Iterator(Room.objects.all())
 
 class ComponentFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -84,7 +91,7 @@ class AccessoryFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: 'Accessory %d' % n)
     serial_number = factory.Sequence(lambda n: 'SN%d' % n)
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
-    location = factory.Iterator(Location.objects.all())
+    room = factory.Iterator(Room.objects.all())
 
 
 class ConsumableFactory(factory.django.DjangoModelFactory):
@@ -94,5 +101,5 @@ class ConsumableFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: 'Consumable %d' % n)
     description = fake.text(max_nb_chars=50)
     quantity = fake.random_int(min=1, max=100)
-    location = factory.Iterator(Location.objects.all())
+    room = factory.Iterator(Room.objects.all())
  

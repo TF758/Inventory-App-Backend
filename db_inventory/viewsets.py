@@ -27,6 +27,19 @@ location_id_detail_view = api_views.LocationModelViewSet.as_view({
     'delete': 'destroy'
 })
 
+room_list_create_view = api_views.RoomModelViewSet.as_view({'get': 'list', 'post':'create'})
+
+room_id_detail_view = api_views.RoomModelViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy'
+})
+
+
+
+
+
 equipment_list_create_view = api_views.EquipmentModelViewSet.as_view({'get': 'list', 'post':'create'})
 
 equipment_id_detail_view = api_views.EquipmentModelViewSet.as_view({
