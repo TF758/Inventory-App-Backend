@@ -1,12 +1,13 @@
 from django.shortcuts import render
-from rest_framework import viewsets, generics
+from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation
-from .serializers import ConsumableSerializer, UserSerializerPrivate, DepartmentSerializer, LocationSerializer,EquipmentSerializer, ComponentSerializer, AccessorySerializer, UserLocationSerializer
+from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation, Room
+from .serializers import *
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import RetrieveUpdateAPIView
-
-
+from .filters import EquipmentFilter, LocationFilter, ComponentFilter, AccessoryFilter, ConsumableFilter, RoomFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
 
 
 
@@ -36,18 +37,13 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Department objects."""
 
     queryset = Department.objects.all()
-    serializer_class = DepartmentSerializer
     lookup_field = 'id'
+    
 
-# class UsersLocationView(generics.ListAPIView): 
-#     """
-#     View to list all users in a specific department.
-#     """
-#     serializer_class = UserLocationSerializer
-
-#     def get_queryset(self):
-#         department_id = self.kwargs['id']
-#         return UserLocation.objects.filter(department__id=department_id)
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return DepartmentWriteSerializer
+        return DepartmentReadSerializer
 
 
 class LocationModelViewSet(viewsets.ModelViewSet):
@@ -56,19 +52,34 @@ class LocationModelViewSet(viewsets.ModelViewSet):
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Location objects."""
 
     queryset = Location.objects.all()
-    serializer_class = LocationSerializer
     lookup_field = 'id'
 
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
 
-# class LocationEquipmentsView(generics.ListAPIView):
-#     """
-#     View to list all equipments in a specific location.
-#     """
-#     serializer_class = EquipmentSerializer
+    filterset_class = LocationFilter
 
-#     def get_queryset(self):
-#         location_id = self.kwargs['id']
-#         return Equipment.objects.filter(location__id=location_id)
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return LocationWriteSerializer
+        return LocationReadSerializer
+
+class RoomModelViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing Room objects.
+    This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Room objects."""
+        
+    queryset = Room.objects.all()
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = RoomFilter
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return RoomWriteSerializer
+        return RoomReadSerializer
 
 
 class EquipmentModelViewSet(viewsets.ModelViewSet):
@@ -77,8 +88,18 @@ class EquipmentModelViewSet(viewsets.ModelViewSet):
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Equipment objects."""
 
     queryset = Equipment.objects.all()
-    serializer_class = EquipmentSerializer
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = EquipmentFilter
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return EquipmentWriteSerializer
+        return EquipmentReadSerializer
+
 
 
 class ComponentModelViewSet(viewsets.ModelViewSet):
@@ -87,18 +108,18 @@ class ComponentModelViewSet(viewsets.ModelViewSet):
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Component objects."""
 
     queryset = Component.objects.all()
-    serializer_class = ComponentSerializer
     lookup_field = 'id'
 
-# class ComponentEquipmentsView(generics.ListAPIView):
-#     """
-#     View to list all equipments associated with a specific component.
-#     """
-#     serializer_class = EquipmentSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
 
-#     def get_queryset(self):
-#         component_id = self.kwargs['id']
-#         return Equipment.objects.filter(components__id=component_id)
+    filterset_class = ComponentFilter
+
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return ComponentWriteSerializer
+        return ComponentReadSerializer
 
 
 class AccessoryModelViewSet(viewsets.ModelViewSet):
@@ -107,8 +128,17 @@ class AccessoryModelViewSet(viewsets.ModelViewSet):
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Accessory objects."""
 
     queryset = Accessory.objects.all()
-    serializer_class = AccessorySerializer
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = AccessoryFilter
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return AccessoryWriteSerializer
+        return AccessoryReadSerializer
 
 
 class ConsumableModelViewSet(viewsets.ModelViewSet):
@@ -118,3 +148,13 @@ class ConsumableModelViewSet(viewsets.ModelViewSet):
     queryset = Consumable.objects.all()
     serializer_class = ConsumableSerializer
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = ConsumableFilter
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return ConsumableWriteSerializer
+        return ConsumableReadSerializer

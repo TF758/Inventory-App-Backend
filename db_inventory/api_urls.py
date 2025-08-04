@@ -15,9 +15,13 @@ urlpatterns = [
     path('locations/',location_list_create_view, name='locations'),
     path('locations/<int:id>/', location_id_detail_view , name='location-detail'),
 
+    
+    path('rooms/',room_list_create_view, name='rooms'),
+    path('rooms/<int:id>/', room_id_detail_view , name='room-detail'),
+
 
     path('equipments/', equipment_list_create_view, name='equipments'),
-    path('equipments/<int:id>/', equipment_id_detail_view, name='equipment-detail'),
+    path('equipment/<int:id>/', equipment_id_detail_view, name='equipment-detail'),
 
     path('components/', component_list_create_view, name='components'), 
     path('components/<int:id>/', component_id_detail_view, name='component-detail'),

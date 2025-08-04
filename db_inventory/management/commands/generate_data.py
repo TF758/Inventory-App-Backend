@@ -18,7 +18,8 @@ from db_inventory.factory import (
     EquipmentFactory,
     ComponentFactory,
     AccessoryFactory,
-    ConsumableFactory
+    ConsumableFactory,
+    RoomFactory
 )
 
 
@@ -51,6 +52,9 @@ class Command(BaseCommand):
         locations = LocationFactory.create_batch(20)
         self.stdout.write(self.style.SUCCESS(f'Created {len(locations)} locations.'))
 
+        # Generate Rooms
+        rooms = RoomFactory.create_batch(80)
+        self.stdout.write(self.style.SUCCESS(f'Created {len(rooms)} rooms.'))
 
         # Generate User Locations
         user_locations = UserLocationFactory.create_batch(50)

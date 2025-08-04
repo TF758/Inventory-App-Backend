@@ -75,12 +75,11 @@ class Department(models.Model):
         verbose_name_plural = 'Departments'
 
 class Location(models.Model):
-    name = models.CharField(max_length=255, blank=True, default='')
-    room = models.CharField(max_length=255, blank=True, default='')
-    area = models.CharField(max_length=100, blank=True, default='')
-    section = models.CharField(max_length=100, blank=True, default='')
+    """
+    Represents a building/facility
+    """
+    name = models.CharField(max_length=255)
     department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True)
-   
 
     def __str__(self):
         return self.name
@@ -89,6 +88,17 @@ class Location(models.Model):
         verbose_name = 'Location'
         verbose_name_plural = 'Locations'
 
+class Room(models.Model):
+    """
+    Represents a room or space within a location
+    """
+    location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name='rooms')
+    name = models.CharField(max_length=255) 
+    area = models.CharField(max_length=100, blank=True, default='')     
+    section = models.CharField(max_length=100, blank=True, default='')  
+
+    def __str__(self):
+        return f"{self.name} @ {self.location.name}"
 
 class UserLocation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -110,7 +120,7 @@ class Equipment(models.Model):
     model = models.CharField(max_length=100, blank=True, default='')
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     identifier = models.CharField(max_length=255, unique=True, editable=False, blank=True)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -184,7 +194,7 @@ class Component(models.Model):
                 super().save(update_fields=["identifier"])
         else:
             # For updates, prevent identifier from changing
-            old = Equipment.objects.filter(pk=self.pk).first()
+            old = Component.objects.filter(pk=self.pk).first()
             if old and old.identifier != self.identifier:
                 raise ValidationError("Identifier is immutable and cannot be changed.")
             super().save(*args, **kwargs)
@@ -198,7 +208,7 @@ class Accessory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -212,7 +222,7 @@ class Consumable(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default='')
     quantity = models.IntegerField(default=0)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
     
 
 

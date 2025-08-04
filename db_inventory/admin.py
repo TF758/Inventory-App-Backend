@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable
+from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room
 
 admin.site.register(User)
 
@@ -9,6 +9,10 @@ admin.site.register(Department)
 admin.site.register(UserLocation)
 
 admin.site.register(Location)
+
+@admin.register(Room)
+class RoomAdmin(admin.ModelAdmin):
+    list_display = ('name', 'area', 'section', 'location')
 
 
 @admin.register(Equipment)
