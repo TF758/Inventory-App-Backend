@@ -132,8 +132,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-            ' http://localhost:5173', # This is the URL for the React app
-            'http://localhost:8000',  # Django development server
+            'https://localhost:5173', # This is the URL for the React app
+            'https://localhost:8000',  # Django development server
         ]
 
 
