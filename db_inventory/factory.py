@@ -4,6 +4,14 @@ from db_inventory.models import User, Department, Location, Equipment, Component
 from faker import Faker
 fake = Faker()
 
+DEPARTMENT_IMAGE_URLS = [
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQQeNHmcybimV62sCsu5LH5zWYkq6TUti8srg&s",
+     "https://publicservice.govt.lc/images/528px-Coat_of_Arms_of_Saint_Lucia.svg.png",
+     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRj6PTPMvpZw-9CRvnUcvrO-1mEDuBLtEyybQ&s",
+     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQV8tXEYcWeRO2y4R6lUie3TKQ0QqgJXDt2Fw&s",
+     "https://scontent-mia3-2.xx.fbcdn.net/v/t39.30808-6/251905257_283920967072718_3803379083888235439_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=zh56Ocy31UwQ7kNvwH0kgi1&_nc_oc=Adl5QhBteM4aCNrffbanHJMczjztnBo4JGfxE0C7bT3B_sHA9_LgMXcmme4S3UtDtLw&_nc_zt=23&_nc_ht=scontent-mia3-2.xx&_nc_gid=H0hszqkNv_moEWvHANAxDg&oh=00_AfUbfh4jHzHm8-ZW6bTb6gg_igSOZ5hugBDQtpc9itqPLw&oe=68A1B10E"
+
+]
 
 
 
@@ -35,14 +43,7 @@ class DepartmentFactory(factory.django.DjangoModelFactory):
 
     name = factory.Sequence(lambda n: 'Department %d' % n)
     description = factory.LazyFunction(lambda: fake.sentence(nb_words=20))
-
-class UserLocationFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = UserLocation
-
-    user = factory.SubFactory(UserFactory)
-    location = factory.Iterator(Location.objects.all())
-    date_joined = factory.LazyFunction(fake.date_time_this_decade)
+    img_link = factory.LazyFunction(lambda: fake.random_element(elements=DEPARTMENT_IMAGE_URLS))
 
 
 class LocationFactory(factory.django.DjangoModelFactory):
@@ -62,6 +63,13 @@ class RoomFactory(factory.django.DjangoModelFactory):
     area = factory.LazyFunction(fake.company)
     section =  f"{fake.color_name()} Section"
 
+class UserLocationFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UserLocation
+
+    user =  factory.Iterator(User.objects.all())
+    room = factory.Iterator(Room.objects.all())
+    date_joined = factory.LazyFunction(fake.date_time_this_decade)
 
 class EquipmentFactory(factory.django.DjangoModelFactory):
     class Meta:

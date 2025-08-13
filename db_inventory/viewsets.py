@@ -11,6 +11,8 @@ user_id_detail_view = api_views.UserModelViewSet.as_view({
 
 department_list_create_view = api_views.DepartmentModelViewSet.as_view({'get': 'list', 'post':'create'})
 
+department_users_view = api_views.DepartmentUsersView.as_view({'get': 'list',})
+
 department_id_detail_view = api_views.DepartmentModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
