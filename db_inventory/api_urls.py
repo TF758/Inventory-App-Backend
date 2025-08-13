@@ -9,7 +9,8 @@ urlpatterns = [
     path('users/<int:id>/',user_id_detail_view, name='user-detail'),
 
     path('departments/', department_list_create_view, name='departments'),
-    path('departments/<int:id>/', department_id_detail_view, name='department-detail'),
+    path('department/<int:id>/', department_id_detail_view, name='department-detail'),
+    path('department/<int:department_id>/users/', department_users_view, name='department-users'),
 
 
     path('locations/',location_list_create_view, name='locations'),

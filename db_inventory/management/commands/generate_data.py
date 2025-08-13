@@ -57,8 +57,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Created {len(rooms)} rooms.'))
 
         # Generate User Locations
-        user_locations = UserLocationFactory.create_batch(50)
-        self.stdout.write(self.style.SUCCESS(f'Created {len(user_locations)} user-location relationships.'))
+        user_rooms = UserLocationFactory.create_batch(70)
+        self.stdout.write(self.style.SUCCESS(f'Created {len(user_rooms)} user-room relationships.'))
 
         # Generate Equipment
         equipment = EquipmentFactory.create_batch(20)

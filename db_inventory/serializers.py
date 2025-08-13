@@ -11,10 +11,12 @@ class UserSerializerPrivate(serializers.ModelSerializer):
         
 
 class UserSerializerPublic(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='fname')
+    last_name = serializers.CharField(source='lname')
     class Meta:
         model = User
         fields = [
-            'email', 'fname', 'lname', 'job_title']
+            'email', 'first_name', 'last_name', 'job_title']
         
         ordering = ['-id']
         
@@ -22,20 +24,23 @@ class UserSerializerPublic(serializers.ModelSerializer):
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'name', 'description' ,'img_link']
 
 
 class DepartmentNameSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = [ 'name']
+        fields = [ 'id', 'name']
 
 
 class DepartmentReadSerializer(serializers.ModelSerializer):
+
+    """Returns general area on a department """
     class Meta:
         model = Department
         fields = ['id', 'name', 'description']
+
 
 
 class DepartmentWriteSerializer(serializers.ModelSerializer):
@@ -51,24 +56,50 @@ class LocationFullSerializer(serializers.ModelSerializer):
         model = Location
         fields = [ 'id', 'name', 'department', 'department_detail']
 
-class LocationNameSerializer(serializers.ModelSerializer):
-    department =serializers.PrimaryKeyRelatedField(queryset = Department.objects.all())
-    department_detail = DepartmentNameSerializer(source = "department", read_only= True)
+
+class DepartmentUserLightSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id')
+    user_email = serializers.EmailField(source='user.email')
+    user_first_name = serializers.CharField(source='user.fname')
+    user_last_name = serializers.CharField(source='user.lname')
+
+    room_id = serializers.IntegerField(source='room.id')
+    room_name = serializers.CharField(source='room.name')
+
+    location_id = serializers.IntegerField(source='room.location.id')
+    location_name = serializers.CharField(source='room.location.name')
+
+    department_id = serializers.IntegerField(source='room.location.department.id')
+    department_name = serializers.CharField(source='room.location.department.name')
 
     class Meta:
-        model = Location
-        fields = [ 'id', 'name', 'department', 'department_detail']
+        model = UserLocation
+        fields = [
+            'id',
+            'user_id', 'user_email', 'user_first_name', 'user_last_name',
+            'room_id', 'room_name',
+            'location_id', 'location_name',
+            'department_id', 'department_name',
+        ]
 
-class LocationNameSerializer(serializers.ModelSerializer):
+class LocationNameSerializerShort(serializers.ModelSerializer):
     department = DepartmentNameSerializer()
 
     class Meta:
         model = Location
-        fields = [ 'name', 'department']
+        fields = [ 'id', 'name', 'department']
+
+
+class LocationNameSerializer(serializers.ModelSerializer):
+    department = DepartmentReadSerializer()
+
+    class Meta:
+        model = Location
+        fields = [ 'id', 'name', 'department']
 
 
 class LocationReadSerializer(serializers.ModelSerializer):
-    department = DepartmentNameSerializer()
+    department = DepartmentReadSerializer()
 
     class Meta:
         model = Location
@@ -90,11 +121,11 @@ class RoomSerializer(serializers.ModelSerializer):
 
 
 class RoomNameSerializer(serializers.ModelSerializer):
-    location = LocationNameSerializer()
+    location = LocationNameSerializerShort()
 
     class Meta:
         model = Room
-        fields = [ 'name', 'location']
+        fields = [ 'id', 'name', 'location']
 
 class RoomReadSerializer(serializers.ModelSerializer):
     location = LocationReadSerializer()
@@ -111,11 +142,11 @@ class RoomWriteSerializer(serializers.ModelSerializer):
 
 class UserLocationSerializer(serializers.ModelSerializer):
     user = UserSerializerPublic()
-    department = DepartmentNameSerializer()
+    room = RoomNameSerializer()
 
     class Meta:
         model = UserLocation
-        fields = ['id', 'user', 'location', 'date_joined']
+        fields = ['id', 'user', 'room',]
 
 
 
@@ -139,8 +170,8 @@ class EquipmentNameSerializer(serializers.ModelSerializer):
     class Meta:
         model = Equipment
         fields = [
-          
-            'identifier',
+            
+            'id',
             'name',
             'room',
         ]

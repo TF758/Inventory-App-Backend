@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation, Room
 from .serializers import *
 from django.views.generic.detail import SingleObjectMixin
-from rest_framework.generics import RetrieveUpdateAPIView
-from .filters import EquipmentFilter, LocationFilter, ComponentFilter, AccessoryFilter, ConsumableFilter, RoomFilter
+from rest_framework.generics import ListAPIView
+from .filters import EquipmentFilter, LocationFilter, ComponentFilter, AccessoryFilter, ConsumableFilter, RoomFilter, DepartmentFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
@@ -38,12 +38,37 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
 
     queryset = Department.objects.all()
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = DepartmentFilter
     
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return DepartmentWriteSerializer
-        return DepartmentReadSerializer
+        return DepartmentSerializer
+
+class DepartmentUsersView(viewsets.ModelViewSet):
+    """Retrieves a list of users in a given department"""
+    serializer_class = DepartmentUserLightSerializer
+    lookup_field = 'id'
+
+
+    def get_queryset(self):
+        department_id = self.kwargs.get('department_id')
+        return (
+            UserLocation.objects.filter(
+                room__location__department__id=department_id
+            )
+            .select_related(
+                'user',
+                'room',
+                'room__location',
+                'room__location__department'
+            )
+        )
 
 
 class LocationModelViewSet(viewsets.ModelViewSet):

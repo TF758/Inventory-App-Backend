@@ -65,6 +65,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Department(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default='')
+    img_link = models.URLField(blank=True, default='')
 
     def __str__(self):
         return self.name
@@ -102,16 +103,16 @@ class Room(models.Model):
 
 class UserLocation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)  
     date_joined = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ('user', 'location')
-        verbose_name = 'User Location'
-        verbose_name_plural = 'User Locations'
+        unique_together = ('user', 'room')
+        verbose_name = 'User Room'
+        verbose_name_plural = 'User Rooms'
     
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.location.name}"
+        return f"{self.user.get_full_name()} - {self.room.name}"
 
 
 class Equipment(models.Model):
