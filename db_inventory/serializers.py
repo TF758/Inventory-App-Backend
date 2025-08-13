@@ -46,7 +46,7 @@ class DepartmentReadSerializer(serializers.ModelSerializer):
 class DepartmentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
-        fields = ['name', 'description']
+        fields = ['name', 'description' ,'img_link']
 
 class LocationFullSerializer(serializers.ModelSerializer):
     department =serializers.PrimaryKeyRelatedField(queryset = Department.objects.all())
