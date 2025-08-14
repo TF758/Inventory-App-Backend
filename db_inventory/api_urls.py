@@ -11,6 +11,11 @@ urlpatterns = [
     path('departments/', department_list_create_view, name='departments'),
     path('department/<int:id>/', department_id_detail_view, name='department-detail'),
     path('department/<int:department_id>/users/', department_users_view, name='department-users'),
+    path('department/<int:department_id>/locations/', department_locations_view, name='department-locations'),
+    path('department/<int:department_id>/equipment/', department_equipment_view, name='department-equipment'),
+    path('department/<int:department_id>/consumables/', department_users_view, name='department-consumables'),
+    path('department/<int:department_id>/accessories/', department_users_view, name='department-accessories'),
+    path('department/<int:department_id>/components/', department_users_view, name='department-components'),
 
 
     path('locations/',location_list_create_view, name='locations'),

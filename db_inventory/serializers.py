@@ -82,6 +82,37 @@ class DepartmentUserLightSerializer(serializers.ModelSerializer):
             'department_id', 'department_name',
         ]
 
+class DepartmentLocationsLightSerializer(serializers.ModelSerializer):
+
+    room_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Location
+        fields = [
+            'id',
+            'name',  'room_count',
+        ]
+
+class DepartmentEquipmentSerializer(serializers.ModelSerializer):
+    
+    room_id = serializers.IntegerField(source='room.id')
+    room_name = serializers.CharField(source='room.name')
+    location_id = serializers.IntegerField(source='room.location.id')
+    location_name = serializers.CharField(source='room.location.name')
+
+    class Meta:
+        model = Equipment
+        fields = [
+            'id',
+            'name',
+            'brand',
+            'identifier',
+            'room_id',
+            'room_name',
+            'location_id',
+            'location_name',
+        ]
+
 class LocationNameSerializerShort(serializers.ModelSerializer):
     department = DepartmentNameSerializer()
 

@@ -8,7 +8,7 @@ from rest_framework.generics import ListAPIView
 from .filters import EquipmentFilter, LocationFilter, ComponentFilter, AccessoryFilter, ConsumableFilter, RoomFilter, DepartmentFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-
+from django.db.models import Count  
 
 
 class UserModelViewSet(viewsets.ModelViewSet):
@@ -54,6 +54,7 @@ class DepartmentUsersView(viewsets.ModelViewSet):
     """Retrieves a list of users in a given department"""
     serializer_class = DepartmentUserLightSerializer
     lookup_field = 'id'
+    
 
 
     def get_queryset(self):
@@ -70,6 +71,42 @@ class DepartmentUsersView(viewsets.ModelViewSet):
             )
         )
 
+class DepartmentLocationsView(viewsets.ModelViewSet):
+    serializer_class = DepartmentLocationsLightSerializer
+
+    def get_queryset(self):
+        department_id = self.kwargs.get("department_id")  
+        return (
+            Location.objects
+            .filter(department_id=department_id)  
+            .annotate(room_count=Count('rooms'))   
+        )
+    
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = LocationFilter
+
+
+class DepartmentEquipmentView(viewsets.ModelViewSet):
+    """Retrieves a list of equipment in a given department"""
+    serializer_class = DepartmentEquipmentSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = EquipmentFilter
+
+    def get_queryset(self):
+        department_id = self.kwargs.get('department_id')
+        return Equipment.objects.filter(room__location__department__id=department_id)
+    
+
+    def get_filterset(self, *args, **kwargs):
+        filterset = super().get_filterset(*args, **kwargs)
+        filterset.filters.pop("department", None)
+        return filterset
 
 class LocationModelViewSet(viewsets.ModelViewSet):
 

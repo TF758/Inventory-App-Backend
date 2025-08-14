@@ -13,6 +13,10 @@ department_list_create_view = api_views.DepartmentModelViewSet.as_view({'get': '
 
 department_users_view = api_views.DepartmentUsersView.as_view({'get': 'list',})
 
+department_locations_view = api_views.DepartmentLocationsView.as_view({'get': 'list',})
+
+department_equipment_view = api_views.DepartmentEquipmentView.as_view({'get': 'list',})
+
 department_id_detail_view = api_views.DepartmentModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
