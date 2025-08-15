@@ -121,6 +121,14 @@ class LocationNameSerializerShort(serializers.ModelSerializer):
         fields = [ 'id', 'name', 'department']
 
 
+class LocationRoomSerializer(serializers.ModelSerializer):
+    
+
+    class Meta:
+        model = Room
+        fields = ['location', 'id', 'name']
+
+
 class LocationNameSerializer(serializers.ModelSerializer):
     department = DepartmentReadSerializer()
 

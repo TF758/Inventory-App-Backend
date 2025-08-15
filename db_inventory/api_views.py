@@ -125,6 +125,21 @@ class LocationModelViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update']:
             return LocationWriteSerializer
         return LocationReadSerializer
+    
+
+class LocationRoomsView(viewsets.ModelViewSet):
+    """Retrieves a list of rooms in a given location"""
+    serializer_class = LocationRoomSerializer
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('location_id')
+        return Room.objects.filter(location_id=location_id)
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = RoomFilter
 
 class RoomModelViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Room objects.

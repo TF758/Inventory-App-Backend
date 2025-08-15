@@ -20,6 +20,7 @@ urlpatterns = [
 
     path('locations/',location_list_create_view, name='locations'),
     path('locations/<int:id>/', location_id_detail_view , name='location-detail'),
+    path('locations/<int:location_id>/rooms/', location_rooms_view , name='location-rooms'),
 
     
     path('rooms/',room_list_create_view, name='rooms'),
