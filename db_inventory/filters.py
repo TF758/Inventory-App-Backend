@@ -1,6 +1,26 @@
 import django_filters
 from .models import *
 
+class UserFilter(django_filters.FilterSet):
+    email = django_filters.CharFilter(lookup_expr= 'istartswith')
+    fname = django_filters.CharFilter(lookup_expr='icontains')
+    lname = django_filters.CharFilter(lookup_expr='icontains')
+    # is_active = django_filters.BooleanFilter()
+    last_login = django_filters.DateFromToRangeFilter()
+    date_joined = django_filters.DateFromToRangeFilter()
+
+    class Meta:
+        model = User
+        fields = [
+            'email',
+            'fname',
+            'lname',
+            # 'is_active',
+            'date_joined',
+            'last_login',
+        ]
+
+
 class DepartmentFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
@@ -10,6 +30,26 @@ class DepartmentFilter(django_filters.FilterSet):
         fields = [
             'name',
             'description',
+        ]
+
+class DepartmentUserFilter(django_filters.FilterSet):
+    user_id = django_filters.NumberFilter(field_name='user__id')
+    user_email = django_filters.CharFilter(lookup_expr='istartswith', field_name='user__email')
+    user_fname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__fname')
+    user_lname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__lname')
+    room_name = django_filters.CharFilter(lookup_expr='icontains', field_name='room__name')
+    location_name = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__name')
+
+
+    class Meta:
+        model = UserLocation
+        fields = [
+            'user_id',
+            'user_email',
+            'user_fname',
+            'user_lname',
+            'room_name',
+            'location_name',
         ]
 
 class EquipmentFilter(django_filters.FilterSet):

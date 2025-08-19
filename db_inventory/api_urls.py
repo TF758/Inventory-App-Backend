@@ -13,18 +13,28 @@ urlpatterns = [
     path('department/<int:department_id>/users/', department_users_view, name='department-users'),
     path('department/<int:department_id>/locations/', department_locations_view, name='department-locations'),
     path('department/<int:department_id>/equipment/', department_equipment_view, name='department-equipment'),
-    path('department/<int:department_id>/consumables/', department_users_view, name='department-consumables'),
-    path('department/<int:department_id>/accessories/', department_users_view, name='department-accessories'),
+    path('department/<int:department_id>/consumables/', department_consumables_view, name='department-consumables'),
+    path('department/<int:department_id>/accessories/', department_accessories_view, name='department-accessories'),
     path('department/<int:department_id>/components/', department_users_view, name='department-components'),
 
 
     path('locations/',location_list_create_view, name='locations'),
     path('locations/<int:id>/', location_id_detail_view , name='location-detail'),
     path('locations/<int:location_id>/rooms/', location_rooms_view , name='location-rooms'),
+    path('locations/<int:location_id>/users/', locations_users_view , name='location-users'),
+    path('locations/<int:location_id>/equipment/', locations_equipment_view , name='location-equipment'),
+    path('locations/<int:location_id>/consumables/', location_consumables_view , name='location-consumables'),
+    path('locations/<int:location_id>/accessories/', location_accessories_view , name='location-accessories'),
 
     
     path('rooms/',room_list_create_view, name='rooms'),
     path('rooms/<int:id>/', room_id_detail_view , name='room-detail'),
+    path('rooms/<int:room_id>/users/', room_users_view , name='room-users'),
+    path('rooms/<int:room_id>/equipment/', room_equipment_view , name='room-equipment'),
+    path('rooms/<int:room_id>/consumables/', room_consumables_view , name='room-consumables'),
+    path('rooms/<int:room_id>/accessories/', room_accessories_view , name='room-accessories'),
+    path('rooms/<int:room_id>/components/', room_components_view , name='room-components'),
+
 
 
     path('equipments/', equipment_list_create_view, name='equipments'),

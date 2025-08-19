@@ -1,11 +1,11 @@
 from django.shortcuts import render
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, mixins
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation, Room
 from .serializers import *
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import ListAPIView
-from .filters import EquipmentFilter, LocationFilter, ComponentFilter, AccessoryFilter, ConsumableFilter, RoomFilter, DepartmentFilter
+from .filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
@@ -20,16 +20,10 @@ This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` acti
     serializer_class = UserSerializerPrivate
     lookup_field = 'id'
 
-    # def get_permissions(self):
-    #     if self.action == 'create':
-    #         permission_classes = [IsAuthenticated]
-    #     elif self.action == 'list':
-    #         permission_classes = [AllowAny]
-    #     elif self.action in ['update', 'partial_update', 'destroy']:
-    #         permission_classes = [IsAuthenticated]
-    #     else:
-    #         permission_classes = [IsAuthenticated]
-    #     return [permission() for permission in permission_classes]
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['email']
+
+    filterset_class = UserFilter
 
 class DepartmentModelViewSet(viewsets.ModelViewSet):
 
@@ -54,6 +48,9 @@ class DepartmentUsersView(viewsets.ModelViewSet):
     """Retrieves a list of users in a given department"""
     serializer_class = DepartmentUserLightSerializer
     lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = DepartmentUserFilter
     
 
 
@@ -71,22 +68,20 @@ class DepartmentUsersView(viewsets.ModelViewSet):
             )
         )
 
-class DepartmentLocationsView(viewsets.ModelViewSet):
+class DepartmentLocationsView(viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentLocationsLightSerializer
-
-    def get_queryset(self):
-        department_id = self.kwargs.get("department_id")  
-        return (
-            Location.objects
-            .filter(department_id=department_id)  
-            .annotate(room_count=Count('rooms'))   
-        )
-    
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
-
     filterset_class = LocationFilter
 
+    def get_queryset(self):
+        department_id = self.kwargs.get("department_id")
+
+        return (
+            Location.objects
+            .filter(department_id=department_id)
+            .annotate(room_count=Count('rooms'))  
+        )
 
 class DepartmentEquipmentView(viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given department"""
@@ -107,6 +102,36 @@ class DepartmentEquipmentView(viewsets.ModelViewSet):
         filterset = super().get_filterset(*args, **kwargs)
         filterset.filters.pop("department", None)
         return filterset
+    
+
+class DepartmentConsumablesView(viewsets.ModelViewSet):
+    """Retrieves a list of consumables in a given department"""
+    serializer_class = DepartmentConsumableSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = ConsumableFilter
+
+    def get_queryset(self):
+        department_id = self.kwargs.get('department_id')
+        return Consumable.objects.filter(room__location__department__id=department_id)
+    
+
+class DepartmentAccessoriesView(viewsets.ModelViewSet):
+    """Retrieves a list of accessories in a given department"""
+    serializer_class = DepartmentAccessorySerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+ 
+
+    def get_queryset(self):
+        department_id = self.kwargs.get('department_id')
+        return Accessory.objects.filter(room__location__department__id=department_id)
 
 class LocationModelViewSet(viewsets.ModelViewSet):
 
@@ -141,6 +166,75 @@ class LocationRoomsView(viewsets.ModelViewSet):
 
     filterset_class = RoomFilter
 
+
+class LocationUsersView(viewsets.ModelViewSet):
+    """Retrieves a list of users in a given location"""
+    serializer_class = LocationUserLightSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend]
+    # filterset_class = LocationUserFilter
+    
+
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('location_id')
+        return (
+            UserLocation.objects.filter(
+                room__location__id=location_id
+            )
+            .select_related(
+                'user',
+                'room',
+            )
+        )
+
+
+class LocationEquipmentView(viewsets.ModelViewSet):
+    """Retrieves a list of equipment in a given location"""
+    serializer_class = LocationEquipmentSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = EquipmentFilter
+
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('location_id')
+        return Equipment.objects.filter(room__location_id=location_id)
+    
+
+class LocationConsumablesView(viewsets.ModelViewSet):
+    """Retrieves a list of consumables in a given location"""
+    serializer_class = LocationConsumableSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = ConsumableFilter
+
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('location_id')
+        return Consumable.objects.filter(room__location_id=location_id)
+    
+class LocationAccessoriesView(viewsets.ModelViewSet):
+    """Retrieves a list of accessories in a given location"""
+    serializer_class = LocationAccessorySerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = AccessoryFilter
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('location_id')
+        return Accessory.objects.filter(room__location_id=location_id)
+
 class RoomModelViewSet(viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Room objects."""
@@ -157,6 +251,87 @@ class RoomModelViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update']:
             return RoomWriteSerializer
         return RoomReadSerializer
+    
+class RoomUsersView(viewsets.ModelViewSet):
+    """Retrieves a list of users in a given room"""
+    serializer_class = RoomUserLightSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend]
+    # filterset_class = RoomUserFilter
+    
+
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('room_id')
+        return (
+            UserLocation.objects.filter(
+                room_id=room_id
+            )
+            .select_related(
+                'user',
+                'room',
+            )
+        )
+
+class RoomEquipmentView(viewsets.ModelViewSet):
+    """Retrieves a list of equipment in a given room"""
+    serializer_class = RoomEquipmentSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = EquipmentFilter
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('room_id')
+        return Equipment.objects.filter(room_id=room_id)
+    
+
+class RoomConsumablesView(viewsets.ModelViewSet):
+    """Retrieves a list of consumables in a given room"""
+    serializer_class = RoomConsumableSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = ConsumableFilter
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('room_id')
+        return Consumable.objects.filter(room_id=room_id)
+    
+
+class RoomAccessoriesView(viewsets.ModelViewSet):
+    """Retrieves a list of accessories in a given room"""
+    serializer_class = RoomAccessorySerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = AccessoryFilter
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('room_id')
+        return Accessory.objects.filter(room_id=room_id)
+    
+
+class RoomComponentsView(viewsets.ModelViewSet):
+    """Retrieves a list of components in a given room"""
+    serializer_class = RoomComponentSerializer
+    lookup_field = 'id'
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    filterset_class = ComponentFilter
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('room_id')
+        return Component.objects.filter(equipment__room_id=room_id)
 
 
 class EquipmentModelViewSet(viewsets.ModelViewSet):
