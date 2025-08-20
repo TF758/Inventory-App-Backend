@@ -17,7 +17,7 @@ class UserModelViewSet(viewsets.ModelViewSet):
 This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for User objects."""
 
     queryset = User.objects.all().order_by('-id')
-    serializer_class = UserSerializerPrivate
+    serializer_class = UserPrivateSerializer
     lookup_field = 'id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
