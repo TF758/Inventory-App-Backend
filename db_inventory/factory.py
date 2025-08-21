@@ -61,7 +61,7 @@ class RoomFactory(factory.django.DjangoModelFactory):
     location = factory.Iterator (Location.objects.all())
     name = factory.LazyFunction(fake.color_name)
     area = factory.LazyFunction(fake.company)
-    section =  f"{fake.color_name()} Section"
+    section = factory.LazyFunction(lambda: f"{fake.color_name()} Section")
 
 class UserLocationFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -76,8 +76,8 @@ class EquipmentFactory(factory.django.DjangoModelFactory):
         model = Equipment
 
     name = factory.Sequence(lambda n: 'Equipment %d' % n)
-    brand = fake.company()
-    model = fake.word()
+    brand = factory.LazyFunction(fake.company)
+    model = factory.LazyFunction(fake.word)
     serial_number = factory.Sequence(lambda n: 'SN%d' % n)
     room = factory.Iterator(Room.objects.all())
 
@@ -86,8 +86,8 @@ class ComponentFactory(factory.django.DjangoModelFactory):
         model = Component
 
     name = factory.Sequence(lambda n: 'Component %d' % n)
-    brand = fake.company()
-    model = fake.word()
+    brand =  factory.LazyFunction(fake.company)
+    model = factory.LazyFunction(fake.word)
     serial_number = factory.Sequence(lambda n: 'SN%d' % n)
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=40))
     equipment = factory.Iterator(Equipment.objects.all())

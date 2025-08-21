@@ -116,7 +116,7 @@ class UserLocation(models.Model):
 
 
 class Equipment(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     brand = models.CharField(max_length=100, blank=True, default='')
     model = models.CharField(max_length=100, blank=True, default='')
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
@@ -161,7 +161,7 @@ class Equipment(models.Model):
 
 
 class Component(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     brand = models.CharField(max_length=100, blank=True, default='')
     model = models.CharField(max_length=100, blank=True, default='')
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
@@ -206,7 +206,7 @@ class Component(models.Model):
 
 
 class Accessory(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
@@ -220,7 +220,7 @@ class Accessory(models.Model):
 
 
 class Consumable(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True, default='')
     quantity = models.IntegerField(default=0)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
