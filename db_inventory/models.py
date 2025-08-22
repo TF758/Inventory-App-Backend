@@ -49,12 +49,12 @@ class CustomUserManager(UserManager):
         return self._create_user(email, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(blank=True, default='', unique=True)
+    email = models.EmailField(blank=True, default='', unique=True, db_index=True)
     fname = models.CharField(max_length=30, blank=True, default='')
     lname = models.CharField(max_length=30, blank=True, default='')
     job_title = models.CharField(max_length=50, blank=True, default='')
     role = models.CharField(max_length=20, blank=True, default='user')
-    public_id = models.CharField(max_length=15, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
 
     is_active = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
@@ -92,7 +92,7 @@ class Department(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default='')
     img_link = models.URLField(blank=True, default='')
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -102,7 +102,7 @@ class Department(models.Model):
 class Location(models.Model):
     name = models.CharField(max_length=255)
     department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True)
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -118,7 +118,7 @@ class Room(models.Model):
     name = models.CharField(max_length=255)
     area = models.CharField(max_length=100, blank=True, default='')
     section = models.CharField(max_length=100, blank=True, default='')
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -146,7 +146,7 @@ class Equipment(models.Model):
     brand = models.CharField(max_length=100, blank=True, default="")
     model = models.CharField(max_length=100, blank=True, default="")
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
 
     def save(self, *args, **kwargs):
@@ -160,7 +160,7 @@ class Component(models.Model):
     model = models.CharField(max_length=100, blank=True, default='')
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, null=True, blank=True)
 
     def save(self, *args, **kwargs):
@@ -173,7 +173,7 @@ class Consumable(models.Model):
     description = models.TextField(blank=True, default='')
     quantity = models.IntegerField(default=0)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -184,8 +184,8 @@ class Accessory(models.Model):
     name = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
-    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True)
 
     def save(self, *args, **kwargs):
         if not self.public_id:
