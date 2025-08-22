@@ -32,8 +32,8 @@ class LocationRoomsView(viewsets.ModelViewSet):
     lookup_field = 'public_id'
 
     def get_queryset(self):
-        location_id = self.kwargs.get('location_id')
-        return Room.objects.filter(location_id=location_id)
+        location_id = self.kwargs.get('public_id')
+        return Room.objects.filter(location__public_id=location_id)
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
@@ -41,27 +41,50 @@ class LocationRoomsView(viewsets.ModelViewSet):
     filterset_class = RoomFilter
 
 
+class LocationRoomsMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = LocationRoomSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        return Room.objects.filter(location__public_id=location_id)
+
+
 class LocationUsersView(viewsets.ModelViewSet):
     """Retrieves a list of users in a given location"""
     serializer_class = LocationUserLightSerializer
-    lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend]
     # filterset_class = LocationUserFilter
     
 
     def get_queryset(self):
-        location_id = self.kwargs.get('location_id')
+        location_id = self.kwargs.get('public_id')
         return (
             UserLocation.objects.filter(
-                room__location__id=location_id
+                room__location__public_id=location_id
             )
             .select_related(
                 'user',
                 'room',
             )
         )
+    
+class LocationUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = LocationUserLightSerializer
+    pagination_class = None
 
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        return (
+            UserLocation.objects.filter(room__location__public_id=location_id)
+            .select_related('user', 'room')
+            .order_by('-id')[:20]
+        )
 
 class LocationEquipmentView(viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given location"""
@@ -75,9 +98,21 @@ class LocationEquipmentView(viewsets.ModelViewSet):
 
 
     def get_queryset(self):
-        location_id = self.kwargs.get('location_id')
-        return Equipment.objects.filter(room__location_id=location_id)
+        location_id = self.kwargs.get('public_id')
+        return Equipment.objects.filter(room__location__public_id=location_id)
     
+class LocationEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = LocationEquipmentSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        return Equipment.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
+
 
 class LocationConsumablesView(viewsets.ModelViewSet):
     """Retrieves a list of consumables in a given location"""
@@ -91,8 +126,23 @@ class LocationConsumablesView(viewsets.ModelViewSet):
 
 
     def get_queryset(self):
-        location_id = self.kwargs.get('location_id')
-        return Consumable.objects.filter(room__location_id=location_id)
+        location_id = self.kwargs.get('public_id')
+
+        print(Location.objects.filter(public_id=location_id).exists())
+
+        return Consumable.objects.filter(room__location__public_id=location_id)
+    
+class LocationConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = LocationConsumableSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        return Consumable.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
     
 class LocationAccessoriesView(viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given location"""
@@ -105,5 +155,18 @@ class LocationAccessoriesView(viewsets.ModelViewSet):
     filterset_class = AccessoryFilter
 
     def get_queryset(self):
-        location_id = self.kwargs.get('location_id')
-        return Accessory.objects.filter(room__location_id=location_id)
+        location_id = self.kwargs.get('public_id')
+        return Accessory.objects.filter(room__location__public_id=location_id)
+    
+
+class LocationAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = LocationAccessorySerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        return Accessory.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
