@@ -10,7 +10,7 @@ class LocationFullSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = [ 'id', 'name', 'department', 'department_detail']
+        fields = [ 'public_id', 'name', 'department', 'department_detail']
 
 
 
@@ -19,12 +19,12 @@ class LocationNameShortSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = [ 'id', 'name', 'department']
+        fields = [ 'public_id', 'name', 'department']
 
 
 class LocationRoomSerializer(serializers.ModelSerializer):
 
-    room_id = serializers.IntegerField(source='id')
+    room_id = serializers.IntegerField(source='public_id')
     room_name = serializers.CharField(source='name')
     room_section = serializers.CharField(source='section')
     location_id = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
@@ -35,7 +35,7 @@ class LocationRoomSerializer(serializers.ModelSerializer):
         fields = ['room_id', 'room_name', 'room_section', 'location_id']
 
 class LocationUserLightSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source='user.id')
+    user_id = serializers.IntegerField(source='user.public_id')
     user_email = serializers.EmailField(source='user.email')
     user_fname = serializers.CharField(source='user.fname')
     user_lname = serializers.CharField(source='user.lname')
@@ -46,7 +46,7 @@ class LocationUserLightSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserLocation
         fields = [
-            'id',
+            'public_id',
             'user_id', 'user_email', 'user_fname', 'user_lname',
             'room_id', 'room_name', 
         ]
@@ -58,7 +58,7 @@ class LocationEquipmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Equipment
-        fields = ['id', 'name',  'identifier', 'room', 'room_name']
+        fields = ['public_id', 'name',  'identifier', 'room', 'room_name']
 
 
 class LocationConsumableSerializer(serializers.ModelSerializer):
@@ -67,7 +67,7 @@ class LocationConsumableSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consumable
-        fields = ['id', 'name', 'quantity', 'room', 'room_name']
+        fields = ['public_id', 'name', 'quantity', 'room', 'room_name']
 
 
 class LocationAccessorySerializer(serializers.ModelSerializer):
@@ -76,7 +76,7 @@ class LocationAccessorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Accessory
-        fields = ['id', 'name', 'serial_number', 'quantity', 'room', 'room_name']
+        fields = ['public_id', 'name', 'serial_number', 'quantity', 'room', 'room_name']
 
 
 class LocationNameSerializer(serializers.ModelSerializer):
@@ -84,7 +84,7 @@ class LocationNameSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = [ 'id', 'name', 'department']
+        fields = [ 'public_id', 'name', 'department']
 
 
 class LocationReadSerializer(serializers.ModelSerializer):
@@ -92,7 +92,7 @@ class LocationReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = ['id', 'name', 'department']
+        fields = ['public_id', 'name', 'department']
 
 
 class LocationWriteSerializer(serializers.ModelSerializer):

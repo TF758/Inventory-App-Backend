@@ -10,14 +10,14 @@ class ConsumableSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consumable
-        fields = ['id', 'name', 'quantity', 'description', "location","location_detail" ]
+        fields = ['public_id', 'name', 'quantity', 'description', "location","location_detail" ]
  
  # Write Serializer
 class ConsumableWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consumable
         fields = [
-            'id',
+            'public_id',
             'name',
             'quantity',
             'description',
@@ -31,7 +31,7 @@ class ConsumableReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consumable
         fields = [
-            'id',
+            'public_id',
             'name',
             'quantity',
             'description',

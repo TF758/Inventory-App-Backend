@@ -8,7 +8,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['id',  'name', 'area', 'section','location', 'location_detail']
+        fields = ['public_id',  'name', 'area', 'section','location', 'location_detail']
 
 
 class RoomNameSerializer(serializers.ModelSerializer):
@@ -16,14 +16,14 @@ class RoomNameSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = [ 'id', 'name', 'location']
+        fields = [ 'public_id', 'name', 'location']
 
 class RoomReadSerializer(serializers.ModelSerializer):
     location = LocationReadSerializer()
 
     class Meta:
         model = Room
-        fields = ['id', 'name', 'area', 'section', 'location']
+        fields = ['public_id', 'name', 'area', 'section', 'location']
 
 
 class RoomWriteSerializer(serializers.ModelSerializer):
@@ -32,7 +32,7 @@ class RoomWriteSerializer(serializers.ModelSerializer):
         fields = ['name', 'area', 'section', 'location']
 
 class RoomUserLightSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source='user.id')
+    user_id = serializers.IntegerField(source='user.public_id')
     user_email = serializers.EmailField(source='user.email')
     user_fname = serializers.CharField(source='user.fname')
     user_lname = serializers.CharField(source='user.lname')
@@ -41,7 +41,7 @@ class RoomUserLightSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserLocation
         fields = [
-            'id',
+            'public_id',
             'user_id', 'user_email', 'user_fname', 'user_lname','user_job_title',
         ]
 
@@ -49,27 +49,27 @@ class RoomEquipmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Equipment
-        fields = ['id', 'name', 'brand', 'identifier', 'model']
+        fields = ['public_id', 'name', 'brand', 'identifier', 'model']
 
 
 class RoomConsumableSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consumable
-        fields = ['id', 'name', 'quantity', ]
+        fields = ['public_id', 'name', 'quantity', ]
 
 class RoomAccessorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Accessory
-        fields = ['id', 'name', 'serial_number', 'quantity']
+        fields = ['public_id', 'name', 'serial_number', 'quantity']
 
 
 class RoomComponentSerializer(serializers.ModelSerializer):
-    equipment_id = serializers.IntegerField(source='equipment.id')
+    equipment_id = serializers.IntegerField(source='equipment.public_id')
     equipment_name = serializers.CharField(source='equipment.name')
 
     class Meta:
         model = Component
-        fields = ['id', 'name', 'quantity', 'model', 'serial_number','equipment_id', 'equipment_name' ]
+        fields = ['public_id', 'name', 'quantity', 'model', 'serial_number','equipment_id', 'equipment_name' ]
 
 
 __all__ = [

@@ -12,8 +12,7 @@ class ComponentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Component
         fields = [
-            'id',
-            'identifier',
+            'public_id',
             'name',
             'brand',
             'quantity',
@@ -29,8 +28,7 @@ class ComponentReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Component
         fields = [
-            'id',
-            'identifier',
+            'public_id',
             'name',
             'brand',
             'quantity',
