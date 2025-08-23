@@ -23,7 +23,7 @@ class RoomModelViewSet(viewsets.ModelViewSet):
             return RoomWriteSerializer
         return RoomReadSerializer
     
-class RoomUsersView(viewsets.ModelViewSet):
+class RoomUsersViewSet(viewsets.ModelViewSet):
     """Retrieves a list of users in a given room"""
     serializer_class = RoomUserLightSerializer
     lookup_field = 'public_id'
@@ -34,18 +34,19 @@ class RoomUsersView(viewsets.ModelViewSet):
 
 
     def get_queryset(self):
-        room_id = self.kwargs.get('room_id')
+        room_id = self.kwargs.get('public_id')
         return (
             UserLocation.objects.filter(
-                room_id=room_id
+                room__public_id=room_id
             )
             .select_related(
                 'user',
                 'room',
             )
         )
+        
 
-class RoomEquipmentView(viewsets.ModelViewSet):
+class RoomEquipmentViewSet(viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given room"""
     serializer_class = RoomEquipmentSerializer
     lookup_field = 'public_id'
@@ -56,11 +57,11 @@ class RoomEquipmentView(viewsets.ModelViewSet):
     filterset_class = EquipmentFilter
 
     def get_queryset(self):
-        room_id = self.kwargs.get('room_id')
-        return Equipment.objects.filter(room_id=room_id)
+        room_id = self.kwargs.get('public_id')
+        return Equipment.objects.filter(room__public_id=room_id)
     
 
-class RoomConsumablesView(viewsets.ModelViewSet):
+class RoomConsumablesViewSet(viewsets.ModelViewSet):
     """Retrieves a list of consumables in a given room"""
     serializer_class = RoomConsumableSerializer
     lookup_field = 'public_id'
@@ -71,11 +72,11 @@ class RoomConsumablesView(viewsets.ModelViewSet):
     filterset_class = ConsumableFilter
 
     def get_queryset(self):
-        room_id = self.kwargs.get('room_id')
-        return Consumable.objects.filter(room_id=room_id)
+        room_id = self.kwargs.get('public_id')
+        return Consumable.objects.filter(room__public_id=room_id)
     
 
-class RoomAccessoriesView(viewsets.ModelViewSet):
+class RoomAccessoriesViewSet(viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given room"""
     serializer_class = RoomAccessorySerializer
     lookup_field = 'public_id'
@@ -86,11 +87,11 @@ class RoomAccessoriesView(viewsets.ModelViewSet):
     filterset_class = AccessoryFilter
 
     def get_queryset(self):
-        room_id = self.kwargs.get('room_id')
-        return Accessory.objects.filter(room_id=room_id)
+        room_id = self.kwargs.get('public_id')
+        return Accessory.objects.filter(room__public_id=room_id)
     
 
-class RoomComponentsView(viewsets.ModelViewSet):
+class RoomComponentsViewSet(viewsets.ModelViewSet):
     """Retrieves a list of components in a given room"""
     serializer_class = RoomComponentSerializer
     lookup_field = 'public_id'
@@ -101,5 +102,60 @@ class RoomComponentsView(viewsets.ModelViewSet):
     filterset_class = ComponentFilter
 
     def get_queryset(self):
-        room_id = self.kwargs.get('room_id')
-        return Component.objects.filter(equipment__room_id=room_id)
+        room_id = self.kwargs.get('public_id')
+        return Component.objects.filter(equipment__room__public_id=room_id)
+
+
+
+class RoomUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomUserLightSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+        return (
+            UserLocation.objects.filter(room__public_id=room_id)
+            .select_related('user', 'room')
+            .order_by('-id')[:20]
+        )
+
+
+class RoomEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomEquipmentSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+        return Equipment.objects.filter(room__public_id=room_id).order_by('-id')[:20]
+
+
+class RoomConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomConsumableSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+        return Consumable.objects.filter(room__public_id=room_id).order_by('-id')[:20]
+
+
+class RoomAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomAccessorySerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+        return Accessory.objects.filter(room__public_id=room_id).order_by('-id')[:20]
+
+
+class RoomComponentsMiniViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomComponentSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+        return Component.objects.filter(equipment__room__public_id=room_id).order_by('-id')[:20]
