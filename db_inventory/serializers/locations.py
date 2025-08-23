@@ -1,25 +1,25 @@
 from rest_framework import serializers
-from .departments import DepartmentNameSerializer, DepartmentReadSerializer
+from .departments import DepartmentListSerializer, DepartmentReadSerializer
 from ..models import * 
 
 
 
 class LocationFullSerializer(serializers.ModelSerializer):
-    department =serializers.PrimaryKeyRelatedField(queryset = Department.objects.all())
-    department_detail = DepartmentNameSerializer(source = "department", read_only= True)
+    department_detail = DepartmentListSerializer(source = "department", read_only= True)
 
     class Meta:
         model = Location
-        fields = [ 'public_id', 'name', 'department', 'department_detail']
+        fields = [ 'public_id', 'name', 'department_detail']
 
 
 
-class LocationNameShortSerializer(serializers.ModelSerializer):
-    department = DepartmentNameSerializer()
+class LocationListSerializer(serializers.ModelSerializer):
+
+    """ returns a list of Locations and thier IDs"""
 
     class Meta:
         model = Location
-        fields = [ 'public_id', 'name', 'department']
+        fields = [ 'public_id', 'name']
 
 
 class LocationRoomSerializer(serializers.ModelSerializer):
@@ -58,7 +58,7 @@ class LocationEquipmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Equipment
-        fields = ['public_id', 'name', 'room_id', 'room_name']
+        fields = ['public_id', 'name','brand', 'model', 'room_id', 'room_name']
 
 
 class LocationConsumableSerializer(serializers.ModelSerializer):
@@ -103,7 +103,7 @@ class LocationWriteSerializer(serializers.ModelSerializer):
 
 __all__ = [
     "LocationFullSerializer",
-    "LocationNameShortSerializer",
+    "LocationListSerializer",
     "LocationRoomSerializer",
     "LocationUserLightSerializer",
     "LocationEquipmentSerializer",
@@ -112,4 +112,5 @@ __all__ = [
     "LocationNameSerializer",
     "LocationReadSerializer",
     "LocationWriteSerializer",
+ 
 ]

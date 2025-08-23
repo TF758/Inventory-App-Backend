@@ -12,6 +12,7 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
 })
 
 department_list_create_view = department_viewsets.DepartmentModelViewSet.as_view({'get': 'list', 'post':'create'})
+department_list_view = department_viewsets.DepartmentListViewSet.as_view({'get': 'list',})
 
 department_users_view = department_viewsets.DepartmentUsersViewSet.as_view({'get': 'list',})
 department_users_light_view = department_viewsets.DepartmentUsersMiniViewSet.as_view({'get': 'list',})
@@ -39,6 +40,7 @@ department_detail_view = department_viewsets.DepartmentModelViewSet.as_view({
 })
 
 location_list_create_view = location_viewsets.LocationModelViewSet.as_view({'get': 'list', 'post':'create'})
+location_list_view = location_viewsets.LocationListViewSet.as_view({'get': 'list'})
 
 location_id_detail_view = location_viewsets.LocationModelViewSet.as_view({
     'get': 'retrieve',
@@ -65,6 +67,7 @@ location_accessories_light_view = location_viewsets.LocationAccessoriesMiniViewS
 
 
 room_list_create_view = room_viewsets.RoomModelViewSet.as_view({'get': 'list', 'post':'create'})
+room_list_view = room_viewsets.RoomListViewset.as_view({'get': 'list'})
 
 room_id_detail_view = room_viewsets.RoomModelViewSet.as_view({
     'get': 'retrieve',

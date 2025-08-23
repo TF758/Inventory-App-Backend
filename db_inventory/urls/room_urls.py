@@ -4,6 +4,7 @@ from ..views import *
 
 urlpatterns = [
 path('', room_list_create_view, name='rooms'),
+path('list/', room_list_view, name='rooms-list'),
 path('<str:public_id>/', room_id_detail_view, name='room-detail'),
 
 # Full endpoints

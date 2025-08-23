@@ -3,6 +3,7 @@ from db_inventory.views import *
 
 urlpatterns = [
     path('',location_list_create_view, name='locations'),
+     path('list/',location_list_view, name='locations-list'),
     path('<str:public_id>/', location_id_detail_view , name='location-detail'),
 
     path('<str:public_id>/rooms-full/', location_rooms_view, name='location-rooms'),

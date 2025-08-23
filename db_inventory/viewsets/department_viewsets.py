@@ -21,6 +21,7 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
+    
 
     filterset_class = DepartmentFilter
     
@@ -29,6 +30,24 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update']:
             return DepartmentWriteSerializer
         return DepartmentSerializer
+
+class DepartmentListViewSet(viewsets.ReadOnlyModelViewSet):
+
+    """Returns a flat list of department objects"""
+
+    queryset = Department.objects.all()
+    lookup_field = 'public_id'
+
+    filter_backends = [SearchFilter]
+    search_fields = ['name']
+    pagination_class = None 
+
+    serializer_class = DepartmentListSerializer
+
+    
+
+   
+
 
 class DepartmentUsersViewSet(viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of users in a given department"""

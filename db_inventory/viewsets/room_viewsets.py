@@ -23,6 +23,18 @@ class RoomModelViewSet(viewsets.ModelViewSet):
             return RoomWriteSerializer
         return RoomReadSerializer
     
+class RoomListViewset(viewsets.ModelViewSet):
+   
+    queryset = Room.objects.all()
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    filter_backends = [SearchFilter]
+    search_fields = ['name']
+
+    serializer_class = RoomListSerializer
+
+    
 class RoomUsersViewSet(viewsets.ModelViewSet):
     """Retrieves a list of users in a given room"""
     serializer_class = RoomUserLightSerializer

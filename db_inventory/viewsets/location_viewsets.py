@@ -25,6 +25,18 @@ class LocationModelViewSet(viewsets.ModelViewSet):
             return LocationWriteSerializer
         return LocationReadSerializer
     
+class LocationListViewSet(viewsets.ModelViewSet):
+
+    """Returns a flat list of location objects"""
+
+    queryset = Location.objects.all()
+    lookup_field = 'public_id'
+    pagination_class = None 
+
+    filter_backends = [SearchFilter]
+    search_fields = ['name']
+
+    serializer_class = LocationListSerializer 
 
 class LocationRoomsView(viewsets.ModelViewSet):
     """Retrieves a list of rooms in a given location"""

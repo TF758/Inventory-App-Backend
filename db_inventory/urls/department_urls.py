@@ -4,6 +4,7 @@ from db_inventory.views import *
 
 urlpatterns = [
     path('', department_list_create_view, name='departments'),
+    path('list/', department_list_view, name='departments-list'),
     path('<str:public_id>/', department_detail_view, name='department-detail'),
 
     path('<str:public_id>/users-full/', department_users_view, name='department-users'),

@@ -10,7 +10,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
         fields = ['public_id', 'name', 'description' ,'img_link']
 
 
-class DepartmentNameSerializer(serializers.ModelSerializer):
+class DepartmentListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
@@ -50,7 +50,6 @@ class DepartmentUserLightSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserLocation
         fields = [
-            'id',
             'user_id', 'user_email', 'user_fname', 'user_lname',
             'room_id', 'room_name',
             'location_id', 'location_name',
@@ -77,6 +76,8 @@ class DepartmentEquipmentSerializer(serializers.ModelSerializer):
         fields = [
             'public_id',
             'name',
+            'brand',
+            'model',
             'room_id',
             'room_name',
             'location_id',
@@ -136,7 +137,7 @@ class DepartmentComponentSerializer(serializers.ModelSerializer):
 
 __all__ = [
     "DepartmentSerializer",
-    "DepartmentNameSerializer",
+    "DepartmentListSerializer",
     "DepartmentReadSerializer",
     "DepartmentWriteSerializer",
     "DepartmentUserLightSerializer",

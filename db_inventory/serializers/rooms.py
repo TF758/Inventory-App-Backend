@@ -1,9 +1,8 @@
 from rest_framework import serializers
-from .locations import LocationNameSerializer, LocationNameShortSerializer, LocationReadSerializer
+from .locations import LocationNameSerializer, LocationListSerializer, LocationReadSerializer
 from ..models import * 
 
 class RoomSerializer(serializers.ModelSerializer):
-    location = serializers.PrimaryKeyRelatedField(queryset = Location.objects.all())
     location_detail = LocationNameSerializer(source = "location", read_only = True)
 
     class Meta:
@@ -12,11 +11,18 @@ class RoomSerializer(serializers.ModelSerializer):
 
 
 class RoomNameSerializer(serializers.ModelSerializer):
-    location = LocationNameShortSerializer()
+    location = LocationListSerializer()
 
     class Meta:
         model = Room
         fields = [ 'public_id', 'name', 'location']
+
+class RoomListSerializer(serializers.ModelSerializer):
+
+    """returns a list of rooms and thier ids"""
+    class Meta:
+        model = Room
+        fields = [ 'public_id', 'name', ]
 
 class RoomReadSerializer(serializers.ModelSerializer):
     location = LocationReadSerializer()
@@ -84,4 +90,5 @@ __all__ = [
     "RoomConsumableSerializer",
     "RoomAccessorySerializer",
     "RoomComponentSerializer",
+    "RoomListSerializer",
 ]
