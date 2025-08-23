@@ -1,41 +1,60 @@
+import secrets
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.db import models
 from django.utils import timezone
-from django.utils.text import slugify
-import hashlib
-import uuid
-from django.core.exceptions import ValidationError
 
+BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+def int_to_base62(num):
+    """Convert an integer to a Base62 string."""
+    if num == 0:
+        return BASE62_ALPHABET[0]
+    chars = []
+    base = len(BASE62_ALPHABET)
+    while num > 0:
+        num, rem = divmod(num, base)
+        chars.append(BASE62_ALPHABET[rem])
+    return "".join(reversed(chars))
+
+def generate_base62_identifier(length=12):
+    """Generate a random Base62 identifier."""
+    random_int = secrets.randbits(length * 6)  # ~6 bits per char in base62
+    return int_to_base62(random_int).rjust(length, BASE62_ALPHABET[0])
+
+def generate_prefixed_public_id(model_class, prefix, length=10):
+    """Generate a unique public_id with a prefix."""
+    while True:
+        candidate = prefix + generate_base62_identifier(length)
+        if not model_class.objects.filter(public_id=candidate).exists():
+            return candidate
 
 class CustomUserManager(UserManager):
     def _create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError("You have not provided a valid e-mail address")
-        
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
-
         return user
-    
+
     def create_user(self, email=None, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
         return self._create_user(email, password, **extra_fields)
-    
+
     def create_superuser(self, email=None, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         return self._create_user(email, password, **extra_fields)
-    
 
 class User(AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(blank=True, default='', unique=True)
+    email = models.EmailField(blank=True, default='', unique=True, db_index=True)
     fname = models.CharField(max_length=30, blank=True, default='')
     lname = models.CharField(max_length=30, blank=True, default='')
     job_title = models.CharField(max_length=50, blank=True, default='')
     role = models.CharField(max_length=20, blank=True, default='user')
+    public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
 
     is_active = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
@@ -53,112 +72,87 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = 'User'
         verbose_name_plural = 'Users'
-    
+
     def get_full_name(self):
         return self.fname + ' ' + self.lname if self.fname or self.lname else self.email
-    
+
     def get_short_name(self):
-        return self.fname + ' ' + self.lname if self.fname or self.lname else self.email or self.email.split('@')[0]
-    
-   
+        return self.fname if self.fname else self.email.split('@')[0]
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            while True:
+                candidate = generate_base62_identifier(length=12)
+                if not User.objects.filter(public_id=candidate).exists():
+                    self.public_id = candidate
+                    break
+        super().save(*args, **kwargs)
 
 class Department(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default='')
     img_link = models.URLField(blank=True, default='')
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
-    def __str__(self):
-        return self.name
-    
-
-    class Meta:
-        verbose_name = 'Department'
-        verbose_name_plural = 'Departments'
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Department, prefix="DPT")
+        super().save(*args, **kwargs)
 
 class Location(models.Model):
-    """
-    Represents a building/facility
-    """
     name = models.CharField(max_length=255)
     department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
-    def __str__(self):
-        return self.name
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Location, prefix="LOC")
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Location'
         verbose_name_plural = 'Locations'
 
 class Room(models.Model):
-    """
-    Represents a room or space within a location
-    """
     location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name='rooms')
-    name = models.CharField(max_length=255) 
-    area = models.CharField(max_length=100, blank=True, default='')     
-    section = models.CharField(max_length=100, blank=True, default='')  
+    name = models.CharField(max_length=255)
+    area = models.CharField(max_length=100, blank=True, default='')
+    section = models.CharField(max_length=100, blank=True, default='')
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Room, prefix="RM")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} @ {self.location.name}"
 
 class UserLocation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)  
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
     date_joined = models.DateTimeField(default=timezone.now)
 
     class Meta:
         unique_together = ('user', 'room')
         verbose_name = 'User Room'
         verbose_name_plural = 'User Rooms'
-    
-    def __str__(self):
-        return f"{self.user.get_full_name()} - {self.room.name}"
 
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.room.name if self.room else 'No Room'}"
 
 class Equipment(models.Model):
     name = models.CharField(max_length=100)
-    brand = models.CharField(max_length=100, blank=True, default='')
-    model = models.CharField(max_length=100, blank=True, default='')
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    identifier = models.CharField(max_length=255, unique=True, editable=False, blank=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
 
-    def __str__(self):
-        return self.name
-    
-    def generate_identifier(self):
-        """
-        Generate a hashed identifier using:
-        - SHA-1 hash of slugified name+brand+model
-        - a short UUID segment
-        Example: abc123ef45-a1b2c3
-        """
-        base_slug = slugify(f"{self.name}-{self.brand}-{self.model or ''}")
-        hash_digest = hashlib.sha1(base_slug.encode()).hexdigest()[:10]
-        uuid_segment = uuid.uuid4().hex[:6]
-        return f"EQ{hash_digest}-{uuid_segment}"
-
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        if is_new:
-            # Step 1: Save the instance to assign a primary key
-            super().save(*args, **kwargs)
-            # Step 2: Now that pk is available, generate identifier and save again
-            if not self.identifier:
-                self.identifier = self.generate_identifier()
-                super().save(update_fields=["identifier"])
-        else:
-            # For updates, prevent identifier from changing
-            old = Equipment.objects.filter(pk=self.pk).first()
-            if old and old.identifier != self.identifier:
-                raise ValidationError("Identifier is immutable and cannot be changed.")
-            super().save(*args, **kwargs)
-
-    class Meta:
-        verbose_name = 'Equipment'
-        verbose_name_plural = 'Equipments'
-        
-
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Equipment, prefix="EQ")
+        super().save(*args, **kwargs)
 
 class Component(models.Model):
     name = models.CharField(max_length=100)
@@ -166,65 +160,34 @@ class Component(models.Model):
     model = models.CharField(max_length=100, blank=True, default='')
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
-    identifier = models.CharField(max_length=255, unique=True, editable=False, blank=True)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, null=True, blank=True)
 
-    def __str__(self):
-        return self.name
-    
-    def generate_identifier(self):
-        """
-        Generate a hashed identifier using:
-        - SHA-1 hash of slugified name+brand+model
-        - a short UUID segment
-        Example: abc123ef45-a1b2c3
-        """
-        base_slug = slugify(f"{self.name}-{self.brand}-{self.model or ''}")
-        hash_digest = hashlib.sha1(base_slug.encode()).hexdigest()[:10]
-        uuid_segment = uuid.uuid4().hex[:6]
-        return f"C{hash_digest}-{uuid_segment}"
-
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        if is_new:
-            # Step 1: Save the instance to assign a primary key
-            super().save(*args, **kwargs)
-            # Step 2: Now that pk is available, generate identifier and save again
-            if not self.identifier:
-                self.identifier = self.generate_identifier()
-                super().save(update_fields=["identifier"])
-        else:
-            # For updates, prevent identifier from changing
-            old = Component.objects.filter(pk=self.pk).first()
-            if old and old.identifier != self.identifier:
-                raise ValidationError("Identifier is immutable and cannot be changed.")
-            super().save(*args, **kwargs)
-
-    class Meta:
-        verbose_name = 'Component'
-        verbose_name_plural = 'Components'
-
-
-class Accessory(models.Model):
-    name = models.CharField(max_length=100)
-    serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    quantity = models.IntegerField(default=0)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = 'Accessory'
-        verbose_name_plural = 'Accessories'
-
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Component, prefix="COM")
+        super().save(*args, **kwargs)
 
 class Consumable(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, default='')
     quantity = models.IntegerField(default=0)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
-    
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Consumable, prefix="CON")
+        super().save(*args, **kwargs)
 
+class Accessory(models.Model):
+    name = models.CharField(max_length=100)
+    serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    quantity = models.IntegerField(default=0)
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Accessory, prefix="AC")
+        super().save(*args, **kwargs)

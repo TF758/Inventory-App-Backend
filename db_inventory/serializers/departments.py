@@ -7,14 +7,14 @@ from ..models import *
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
-        fields = ['id', 'name', 'description' ,'img_link']
+        fields = ['public_id', 'name', 'description' ,'img_link']
 
 
 class DepartmentNameSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = [ 'id', 'name']
+        fields = [ 'public_id', 'name']
 
 
 class DepartmentReadSerializer(serializers.ModelSerializer):
@@ -22,7 +22,7 @@ class DepartmentReadSerializer(serializers.ModelSerializer):
     """Returns general area on a department """
     class Meta:
         model = Department
-        fields = ['id', 'name', 'description']
+        fields = ['public_id', 'name', 'description']
 
 
 
@@ -33,18 +33,18 @@ class DepartmentWriteSerializer(serializers.ModelSerializer):
 
 
 class DepartmentUserLightSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source='user.id')
+    user_id = serializers.CharField(source='user.public_id')
     user_email = serializers.EmailField(source='user.email')
     user_fname = serializers.CharField(source='user.fname')
     user_lname = serializers.CharField(source='user.lname')
 
-    room_id = serializers.IntegerField(source='room.id')
+    room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
 
-    location_id = serializers.IntegerField(source='room.location.id')
+    location_id = serializers.CharField(source='room.location.public_id')
     location_name = serializers.CharField(source='room.location.name')
 
-    department_id = serializers.IntegerField(source='room.location.department.id')
+    department_id = serializers.CharField(source='room.location.department.public_id')
     department_name = serializers.CharField(source='room.location.department.name')
 
     class Meta:
@@ -63,22 +63,20 @@ class DepartmentLocationsLightSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = ['id', 'name', 'room_count']
+        fields = ['public_id', 'name', 'room_count']
 
 class DepartmentEquipmentSerializer(serializers.ModelSerializer):
     
-    room_id = serializers.IntegerField(source='room.id')
+    room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
-    location_id = serializers.IntegerField(source='room.location.id')
+    location_id = serializers.CharField(source='room.location.public_id')
     location_name = serializers.CharField(source='room.location.name')
 
     class Meta:
         model = Equipment
         fields = [
-            'id',
+            'public_id',
             'name',
-            'brand',
-            'identifier',
             'room_id',
             'room_name',
             'location_id',
@@ -86,15 +84,15 @@ class DepartmentEquipmentSerializer(serializers.ModelSerializer):
         ]
 
 class DepartmentConsumableSerializer(serializers.ModelSerializer):
-    room_id = serializers.IntegerField(source='room.id')
+    room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
-    location_id = serializers.IntegerField(source='room.location.id')
+    location_id = serializers.CharField(source='room.location.public_id')
     location_name = serializers.CharField(source='room.location.name')
 
     class Meta:
         model = Consumable
         fields = [
-            'id',
+            'public_id',
             'name',
             'quantity',
             'room_id',
@@ -104,21 +102,36 @@ class DepartmentConsumableSerializer(serializers.ModelSerializer):
         ]
 
 class DepartmentAccessorySerializer(serializers.ModelSerializer):
-    room_id = serializers.IntegerField(source='room.id')
+    room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
-    location_id = serializers.IntegerField(source='room.location.id')
+    location_id = serializers.CharField(source='room.location.public_id')
     location_name = serializers.CharField(source='room.location.name')
 
     class Meta:
         model = Accessory
         fields = [
-            'id',
+            'public_id',
             'name',
             'quantity',
             'room_id',
             'room_name',
             'location_id',
             'location_name',
+        ]
+
+class DepartmentComponentSerializer(serializers.ModelSerializer):
+    equipment_id = serializers.CharField(source='equipment.public_id')
+    equipment_name = serializers.CharField(source='equipment.name')
+
+    class Meta:
+        model = Component
+        fields = [
+            'public_id',
+            'name',
+            'brand',
+            'quantity',
+            'equipment_id',
+            'equipment_name',
         ]
 
 __all__ = [
@@ -131,4 +144,5 @@ __all__ = [
     "DepartmentEquipmentSerializer",
     "DepartmentConsumableSerializer",
     "DepartmentAccessorySerializer",
+    "DepartmentComponentSerializer"
 ]

@@ -6,7 +6,7 @@ class UserPrivateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-           'id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'role']
+           'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'role']
         
         ordering = ['-id']
         
@@ -29,7 +29,7 @@ class UserLocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserLocation
-        fields = ['id', 'user', 'room',]
+        fields = ['public_id', 'user', 'room',]
 
 __all__ = [
     "UserPrivateSerializer",

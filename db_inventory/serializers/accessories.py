@@ -11,14 +11,14 @@ class AccessorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Accessory
-        fields = ['id', 'name', 'serial_number', 'quantity',  "location","location_detail"   ]
+        fields = ['public_id', 'name', 'serial_number', 'quantity',  "location","location_detail"   ]
 
 # Write Serializer
 class AccessoryWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Accessory
         fields = [
-            'id',
+            'public_id',
             'name',
             'serial_number',
             'quantity',
@@ -32,7 +32,7 @@ class AccessoryReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Accessory
         fields = [
-            'id',
+            'public_id',
             'name',
             'serial_number',
             'quantity',

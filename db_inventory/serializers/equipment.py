@@ -8,8 +8,7 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Equipment
         fields = [
-            'id',
-            'identifier',
+            'public_id',
             'name',
             'brand',
             'model',
@@ -25,7 +24,7 @@ class EquipmentNameSerializer(serializers.ModelSerializer):
         model = Equipment
         fields = [
             
-            'id',
+            'public_id',
             'name',
             'room',
         ]
@@ -37,8 +36,7 @@ class EquipmentReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Equipment
         fields = [
-            'id',
-            'identifier',
+            'public_id',
             'name',
             'brand',
             'model',
