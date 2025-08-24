@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from ..serializers.accessories import (
+    AccessoryFullSerializer,
     AccessorySerializer, 
     AccessoryReadSerializer,
     AccessoryWriteSerializer
@@ -25,4 +26,4 @@ class AccessoryModelViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return AccessoryWriteSerializer
-        return AccessoryReadSerializer
+        return AccessoryFullSerializer
