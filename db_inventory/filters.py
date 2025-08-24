@@ -38,7 +38,7 @@ class DepartmentUserFilter(django_filters.FilterSet):
     user_lname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__lname')
     room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
     location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
+  
 
 
     class Meta:
@@ -50,7 +50,7 @@ class DepartmentUserFilter(django_filters.FilterSet):
             'user_lname',
             'room',
             'location',
-            'department',
+           
         ]
 
 class EquipmentFilter(django_filters.FilterSet):
@@ -76,7 +76,7 @@ class EquipmentFilter(django_filters.FilterSet):
     ]
         
 class LocationFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(lookup_expr='icontains')
+    name = django_filters.CharFilter(lookup_expr='icontains', field_name="department__public_id")
     department = django_filters.CharFilter(lookup_expr='icontains', field_name="department__name")
 
     class Meta:
@@ -108,10 +108,10 @@ class ComponentFilter(django_filters.FilterSet):
     name= django_filters.CharFilter(lookup_expr='icontains')
     brand=  django_filters.CharFilter(lookup_expr='icontains')
     model=django_filters.CharFilter(lookup_expr='icontains')
-    equipment =django_filters.CharFilter(lookup_expr='icontains', field_name="equipment__public_id")
-    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
+    equipment =django_filters.CharFilter(lookup_expr='icontains', field_name="equipment__name")
+    room = django_filters.CharFilter(lookup_expr='icontains', field_name='equipment__room__public_id')
+    location = django_filters.CharFilter(lookup_expr='icontains', field_name='equipment__room__location__public_id')
+    department = django_filters.CharFilter(lookup_expr='icontains', field_name='equipment__room__location__department__public_id')
 
 
     class Meta:

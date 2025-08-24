@@ -9,6 +9,7 @@ from ..filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
+from ..utils import ExcludeFiltersMixin
 
 
 class DepartmentModelViewSet(viewsets.ModelViewSet):
@@ -54,7 +55,7 @@ class DepartmentUsersViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentUserLightSerializer
 
     filter_backends = [DjangoFilterBackend]
-    # filterset_class = DepartmentUserFilter
+    filterset_class = DepartmentUserFilter
     
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
@@ -94,15 +95,15 @@ class DepartmentUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by('-id')[:20]  # last 20 entries, most recent first
         )
 
-class DepartmentLocationsViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentLocationsViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     serializer_class = DepartmentLocationsLightSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
     filterset_class = LocationFilter
+    exclude_filter_fields = ["department"]
 
     lookup_field = 'public_id'
 
-    
 
     def get_queryset(self):
         department_id = self.kwargs.get("public_id")
@@ -111,7 +112,13 @@ class DepartmentLocationsViewSet(viewsets.ReadOnlyModelViewSet):
             Location.objects
             .filter(department__public_id=department_id)
             .annotate(room_count=Count('rooms'))  
+            
         )
+    
+    def get_filterset(self, *args, **kwargs):
+        filterset = super().get_filterset(*args, **kwargs)
+        filterset.filters.pop("department", None)
+        return filterset
 
 class DepartmentLocationsMiniViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentLocationsLightSerializer
@@ -127,13 +134,15 @@ class DepartmentLocationsMiniViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
-class DepartmentEquipmentViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentEquipmentViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of equipment in a given department"""
     serializer_class = DepartmentEquipmentSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
+
+    exclude_filter_fields = ["department"]
 
     filterset_class = EquipmentFilter
 
@@ -142,10 +151,6 @@ class DepartmentEquipmentViewSet(viewsets.ReadOnlyModelViewSet):
         return Equipment.objects.filter(room__location__department__public_id=department_id)
     
 
-    def get_filterset(self, *args, **kwargs):
-        filterset = super().get_filterset(*args, **kwargs)
-        filterset.filters.pop("department", None)
-        return filterset
 
 class DepartmentEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentEquipmentSerializer
@@ -160,7 +165,7 @@ class DepartmentEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
-class DepartmentConsumablesViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentConsumablesViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of consumables in a given department"""
     serializer_class = DepartmentConsumableSerializer
     lookup_field = 'public_id'
@@ -168,11 +173,14 @@ class DepartmentConsumablesViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
+    exclude_filter_fields = ["department"]
+
     filterset_class = ConsumableFilter
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__location__department__public_id=department_id)
+    
 
 
 class DepartmentConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
@@ -187,19 +195,21 @@ class DepartmentConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by('-id')[:20]
         )
 
-class DepartmentAccessoriesViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of accessories in a given department"""
     serializer_class = DepartmentAccessorySerializer
     lookup_field = 'public_id'
+
+    exclude_filter_fields = ["department"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
  
-
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__location__department__public_id=department_id)
+    
 
 class DepartmentAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentAccessorySerializer
@@ -213,7 +223,7 @@ class DepartmentAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by('-id')[:20]
         )    
 
-class DepartmentComponentsViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentComponentsViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of components in a given department"""
     serializer_class = DepartmentComponentSerializer
     lookup_field = 'public_id'
@@ -221,11 +231,13 @@ class DepartmentComponentsViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
- 
+    exclude_filter_fields = ["department"]
+
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Component.objects.filter(equipment__room__location__department__public_id=department_id)
+    
     
 
 class DepartmentComponentsMiniViewSet(viewsets.ReadOnlyModelViewSet):

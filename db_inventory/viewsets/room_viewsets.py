@@ -4,6 +4,7 @@ from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocatio
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter
+from ..utils import ExcludeFiltersMixin
 
 
 class RoomModelViewSet(viewsets.ModelViewSet):
@@ -58,13 +59,15 @@ class RoomUsersViewSet(viewsets.ModelViewSet):
         )
         
 
-class RoomEquipmentViewSet(viewsets.ModelViewSet):
+class RoomEquipmentViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given room"""
     serializer_class = RoomEquipmentSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
+
+    exclude_filter_fields = ["department", "location", "room"]
 
     filterset_class = EquipmentFilter
 
@@ -73,13 +76,15 @@ class RoomEquipmentViewSet(viewsets.ModelViewSet):
         return Equipment.objects.filter(room__public_id=room_id)
     
 
-class RoomConsumablesViewSet(viewsets.ModelViewSet):
+class RoomConsumablesViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of consumables in a given room"""
     serializer_class = RoomConsumableSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
+
+    exclude_filter_fields = ["department", "location", "room"]
 
     filterset_class = ConsumableFilter
 
@@ -88,10 +93,12 @@ class RoomConsumablesViewSet(viewsets.ModelViewSet):
         return Consumable.objects.filter(room__public_id=room_id)
     
 
-class RoomAccessoriesViewSet(viewsets.ModelViewSet):
+class RoomAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given room"""
     serializer_class = RoomAccessorySerializer
     lookup_field = 'public_id'
+
+    exclude_filter_fields = ["department", "location", "room"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
@@ -103,13 +110,15 @@ class RoomAccessoriesViewSet(viewsets.ModelViewSet):
         return Accessory.objects.filter(room__public_id=room_id)
     
 
-class RoomComponentsViewSet(viewsets.ModelViewSet):
+class RoomComponentsViewSet(ExcludeFiltersMixin,viewsets.ModelViewSet):
     """Retrieves a list of components in a given room"""
     serializer_class = RoomComponentSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
+
+    exclude_filter_fields = ["department", "location", "room"]
 
     filterset_class = ComponentFilter
 
