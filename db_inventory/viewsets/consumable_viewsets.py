@@ -2,7 +2,8 @@ from rest_framework import viewsets
 from ..serializers.consumables import (
 ConsumableReadSerializer,
 ConsumableWriteSerializer,
-ConsumableSerializer
+ConsumableSerializer,
+ConsumableLocationReadSerializer
 )
 from ..models import Consumable
 from django_filters.rest_framework import DjangoFilterBackend
@@ -26,4 +27,4 @@ class ConsumableModelViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return ConsumableWriteSerializer
-        return ConsumableReadSerializer
+        return ConsumableLocationReadSerializer

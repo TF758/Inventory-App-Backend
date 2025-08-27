@@ -38,8 +38,34 @@ class ConsumableReadSerializer(serializers.ModelSerializer):
             'room',
         ]
 
+class ConsumableLocationReadSerializer(serializers.ModelSerializer):
+    room_id = serializers.CharField(source='room.public_id')
+    room_name = serializers.CharField(source='room.name')
+
+    location_id = serializers.CharField(source='room.location.public_id')
+    location_name = serializers.CharField(source='room.location.name')
+
+    department_id = serializers.CharField(source='room.location.department.public_id')
+    department_name = serializers.CharField(source='room.location.department.name')
+
+    class Meta:
+        model = Consumable
+        fields = [
+            'public_id',
+            'name',
+            'quantity',
+            'room_id',
+            'room_name',
+            'location_id',
+            'location_name',
+            'department_id',
+            'department_name'
+        ]
+
+
 __all__ = [
     'ConsumableSerializer',
     'ConsumableWriteSerializer',
     'ConsumableReadSerializer',
+    'ConsumableLocationReadSerializer',
 ]

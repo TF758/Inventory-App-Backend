@@ -36,8 +36,8 @@ class DepartmentUserFilter(django_filters.FilterSet):
     user_email = django_filters.CharFilter(lookup_expr='istartswith', field_name='user__email')
     user_fname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__fname')
     user_lname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__lname')
-    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
+    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__name')
+    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__name')
   
 
 
@@ -49,8 +49,7 @@ class DepartmentUserFilter(django_filters.FilterSet):
             'user_fname',
             'user_lname',
             'room',
-            'location',
-           
+            'location',     
         ]
 
 class EquipmentFilter(django_filters.FilterSet):
@@ -76,7 +75,7 @@ class EquipmentFilter(django_filters.FilterSet):
     ]
         
 class LocationFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(lookup_expr='icontains', field_name="department__public_id")
+    name = django_filters.CharFilter(lookup_expr='icontains', field_name="name")
     department = django_filters.CharFilter(lookup_expr='icontains', field_name="department__name")
 
     class Meta:

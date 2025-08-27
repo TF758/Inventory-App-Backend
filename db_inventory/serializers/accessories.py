@@ -42,10 +42,12 @@ class AccessoryReadSerializer(serializers.ModelSerializer):
 class AccessoryFullSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
-    loc_id = serializers.CharField(source='room.location.public_id')
-    loc_name =  serializers.CharField(source='room.location.name')
-    dep_id = serializers.CharField(source='room.location.department.public_id')
-    dep_name = serializers.CharField(source='room.location.department.name')
+
+    location_id = serializers.CharField(source='room.location.public_id')
+    location_name = serializers.CharField(source='room.location.name')
+
+    department_id = serializers.CharField(source='room.location.department.public_id')
+    department_name = serializers.CharField(source='room.location.department.name')
 
     class Meta:
         model = Accessory
@@ -56,10 +58,10 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'quantity',
             'room_id',
             'room_name',
-            'loc_id',
-            'loc_name',
-            'dep_id',
-            'dep_name',
+            'location_id',
+            'location_name',
+            'department_id',
+            'department_name'
         ]
 
 

@@ -44,8 +44,19 @@ class EquipmentReadSerializer(serializers.ModelSerializer):
             'room',
         ]
 
+class EquipmentDropdownSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for dropdowns/search.
+    Returns just id + name .
+    """
+
+    class Meta:
+        model = Equipment
+        fields = ["name", "public_id"]
+
 __all__ = [
     "EquipmentWriteSerializer",
     "EquipmentNameSerializer",
     "EquipmentReadSerializer",
+    "EquipmentDropdownSerializer",
 ]
