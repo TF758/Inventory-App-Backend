@@ -161,3 +161,22 @@ class ConsumableFilter(django_filters.FilterSet):
             'location',
             'department',
         ]
+
+class UserLocationFilter (django_filters.FilterSet):
+    email = django_filters.CharFilter(lookup_expr='icontains', field_name="user__email")
+    fname = django_filters.CharFilter(lookup_expr='icontains', field_name="user__fname")
+    lname = django_filters.CharFilter(lookup_expr='icontains', field_name="user__lname")
+    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
+    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
+    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
+
+    class Meta:
+        models= UserLocation
+        fields = [
+            'email',
+            'fname',
+            'lname',
+            'room',
+            'location',
+            'department',
+        ]

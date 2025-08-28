@@ -4,7 +4,7 @@ from ..serializers.locations import *
 from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter 
+from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, UserLocationFilter
 from ..utils import ExcludeFiltersMixin
 
 
@@ -74,7 +74,10 @@ class LocationUsersView(ExcludeFiltersMixin, viewsets.ModelViewSet):
     serializer_class = LocationUserLightSerializer
 
     filter_backends = [DjangoFilterBackend]
-    # filterset_class = 
+
+    exclude_filter_fields = ["department", "location"]
+
+    filterset_class =  UserLocationFilter
     
 
     def get_queryset(self):

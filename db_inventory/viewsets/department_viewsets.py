@@ -114,11 +114,6 @@ class DepartmentLocationsViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMi
             .annotate(room_count=Count('rooms'))  
             
         )
-    
-    def get_filterset(self, *args, **kwargs):
-        filterset = super().get_filterset(*args, **kwargs)
-        filterset.filters.pop("department", None)
-        return filterset
 
 class DepartmentLocationsMiniViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentLocationsLightSerializer
@@ -197,8 +192,10 @@ class DepartmentConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
 
 class DepartmentAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of accessories in a given department"""
-    serializer_class = DepartmentAccessorySerializer
+    serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
+
+    filterset_class = AccessoryFilter
 
     exclude_filter_fields = ["department"]
 
