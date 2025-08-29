@@ -1,5 +1,10 @@
 from django.urls import path, include
 from .views import *
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+
 
 
 urlpatterns = [
@@ -27,5 +32,8 @@ urlpatterns = [
 
     path('consumables/', consumable_list_create_view, name="consumables"),
     path('consumables/<str:public_id>/', consumable_id_detail_view, name='consumable-detail'),
+
+     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
 ]
