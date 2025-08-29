@@ -73,7 +73,8 @@ class LocationUsersView(ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given location"""
     serializer_class = LocationUserLightSerializer
 
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['user__email']
 
     exclude_filter_fields = ["department", "location"]
 

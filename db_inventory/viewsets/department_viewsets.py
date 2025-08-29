@@ -54,8 +54,12 @@ class DepartmentUsersViewSet(viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of users in a given department"""
     serializer_class = DepartmentUserLightSerializer
 
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['user__email']
+
+
     filterset_class = DepartmentUserFilter
+
     
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')

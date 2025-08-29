@@ -8,11 +8,11 @@ path('list/', room_list_view, name='rooms-list'),
 path('<str:public_id>/', room_id_detail_view, name='room-detail'),
 
 # Full endpoints
-path('<str:public_id>/users/', room_users_view, name='room-users'),
-path('<str:public_id>/equipment/', room_equipment_view, name='room-equipment'),
-path('<str:public_id>/consumables/', room_consumables_view, name='room-consumables'),
-path('<str:public_id>/accessories/', room_accessories_view, name='room-accessories'),
-path('<str:public_id>/components/', room_components_view, name='room-components'),
+path('<str:public_id>/users-full/', room_users_view, name='room-users'),
+path('<str:public_id>/equipment-full/', room_equipment_view, name='room-equipment'),
+path('<str:public_id>/consumables-full/', room_consumables_view, name='room-consumables'),
+path('<str:public_id>/accessories-full/', room_accessories_view, name='room-accessories'),
+path('<str:public_id>/components-full/', room_components_view, name='room-components'),
 
 # Light endpoints
 path('<str:public_id>/users-light/', room_users_light_view, name='room-users-light'),

@@ -27,12 +27,12 @@ class LocationRoomSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source='public_id')
     room_name = serializers.CharField(source='name')
     room_section = serializers.CharField(source='section')
-    location_id = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
+
     
 
     class Meta:
         model = Room
-        fields = ['room_id', 'room_name', 'room_section', 'location_id']
+        fields = ['room_id', 'room_name', 'room_section', ]
 
 class LocationUserLightSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(source='user.public_id')
