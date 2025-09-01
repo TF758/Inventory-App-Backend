@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.generics import GenericAPIView
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from django.contrib.auth import authenticate
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -24,42 +26,46 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             "public_id": user.public_id,
             "fname": user.fname,
             "lname": user.lname,
-        })
+        },  status=status.HTTP_200_OK)
 
         # set refresh token as HttpOnly cookie
         response.set_cookie(
-            key="refresh",
-            value=str(refresh),
-            httponly=False,
-            secure=True,  # True in production with HTTPS
-            samesite="None",
-        )
+                key="refresh",
+                value=str(refresh),
+                httponly=True,
+                secure=True,        # set True in production (HTTPS)
+                samesite="None",  # adjust if you need cross-site
+                max_age=refresh.lifetime.total_seconds()
+            )
         return response
 
 
 class CookieTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
-        # Read refresh token from cookie
-        refresh_token = request.COOKIES.get("refresh")
-        if not refresh_token:
-            return Response({"detail": "Refresh token not found"}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Call parent with token in request.data
-        request.data["refresh"] = refresh_token
         response = super().post(request, *args, **kwargs)
+
+        # If refresh failed → clear cookie
+        if response.status_code != 200:
+            res = Response({"detail": "Refresh token expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            res.delete_cookie("refresh")
+            return res
+
         return response
     
 
 class LogoutAPIView(GenericAPIView):
-    serializer_class = LogoutSerializer
-
-
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        refresh_token = request.COOKIES.get('refresh')
+        if refresh_token is None:
+            return Response({"detail": "No refresh token found."}, status=400)
 
-        return Response(
-            {"detail": "Successfully logged out."},
-            status=status.HTTP_200_OK
-        )
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError:
+            return Response({"detail": "Token is expired or invalid."}, status=400)
+
+        # clear the cookie
+        response = Response({"detail": "Successfully logged out."}, status=200)
+        response.delete_cookie('refresh')
+        return response
