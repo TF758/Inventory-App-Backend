@@ -1,21 +1,45 @@
 from django.contrib import admin
 from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils.translation import gettext_lazy as _
 
 # Simple models
-admin.site.register(User)
+
 admin.site.register(Department)
 admin.site.register(UserLocation)
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin):
+    ordering = ("email",)
+    list_display = ("email", "fname", "lname", "is_staff", "is_active")
+    search_fields = ("email", "fname", "lname")
+    readonly_fields = ("public_id",)
+
+    fieldsets = (
+        (None, {"fields": ("email", "password")}),
+        ("Personal info", {"fields": ("fname", "lname", "job_title", "role")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
+    )
+
+    add_fieldsets = (
+        (None, {
+            "classes": ("wide",),
+            "fields": ("email", "fname", "lname", "password1", "password2", "is_staff", "is_superuser"),
+        }),
+    )
 
 
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
     list_display = ('name', 'area', 'section', 'location')
+    readonly_fields = ("public_id",)
 
 
 @admin.register(Equipment)
 class EquipmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'serial_number', 'public_id')  # visible in list
-    readonly_fields = ('public_id',)  # visible in form, but cannot edit
+    readonly_fields = ('public_id',) 
     fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'location')
 
 
