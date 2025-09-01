@@ -11,7 +11,7 @@ from .viewsets import general_viewsets
 urlpatterns = [
 
     path('login/',api_login_view, name='custom_login'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', api_token_refresh, name='token_refresh'),
 
     path('users/', user_list_create_view, name='users'),
     path('users/<str:public_id>/',user_id_detail_view, name='user-detail'),
