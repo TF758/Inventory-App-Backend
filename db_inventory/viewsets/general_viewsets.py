@@ -1,10 +1,11 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import CustomTokenObtainPairSerializer
+from ..serializers.general import CustomTokenObtainPairSerializer, LogoutSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.generics import GenericAPIView
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -47,3 +48,18 @@ class CookieTokenRefreshView(TokenRefreshView):
         request.data["refresh"] = refresh_token
         response = super().post(request, *args, **kwargs)
         return response
+    
+
+class LogoutAPIView(GenericAPIView):
+    serializer_class = LogoutSerializer
+
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"detail": "Successfully logged out."},
+            status=status.HTTP_200_OK
+        )
