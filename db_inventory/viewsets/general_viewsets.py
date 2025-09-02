@@ -9,6 +9,8 @@ from rest_framework.generics import GenericAPIView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.contrib.auth import authenticate
 
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
@@ -32,26 +34,33 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         response.set_cookie(
                 key="refresh",
                 value=str(refresh),
-                httponly=True,
-                secure=True,        # set True in production (HTTPS)
-                samesite="None",  # adjust if you need cross-site
-                max_age=refresh.lifetime.total_seconds()
+                httponly=False,
+                secure=True, 
+                samesite="None",
             )
+        
+        print("refresh cookie set")
         return response
 
 
 class CookieTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
+        # Copy refresh token from cookie into request.data
+        if 'refresh' in request.COOKIES:
+            request.data['refresh'] = request.COOKIES['refresh']
 
-        # If refresh failed → clear cookie
-        if response.status_code != 200:
-            res = Response({"detail": "Refresh token expired."}, status=status.HTTP_401_UNAUTHORIZED)
-            res.delete_cookie("refresh")
-            return res
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            # Clear cookie if refresh fails
+            response = Response({"detail": "Refresh token expired or invalid."}, status=401)
+            response.delete_cookie('refresh', path='/')
+            return response
 
+        data = serializer.validated_data
+        response = Response(data)
         return response
-    
 
 class LogoutAPIView(GenericAPIView):
     def post(self, request):
