@@ -2,6 +2,7 @@ import secrets
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -190,4 +191,41 @@ class Accessory(models.Model):
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Accessory, prefix="AC")
+        super().save(*args, **kwargs)
+
+class RoleAssignment(models.Model):
+    ROLE_CHOICES = [
+        ("SITE_ADMIN", "Site Admin"),
+        ("DEPARTMENT_ADMIN", "Department Admin"),
+        ("LOCATION_ADMIN", "Location Admin"),
+        ("ROOM_ADMIN", "Room Admin"),
+        ("ROOM_CLERK", "Room Clerk"),
+    ]
+
+    user = models.ForeignKey("User", on_delete=models.CASCADE)
+    role = models.CharField(max_length=30, choices=ROLE_CHOICES)
+
+    department = models.ForeignKey("Department", on_delete=models.CASCADE, null=True, blank=True)
+    location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True)
+
+    class Meta:
+        unique_together = ("user", "role", "department", "location", "room")
+
+    def clean(self):
+        """
+        Enforce that the correct scope field is filled for each role.
+        """
+        if self.role == "SITE_ADMIN":
+            return
+
+        if self.role == "DEPARTMENT_ADMIN" and not self.department:
+            raise ValidationError("Department must be provided for Department Admin role.")
+        if self.role == "LOCATION_ADMIN" and not self.location:
+            raise ValidationError("Location must be provided for Location Admin role.")
+        if self.role in ["ROOM_ADMIN", "ROOM_CLERK"] and not self.room:
+            raise ValidationError(f"{self.role.replace('_',' ').title()} role requires a Room to be specified.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
         super().save(*args, **kwargs)
