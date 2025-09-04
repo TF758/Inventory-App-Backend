@@ -132,18 +132,12 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
 
 class RoomPermission(BasePermission):
     """
-    Custom DRF permission for Room objects.
-    Enforces hierarchy + scope rules:
-      - ROOM_CLERK exist for minor updates
-      - ROOM_VIEWER has view
-      - ROOM_ADMIN can edit
-      - LOCATION_ADMIN+ can delete/create
+    Permission for Room objects:
+      - GET is open to all authenticated users 
+      - POST/PUT/PATCH/DELETE enforce role hierarchy
     """
 
     method_role_map = {
-        "GET": "ROOM_VIEWER",      # now explicitly Room Viewer
-        "HEAD": "ROOM_VIEWER",
-        "OPTIONS": "ROOM_VIEWER",
         "POST": "LOCATION_ADMIN",
         "PUT": "ROOM_ADMIN",
         "PATCH": "ROOM_ADMIN",
@@ -151,28 +145,25 @@ class RoomPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        """Check general permissions before object exists (e.g. list, create)."""
+        # Allow GET/HEAD/OPTIONS for everyone
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
+        # Only check hierarchy for write actions
         required_role = self.method_role_map.get(request.method)
         if not required_role:
-            return False
+            return False  
 
-        location = None
-        if request.method == "POST":
-            location_id = request.data.get("location")
-            if location_id:
-                try:
-                    location = Location.objects.get(pk=location_id)
-                except Location.DoesNotExist:
-                    return False  # invalid location -> deny
-
-        return check_permission(
-            user=request.user,
-            required_role=required_role,
-            location=location,
+        return any(
+            has_hierarchy_permission(role.role, required_role)
+            for role in get_user_roles(request.user)
         )
 
     def has_object_permission(self, request, view, obj):
-        """Check permissions for object-level operations (retrieve/update/delete)."""
+        # GET/HEAD/OPTIONS are open, but object-level scope still enforced
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
@@ -185,18 +176,12 @@ class RoomPermission(BasePermission):
 
 class LocationPermission(BasePermission):
     """
-    Custom DRF permission for Location objects.
-    Rules:
-      - ROOM_CLERK has no rights on locations
-      - LOCATION_ADMIN can view and update their location
-      - DEPARTMENT_ADMIN can create and delete locations
-      - SITE_ADMIN bypasses all checks
+    Permission for Location objects:
+      - GET/HEAD/OPTIONS are open 
+      - POST/PUT/PATCH/DELETE enforce role hierarchy
     """
 
     method_role_map = {
-        "GET": "LOCATION_VIEWER",     # switched to Location Viewer
-        "HEAD": "LOCATION_VIEWER",
-        "OPTIONS": "LOCATION_VIEWER",
         "POST": "DEPARTMENT_ADMIN",
         "PUT": "LOCATION_ADMIN",
         "PATCH": "LOCATION_ADMIN",
@@ -204,25 +189,34 @@ class LocationPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        """Check before object exists (e.g., POST)."""
+        # Allow GET/HEAD/OPTIONS for all
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
+        # For POST, we might need department from request data
         if request.method == "POST":
-            # Department must be in request data for create
             department_id = request.data.get("department")
             return check_permission(
                 user=request.user,
                 required_role=required_role,
-                department_id=department_id,
+                department=Department.objects.filter(pk=department_id).first() if department_id else None,
             )
 
-        # For list, let higher roles pass (SITE_ADMIN, DEPT_ADMIN)
-        return check_permission(user=request.user, required_role=required_role)
+        # PUT/PATCH/DELETE will be object-level checked
+        return any(
+            has_hierarchy_permission(role.role, required_role)
+            for role in get_user_roles(request.user)
+        )
 
     def has_object_permission(self, request, view, obj):
-        """Check when operating on an existing Location."""
+        # GET/HEAD/OPTIONS are open, but scope is filtered in queryset
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
@@ -233,43 +227,43 @@ class LocationPermission(BasePermission):
             location=obj,
             department=obj.department,
         )
-    
 
 
 class DepartmentPermission(BasePermission):
     """
-    Custom DRF permission for Department objects.
-    Rules:
-      - DEPARTMENT_ADMIN can view/list/update their department
-      - SITE_ADMIN can create, delete
-      - Lower roles cannot act on departments
+    Permission for Department objects:
+      - GET/HEAD/OPTIONS open 
+      - POST/DELETE restricted to SITE_ADMIN
+      - PUT/PATCH restricted to DEPARTMENT_ADMIN and SITE_ADMIN
     """
 
     method_role_map = {
-        "GET": "DEPARTMENT_VIEWER",     # switched to Department Viewer
-        "HEAD": "DEPARTMENT_VIEWER",
-        "OPTIONS": "DEPARTMENT_VIEWER",
         "POST": "SITE_ADMIN",
         "PUT": "DEPARTMENT_ADMIN",
         "PATCH": "DEPARTMENT_ADMIN",
         "DELETE": "SITE_ADMIN",
-        }
+    }
 
     def has_permission(self, request, view):
-        """Check before object exists (e.g., POST)."""
+        # Allow GET/HEAD/OPTIONS for all authenticated users
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        # For POST, check if user is SiteAdmin
-        if request.method == "POST":
-            return check_permission(user=request.user, required_role=required_role)
-
-        # For listing, allow DepartmentAdmin and above
-        return check_permission(user=request.user, required_role=required_role)
+        # POST/PUT/PATCH/DELETE are hierarchy-based
+        return any(
+            has_hierarchy_permission(role.role, required_role)
+            for role in get_user_roles(request.user)
+        )
 
     def has_object_permission(self, request, view, obj):
-        """Check when operating on an existing Department."""
+        # GET/HEAD/OPTIONS are open, actual data filtered via queryset
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
