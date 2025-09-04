@@ -68,9 +68,9 @@ class Command(BaseCommand):
 
         # Assign ~90% of users to rooms
         assigned_users = random.sample(users, int(len(users) * 0.9))
-        for user in assigned_users:
+        for user in users:
             UserLocationFactory(user=user, room=random.choice(rooms))
-        self.stdout.write(self.style.SUCCESS(f'Assigned {len(assigned_users)} users to rooms.'))
+            self.stdout.write(self.style.SUCCESS(f'Assigned {len(users)} users to rooms.'))
 
         # Equipment (2–5 per room)
         equipment = []
