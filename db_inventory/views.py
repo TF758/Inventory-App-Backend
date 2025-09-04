@@ -1,6 +1,10 @@
-from .viewsets import user_viewsets, department_viewsets, location_viewsets, room_viewsets, equipment_viewsets,component_viewsets,consumable_viewsets, accessory_viewsets
+from .viewsets import user_viewsets, department_viewsets, location_viewsets, room_viewsets, equipment_viewsets,component_viewsets,consumable_viewsets, accessory_viewsets, general_viewsets
 
 
+
+api_login_view = general_viewsets.CustomTokenObtainPairView.as_view()
+api_token_refresh = general_viewsets.CookieTokenRefreshView.as_view()
+api_logout = general_viewsets.LogoutAPIView.as_view()
 
 user_list_create_view = user_viewsets.UserModelViewSet.as_view({'get': 'list', 'post':'create'})
 

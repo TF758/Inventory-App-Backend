@@ -2,6 +2,7 @@ import secrets
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -191,3 +192,51 @@ class Accessory(models.Model):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Accessory, prefix="AC")
         super().save(*args, **kwargs)
+
+class RoleAssignment(models.Model):
+    ROLE_CHOICES = [
+        # Room roles
+        ("ROOM_VIEWER", "Room Viewer"),   
+        ("ROOM_CLERK", "Room Clerk"),     
+        ("ROOM_ADMIN", "Room Admin"),    
+
+        # Location roles
+        ("LOCATION_VIEWER", "Location Viewer"), 
+        ("LOCATION_ADMIN", "Location Admin"),  
+
+        # Department roles
+        ("DEPARTMENT_VIEWER", "Department Viewer"), 
+        ("DEPARTMENT_ADMIN", "Department Admin"),  
+
+        # Global
+        ("SITE_ADMIN", "Site Admin"),    
+    ]
+
+    user = models.ForeignKey("User", on_delete=models.CASCADE,  related_name="role_assignments",)
+    role = models.CharField(max_length=40, choices=ROLE_CHOICES)
+
+    department = models.ForeignKey("Department", on_delete=models.CASCADE, null=True, blank=True,related_name="role_assignments" )
+    location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
+    room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
+
+    class Meta:
+        unique_together = ("user", "role", "department", "location", "room")
+
+    def clean(self):
+        """
+        Enforce that the correct scope field is filled for each role.
+        """
+        if self.role == "SITE_ADMIN":
+            return
+
+        if self.role == "DEPARTMENT_ADMIN" and not self.department:
+            raise ValidationError("Department must be provided for Department Admin role.")
+        if self.role == "LOCATION_ADMIN" and not self.location:
+            raise ValidationError("Location must be provided for Location Admin role.")
+        if self.role in ["ROOM_ADMIN", "ROOM_CLERK"] and not self.room:
+            raise ValidationError(f"{self.role.replace('_',' ').title()} role requires a Room to be specified.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+

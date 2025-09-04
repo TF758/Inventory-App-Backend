@@ -1,29 +1,29 @@
 import factory
 from db_inventory.models import User, Department, Location, Equipment, Component, Accessory, Consumable, UserLocation, Room
-
 from faker import Faker
+import random
+
 fake = Faker()
 
 DEPARTMENT_IMAGE_URLS = [
     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQQeNHmcybimV62sCsu5LH5zWYkq6TUti8srg&s",
-     "https://publicservice.govt.lc/images/528px-Coat_of_Arms_of_Saint_Lucia.svg.png",
-     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRj6PTPMvpZw-9CRvnUcvrO-1mEDuBLtEyybQ&s",
-     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQV8tXEYcWeRO2y4R6lUie3TKQ0QqgJXDt2Fw&s",
-     "https://scontent-mia3-2.xx.fbcdn.net/v/t39.30808-6/251905257_283920967072718_3803379083888235439_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=zh56Ocy31UwQ7kNvwH0kgi1&_nc_oc=Adl5QhBteM4aCNrffbanHJMczjztnBo4JGfxE0C7bT3B_sHA9_LgMXcmme4S3UtDtLw&_nc_zt=23&_nc_ht=scontent-mia3-2.xx&_nc_gid=H0hszqkNv_moEWvHANAxDg&oh=00_AfUbfh4jHzHm8-ZW6bTb6gg_igSOZ5hugBDQtpc9itqPLw&oe=68A1B10E"
-
+    "https://publicservice.govt.lc/images/528px-Coat_of_Arms_of_Saint_Lucia.svg.png",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRj6PTPMvpZw-9CRvnUcvrO-1mEDuBLtEyybQ&s",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQV8tXEYcWeRO2y4R6lUie3TKQ0QqgJXDt2Fw&s",
+    "https://scontent-mia3-2.xx.fbcdn.net/v/t39.30808-6/251905257_283920967072718_3803379083888235439_n.jpg"
 ]
-
 
 
 class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
 
-    email = factory.Faker('email')
+    email = factory.Sequence(lambda n: f"{fake.first_name().lower()}.{fake.last_name().lower()}.{n}@example.com")
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
     job_title = factory.Faker('job')
-    is_active = factory.Faker("boolean")
+    is_active = True
+
 
 class AdminUserFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -37,13 +37,14 @@ class AdminUserFactory(factory.django.DjangoModelFactory):
     is_staff = True
     is_superuser = True
 
+
 class DepartmentFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Department
 
-    name = factory.Sequence(lambda n: 'Department %d' % n)
+    name = factory.Sequence(lambda n: f'Department {n}')
     description = factory.LazyFunction(lambda: fake.sentence(nb_words=20))
-    img_link = factory.LazyFunction(lambda: fake.random_element(elements=DEPARTMENT_IMAGE_URLS))
+    img_link = factory.LazyFunction(lambda: random.choice(DEPARTMENT_IMAGE_URLS))
 
 
 class LocationFactory(factory.django.DjangoModelFactory):
@@ -51,63 +52,66 @@ class LocationFactory(factory.django.DjangoModelFactory):
         model = Location
 
     name = factory.LazyFunction(fake.company)
-    department = factory.Iterator (Department.objects.all())
+    department = factory.LazyFunction(lambda: random.choice(Department.objects.all()))
 
 
 class RoomFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Room
 
-    location = factory.Iterator (Location.objects.all())
     name = factory.LazyFunction(fake.color_name)
+    location = factory.LazyFunction(lambda: random.choice(Location.objects.all()))
     area = factory.LazyFunction(fake.company)
     section = factory.LazyFunction(lambda: f"{fake.color_name()} Section")
+
 
 class UserLocationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = UserLocation
 
-    user =  factory.Iterator(User.objects.all())
-    room = factory.Iterator(Room.objects.all())
+    user = factory.SubFactory(UserFactory)
+    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
     date_joined = factory.LazyFunction(fake.date_time_this_decade)
+
 
 class EquipmentFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Equipment
 
-    name = factory.Sequence(lambda n: 'Equipment %d' % n)
+    name = factory.Sequence(lambda n: f'Equipment {n}')
     brand = factory.LazyFunction(fake.company)
     model = factory.LazyFunction(fake.word)
-    serial_number = factory.Sequence(lambda n: 'SN%d' % n)
-    room = factory.Iterator(Room.objects.all())
+    serial_number = factory.Sequence(lambda n: f'SN{n}')
+    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+
 
 class ComponentFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Component
 
-    name = factory.Sequence(lambda n: 'Component %d' % n)
-    brand =  factory.LazyFunction(fake.company)
+    name = factory.Sequence(lambda n: f'Component {n}')
+    brand = factory.LazyFunction(fake.company)
     model = factory.LazyFunction(fake.word)
-    serial_number = factory.Sequence(lambda n: 'SN%d' % n)
+    serial_number = factory.Sequence(lambda n: f'SN{n}')
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=40))
-    equipment = factory.Iterator(Equipment.objects.all())
+    equipment = factory.LazyFunction(lambda: random.choice(Equipment.objects.all()))
+
 
 class AccessoryFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Accessory
 
-    name = factory.Sequence(lambda n: 'Accessory %d' % n)
-    serial_number = factory.Sequence(lambda n: 'SN%d' % n)
+    name = factory.Sequence(lambda n: f'Accessory {n}')
+    serial_number = factory.Sequence(lambda n: f'SN{n}')
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
-    room = factory.Iterator(Room.objects.all())
+    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
 
 
 class ConsumableFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Consumable
 
-    name = factory.Sequence(lambda n: 'Consumable %d' % n)
-    description = fake.text(max_nb_chars=50)
-    quantity = fake.random_int(min=1, max=100)
-    room = factory.Iterator(Room.objects.all())
- 
+    name = factory.Sequence(lambda n: f'Consumable {n}')
+    description = factory.LazyFunction(lambda: fake.text(max_nb_chars=50))
+    quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
+    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
