@@ -195,19 +195,29 @@ class Accessory(models.Model):
 
 class RoleAssignment(models.Model):
     ROLE_CHOICES = [
-        ("SITE_ADMIN", "Site Admin"),
-        ("DEPARTMENT_ADMIN", "Department Admin"),
-        ("LOCATION_ADMIN", "Location Admin"),
-        ("ROOM_ADMIN", "Room Admin"),
-        ("ROOM_CLERK", "Room Clerk"),
+        # Room roles
+        ("ROOM_VIEWER", "Room Viewer"),   
+        ("ROOM_CLERK", "Room Clerk"),     
+        ("ROOM_ADMIN", "Room Admin"),    
+
+        # Location roles
+        ("LOCATION_VIEWER", "Location Viewer"), 
+        ("LOCATION_ADMIN", "Location Admin"),  
+
+        # Department roles
+        ("DEPARTMENT_VIEWER", "Department Viewer"), 
+        ("DEPARTMENT_ADMIN", "Department Admin"),  
+
+        # Global
+        ("SITE_ADMIN", "Site Admin"),    
     ]
 
-    user = models.ForeignKey("User", on_delete=models.CASCADE)
-    role = models.CharField(max_length=30, choices=ROLE_CHOICES)
+    user = models.ForeignKey("User", on_delete=models.CASCADE,  related_name="role_assignments",)
+    role = models.CharField(max_length=40, choices=ROLE_CHOICES)
 
-    department = models.ForeignKey("Department", on_delete=models.CASCADE, null=True, blank=True)
-    location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True)
-    room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True)
+    department = models.ForeignKey("Department", on_delete=models.CASCADE, null=True, blank=True,related_name="role_assignments" )
+    location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
+    room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
 
     class Meta:
         unique_together = ("user", "role", "department", "location", "room")
@@ -229,3 +239,4 @@ class RoleAssignment(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+

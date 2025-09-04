@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room
+from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room, RoleAssignment
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
@@ -7,6 +7,8 @@ from django.utils.translation import gettext_lazy as _
 
 admin.site.register(Department)
 admin.site.register(UserLocation)
+
+admin.site.register(RoleAssignment)
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
