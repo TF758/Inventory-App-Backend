@@ -20,26 +20,28 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         serializer.is_valid(raise_exception=True)
         user = serializer.user
 
-        refresh = RefreshToken.for_user(user)
+        # Generate refresh token using serializer's get_token
+        refresh = self.get_serializer_class().get_token(user)
+
+        # Access token from refresh
         access_token = str(refresh.access_token)
 
-        response = Response({
-            "access": access_token,
-            "public_id": user.public_id,
-            "fname": user.fname,
-            "lname": user.lname,
-        },  status=status.HTTP_200_OK)
+        # Build response from serializer validated data
+        response_data = serializer.validated_data.copy()
+        response_data.pop("refresh", None)  # remove refresh from JSON
+        response_data.pop("user_id", None)  # remove user_id if present
+        response_data["access"] = access_token
 
-        # set refresh token as HttpOnly cookie
+        # Set refresh token as HttpOnly cookie
+        response = Response(response_data, status=status.HTTP_200_OK)
         response.set_cookie(
-                key="refresh",
-                value=str(refresh),
-                httponly=False,
-                secure=True, 
-                samesite="None",
-            )
-        
-        print("refresh cookie set")
+            key="refresh",
+            value=str(refresh),
+            httponly=True,
+            secure=True,
+            samesite="None",
+        )
+
         return response
 
 
