@@ -3,15 +3,18 @@ from ..serializers.rooms import  *
 from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocation
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter
+from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter, UserLocationFilter
 from ..utils import ExcludeFiltersMixin
+from ..permissions import *
+from rest_framework.permissions import IsAuthenticated
+from ..mxins import ScopeFilterMixin
 
 
-class RoomModelViewSet(viewsets.ModelViewSet):
+class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Room objects."""
         
-    queryset = Room.objects.all()
+    queryset = Room.objects.all().order_by("id")
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -19,12 +22,15 @@ class RoomModelViewSet(viewsets.ModelViewSet):
 
     filterset_class = RoomFilter
 
+
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return RoomWriteSerializer
         return RoomReadSerializer
     
-class RoomListViewset(viewsets.ModelViewSet):
+
+        
+class RoomListViewset(ScopeFilterMixin, viewsets.ModelViewSet):
    
     queryset = Room.objects.all()
     lookup_field = 'public_id'
@@ -36,13 +42,16 @@ class RoomListViewset(viewsets.ModelViewSet):
     serializer_class = RoomListSerializer
 
     
-class RoomUsersViewSet(viewsets.ModelViewSet):
+class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given room"""
     serializer_class = RoomUserLightSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend]
-    # filterset_class = RoomUserFilter
+    filterset_class = UserLocationFilter
+
+
+    exclude_filter_fields = ["department", "location", "room"]
     
 
 
@@ -59,7 +68,7 @@ class RoomUsersViewSet(viewsets.ModelViewSet):
         )
         
 
-class RoomEquipmentViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
+class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given room"""
     serializer_class = RoomEquipmentSerializer
     lookup_field = 'public_id'
@@ -71,12 +80,13 @@ class RoomEquipmentViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
 
     filterset_class = EquipmentFilter
 
+
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__public_id=room_id)
     
 
-class RoomConsumablesViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
+class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of consumables in a given room"""
     serializer_class = RoomConsumableSerializer
     lookup_field = 'public_id'
@@ -88,12 +98,13 @@ class RoomConsumablesViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
 
     filterset_class = ConsumableFilter
 
+
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__public_id=room_id)
     
 
-class RoomAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
+class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given room"""
     serializer_class = RoomAccessorySerializer
     lookup_field = 'public_id'
@@ -110,7 +121,7 @@ class RoomAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ModelViewSet):
         return Accessory.objects.filter(room__public_id=room_id)
     
 
-class RoomComponentsViewSet(ExcludeFiltersMixin,viewsets.ModelViewSet):
+class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelViewSet):
     """Retrieves a list of components in a given room"""
     serializer_class = RoomComponentSerializer
     lookup_field = 'public_id'
@@ -128,7 +139,7 @@ class RoomComponentsViewSet(ExcludeFiltersMixin,viewsets.ModelViewSet):
 
 
 
-class RoomUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomUserLightSerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -142,7 +153,7 @@ class RoomUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
-class RoomEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class RoomEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomEquipmentSerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -152,7 +163,7 @@ class RoomEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
         return Equipment.objects.filter(room__public_id=room_id).order_by('-id')[:20]
 
 
-class RoomConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class RoomConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomConsumableSerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -162,7 +173,7 @@ class RoomConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
         return Consumable.objects.filter(room__public_id=room_id).order_by('-id')[:20]
 
 
-class RoomAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class RoomAccessoriesMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomAccessorySerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -172,7 +183,7 @@ class RoomAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
         return Accessory.objects.filter(room__public_id=room_id).order_by('-id')[:20]
 
 
-class RoomComponentsMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomComponentSerializer
     lookup_field = 'public_id'
     pagination_class = None
