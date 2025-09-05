@@ -219,6 +219,9 @@ class RoleAssignment(models.Model):
     location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
     room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
 
+    assigned_by = models.ForeignKey("User", on_delete=models.CASCADE,  null=True, blank=True )
+    assigned_date =  models.DateTimeField(default=timezone.now)
+
     class Meta:
         unique_together = ("user", "role", "department", "location", "room")
 
@@ -227,14 +230,32 @@ class RoleAssignment(models.Model):
         Enforce that the correct scope field is filled for each role.
         """
         if self.role == "SITE_ADMIN":
+            # Site Admin: no restrictions, can span everything
             return
 
-        if self.role == "DEPARTMENT_ADMIN" and not self.department:
-            raise ValidationError("Department must be provided for Department Admin role.")
-        if self.role == "LOCATION_ADMIN" and not self.location:
-            raise ValidationError("Location must be provided for Location Admin role.")
-        if self.role in ["ROOM_ADMIN", "ROOM_CLERK"] and not self.room:
-            raise ValidationError(f"{self.role.replace('_',' ').title()} role requires a Room to be specified.")
+        # Department-level roles
+        if self.role in ["DEPARTMENT_ADMIN", "DEPARTMENT_VIEWER"]:
+            if not self.department:
+                raise ValidationError("Department must be provided for Department roles.")
+            if self.location or self.room:
+                raise ValidationError("Department roles cannot have Location or Room assigned.")
+
+        # Location-level roles
+        elif self.role in ["LOCATION_ADMIN", "LOCATION_VIEWER"]:
+            if not self.location:
+                raise ValidationError("Location must be provided for Location roles.")
+            if self.department or self.room:
+                raise ValidationError("Location roles cannot have Department or Room assigned.")
+
+        # Room-level roles
+        elif self.role in ["ROOM_ADMIN", "ROOM_VIEWER", "ROOM_CLERK"]:
+            if not self.room:
+                raise ValidationError("Room must be provided for Room roles.")
+            if self.department or self.location:
+                raise ValidationError("Room roles cannot have Department or Location assigned.")
+
+        else:
+            raise ValidationError(f"Unknown role: {self.role}")
 
     def save(self, *args, **kwargs):
         self.clean()
