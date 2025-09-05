@@ -41,4 +41,7 @@ urlpatterns = [
      path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
+
+    path('roles/',my_role_list , name='my-role-list'),
+     path('roles/<str:public_id>',user_role_list , name='user-role-list'),
 ]

@@ -89,8 +89,8 @@ class RoomFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
     area = django_filters.CharFilter(lookup_expr='icontains')
     section = django_filters.CharFilter(lookup_expr='icontains')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='location__name')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
+    location = django_filters.CharFilter(lookup_expr='icontains', field_name='location__public_id')
+    department = django_filters.CharFilter(lookup_expr='icontains', field_name='location__department__public_id')
 
 
     class Meta:

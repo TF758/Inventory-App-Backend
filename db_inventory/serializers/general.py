@@ -1,6 +1,7 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from ..models import RoleAssignment, Location, Department, Room, User
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -78,3 +79,74 @@ class LogoutSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {'refresh': self.error_messages['bad_token']}
             )
+        
+
+class RoleListSerializer(serializers.ModelSerializer):
+ 
+
+    class Meta:
+        model = RoleAssignment
+        fields = [ 'id', 'role', 'department', 'location', 'room']
+
+
+class RoleSwitchSerializer(serializers.Serializer):
+    role_id = serializers.IntegerField()
+
+    def validate_role_id(self, value):
+        """
+        Ensure the role exists and belongs to the current user.
+        """
+        user = self.context['request'].user
+        try:
+            role = RoleAssignment.objects.get(id=value, user=user)
+        except RoleAssignment.DoesNotExist:
+            raise serializers.ValidationError("This role does not belong to the current user or does not exist.")
+
+        return role  # return the RoleAssignment instance for convenience
+    
+
+class UserRoleReadSerializer(serializers.ModelSerializer):
+    user_id = serializers.CharField(source='user.public_id', read_only=True)
+    user_fname = serializers.CharField(source='user.fname', read_only=True)
+    user_lname = serializers.CharField(source='user.lname', read_only=True)
+    department = serializers.CharField(source='department.public_id', read_only=True)
+    location = serializers.CharField(source='location.public_id', read_only=True)
+    room = serializers.CharField(source='room.public_id', read_only=True)
+
+    class Meta:
+        model = RoleAssignment
+        fields = [
+            'user_id', 'user_fname', 'user_lname',
+            'role', 'department', 'location', 'room'
+        ]
+
+class UserRoleWriteSerializer(serializers.ModelSerializer):
+    user_id = serializers.SlugRelatedField(
+        slug_field='public_id',
+        queryset=User.objects.all(),
+        source='user'
+    )
+    department = serializers.SlugRelatedField(
+        slug_field='public_id',
+        queryset=Department.objects.all(),
+        allow_null=True,
+        required=False
+    )
+    location = serializers.SlugRelatedField(
+        slug_field='public_id',
+        queryset=Location.objects.all(),
+        allow_null=True,
+        required=False
+    )
+    room = serializers.SlugRelatedField(
+        slug_field='public_id',
+        queryset=Room.objects.all(),
+        allow_null=True,
+        required=False
+    )
+
+    class Meta:
+        model = RoleAssignment
+        fields = [
+            'user_id', 'role', 'department', 'location', 'room'
+        ]

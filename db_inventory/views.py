@@ -15,6 +15,10 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
     'delete': 'destroy'
 })
 
+my_role_list = general_viewsets.RoleListView.as_view()
+user_role_switch = general_viewsets.RoleSwitchView.as_view()
+user_role_list = general_viewsets.UserRoleListView.as_view()
+
 department_list_create_view = department_viewsets.DepartmentModelViewSet.as_view({'get': 'list', 'post':'create'})
 department_list_view = department_viewsets.DepartmentListViewSet.as_view({'get': 'list',})
 

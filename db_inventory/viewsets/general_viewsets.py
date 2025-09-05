@@ -1,14 +1,16 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import CustomTokenObtainPairSerializer, LogoutSerializer
+from ..serializers.general import CustomTokenObtainPairSerializer, LogoutSerializer, RoleSwitchSerializer, RoleListSerializer,  UserRoleReadSerializer, UserRoleWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.contrib.auth import authenticate
-
+from rest_framework.permissions import IsAuthenticated
+from ..models import RoleAssignment, User
+from rest_framework import viewsets
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -79,4 +81,96 @@ class LogoutAPIView(GenericAPIView):
         # clear the cookie
         response = Response({"detail": "Successfully logged out."}, status=200)
         response.delete_cookie('refresh')
+        return response
+    
+
+
+class RoleListView(ListAPIView):
+    serializer_class = RoleListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.role_assignments.all()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        # Optionally include active_role_id (if stored elsewhere or inferred)
+        active_role_id = None
+        roles = serializer.data
+        return Response({
+            "active_role_id": active_role_id,
+            "roles": roles
+        })
+
+
+class UserRoleListView(ListAPIView):
+
+    """Returns a list of all the roles for a given user using thier public id"""
+    queryset = RoleAssignment.objects.all().order_by('role')
+    lookup_field = 'public_id'
+    serializer_class = UserRoleReadSerializer
+
+
+    def get_queryset(self):
+        public_id = self.kwargs.get('public_id')
+        try:
+            user = User.objects.get(public_id=public_id)
+        except User.DoesNotExist:
+            return RoleAssignment.objects.none()
+        return RoleAssignment.objects.filter(user=user)
+
+
+# 2️⃣ Switch active role
+class RoleSwitchView(GenericAPIView):
+    serializer_class = RoleSwitchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        # Get validated RoleAssignment instance
+        role = serializer.validated_data['role_id']
+
+        # Generate new tokens
+        refresh = CustomTokenObtainPairSerializer.get_token(request.user)
+        refresh["active_role_id"] = role.id
+        refresh["public_id"] = str(request.user.public_id)
+        refresh["fname"] = request.user.fname
+        refresh["lname"] = request.user.lname
+
+        access_token = str(refresh.access_token)
+
+        # Build response
+        roles = request.user.role_assignments.all()
+        response_data = {
+            "access": access_token,
+            "active_role_id": role.id,
+            "public_id": str(request.user.public_id),
+            "fname": request.user.fname,
+            "lname": request.user.lname,
+            "roles": [
+                {
+                    "id": r.id,
+                    "role": r.role,
+                    "department": r.department_id,
+                    "location": r.location_id,
+                    "room": r.room_id,
+                }
+                for r in roles
+            ]
+        }
+
+        # Set refresh token as HttpOnly cookie
+        response = Response(response_data, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key="refresh",
+            value=str(refresh),
+            httponly=True,
+            secure=True,
+            samesite="None",
+        )
+
         return response
