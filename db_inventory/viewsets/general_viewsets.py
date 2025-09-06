@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import CustomTokenObtainPairSerializer, LogoutSerializer, RoleSwitchSerializer, RoleListSerializer,  UserRoleReadSerializer, UserRoleWriteSerializer
+from ..serializers.general import CustomTokenObtainPairSerializer, RoleSwitchSerializer, RoleListSerializer,  UserRoleReadSerializer, UserRoleWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.response import Response
@@ -7,10 +7,9 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
-from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 from ..models import RoleAssignment, User
-from rest_framework import viewsets
+
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -42,8 +41,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             httponly=True,
             secure=True,
             samesite="None",
+            path="/",
         )
-
+       
         return response
 
 
@@ -66,9 +66,16 @@ class CookieTokenRefreshView(TokenRefreshView):
         response = Response(data)
         return response
 
+
+
 class LogoutAPIView(GenericAPIView):
+
+    permission_classes = [AllowAny]          
+    authentication_classes = []              
+
     def post(self, request):
-        refresh_token = request.COOKIES.get('refresh')
+        refresh_token = request.COOKIES.get("refresh")
+
         if refresh_token is None:
             return Response({"detail": "No refresh token found."}, status=400)
 
@@ -78,9 +85,8 @@ class LogoutAPIView(GenericAPIView):
         except TokenError:
             return Response({"detail": "Token is expired or invalid."}, status=400)
 
-        # clear the cookie
         response = Response({"detail": "Successfully logged out."}, status=200)
-        response.delete_cookie('refresh')
+        response.delete_cookie("refresh", path="/")
         return response
     
 
