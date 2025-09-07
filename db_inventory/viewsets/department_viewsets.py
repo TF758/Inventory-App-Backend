@@ -10,7 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
 from ..utils import ExcludeFiltersMixin
-
+from ..mxins import ScopeFilterMixin
 
 class DepartmentModelViewSet(viewsets.ModelViewSet):
 
@@ -32,7 +32,7 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
             return DepartmentWriteSerializer
         return DepartmentSerializer
 
-class DepartmentListViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentListViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
     """Returns a flat list of department objects"""
 
@@ -45,12 +45,9 @@ class DepartmentListViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = DepartmentListSerializer
 
-    
-
-   
 
 
-class DepartmentUsersViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of users in a given department"""
     serializer_class = DepartmentUserLightSerializer
 
@@ -75,7 +72,7 @@ class DepartmentUsersViewSet(viewsets.ReadOnlyModelViewSet):
             )
         )
     
-class DepartmentUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     """
     Lightweight, read-only version for dashboard:
     last 20 users of a department, ordered by most recent (-id).
@@ -99,7 +96,7 @@ class DepartmentUsersMiniViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by('-id')[:20]  # last 20 entries, most recent first
         )
 
-class DepartmentLocationsViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
+class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     serializer_class = DepartmentLocationsLightSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
@@ -119,7 +116,7 @@ class DepartmentLocationsViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMi
             
         )
 
-class DepartmentLocationsMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentLocationsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentLocationsLightSerializer
     lookup_field = 'public_id'
     pagination_class = None  # disable global pagination
@@ -133,7 +130,7 @@ class DepartmentLocationsMiniViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
-class DepartmentEquipmentViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
+class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of equipment in a given department"""
     serializer_class = DepartmentEquipmentSerializer
     lookup_field = 'public_id'
@@ -151,7 +148,7 @@ class DepartmentEquipmentViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMi
     
 
 
-class DepartmentEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentEquipmentSerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -164,7 +161,7 @@ class DepartmentEquipmentMiniViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
-class DepartmentConsumablesViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
+class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of consumables in a given department"""
     serializer_class = DepartmentConsumableSerializer
     lookup_field = 'public_id'
@@ -182,7 +179,7 @@ class DepartmentConsumablesViewSet(viewsets.ReadOnlyModelViewSet, ExcludeFilters
     
 
 
-class DepartmentConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentConsumableSerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -194,7 +191,7 @@ class DepartmentConsumablesMiniViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by('-id')[:20]
         )
 
-class DepartmentAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
+class DepartmentAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of accessories in a given department"""
     serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
@@ -212,7 +209,7 @@ class DepartmentAccessoriesViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelVi
         return Accessory.objects.filter(room__location__department__public_id=department_id)
     
 
-class DepartmentAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentAccessorySerializer
     lookup_field = 'public_id'
     pagination_class = None
@@ -224,7 +221,7 @@ class DepartmentAccessoriesMiniViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by('-id')[:20]
         )    
 
-class DepartmentComponentsViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
+class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of components in a given department"""
     serializer_class = DepartmentComponentSerializer
     lookup_field = 'public_id'
@@ -241,7 +238,7 @@ class DepartmentComponentsViewSet(ExcludeFiltersMixin, viewsets.ReadOnlyModelVie
     
     
 
-class DepartmentComponentsMiniViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DepartmentComponentSerializer
     lookup_field = 'public_id'
     pagination_class = None

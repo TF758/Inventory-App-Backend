@@ -33,6 +33,10 @@ class RoomReadSerializer(serializers.ModelSerializer):
 
 
 class RoomWriteSerializer(serializers.ModelSerializer):
+    location = serializers.SlugRelatedField(
+        queryset=Location.objects.all(),
+        slug_field='public_id' 
+    )
     class Meta:
         model = Room
         fields = ['name', 'area', 'section', 'location']

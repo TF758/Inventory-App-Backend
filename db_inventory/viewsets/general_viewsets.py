@@ -92,7 +92,7 @@ class LogoutAPIView(GenericAPIView):
 
 
 class RoleListView(ListAPIView):
-    serializer_class = RoleListSerializer
+    serializer_class = UserRoleReadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -101,14 +101,7 @@ class RoleListView(ListAPIView):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-
-        # Optionally include active_role_id (if stored elsewhere or inferred)
-        active_role_id = None
-        roles = serializer.data
-        return Response({
-            "active_role_id": active_role_id,
-            "roles": roles
-        })
+        return Response(serializer.data) 
 
 
 class UserRoleListView(ListAPIView):
