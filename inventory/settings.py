@@ -174,5 +174,8 @@ CORS_ALLOW_HEADERS = [
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "USER_ID_FIELD": "public_id",
+    "USER_ID_CLAIM": "public_id",
 
 }
+
