@@ -56,6 +56,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     job_title = models.CharField(max_length=50, blank=True, default='')
     role = models.CharField(max_length=20, blank=True, default='user')
     public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
+    active_role = models.ForeignKey(
+        "RoleAssignment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="active_for_users", 
+    )
 
     is_active = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
