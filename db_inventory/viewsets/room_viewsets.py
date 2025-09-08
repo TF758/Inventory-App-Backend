@@ -7,7 +7,7 @@ from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,Accesso
 from ..utils import ExcludeFiltersMixin
 from ..permissions import *
 from rest_framework.permissions import IsAuthenticated
-from ..mxins import ScopeFilterMixin
+from ..mixins import ScopeFilterMixin
 
 
 class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):

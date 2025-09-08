@@ -11,8 +11,9 @@ from rest_framework.filters import SearchFilter
 from django.db.models import Count  
 from ..utils import ExcludeFiltersMixin
 from ..mxins import ScopeFilterMixin
+from ..permissions import DepartmentPermission
 
-class DepartmentModelViewSet(viewsets.ModelViewSet):
+class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Department objects.
     This viewset provides `list`, `create`, actions for Department objects."""
@@ -22,6 +23,8 @@ class DepartmentModelViewSet(viewsets.ModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
+
+    permission_classes=[DepartmentPermission]
     
 
     filterset_class = DepartmentFilter
@@ -39,6 +42,8 @@ class DepartmentListViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Department.objects.all()
     lookup_field = 'public_id'
 
+    permission_classes=[DepartmentPermission]
+
     filter_backends = [SearchFilter]
     search_fields = ['name']
     pagination_class = None 
@@ -53,6 +58,8 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['user__email']
+
+    permission_classes=[DepartmentPermission]
 
 
     filterset_class = DepartmentUserFilter
@@ -81,6 +88,8 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     serializer_class = DepartmentUserLightSerializer
     pagination_class = None  # disables global pagination
 
+    permission_classes=[DepartmentPermission]
+
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return (
@@ -102,6 +111,7 @@ class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     search_fields = ['name']
     filterset_class = LocationFilter
     exclude_filter_fields = ["department"]
+    permission_classes=[DepartmentPermission]
 
     lookup_field = 'public_id'
 
@@ -120,6 +130,7 @@ class DepartmentLocationsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
     serializer_class = DepartmentLocationsLightSerializer
     lookup_field = 'public_id'
     pagination_class = None  # disable global pagination
+    permission_classes=[DepartmentPermission]
 
     def get_queryset(self):
         department_id = self.kwargs.get("public_id")
@@ -134,6 +145,8 @@ class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     """Retrieves a list of equipment in a given department"""
     serializer_class = DepartmentEquipmentSerializer
     lookup_field = 'public_id'
+
+    permission_classes=[DepartmentPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
@@ -153,6 +166,8 @@ class DepartmentEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
     lookup_field = 'public_id'
     pagination_class = None
 
+    permission_classes=[DepartmentPermission]
+
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return (
@@ -169,6 +184,8 @@ class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
+    permission_classes=[DepartmentPermission]
+
     exclude_filter_fields = ["department"]
 
     filterset_class = ConsumableFilter
@@ -184,6 +201,8 @@ class DepartmentConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelV
     lookup_field = 'public_id'
     pagination_class = None
 
+    permission_classes=[DepartmentPermission]
+
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return (
@@ -195,6 +214,8 @@ class DepartmentAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewse
     """Retrieves a list of accessories in a given department"""
     serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
+
+    permission_classes=[DepartmentPermission]
 
     filterset_class = AccessoryFilter
 
@@ -214,6 +235,8 @@ class DepartmentAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelV
     lookup_field = 'public_id'
     pagination_class = None
 
+    permission_classes=[DepartmentPermission]
+
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return (
@@ -225,6 +248,8 @@ class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewset
     """Retrieves a list of components in a given department"""
     serializer_class = DepartmentComponentSerializer
     lookup_field = 'public_id'
+
+    permission_classes=[DepartmentPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
@@ -242,6 +267,8 @@ class DepartmentComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVi
     serializer_class = DepartmentComponentSerializer
     lookup_field = 'public_id'
     pagination_class = None
+
+    permission_classes=[DepartmentPermission]
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')

@@ -131,12 +131,18 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
             q |= Q(location__department=active_role.department)
 
     elif model_class == Location:
+        if active_role.room:
+        # Room-level roles cannot see any locations
+            return queryset.none()
         if active_role.location:
             q |= Q(pk=active_role.location.pk)
         elif active_role.department:
             q |= Q(department=active_role.department)
 
     elif model_class == Department:
+        if active_role.room or active_role.location:
+        # Room or location roles cannot see departments
+            return queryset.none()
         if active_role.department:
             q |= Q(pk=active_role.department.pk)
 
@@ -144,113 +150,110 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
 
 
 class RoomPermission(BasePermission):
-    """
-    Permission for Room objects:
-      - GET is open to all authenticated users 
-      - POST/PUT/PATCH/DELETE enforce role hierarchy
-    """
-
     method_role_map = {
         "POST": "LOCATION_ADMIN",
         "PUT": "ROOM_ADMIN",
         "PATCH": "ROOM_ADMIN",
         "DELETE": "LOCATION_ADMIN",
+        "GET": "ROOM_VIEWER",  # minimum role required for GET
     }
 
     def has_permission(self, request, view):
-        # Allow GET/HEAD/OPTIONS for everyone
-        if request.method in ["GET", "HEAD", "OPTIONS"]:
-            return True
-
-        # Only check hierarchy for write actions
-        required_role = self.method_role_map.get(request.method)
-        if not required_role:
-            return False  
-
-        return check_permission(request.user, required_role)
-        
-
-    def has_object_permission(self, request, view, obj):
-        # GET/HEAD/OPTIONS are open, but object-level scope still enforced
-        if request.method in ["GET", "HEAD", "OPTIONS"]:
-            return True
-
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        return check_permission(
-            user=request.user,
-            required_role=required_role,
-            room=obj,
-        )
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
 
+        # check hierarchy
+        return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
+
+    def has_object_permission(self, request, view, obj):
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # enforce scope
+        if active_role.room:
+            return active_role.room == obj
+        if active_role.location:
+            return active_role.location == obj.location
+        if active_role.department:
+            return active_role.department == obj.location.department
+
+        return False
+    
+
+    
 class LocationPermission(BasePermission):
     """
-    Permission for Location objects:
-      - GET/HEAD/OPTIONS are open 
-      - POST/PUT/PATCH/DELETE enforce role hierarchy
+    Permission for Location objects based on the user's active_role:
+      - All methods enforce role hierarchy and object scope
     """
 
-    method_role_map = {
+    method_role_map: dict[str, str] = {
+        "GET": "LOCATION_VIEWER",      
         "POST": "DEPARTMENT_ADMIN",
         "PUT": "LOCATION_ADMIN",
         "PATCH": "LOCATION_ADMIN",
         "DELETE": "DEPARTMENT_ADMIN",
     }
 
-    def has_permission(self, request, view):
-        # Allow GET/HEAD/OPTIONS for all
-        if request.method in ["GET", "HEAD", "OPTIONS"]:
-            return True
-
+    def has_permission(self, request, view) -> bool:
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        
-         # POST needs department from request data
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # POST: check department from request data
         if request.method == "POST":
             department_id = request.data.get("department")
-            department = (
-                Department.objects.filter(pk=department_id).first()
-                if department_id else None
-            )
-            return check_permission(
-                user=request.user,
-                required_role=required_role,
-                department=department,
-            )
-
-        # PUT/PATCH/DELETE will be object-level checked
-        return check_permission(request.user, required_role)
-
-    def has_object_permission(self, request, view, obj):
-        # GET/HEAD/OPTIONS are open, but scope is filtered in queryset
-        if request.method in ["GET", "HEAD", "OPTIONS"]:
-            return True
-
-        required_role = self.method_role_map.get(request.method)
-        if not required_role:
+            department = Department.objects.filter(pk=department_id).first() if department_id else None
+            if not department:
+                return False
+            if active_role.role == "SITE_ADMIN":
+                return True
+            if active_role.department and active_role.department == department:
+                return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
             return False
 
-        return check_permission(
-            user=request.user,
-            required_role=required_role,
-            location=obj,
-            department=obj.department,
-        )
+        # Other methods: just check hierarchy (object-level still enforced later)
+        return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
+
+    def has_object_permission(self, request, view, obj: Location) -> bool:
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Object-level scope enforcement
+        if active_role.department and obj.department == active_role.department:
+            return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(self.method_role_map.get(request.method, ""), 0)
+        if active_role.location and obj == active_role.location:
+            return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(self.method_role_map.get(request.method, ""), 0)
+
+        # Room-level roles cannot access locations
+        return False
 
 
 class DepartmentPermission(BasePermission):
     """
-    Permission for Department objects:
-      - GET/HEAD/OPTIONS open 
-      - POST/DELETE restricted to SITE_ADMIN
-      - PUT/PATCH restricted to DEPARTMENT_ADMIN and SITE_ADMIN
+    Permission for Department objects based on the user's active_role:
+      - All methods enforce hierarchy and object scope
     """
 
     method_role_map = {
+        "GET": "DEPARTMENT_VIEWER",     # minimum role to view departments
         "POST": "SITE_ADMIN",
         "PUT": "DEPARTMENT_ADMIN",
         "PATCH": "DEPARTMENT_ADMIN",
@@ -258,27 +261,37 @@ class DepartmentPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        # Allow GET/HEAD/OPTIONS for all authenticated users
-        if request.method in ["GET", "HEAD", "OPTIONS"]:
-            return True
-
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        return check_permission(request.user, required_role)
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # POST requires SITE_ADMIN and department is not relevant yet
+        if request.method == "POST":
+            return active_role.role == "SITE_ADMIN"
+
+        # All other methods: enforce hierarchy
+        return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
 
     def has_object_permission(self, request, view, obj):
-        # GET/HEAD/OPTIONS are open, actual data filtered via queryset
-        if request.method in ["GET", "HEAD", "OPTIONS"]:
-            return True
-
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        return check_permission(
-            user=request.user,
-            required_role=required_role,
-            department=obj,
-        )
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # SITE_ADMIN bypasses everything
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Object-level scope: department active role must match
+        if active_role.department and obj == active_role.department:
+            return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
+
+        # Lower-level roles (location/room) cannot access departments
+        return False
