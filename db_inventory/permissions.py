@@ -24,6 +24,9 @@ ROLE_HIERARCHY = {
     "SITE_ADMIN": 99,
 }
 
+def get_active_role(user: User) -> Optional[RoleAssignment]:
+    """Return the user's active role assignment (or None)."""
+    return user.active_role
 
 def get_user_roles(user: User):
     """Return all role assignments for a given user."""
@@ -44,6 +47,10 @@ def is_in_scope(
     department: Optional[Department] = None,
 ) -> bool:
     """Check whether a role assignment applies to the given object scope."""
+
+    if not role_assignment:
+        return False
+
     if role_assignment.role == "SITE_ADMIN":
         return True
 
@@ -73,12 +80,15 @@ def check_permission(
     department: Optional[Department] = None,
 ) -> bool:
     """
-    Returns True if the user has permission to act on the given object.
+    Returns True if the user's active role has permission for the given object.
     """
-    for role in get_user_roles(user):
-        if has_hierarchy_permission(role.role, required_role):
-            if is_in_scope(role, room=room, location=location, department=department):
-                return True
+    role = user.active_role
+    if not role:
+        return False
+
+    if has_hierarchy_permission(role.role, required_role):
+        return is_in_scope(role, room=room, location=location, department=department)
+
     return False
 
 
@@ -89,43 +99,46 @@ def ensure_permission(
     location: Optional[Location] = None,
     department: Optional[Department] = None,
 ):
-    """
-    Raises PermissionDenied if the user does not meet the required permission.
-    """
-    if not check_permission(user, required_role, room=room, location=location, department=department):
-        raise PermissionDenied(detail=f"User lacks {required_role} permission for this resource.")
+    """Raise PermissionDenied if active role doesn't meet the requirement."""
+    if not check_permission(user, required_role, room, location, department):
+        raise PermissionDenied(
+            detail=f"Active role lacks {required_role} permission for this resource."
+        )
 
 
 def filter_queryset_by_scope(user: User, queryset, model_class):
     """
-    Restrict a queryset to only objects within the user's assigned scope.
+    Restrict a queryset to only objects within the user's active role scope.
     Site admins always see everything.
     """
-    role_assignments = get_user_roles(user)
+    active_role = user.active_role
 
-    # Site admins bypass all filters
-    if any(r.role == "SITE_ADMIN" for r in role_assignments):
+    if not active_role:
+        return queryset.none()  # no active role, no access
+
+    # SITE_ADMIN sees all
+    if active_role.role == "SITE_ADMIN":
         return queryset
 
     q = Q()
-    for role in role_assignments:
-        if model_class == Room:
-            if role.room:
-                q |= Q(pk=role.room.pk)
-            elif role.location:
-                q |= Q(location=role.location)
-            elif role.department:
-                q |= Q(location__department=role.department)
 
-        elif model_class == Location:
-            if role.location:
-                q |= Q(pk=role.location.pk)
-            elif role.department:
-                q |= Q(department=role.department)
+    if model_class == Room:
+        if active_role.room:
+            q |= Q(pk=active_role.room.pk)
+        elif active_role.location:
+            q |= Q(location=active_role.location)
+        elif active_role.department:
+            q |= Q(location__department=active_role.department)
 
-        elif model_class == Department:
-            if role.department:
-                q |= Q(pk=role.department.pk)
+    elif model_class == Location:
+        if active_role.location:
+            q |= Q(pk=active_role.location.pk)
+        elif active_role.department:
+            q |= Q(department=active_role.department)
+
+    elif model_class == Department:
+        if active_role.department:
+            q |= Q(pk=active_role.department.pk)
 
     return queryset.filter(q).distinct()
 
@@ -154,10 +167,8 @@ class RoomPermission(BasePermission):
         if not required_role:
             return False  
 
-        return any(
-            has_hierarchy_permission(role.role, required_role)
-            for role in get_user_roles(request.user)
-        )
+        return check_permission(request.user, required_role)
+        
 
     def has_object_permission(self, request, view, obj):
         # GET/HEAD/OPTIONS are open, but object-level scope still enforced
@@ -197,20 +208,22 @@ class LocationPermission(BasePermission):
         if not required_role:
             return False
 
-        # For POST, we might need department from request data
+        
+         # POST needs department from request data
         if request.method == "POST":
             department_id = request.data.get("department")
+            department = (
+                Department.objects.filter(pk=department_id).first()
+                if department_id else None
+            )
             return check_permission(
                 user=request.user,
                 required_role=required_role,
-                department=Department.objects.filter(pk=department_id).first() if department_id else None,
+                department=department,
             )
 
         # PUT/PATCH/DELETE will be object-level checked
-        return any(
-            has_hierarchy_permission(role.role, required_role)
-            for role in get_user_roles(request.user)
-        )
+        return check_permission(request.user, required_role)
 
     def has_object_permission(self, request, view, obj):
         # GET/HEAD/OPTIONS are open, but scope is filtered in queryset
@@ -253,11 +266,7 @@ class DepartmentPermission(BasePermission):
         if not required_role:
             return False
 
-        # POST/PUT/PATCH/DELETE are hierarchy-based
-        return any(
-            has_hierarchy_permission(role.role, required_role)
-            for role in get_user_roles(request.user)
-        )
+        return check_permission(request.user, required_role)
 
     def has_object_permission(self, request, view, obj):
         # GET/HEAD/OPTIONS are open, actual data filtered via queryset

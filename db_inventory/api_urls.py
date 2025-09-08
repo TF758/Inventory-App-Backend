@@ -43,5 +43,6 @@ urlpatterns = [
 
 
     path('roles/',my_role_list , name='my-role-list'),
-     path('roles/<str:public_id>',user_role_list , name='user-role-list'),
+    path('roles/me/active-role',my_active_role , name='my-role-list'),
+    path('roles/<str:public_id>',user_role_list , name='user-role-list'),
 ]
