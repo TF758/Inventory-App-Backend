@@ -1,4 +1,4 @@
-from .viewsets import user_viewsets, department_viewsets, location_viewsets, room_viewsets, equipment_viewsets,component_viewsets,consumable_viewsets, accessory_viewsets, general_viewsets
+from .viewsets import user_viewsets, department_viewsets, location_viewsets, room_viewsets, equipment_viewsets,component_viewsets,consumable_viewsets, accessory_viewsets, general_viewsets, role_viewsets
 
 
 
@@ -18,6 +18,8 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
 my_role_list = general_viewsets.RoleListView.as_view()
 user_role_switch = general_viewsets.RoleSwitchView.as_view()
 user_role_list = general_viewsets.UserRoleListView.as_view()
+
+my_active_role = role_viewsets.ActiveRoleViewSet.as_view({'get': 'retrieve', 'put': 'update'})
 
 department_list_create_view = department_viewsets.DepartmentModelViewSet.as_view({'get': 'list', 'post':'create'})
 department_list_view = department_viewsets.DepartmentListViewSet.as_view({'get': 'list',})

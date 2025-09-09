@@ -10,7 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
 from ..utils import ExcludeFiltersMixin
-from ..mxins import ScopeFilterMixin
+from ..mixins import ScopeFilterMixin
 from ..permissions import DepartmentPermission
 
 class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
