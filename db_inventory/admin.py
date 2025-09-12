@@ -13,7 +13,7 @@ admin.site.register(RoleAssignment)
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "fname", "lname", "is_staff", "is_active")
+    list_display = ("email", "fname", "lname","active_role", "is_staff", "is_active")
     search_fields = ("email", "fname", "lname")
     readonly_fields = ("public_id",)
 
@@ -40,9 +40,9 @@ class RoomAdmin(admin.ModelAdmin):
 
 @admin.register(Equipment)
 class EquipmentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'brand', 'serial_number', 'public_id')  # visible in list
+    list_display = ('name', 'brand', 'serial_number', 'public_id')  
     readonly_fields = ('public_id',) 
-    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'location')
+    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room')
 
 
 @admin.register(Component)

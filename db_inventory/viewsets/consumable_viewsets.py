@@ -9,9 +9,9 @@ from ..models import Consumable
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import ConsumableFilter
+from ..mixins import ScopeFilterMixin
 
-
-class ConsumableModelViewSet(viewsets.ModelViewSet):
+class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Consumable objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Consumable objects."""
     

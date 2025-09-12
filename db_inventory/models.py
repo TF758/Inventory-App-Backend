@@ -81,6 +81,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = 'User'
         verbose_name_plural = 'Users'
 
+    def __str__(self):
+        return self.get_full_name()
+
     def get_full_name(self):
         return self.fname + ' ' + self.lname if self.fname or self.lname else self.email
 
@@ -102,6 +105,10 @@ class Department(models.Model):
     img_link = models.URLField(blank=True, default='')
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
+
+    def __str__(self):
+        return self.name
+
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Department, prefix="DPT")
@@ -112,6 +119,9 @@ class Location(models.Model):
     department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
+    def __str__(self):
+        return self.name + ' @ ' + self.department.name
+    
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Location, prefix="LOC")
@@ -157,6 +167,9 @@ class Equipment(models.Model):
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
 
+    # def __str__(self):
+    #     return self.name
+
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Equipment, prefix="EQ")
@@ -171,6 +184,9 @@ class Component(models.Model):
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, null=True, blank=True)
 
+    def __str__(self):
+        return self.name + ' @ ' + self.equipment.name
+
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Component, prefix="COM")
@@ -183,6 +199,9 @@ class Consumable(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
+    def __str__(self):
+        return self.name
+
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Consumable, prefix="CON")
@@ -194,6 +213,9 @@ class Accessory(models.Model):
     quantity = models.IntegerField(default=0)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -263,7 +285,24 @@ class RoleAssignment(models.Model):
 
         else:
             raise ValidationError(f"Unknown role: {self.role}")
+        
+    def __str__(self):
+        """
+        Human-readable representation of the role assignment.
+        Example: "Alice Smith - Room Admin (Room: Conference Room A)"
+        """
+        if self.role == "SITE_ADMIN":
+            scope = "Entire Site"
+        elif self.role.startswith("DEPARTMENT") and self.department:
+            scope = f"Department: {self.department}"
+        elif self.role.startswith("LOCATION") and self.location:
+            scope = f"Location: {self.location}"
+        elif self.role.startswith("ROOM") and self.room:
+            scope = f"Room: {self.room}"
+        else:
+            scope = "Unscoped"
 
+        return f"{self.user.get_full_name()} - {self.get_role_display()} ({scope})"
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
