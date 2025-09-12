@@ -9,8 +9,10 @@ from ..models import Accessory
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import AccessoryFilter
+from ..mixins import ScopeFilterMixin
 
-class AccessoryModelViewSet(viewsets.ModelViewSet):
+
+class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Accessory objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Accessory objects."""
