@@ -15,7 +15,13 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
     'delete': 'destroy'
 })
 
-my_role_list = general_viewsets.RoleListView.as_view()
+my_role_list = general_viewsets.MyRoleList.as_view()
+role_detial_view = general_viewsets.RoleDetailView.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy'
+})
 user_role_switch = general_viewsets.RoleSwitchView.as_view()
 user_role_list = general_viewsets.UserRoleListView.as_view()
 

@@ -1,7 +1,7 @@
 from typing import Optional
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
-from .models import RoleAssignment, User, Room, Location, Department
+from .models import RoleAssignment, User, Room, Location, Department, Equipment, Component, Accessory, Consumable
 from django.db.models import Q
 
 
@@ -146,6 +146,31 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         if active_role.department:
             q |= Q(pk=active_role.department.pk)
 
+
+    elif model_class in (Equipment, Accessory, Consumable):
+        if active_role.room:
+            q |= Q(room=active_role.room)
+        elif active_role.location:
+            q |= Q(room__location=active_role.location)
+        elif active_role.department:
+            q |= Q(room__location__department=active_role.department)
+
+    elif model_class == Component:
+        if active_role.room:
+             q |= Q(equipment__room=active_role.room)
+        elif active_role.location:
+            q |= Q(equipment__room__location=active_role.location)
+        elif active_role.department:
+            q |= Q(equipment__room__location__department=active_role.department)
+
+
+    elif model_class == User:
+        if active_role.room:
+            q |= Q(role_assignments__room=active_role.room)
+        elif active_role.location:
+            q |= Q(role_assignments__location=active_role.location)
+        elif active_role.department:
+            q |= Q(role_assignments__department=active_role.department)
     return queryset.filter(q).distinct()
 
 
@@ -155,7 +180,7 @@ class RoomPermission(BasePermission):
         "PUT": "ROOM_ADMIN",
         "PATCH": "ROOM_ADMIN",
         "DELETE": "LOCATION_ADMIN",
-        "GET": "ROOM_VIEWER",  # minimum role required for GET
+        "GET": "ROOM_VIEWER",  
     }
 
     def has_permission(self, request, view):

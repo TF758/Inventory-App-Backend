@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import CustomTokenObtainPairSerializer, RoleSwitchSerializer, RoleListSerializer,  UserRoleReadSerializer, UserRoleWriteSerializer
+from ..serializers.general import CustomTokenObtainPairSerializer, RoleSwitchSerializer, RoleListSerializer,  RoleReadSerializer, RoleWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.response import Response
@@ -9,7 +9,7 @@ from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework.permissions import IsAuthenticated
 from ..models import RoleAssignment, User
-
+from rest_framework import viewsets
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -91,8 +91,8 @@ class LogoutAPIView(GenericAPIView):
     
 
 
-class RoleListView(ListAPIView):
-    serializer_class = UserRoleReadSerializer
+class MyRoleList(ListAPIView):
+    serializer_class = RoleReadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -103,13 +103,24 @@ class RoleListView(ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data) 
 
+class RoleDetailView(viewsets.ModelViewSet):
+    queryset = RoleAssignment.objects.all()
+    permission_classes = [IsAuthenticated]
+
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return RoleWriteSerializer
+        return RoleReadSerializer
+
+
 
 class UserRoleListView(ListAPIView):
 
     """Returns a list of all the roles for a given user using thier public id"""
     queryset = RoleAssignment.objects.all().order_by('role')
     lookup_field = 'public_id'
-    serializer_class = UserRoleReadSerializer
+    serializer_class = RoleReadSerializer
 
 
     def get_queryset(self):

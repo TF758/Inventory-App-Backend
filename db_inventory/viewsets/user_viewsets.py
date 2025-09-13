@@ -5,8 +5,10 @@ from ..models import User
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import UserFilter
+from ..mixins import ScopeFilterMixin
 
-class UserModelViewSet(viewsets.ModelViewSet):
+
+class UserModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing User objects.
 This viewset provides `list`, `create`, actions for User objects."""
