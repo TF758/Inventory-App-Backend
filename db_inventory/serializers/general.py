@@ -8,34 +8,35 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
 
-        # Always include basic user info
         token["public_id"] = str(user.public_id)
         token["fname"] = user.fname
         token["lname"] = user.lname
-
-        token["active_role_id"] = user.active_role.id if user.active_role else None
-
+        token["active_role_id"] = (
+            user.active_role.id if user.active_role else None
+        )
 
         if "user_id" in token:
             del token["user_id"]
-
 
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
 
-        # Add user info into response
+        active_role_data = None
+        if self.user.active_role:
+            active_role_data = RoleReadSerializer(self.user.active_role).data
+
         data.update({
             "public_id": str(self.user.public_id),
             "fname": self.user.fname,
             "lname": self.user.lname,
-            "active_role_id": self.user.active_role.id if self.user.active_role else None
+            "active_role_id": (
+                self.user.active_role.id if self.user.active_role else None
+            ),
+            "active_role": active_role_data,
         })
-        
 
-     
-  
         return data
 
 
