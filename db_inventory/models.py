@@ -81,8 +81,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = 'User'
         verbose_name_plural = 'Users'
 
+    # def __str__(self):
+    #     return self.get_full_name()
+
     def __str__(self):
-        return self.get_full_name()
+        return self.email 
 
     def get_full_name(self):
         return self.fname + ' ' + self.lname if self.fname or self.lname else self.email
@@ -248,6 +251,8 @@ class RoleAssignment(models.Model):
     location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
     room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
 
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
+
     assigned_by = models.ForeignKey("User", on_delete=models.CASCADE,  null=True, blank=True )
     assigned_date =  models.DateTimeField(default=timezone.now)
 
@@ -286,6 +291,21 @@ class RoleAssignment(models.Model):
         else:
             raise ValidationError(f"Unknown role: {self.role}")
         
+
+
+    def save(self, *args, **kwargs):
+        # Run model validation before saving
+        self.full_clean()
+
+        # Auto-generate a public ID if missing
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(
+                RoleAssignment, prefix="RA"
+            )
+
+        return super().save(*args, **kwargs)
+
+        
     def __str__(self):
         """
         Human-readable representation of the role assignment.
@@ -303,7 +323,6 @@ class RoleAssignment(models.Model):
             scope = "Unscoped"
 
         return f"{self.user.get_full_name()} - {self.get_role_display()} ({scope})"
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
+    
+   
 
