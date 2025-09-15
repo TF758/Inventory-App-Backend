@@ -8,7 +8,12 @@ from django.utils.translation import gettext_lazy as _
 admin.site.register(Department)
 admin.site.register(UserLocation)
 
-admin.site.register(RoleAssignment)
+@admin.register(RoleAssignment)
+class RoleAssignmentAdmin(admin.ModelAdmin):
+    list_display = ('user', 'role', 'department', 'location', 'room', 'assigned_by', 'assigned_date', 'public_id')
+    readonly_fields = ('public_id',)
+    search_fields = ('user__email', 'role', 'department__name', 'location__name', 'room__name', 'assigned_by__email')
+    list_filter = ('role', 'department')
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):

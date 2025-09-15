@@ -9,10 +9,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
 
         token["public_id"] = str(user.public_id)
-        token["fname"] = user.fname
-        token["lname"] = user.lname
-        token["active_role_id"] = (
-            user.active_role.id if user.active_role else None
+        token["role_id"] = (
+            user.active_role.public_id if user.active_role else None
         )
 
         if "user_id" in token:
@@ -29,12 +27,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         data.update({
             "public_id": str(self.user.public_id),
-            "fname": self.user.fname,
-            "lname": self.user.lname,
-            "active_role_id": (
-                self.user.active_role.id if self.user.active_role else None
+            "role_id": (
+                self.user.active_role.public_id if self.user.active_role else None
             ),
-            "active_role": active_role_data,
+            # "active_role": active_role_data,
         })
 
         return data
