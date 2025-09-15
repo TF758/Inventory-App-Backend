@@ -292,6 +292,10 @@ class RoleAssignment(models.Model):
             raise ValidationError(f"Unknown role: {self.role}")
         
 
+    def get_role_id(self):
+        return self.public_id
+        
+
 
     def save(self, *args, **kwargs):
         # Run model validation before saving

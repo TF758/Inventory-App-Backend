@@ -107,6 +107,8 @@ class RoleDetailView(viewsets.ModelViewSet):
     queryset = RoleAssignment.objects.all()
     permission_classes = [IsAuthenticated]
 
+    lookup_field = 'public_id'
+
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
