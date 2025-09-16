@@ -77,6 +77,7 @@ class RoleReadSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "role",
+            "public_id",
             "area_id",       # <-- generic id (public_id of dept/location/room)
             "area_type",     # <-- tells you which one it is
             "area_name",     # <-- display name

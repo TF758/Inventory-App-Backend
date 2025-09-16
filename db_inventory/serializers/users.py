@@ -3,12 +3,12 @@ from .rooms import RoomNameSerializer
 from ..models import User, UserLocation
 
 class UserPrivateSerializer(serializers.ModelSerializer):
-    active_role = serializers.CharField(source='active_role.get_role_id', read_only=True)
+    current_role = serializers.CharField(source='active_role.get_role_id', read_only=True)
 
     class Meta:
         model = User
         fields = [
-           'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'active_role']
+           'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'current_role']
         
         ordering = ['-id']
         
