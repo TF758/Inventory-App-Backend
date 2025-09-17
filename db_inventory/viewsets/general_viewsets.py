@@ -60,19 +60,19 @@ class SessionTokenLoginView(TokenObtainPairView):
         serializer.is_valid(raise_exception=True)
         user = serializer.user
 
-        # 1️⃣ Access token (JWT)
+        #Access token (JWT)
         access_token = str(AccessToken.for_user(user))
 
-        # 2️⃣ Opaque refresh token
+        # Opaque refresh token
         import secrets
         raw_refresh = secrets.token_urlsafe(64)
         hashed_refresh = UserSession.hash_token(raw_refresh)
 
-        # 3️⃣ Save session
+        # Save session
         session = UserSession.objects.create(
             user=user,
             refresh_token_hash=hashed_refresh,
-            expires_at=timezone.now() + timedelta(days=7),
+            expires_at=timezone.localtime(timezone.now()) + timedelta(days=1),
             ip_address=request.META.get("REMOTE_ADDR"),
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
