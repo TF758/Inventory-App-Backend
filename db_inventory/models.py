@@ -3,6 +3,10 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserM
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+import uuid
+import hashlib
+from django.db import models
+from django.conf import settings
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -330,3 +334,37 @@ class RoleAssignment(models.Model):
     
    
 
+class UserSession(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+        EXPIRED = "expired", "Expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sessions"
+    )
+    refresh_token_hash = models.CharField(max_length=128, unique=True)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.ACTIVE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    last_used_at = models.DateTimeField(auto_now=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=256, null=True, blank=True)
+
+    def mark_revoked(self):
+        self.status = self.Status.REVOKED
+        self.save(update_fields=["status"])
+
+    def is_active(self):
+        return self.status == self.Status.ACTIVE and self.expires_at >= timezone.now()
+
+    @staticmethod
+    def hash_token(raw_token: str) -> str:
+        """Hash refresh token before storing or comparing."""
+        return hashlib.sha256(raw_token.encode()).hexdigest()
+
+    def __str__(self):
+        return f"Session {self.id} for {self.user} ({self.status})"

@@ -12,7 +12,7 @@ urlpatterns = [
 
     path('login/',api_login_view, name='custom_login'),
     path('logout/',api_logout, name='logout'),
-    path('token/refresh/', api_token_refresh, name='token_refresh'),
+    path('refresh/', api_token_refresh, name='token_refresh'),
 
     path('users/', user_list_create_view, name='users'),
     path('users/<str:public_id>/',user_id_detail_view, name='user-detail'),

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room, RoleAssignment
+from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room, RoleAssignment, UserSession
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
@@ -7,6 +7,13 @@ from django.utils.translation import gettext_lazy as _
 
 admin.site.register(Department)
 admin.site.register(UserLocation)
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "status", "created_at", "last_used_at", "ip_address")
+    list_filter = ("status", "created_at")
+    search_fields = ("user__username", "ip_address")
 
 @admin.register(RoleAssignment)
 class RoleAssignmentAdmin(admin.ModelAdmin):
