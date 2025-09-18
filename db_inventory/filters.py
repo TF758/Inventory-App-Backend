@@ -76,21 +76,24 @@ class EquipmentFilter(django_filters.FilterSet):
         
 class LocationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains', field_name="name")
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name="department__name")
+    department = django_filters.CharFilter(lookup_expr='exact', field_name="department__public_id")
+    location = django_filters.CharFilter(field_name='public_id', lookup_expr='exact')  
 
     class Meta:
         model = Location
         fields = [
             'name',
             'department',
+            'location'
         ]
 
 class RoomFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
     area = django_filters.CharFilter(lookup_expr='icontains')
     section = django_filters.CharFilter(lookup_expr='icontains')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='location__public_id')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='location__department__public_id')
+    location = django_filters.CharFilter(field_name='location__public_id', lookup_expr='exact')
+    department = django_filters.CharFilter(field_name='location__department__public_id', lookup_expr='exact')
+    room = django_filters.CharFilter(field_name='public_id', lookup_expr='exact')  
 
 
     class Meta:
@@ -101,6 +104,7 @@ class RoomFilter(django_filters.FilterSet):
             'section',
             'location',
             'department',
+            'room',
         ]
 
 class ComponentFilter(django_filters.FilterSet):
