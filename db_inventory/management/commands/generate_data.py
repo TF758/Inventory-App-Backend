@@ -10,7 +10,7 @@ django.setup()
 from django.core.management import call_command
 
 from django.core.management.base import BaseCommand
-from db_inventory.factory import (
+from inventory.db_inventory.factories import (
     UserFactory, AdminUserFactory,
     DepartmentFactory,
     UserLocationFactory,
