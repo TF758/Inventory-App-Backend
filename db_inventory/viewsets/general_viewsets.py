@@ -68,7 +68,7 @@ class SessionTokenLoginView(TokenObtainPairView):
         raw_refresh = secrets.token_urlsafe(64)
         hashed_refresh = UserSession.hash_token(raw_refresh)
 
-        # Save session
+       # Save session first
         session = UserSession.objects.create(
             user=user,
             refresh_token_hash=hashed_refresh,
@@ -77,15 +77,19 @@ class SessionTokenLoginView(TokenObtainPairView):
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
 
-        # 4️⃣ Build response including metadata
+        # Access token (JWT) bound to session
+        access_token_obj = AccessToken.for_user(user)
+        access_token_obj["session_id"] = str(session.id)
+        access_token = str(access_token_obj)
+
+        # Build response including metadata
         response_data = {
             "access": access_token,
             "public_id": str(user.public_id),
             "role_id": user.active_role.public_id if user.active_role else None,
-            "session_id": str(session.id),
         }
 
-        # 5️⃣ Set refresh token as HttpOnly cookie
+        # Set refresh token as HttpOnly cookie
         response = Response(response_data, status=200)
         response.set_cookie(
             key="refresh",
@@ -96,7 +100,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             path="/",
         )
 
-        return response    
+        return response
 
 class RefreshAPIView(APIView):
     permission_classes = [AllowAny]          
