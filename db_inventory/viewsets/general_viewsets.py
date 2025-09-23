@@ -126,6 +126,7 @@ class RefreshAPIView(APIView):
         user = session.user
         access_token = AccessToken.for_user(user)
         access_token["public_id"] = str(user.public_id)
+        access_token["session_id"] = str(session.id)
         access_token["role_id"] = user.active_role.public_id if user.active_role else None
 
         # Optionally rotate refresh token
