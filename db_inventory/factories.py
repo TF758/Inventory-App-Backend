@@ -61,8 +61,7 @@ class RoomFactory(factory.django.DjangoModelFactory):
 
     name = factory.LazyFunction(fake.color_name)
     location = factory.LazyFunction(lambda: random.choice(Location.objects.all()))
-    area = factory.LazyFunction(fake.company)
-    section = factory.LazyFunction(lambda: f"{fake.color_name()} Section")
+    
 
 
 class UserLocationFactory(factory.django.DjangoModelFactory):

@@ -89,8 +89,6 @@ class LocationFilter(django_filters.FilterSet):
 
 class RoomFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
-    area = django_filters.CharFilter(lookup_expr='icontains')
-    section = django_filters.CharFilter(lookup_expr='icontains')
     location = django_filters.CharFilter(field_name='location__public_id', lookup_expr='exact')
     department = django_filters.CharFilter(field_name='location__department__public_id', lookup_expr='exact')
     room = django_filters.CharFilter(field_name='public_id', lookup_expr='exact')  
@@ -100,8 +98,6 @@ class RoomFilter(django_filters.FilterSet):
         model = Room
         fields = [
             'name',
-            'area',
-            'section',
             'location',
             'department',
             'room',

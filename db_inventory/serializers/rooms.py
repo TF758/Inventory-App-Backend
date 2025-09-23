@@ -7,7 +7,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['public_id',  'name', 'area', 'section','location', 'location_detail']
+        fields = ['public_id',  'name','location', 'location_detail']
 
 
 class RoomNameSerializer(serializers.ModelSerializer):
@@ -29,7 +29,7 @@ class RoomReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['public_id', 'name', 'area', 'section', 'location']
+        fields = ['public_id', 'name', 'location']
 
 
 class RoomWriteSerializer(serializers.ModelSerializer):
@@ -39,7 +39,7 @@ class RoomWriteSerializer(serializers.ModelSerializer):
     )
     class Meta:
         model = Room
-        fields = ['name', 'area', 'section', 'location']
+        fields = ['name',  'location']
 
 class RoomUserLightSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(source='user.public_id')
@@ -49,12 +49,12 @@ class RoomUserLightSerializer(serializers.ModelSerializer):
     user_job_title = serializers.CharField(source='user.job_title')
 
     room_name = serializers.CharField(source='room.name')
-    room_area = serializers.CharField(source='room.area')
+  
 
     class Meta:
         model = UserLocation
         fields = [
-            'user_id', 'user_email', 'user_fname', 'user_lname','user_job_title','room_name','room_area'
+            'user_id', 'user_email', 'user_fname', 'user_lname','user_job_title','room_name'
         ]
 
 class RoomEquipmentSerializer(serializers.ModelSerializer):

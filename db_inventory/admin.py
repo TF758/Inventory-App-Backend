@@ -46,7 +46,7 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
-    list_display = ('name', 'area', 'section', 'location')
+    list_display = ('name', 'location')
     readonly_fields = ("public_id",)
 
 

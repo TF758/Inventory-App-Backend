@@ -141,8 +141,6 @@ class Location(models.Model):
 class Room(models.Model):
     location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name='rooms')
     name = models.CharField(max_length=255)
-    area = models.CharField(max_length=100, blank=True, default='')
-    section = models.CharField(max_length=100, blank=True, default='')
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
     def save(self, *args, **kwargs):
