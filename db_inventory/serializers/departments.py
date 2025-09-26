@@ -124,16 +124,43 @@ class DepartmentComponentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id')
     equipment_name = serializers.CharField(source='equipment.name')
 
+    area_id = serializers.SerializerMethodField()
+    area_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Component
         fields = [
             'public_id',
             'name',
             'brand',
+            'model',
             'quantity',
+            'serial_number',
             'equipment_id',
             'equipment_name',
+            'area_id',
+            'area_name',
         ]
+
+    def get_area_id(self, obj):
+        if obj.equipment and obj.equipment.room:
+            return obj.equipment.room.public_id
+        return None
+
+    def get_area_name(self, obj):
+        if obj.equipment and obj.equipment.room:
+            room = obj.equipment.room
+            location = room.location
+
+
+            parts = []
+            if location:
+                parts.append(location.name)
+            if room:
+                parts.append(room.name)
+
+            return " / ".join(parts)  # e.g. "IT Dept / Main Campus / Server Room 1"
+        return None
 
 __all__ = [
     "DepartmentSerializer",

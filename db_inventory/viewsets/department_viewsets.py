@@ -256,6 +256,9 @@ class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewset
 
     exclude_filter_fields = ["department"]
 
+    filterset_class = ComponentFilter
+    
+
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')

@@ -1,10 +1,10 @@
 from rest_framework import viewsets
 from ..serializers.locations import *
 
-from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory
+from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, UserLocationFilter
+from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, UserLocationFilter, ComponentFilter
 from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
 from ..permissions import LocationPermission
@@ -238,3 +238,45 @@ class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
+    
+
+
+class LocationComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
+    """Retrieves a list of components in a given location"""
+    serializer_class = LocationComponentSerializer
+    lookup_field = 'public_id'
+
+    permission_classes=[LocationPermission]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['name']
+
+    exclude_filter_fields = ["department", "location"]
+
+    filterset_class = ComponentFilter
+    
+    def get_queryset(self):
+        location_id = self.kwargs.get("public_id")
+
+        if not location_id:
+            return Component.objects.none()
+
+        return Component.objects.filter(
+            equipment__room__location__public_id=location_id
+        ).select_related(
+            "equipment__room__location__department" 
+        )
+    
+class LocationComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+    serializer_class = LocationComponentSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    permission_classes=[LocationPermission]
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        return (
+            Component.objects.filter(equipment__room__location__public_id=location_id)
+            .order_by('-id')[:20]
+        )

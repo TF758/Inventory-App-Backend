@@ -81,6 +81,9 @@ location_consumables_light_view = location_viewsets.LocationConsumablesMiniViewS
 location_accessories_view = location_viewsets.LocationAccessoriesView.as_view({'get': 'list'})
 location_accessories_light_view = location_viewsets.LocationAccessoriesMiniViewSet.as_view({'get': 'list'})
 
+location_components_view = location_viewsets.LocationComponentsViewSet.as_view({'get': 'list'})
+location_components_light_view = location_viewsets.LocationComponentsMiniViewSet.as_view({'get': 'list'})
+
 
 room_list_create_view = room_viewsets.RoomModelViewSet.as_view({'get': 'list', 'post':'create'})
 room_list_view = room_viewsets.RoomListViewset.as_view({'get': 'list'})
@@ -111,12 +114,15 @@ room_components_light_view = room_viewsets.RoomComponentsMiniViewSet.as_view({'g
 
 equipment_list_create_view = equipment_viewsets.EquipmentModelViewSet.as_view({'get': 'list', 'post':'create'})
 
+
 equipment_id_detail_view = equipment_viewsets.EquipmentModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
     'patch': 'partial_update',
     'delete': 'destroy'
 })
+
+equipment_batch_import_view = equipment_viewsets.EquipmentBatchImportView.as_view()
 
 component_list_create_view = component_viewsets.ComponentModelViewSet.as_view({'get': 'list', 'post':'create'})
 component_id_detail_view = component_viewsets.ComponentModelViewSet.as_view({
@@ -141,3 +147,6 @@ consumable_id_detail_view = consumable_viewsets.ConsumableModelViewSet.as_view({
     'patch': 'partial_update',
     'delete': 'destroy'
 })
+
+consumable_batch_import_view = consumable_viewsets.ConsumableBatchImportView.as_view()
+

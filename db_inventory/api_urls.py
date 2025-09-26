@@ -27,6 +27,7 @@ urlpatterns = [
 
     path('equipments/', equipment_list_create_view, name='equipments'),
     path('equipments/<str:public_id>/', equipment_id_detail_view, name='equipment-detail'),
+    path('equipments-import/', equipment_batch_import_view, name='equipment-batch-import'),
 
     path('components/', component_list_create_view, name='components'), 
     path('components/<str:public_id>/', component_id_detail_view, name='component-detail'),
@@ -37,6 +38,7 @@ urlpatterns = [
 
     path('consumables/', consumable_list_create_view, name="consumables"),
     path('consumables/<str:public_id>/', consumable_id_detail_view, name='consumable-detail'),
+    path('consumables/import/', consumable_batch_import_view, name='consumable-batch-import'),
 
      path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

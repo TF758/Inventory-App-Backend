@@ -26,13 +26,10 @@ class LocationRoomSerializer(serializers.ModelSerializer):
 
     room_id = serializers.CharField(source='public_id')
     room_name = serializers.CharField(source='name')
-    room_section = serializers.CharField(source='section')
-
-    
-
+ 
     class Meta:
         model = Room
-        fields = ['room_id', 'room_name', 'room_section', ]
+        fields = ['room_id', 'room_name',  ]
 
 class LocationUserLightSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(source='user.public_id')
@@ -79,6 +76,38 @@ class LocationAccessorySerializer(serializers.ModelSerializer):
         fields = ['public_id', 'name', 'serial_number', 'quantity', 'room_id', 'room_name']
 
 
+class LocationComponentSerializer(serializers.ModelSerializer):
+    equipment_id = serializers.CharField(source='equipment.public_id')
+    equipment_name = serializers.CharField(source='equipment.name')
+
+    area_id = serializers.SerializerMethodField()
+    area_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Component
+        fields = [
+            'public_id',
+            'name',
+            'brand',
+            'model',
+            'quantity',
+            'serial_number',
+            'equipment_id',
+            'equipment_name',
+            'area_id',
+            'area_name',
+        ]
+
+    def get_area_id(self, obj):
+        if obj.equipment and obj.equipment.room:
+            return obj.equipment.room.public_id
+        return None
+
+    def get_area_name(self, obj):
+        if obj.equipment and obj.equipment.room:
+            return obj.equipment.room.name   # ✅ just the room name
+        return None
+
 class LocationNameSerializer(serializers.ModelSerializer):
     department = DepartmentReadSerializer()
 
@@ -112,5 +141,6 @@ __all__ = [
     "LocationNameSerializer",
     "LocationReadSerializer",
     "LocationWriteSerializer",
+    "LocationComponentSerializer"
  
 ]

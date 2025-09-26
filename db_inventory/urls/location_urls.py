@@ -20,4 +20,7 @@ urlpatterns = [
     
     path('<str:public_id>/accessories-full/', location_accessories_view, name='location-accessories'),
     path('<str:public_id>/accessories-light/', location_accessories_light_view, name='location-accessories-light'),
+
+    path('<str:public_id>/components-full/', location_components_view, name='location-components'),
+    path('<str:public_id>/components-light/', location_components_light_view, name='location-components-light'),
 ]
