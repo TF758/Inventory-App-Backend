@@ -1,8 +1,14 @@
 from rest_framework import viewsets, mixins, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied
-from ..serializers.roles import ActiveRoleSerializer
+from ..serializers.roles import *
 from ..models import User, RoleAssignment
+from rest_framework import status
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
+from ..models import RoleAssignment, User
+from rest_framework import viewsets
+
 
 class ActiveRoleViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
     """
@@ -50,3 +56,47 @@ class ActiveRoleViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
             {"active_role": role.public_id},
             status=status.HTTP_200_OK,
         )
+    
+
+class MyRoleList(ListAPIView):
+    serializer_class = RoleReadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.role_assignments.all()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data) 
+
+class RoleDetailView(viewsets.ModelViewSet):
+    queryset = RoleAssignment.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    lookup_field = 'public_id'
+
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return RoleWriteSerializer
+        return RoleReadSerializer
+
+
+
+class UserRoleListView(ListAPIView):
+
+    """Returns a list of all the roles for a given user using thier public id"""
+    queryset = RoleAssignment.objects.all().order_by('role')
+    lookup_field = 'public_id'
+    serializer_class = RoleReadSerializer
+
+
+    def get_queryset(self):
+        public_id = self.kwargs.get('public_id')
+        try:
+            user = User.objects.get(public_id=public_id)
+        except User.DoesNotExist:
+            return RoleAssignment.objects.none()
+        return RoleAssignment.objects.filter(user=user)
+
