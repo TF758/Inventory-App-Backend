@@ -1,5 +1,6 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
 from ..serializers.general import SessionTokenLoginViewSerializer
+from ..serializers.equipment import EquipmenBatchtWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,6 +9,8 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
+from ..utils import get_serializer_field_info
+from rest_framework.serializers import Serializer
 
 
 class SessionTokenLoginView(TokenObtainPairView):
@@ -139,3 +142,52 @@ class LogoutAPIView(APIView):
         response = Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
         response.delete_cookie("refresh", path="/")
         return response
+
+def get_serializer_field_info(serializer_class: Serializer):
+        """Return cleaned up metadata for serializer fields"""
+        serializer = serializer_class()
+
+        field_info = {}
+        for field_name, field in serializer.fields.items():
+            field_info[field_name] = {
+                "label": field.label or field_name.replace("_", " ").title(),
+                "type": field.__class__.__name__,
+                "required": field.required,
+                "read_only": field.read_only,
+                "write_only": field.write_only,
+                "help_text": field.help_text or "",
+                "max_length": getattr(field, "max_length", None),
+            }
+        return field_info
+
+class SerializerFieldsView(APIView):
+
+    """Used to return data about a model field using it's respective serializer in batch processes"""
+    """
+    Return field metadata for a given model serializer.
+    Pass `serializer_name` as query param (e.g., EquipmentBatchWriteSerializer)
+    """
+
+    serializer_map = {
+        "equipment": EquipmenBatchtWriteSerializer,
+        # "consumable": ConsumableBatchWriteSerializer,
+        # "accessory": AccessoryBatchWriteSerializer,
+    }
+
+    def get(self, request):
+        serializer_key = request.query_params.get("serializer")
+        if not serializer_key:
+            return Response(
+                {"error": "Query param 'serializer' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer_class = self.serializer_map.get(serializer_key.lower())
+        if not serializer_class:
+            return Response(
+                {"error": f"No serializer found for '{serializer_key}'"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(get_serializer_field_info(serializer_class))
+    

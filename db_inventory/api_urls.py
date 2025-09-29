@@ -52,4 +52,8 @@ urlpatterns = [
     path("roles/me/active-role/<str:role_id>/", my_active_role, name="my-active-role-update"),
 
     path('roles/users/<str:public_id>',user_role_list , name='user-role-list'),
+
+    path('serializer-fields/',serializer_parameters_view , name='get-serializer-fields'),
+
+
 ]
