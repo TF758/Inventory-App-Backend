@@ -48,16 +48,6 @@ class EquipmenBatchtWriteSerializer(serializers.ModelSerializer):
             'room',
         ]
 
-    # def validate_room(self, value):
-    #     """Resolve room name to Room instance."""
-    #     if not value:
-    #         return None  # allow null/blank
-    #     try:
-    #         room_obj = Room.objects.get(name=value)
-    #         return room_obj
-    #     except Room.DoesNotExist:
-    #         raise serializers.ValidationError(f"Room '{value}' does not exist.")
-        
     def validate_room(self, value):
         if not value:
             return None

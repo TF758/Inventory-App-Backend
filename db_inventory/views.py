@@ -123,6 +123,7 @@ equipment_id_detail_view = equipment_viewsets.EquipmentModelViewSet.as_view({
 })
 
 equipment_batch_import_view = equipment_viewsets.EquipmentBatchImportView.as_view()
+equipment_batch_validate_view = equipment_viewsets.EquipmentBatchValidateView.as_view()
 
 component_list_create_view = component_viewsets.ComponentModelViewSet.as_view({'get': 'list', 'post':'create'})
 component_id_detail_view = component_viewsets.ComponentModelViewSet.as_view({
