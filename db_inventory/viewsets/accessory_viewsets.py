@@ -1,8 +1,6 @@
 from rest_framework import viewsets
 from ..serializers.accessories import (
     AccessoryFullSerializer,
-    AccessorySerializer, 
-    AccessoryReadSerializer,
     AccessoryWriteSerializer
 )
 from ..models import Accessory
@@ -11,6 +9,7 @@ from rest_framework.filters import SearchFilter
 from ..filters import AccessoryFilter
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
+from ..pagination import BasePagination
 
 class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -24,6 +23,8 @@ class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     search_fields = ['^name', 'name']
 
     filterset_class = AccessoryFilter
+
+    pagination_class = BasePagination
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:

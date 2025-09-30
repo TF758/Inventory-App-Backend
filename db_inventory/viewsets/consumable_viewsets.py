@@ -15,6 +15,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
+from ..pagination import BasePagination
 
 
 class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
@@ -27,6 +28,8 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['^name', 'name']
+
+    pagination_class = BasePagination
 
 
     filterset_class = ConsumableFilter

@@ -9,6 +9,7 @@ from rest_framework.filters import SearchFilter
 from ..filters import ComponentFilter
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
+from ..pagination import BasePagination
 
 
 class ComponentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
@@ -23,6 +24,8 @@ class ComponentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     search_fields = ['^name', 'name']
 
     filterset_class = ComponentFilter
+
+    pagination_class = BasePagination
 
 
     def get_serializer_class(self):

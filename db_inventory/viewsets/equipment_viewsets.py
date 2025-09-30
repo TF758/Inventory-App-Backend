@@ -16,6 +16,8 @@ from rest_framework.views import APIView
 from django.db import transaction
 from rest_framework.decorators import action
 from ..mixins import EquipmentBatchMixin
+from django.conf import settings
+from ..pagination import BasePagination
 
 class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -31,6 +33,8 @@ class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     model_class = Equipment
 
     filterset_class = EquipmentFilter
+
+    pagination_class = BasePagination
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:

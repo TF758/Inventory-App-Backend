@@ -6,9 +6,9 @@ from rest_framework.filters import SearchFilter
 from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter, UserLocationFilter
 from ..utils import ExcludeFiltersMixin
 from ..permissions import *
-from rest_framework.permissions import IsAuthenticated
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
+from ..pagination import BasePagination
 
 class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
@@ -20,6 +20,7 @@ class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['^name', 'name']
 
+    pagination_class = BasePagination
 
     filterset_class = RoomFilter
 
@@ -68,6 +69,8 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserLocationFilter
 
+    pagination_class = BasePagination
+
 
     exclude_filter_fields = ["department", "location", "room"]
     
@@ -98,6 +101,8 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
 
     filterset_class = EquipmentFilter
 
+    pagination_class = BasePagination
+
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -115,6 +120,8 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
     exclude_filter_fields = ["department", "location", "room"]
 
     filterset_class = ConsumableFilter
+
+    pagination_class = BasePagination
 
 
     def get_queryset(self):
@@ -134,6 +141,8 @@ class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
     filterset_class = AccessoryFilter
 
+    pagination_class = BasePagination
+
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__public_id=room_id)
@@ -151,10 +160,21 @@ class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelV
 
     filterset_class = ComponentFilter
 
+    pagination_class = BasePagination
+
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Component.objects.filter(equipment__room__public_id=room_id)
+    
 
+class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomComponentSerializer
+    lookup_field = 'public_id'
+    pagination_class = None
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+        return Component.objects.filter(equipment__room__public_id=room_id).order_by('-id')[:20]
 
 
 class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
@@ -200,12 +220,3 @@ class RoomAccessoriesMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet)
         room_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__public_id=room_id).order_by('-id')[:20]
 
-
-class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomComponentSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
-
-    def get_queryset(self):
-        room_id = self.kwargs.get('public_id')
-        return Component.objects.filter(equipment__room__public_id=room_id).order_by('-id')[:20]

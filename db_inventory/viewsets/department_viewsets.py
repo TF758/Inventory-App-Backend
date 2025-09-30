@@ -12,6 +12,7 @@ from django.db.models import Count
 from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
 from ..permissions import DepartmentPermission
+from ..pagination import BasePagination
 
 class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -25,6 +26,8 @@ class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     search_fields = ['name']
 
     permission_classes=[DepartmentPermission]
+
+    pagination_class = BasePagination
     
 
     filterset_class = DepartmentFilter
@@ -63,6 +66,8 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 
     filterset_class = DepartmentUserFilter
+
+    pagination_class = BasePagination
 
     
     def get_queryset(self):
@@ -108,10 +113,14 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     serializer_class = DepartmentLocationsLightSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter]
+
     search_fields = ['name']
     filterset_class = LocationFilter
     exclude_filter_fields = ["department"]
+
     permission_classes=[DepartmentPermission]
+
+    pagination_class = BasePagination
 
     lookup_field = 'public_id'
 
@@ -155,6 +164,8 @@ class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
     filterset_class = EquipmentFilter
 
+    pagination_class = BasePagination
+
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__location__department__public_id=department_id)
@@ -190,6 +201,8 @@ class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
 
     filterset_class = ConsumableFilter
 
+    pagination_class = BasePagination
+
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__location__department__public_id=department_id)
@@ -224,6 +237,8 @@ class DepartmentAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewse
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
+    pagination_class = BasePagination
+
  
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
@@ -257,6 +272,8 @@ class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewset
     exclude_filter_fields = ["department"]
 
     filterset_class = ComponentFilter
+
+    pagination_class = BasePagination
     
 
 
