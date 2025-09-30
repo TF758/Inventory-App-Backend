@@ -18,3 +18,33 @@ class ExcludeFiltersMixin:
                 }
 
         return DynamicFilterset
+
+
+def get_serializer_field_info(serializer_class):
+    """
+    Return a dict of field metadata for a given serializer.
+    Example output:
+    {
+        "name": {"required": True, "allow_null": False, "max_length": 100},
+        "brand": {"required": False, "allow_null": True, "max_length": 100},
+        ...
+    }
+    """
+    serializer = serializer_class()
+    field_info = {}
+
+    for field_name, field in serializer.fields.items():
+        info = {
+            "required": field.required,
+            "allow_null": getattr(field, "allow_null", False),
+            "allow_blank": getattr(field, "allow_blank", False),
+        }
+        if hasattr(field, "max_length") and field.max_length:
+            info["max_length"] = field.max_length
+        if hasattr(field, "min_length") and field.min_length:
+            info["min_length"] = field.min_length
+        if hasattr(field, "choices") and field.choices:
+            info["choices"] = list(field.choices.keys())
+        field_info[field_name] = info
+
+    return field_info

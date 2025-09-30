@@ -13,12 +13,14 @@ class EquipmenBatchtWriteSerializer(serializers.ModelSerializer):
         }
     )
     brand = serializers.CharField(
+        required=False,
         max_length=100,
         error_messages={
             'max_length': 'Equipment brand name is too long.',
         }
     )
     model = serializers.CharField(
+        required=False,
         max_length=100,
         error_messages={
             'max_length': 'Equipment model identifier is too long.',
@@ -51,21 +53,23 @@ class EquipmenBatchtWriteSerializer(serializers.ModelSerializer):
     def validate_room(self, value):
         if not value:
             return None
-        qs = Room.objects.filter(name=value)
+        qs = Room.objects.filter(public_id=value)
         if not qs.exists():
             raise serializers.ValidationError(f"Room '{value}' does not exist.")
         if qs.count() > 1:
             raise serializers.ValidationError(
-                f"Multiple rooms named '{value}' exist. Please use a unique name or ID."
+                f"Multiple rooms with public_id '{value}' exist. This should not happen."
             )
-        return qs.first()
+        return qs.first().public_id  # safe, returns the ID only
+        
     def create(self, validated_data):
-            room_obj = validated_data.pop("room", None)
-            instance = super().create(validated_data)
-            if room_obj:
-                instance.room = room_obj
-                instance.save(update_fields=["room"])
-            return instance
+        room_public_id = validated_data.pop("room", None)
+        instance = super().create(validated_data)
+        if room_public_id:
+            room_obj = Room.objects.get(public_id=room_public_id)
+            instance.room = room_obj
+            instance.save(update_fields=["room"])
+        return instance
 
 class EquipmentWriteSerializer(serializers.ModelSerializer):
     class Meta:
