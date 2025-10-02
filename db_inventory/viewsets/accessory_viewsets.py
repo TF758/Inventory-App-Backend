@@ -10,6 +10,10 @@ from ..filters import AccessoryFilter
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination
+from ..mixins import AccessoryBatchMixin
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -47,3 +51,57 @@ class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
             ).order_by('starts_with_order', 'name')  # starts-with results first
 
         return qs
+    
+
+class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):
+    save_to_db = False
+
+    def post(self, request, *args, **kwargs):
+        data = request.data if isinstance(request.data, list) else []
+        if not data:
+            return Response(
+                {"detail": "Expected a list of objects"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        successes, errors = self.process_batch(data)
+
+        return Response(
+            {
+                "validated": successes,
+                "errors": errors,
+                "summary": {
+                    "total": len(data),
+                    "valid": len(successes),
+                    "invalid": len(errors),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AccessoryBatchImportView(AccessoryBatchMixin, APIView):
+    save_to_db = True
+
+    def post(self, request, *args, **kwargs):
+        data = request.data if isinstance(request.data, list) else []
+        if not data:
+            return Response(
+                {"detail": "Expected a list of objects"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        successes, errors = self.process_batch(data)
+
+        return Response(
+            {
+                "created": successes,
+                "errors": errors,
+                "summary": {
+                    "total": len(data),
+                    "success": len(successes),
+                    "failed": len(errors),
+                },
+            },
+            status=status.HTTP_207_MULTI_STATUS,
+        )

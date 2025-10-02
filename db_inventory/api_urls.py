@@ -36,6 +36,8 @@ urlpatterns = [
 
     path('accessories/', accessory_list_create_view, name='accessories'),
     path('accessories/<str:public_id>/', accessory_id_detail_view, name='accessory-detail'),
+     path("accessories-validate-import/", accessory_batch_validate_view, name="accessories-validate-import"),
+    path("accessories-import/", accessory_batch_import_view, name="accessories-import"),
 
     path('consumables/', consumable_list_create_view, name="consumables"),
     path('consumables/<str:public_id>/', consumable_id_detail_view, name='consumable-detail'),

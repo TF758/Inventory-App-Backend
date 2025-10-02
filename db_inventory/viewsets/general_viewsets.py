@@ -2,6 +2,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from ..serializers.general import SessionTokenLoginViewSerializer
 from ..serializers.equipment import EquipmentBatchtWriteSerializer
 from ..serializers.consumables import ConsumableBatchWriteSerializer
+from ..serializers.accessories import AccessoryBatchWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
@@ -172,7 +173,7 @@ class SerializerFieldsView(APIView):
     serializer_map = {
         "equipment": EquipmentBatchtWriteSerializer,
         "consumable": ConsumableBatchWriteSerializer,
-        # "accessory": AccessoryBatchWriteSerializer,
+        "accessory": AccessoryBatchWriteSerializer,
     }
 
     def get(self, request):
