@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import Accessory, Location
+from ..models import Accessory, Location, Room
 from .locations import LocationFullSerializer
 from .rooms import RoomNameSerializer
 
@@ -65,9 +65,69 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
         ]
 
 
+class AccessoryBatchWriteSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=100,
+        error_messages={
+            'blank': 'Accessory name cannot be empty.',
+            'max_length': 'Accessory name is too long.',
+        }
+    )
+    serial_number = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        error_messages={
+            'max_length': 'Accessory serial number is too long.',
+        }
+    )
+    quantity = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        error_messages={
+            'invalid': 'Quantity must be an integer.',
+            'min_value': 'Quantity cannot be negative.'
+        }
+    )
+    room = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        write_only=True,
+    )
+
+    class Meta:
+        model = Accessory
+        fields = [
+            'name',
+            'serial_number',
+            'quantity',
+            'room',
+        ]
+
+    def validate_room(self, value):
+        if not value:
+            return None
+        qs = Room.objects.filter(public_id=value)
+        if not qs.exists():
+            raise serializers.ValidationError(f"Room '{value}' does not exist.")
+        return qs.first().public_id
+
+    def create(self, validated_data):
+        room_public_id = validated_data.pop("room", None)
+        instance = super().create(validated_data)
+        if room_public_id:
+            instance.room = Room.objects.get(public_id=room_public_id)
+            instance.save(update_fields=["room"])
+        return instance
+
+
+
 __all__ = [
     'AccessorySerializer',
     'AccessoryWriteSerializer',
     'AccessoryReadSerializer',
     'AccessoryFullSerializer',
+    'AccessoryBatchWriteSerializer'
 ]

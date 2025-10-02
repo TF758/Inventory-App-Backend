@@ -149,6 +149,7 @@ consumable_id_detail_view = consumable_viewsets.ConsumableModelViewSet.as_view({
 })
 
 consumable_batch_import_view = consumable_viewsets.ConsumableBatchImportView.as_view()
+consumable_batch_validate_view = consumable_viewsets.ConsumableBatchValidateView.as_view()
 
 
 serializer_parameters_view = general_viewsets.SerializerFieldsView.as_view()

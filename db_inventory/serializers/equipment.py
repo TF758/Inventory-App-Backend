@@ -4,7 +4,7 @@ from ..models import Equipment, Room
 from .rooms import RoomNameSerializer, RoomReadSerializer
 
 
-class EquipmenBatchtWriteSerializer(serializers.ModelSerializer):
+class EquipmentBatchtWriteSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         max_length=100,
         error_messages={

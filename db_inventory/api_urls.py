@@ -39,9 +39,10 @@ urlpatterns = [
 
     path('consumables/', consumable_list_create_view, name="consumables"),
     path('consumables/<str:public_id>/', consumable_id_detail_view, name='consumable-detail'),
-    path('consumables/import/', consumable_batch_import_view, name='consumable-batch-import'),
+    path('consumables-import/', consumable_batch_import_view, name='consumables-batch-import'),
+    path('consumables-validate-import/', consumable_batch_validate_view, name='consumables-batch-validate'),
 
-     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
 
