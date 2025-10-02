@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from ..serializers.equipment import (
 EquipmentReadSerializer,
 EquipmentWriteSerializer
-,EquipmenBatchtWriteSerializer
+,EquipmentBatchtWriteSerializer
 )
 from ..models import Equipment
 from django_filters.rest_framework import DjangoFilterBackend
@@ -17,7 +17,7 @@ from django.db import transaction
 from rest_framework.decorators import action
 from ..mixins import EquipmentBatchMixin
 from django.conf import settings
-from ..pagination import BasePagination
+from ..pagination import FlexiblePagination
 
 class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -34,7 +34,7 @@ class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     filterset_class = EquipmentFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:

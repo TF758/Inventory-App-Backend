@@ -8,7 +8,7 @@ from ..utils import ExcludeFiltersMixin
 from ..permissions import *
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
-from ..pagination import BasePagination
+from ..pagination import FlexiblePagination
 
 class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
@@ -20,7 +20,7 @@ class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['^name', 'name']
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
     filterset_class = RoomFilter
 
@@ -69,7 +69,7 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserLocationFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
     exclude_filter_fields = ["department", "location", "room"]
@@ -101,7 +101,7 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
 
     filterset_class = EquipmentFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
     def get_queryset(self):
@@ -121,7 +121,7 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
     filterset_class = ConsumableFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
     def get_queryset(self):
@@ -141,7 +141,7 @@ class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
     filterset_class = AccessoryFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -160,7 +160,7 @@ class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelV
 
     filterset_class = ComponentFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')

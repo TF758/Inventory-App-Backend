@@ -15,7 +15,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
-from ..pagination import BasePagination
+from ..pagination import FlexiblePagination
+from ..mixins import ConsumableBatchMixin
 
 
 class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
@@ -29,7 +30,7 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['^name', 'name']
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
     filterset_class = ConsumableFilter
@@ -57,38 +58,41 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
     
 
-class ConsumableBatchImportView(APIView):
+class ConsumableBatchValidateView(ConsumableBatchMixin, APIView):
+    save_to_db = False
+
     def post(self, request, *args, **kwargs):
         data = request.data if isinstance(request.data, list) else []
         if not data:
-            return Response(
-                {"detail": "Expected a list of objects"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"detail": "Expected a list of objects"}, status=status.HTTP_400_BAD_REQUEST)
 
-        successes, errors = [], []
+        successes, errors = self.process_batch(data)
 
-        with transaction.atomic():
-            sid = transaction.savepoint()
-            for idx, row in enumerate(data):
-                serializer = ConsumableWriteSerializer(data=row)
-                if serializer.is_valid():
-                    obj = serializer.save()
-                    successes.append(ConsumableReadSerializer(obj).data)
-                else:
-                    errors.append({"row": idx, "errors": serializer.errors})
+        return Response(
+            {
+                "validated": successes,
+                "errors": errors,
+                "summary": {"total": len(data), "valid": len(successes), "invalid": len(errors)},
+            },
+            status=status.HTTP_200_OK,
+        )
 
-            transaction.savepoint_commit(sid)
+
+class ConsumableBatchImportView(ConsumableBatchMixin, APIView):
+    save_to_db = True
+
+    def post(self, request, *args, **kwargs):
+        data = request.data if isinstance(request.data, list) else []
+        if not data:
+            return Response({"detail": "Expected a list of objects"}, status=status.HTTP_400_BAD_REQUEST)
+
+        successes, errors = self.process_batch(data)
 
         return Response(
             {
                 "created": successes,
                 "errors": errors,
-                "summary": {
-                    "total": len(data),
-                    "success": len(successes),
-                    "failed": len(errors),
-                },
+                "summary": {"total": len(data), "success": len(successes), "failed": len(errors)},
             },
             status=status.HTTP_207_MULTI_STATUS,
         )

@@ -9,7 +9,7 @@ from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
 from ..permissions import LocationPermission
 from django.db.models import Case, When, Value, IntegerField
-from ..pagination import BasePagination
+from ..pagination import BasePagination, FlexiblePagination
 
 class LocationModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -26,7 +26,7 @@ class LocationModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     filterset_class = LocationFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -83,7 +83,7 @@ class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
 
     filterset_class = RoomFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
 class LocationRoomsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
@@ -114,7 +114,7 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
 
     permission_classes =[LocationPermission]
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
     
 
     def get_queryset(self):
@@ -157,7 +157,7 @@ class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
 
     permission_classes =[LocationPermission]
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
     def get_queryset(self):
@@ -193,7 +193,7 @@ class LocationConsumablesView(ScopeFilterMixin, ExcludeFiltersMixin,viewsets.Mod
 
     permission_classes =[LocationPermission]
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
 
     def get_queryset(self):
@@ -231,7 +231,7 @@ class LocationAccessoriesView(ExcludeFiltersMixin, viewsets.ModelViewSet):
 
     permission_classes =[LocationPermission]
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
@@ -268,7 +268,7 @@ class LocationComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.
 
     filterset_class = ComponentFilter
 
-    pagination_class = BasePagination
+    pagination_class = FlexiblePagination
     
     def get_queryset(self):
         location_id = self.kwargs.get("public_id")
