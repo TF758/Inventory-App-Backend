@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from ..serializers.equipment import (
 EquipmentReadSerializer,
 EquipmentWriteSerializer
-,EquipmentBatchtWriteSerializer
+,EquipmentBatchtWriteSerializer, EquipmentSerializer
 )
 from ..models import Equipment
 from django_filters.rest_framework import DjangoFilterBackend
@@ -39,7 +39,8 @@ class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return EquipmentWriteSerializer
-        return EquipmentReadSerializer
+        return EquipmentSerializer
+    
 
     def get_queryset(self):
         qs = super().get_queryset()

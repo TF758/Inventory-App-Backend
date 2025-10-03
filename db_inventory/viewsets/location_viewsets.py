@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from ..serializers.locations import *
+from ..serializers.equipment import EquipmentSerializer
 
 from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component
 from django_filters.rest_framework import DjangoFilterBackend
@@ -145,7 +146,7 @@ class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given location"""
-    serializer_class = LocationEquipmentSerializer
+    serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
 
     exclude_filter_fields = ["department", "location"]
@@ -163,6 +164,12 @@ class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__location__public_id=location_id)
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        return super().get_serializer(*args, **kwargs)
     
 class LocationEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = LocationEquipmentSerializer

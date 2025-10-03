@@ -9,6 +9,7 @@ from ..permissions import *
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination
+from ..serializers import *
 
 class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
@@ -91,7 +92,7 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
 
 class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given room"""
-    serializer_class = RoomEquipmentSerializer
+    serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -107,6 +108,13 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__public_id=room_id)
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):

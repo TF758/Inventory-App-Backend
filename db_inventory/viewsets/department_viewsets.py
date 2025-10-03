@@ -152,7 +152,7 @@ class DepartmentLocationsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
 
 class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of equipment in a given department"""
-    serializer_class = DepartmentEquipmentSerializer
+    serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
 
     permission_classes=[DepartmentPermission]
@@ -169,6 +169,11 @@ class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__location__department__public_id=department_id)
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 

@@ -54,6 +54,7 @@ class ConsumableLocationReadSerializer(serializers.ModelSerializer):
             'public_id',
             'name',
             'quantity',
+            'description',
             'room_id',
             'room_name',
             'location_id',
