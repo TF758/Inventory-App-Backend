@@ -5,7 +5,7 @@ from .models import Location, Department, Equipment, Accessory
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-from .serializers.equipment import EquipmentBatchtWriteSerializer, EquipmentReadSerializer
+from .serializers.equipment import EquipmentBatchtWriteSerializer,EquipmentSerializer
 from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWriteSerializer
 from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
@@ -82,7 +82,7 @@ class EquipmentBatchMixin:
                         obj = serializer.save()
                         successes.append({
                             "row": row_number,
-                            "data": EquipmentReadSerializer(obj).data
+                            "data": EquipmentSerializer(obj).data
                         })
                     else:
                         successes.append({

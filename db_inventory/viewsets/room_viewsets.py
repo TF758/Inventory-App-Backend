@@ -209,7 +209,7 @@ class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
             .select_related('user', 'room')
             .order_by('-id')[:20]
         )
-
+    
 
 class RoomEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomEquipmentSerializer
@@ -219,24 +219,42 @@ class RoomEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__public_id=room_id).order_by('-id')[:20]
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
 
 
 class RoomConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomConsumableSerializer
+    serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__public_id=room_id).order_by('-id')[:20]
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
 
 
 class RoomAccessoriesMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomAccessorySerializer
+    serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__public_id=room_id).order_by('-id')[:20]
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
 

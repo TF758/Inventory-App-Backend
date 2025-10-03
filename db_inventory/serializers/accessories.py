@@ -4,15 +4,6 @@ from .locations import LocationFullSerializer
 from .rooms import RoomNameSerializer
 
 
-class AccessorySerializer(serializers.ModelSerializer):
-    location = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
-    location_detail = LocationFullSerializer(source="location", read_only=True)
-
-    
-    class Meta:
-        model = Accessory
-        fields = ['public_id', 'name', 'serial_number', 'quantity',  "location","location_detail"   ]
-
 # Write Serializer
 class AccessoryWriteSerializer(serializers.ModelSerializer):
     class Meta:
@@ -128,7 +119,6 @@ class AccessoryBatchWriteSerializer(serializers.ModelSerializer):
 
 
 __all__ = [
-    'AccessorySerializer',
     'AccessoryWriteSerializer',
     'AccessoryFullSerializer',
     'AccessoryBatchWriteSerializer'

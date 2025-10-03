@@ -124,33 +124,6 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
             'room',
         ]
 
-# Read Serializer
-class EquipmentNameSerializer(serializers.ModelSerializer):
-    room = RoomNameSerializer()
-
-    class Meta:
-        model = Equipment
-        fields = [
-            
-            'public_id',
-            'name',
-            'room',
-        ]
-
-# Read Serializer
-class EquipmentReadSerializer(serializers.ModelSerializer):
-    room = RoomReadSerializer()
-
-    class Meta:
-        model = Equipment
-        fields = [
-            'public_id',
-            'name',
-            'brand',
-            'model',
-            'serial_number',
-            'room',
-        ]
 
 
 class EquipmentDropdownSerializer(serializers.ModelSerializer):
@@ -166,7 +139,5 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
 __all__ = [
     "EquipmentSerializer",
     "EquipmentWriteSerializer",
-    "EquipmentNameSerializer",
-    "EquipmentReadSerializer",
     "EquipmentDropdownSerializer",
 ]

@@ -178,7 +178,7 @@ class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
 
 class DepartmentEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = DepartmentEquipmentSerializer
+    serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -190,6 +190,11 @@ class DepartmentEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
             Equipment.objects.filter(room__location__department__public_id=department_id)
             .order_by('-id')[:20]
         )
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)
 
 
 class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
@@ -220,7 +225,7 @@ class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
 
 
 class DepartmentConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = DepartmentConsumableSerializer
+    serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -232,6 +237,11 @@ class DepartmentConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelV
             Consumable.objects.filter(room__location__department__public_id=department_id)
             .order_by('-id')[:20]
         )
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)
 
 class DepartmentAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of accessories in a given department"""
@@ -254,9 +264,14 @@ class DepartmentAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewse
         department_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__location__department__public_id=department_id)
     
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)
+    
 
 class DepartmentAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = DepartmentAccessorySerializer
+    serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -267,7 +282,12 @@ class DepartmentAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelV
         return (
             Accessory.objects.filter(room__location__department__public_id=department_id)
             .order_by('-id')[:20]
-        )    
+        )
+
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)    
 
 class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of components in a given department"""

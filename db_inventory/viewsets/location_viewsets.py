@@ -172,7 +172,7 @@ class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
         return super().get_serializer(*args, **kwargs)
     
 class LocationEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationEquipmentSerializer
+    serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -184,6 +184,11 @@ class LocationEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
         return Equipment.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        return super().get_serializer(*args, **kwargs)
 
 
 class LocationConsumablesView(ScopeFilterMixin, ExcludeFiltersMixin,viewsets.ModelViewSet):
@@ -229,7 +234,11 @@ class LocationConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
         location_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
     
-
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        return super().get_serializer(*args, **kwargs)
+    
     
     
 class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.ModelViewSet):
@@ -260,7 +269,7 @@ class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.Mod
     
 
 class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationAccessorySerializer
+    serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -272,6 +281,11 @@ class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 

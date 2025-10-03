@@ -1,8 +1,7 @@
 from rest_framework import viewsets
 from ..serializers.equipment import (
-EquipmentReadSerializer,
 EquipmentWriteSerializer
-,EquipmentBatchtWriteSerializer, EquipmentSerializer
+,EquipmentSerializer
 )
 from ..models import Equipment
 from django_filters.rest_framework import DjangoFilterBackend

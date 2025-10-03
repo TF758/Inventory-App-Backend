@@ -1,7 +1,6 @@
 from rest_framework import viewsets
 from ..serializers.components import (
-   ComponentReadSerializer,
-   ComponentWriteSerializer
+   ComponentWriteSerializer, ComponentSerializer
 )
 from ..models import Component
 from django_filters.rest_framework import DjangoFilterBackend
@@ -31,7 +30,7 @@ class ComponentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return ComponentWriteSerializer
-        return ComponentReadSerializer
+        return ComponentSerializer
     
 
     def get_queryset(self):

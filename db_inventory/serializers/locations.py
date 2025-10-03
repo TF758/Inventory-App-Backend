@@ -49,33 +49,6 @@ class LocationUserLightSerializer(serializers.ModelSerializer):
         ]
 
 
-class LocationEquipmentSerializer(serializers.ModelSerializer):
-    room_name = serializers.CharField(source='room.name')
-    room_id = serializers.CharField(source='room.public_id')
-
-    class Meta:
-        model = Equipment
-        fields = ['public_id', 'name','brand', 'model', 'room_id', 'room_name']
-
-
-class LocationConsumableSerializer(serializers.ModelSerializer):
-    room_name = serializers.CharField(source='room.name')
-    room_id = serializers.CharField(source='room.public_id')
-
-    class Meta:
-        model = Consumable
-        fields = ['public_id', 'name', 'quantity', 'room_id', 'room_name']
-
-
-class LocationAccessorySerializer(serializers.ModelSerializer):
-    room_name = serializers.CharField(source='room.name')
-    room_id = serializers.CharField(source='room.public_id')
-
-    class Meta:
-        model = Accessory
-        fields = ['public_id', 'name', 'serial_number', 'quantity', 'room_id', 'room_name']
-
-
 class LocationComponentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id')
     equipment_name = serializers.CharField(source='equipment.name')
@@ -135,9 +108,6 @@ __all__ = [
     "LocationListSerializer",
     "LocationRoomSerializer",
     "LocationUserLightSerializer",
-    "LocationEquipmentSerializer",
-    "LocationConsumableSerializer",
-    "LocationAccessorySerializer",
     "LocationNameSerializer",
     "LocationReadSerializer",
     "LocationWriteSerializer",
