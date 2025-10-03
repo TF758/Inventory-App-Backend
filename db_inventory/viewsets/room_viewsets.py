@@ -145,7 +145,7 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
 class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given room"""
-    serializer_class = RoomAccessorySerializer
+    serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
 
     exclude_filter_fields = ["department", "location", "room"]
@@ -160,6 +160,12 @@ class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__public_id=room_id)
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelViewSet):

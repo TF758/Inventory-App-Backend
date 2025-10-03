@@ -18,14 +18,14 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
         ]
 
 class ConsumableAreaReaSerializer(serializers.ModelSerializer):
-    room_id = serializers.CharField(source='room.public_id')
-    room_name = serializers.CharField(source='room.name')
+    room_id = serializers.CharField(source='room.public_id', read_only=True)
+    room_name = serializers.CharField(source='room.name', read_only=True)
 
-    location_id = serializers.CharField(source='room.location.public_id')
-    location_name = serializers.CharField(source='room.location.name')
+    location_id = serializers.CharField(source='room.location.public_id', read_only=True)
+    location_name = serializers.CharField(source='room.location.name', read_only=True)
 
-    department_id = serializers.CharField(source='room.location.department.public_id')
-    department_name = serializers.CharField(source='room.location.department.name')
+    department_id = serializers.CharField(source='room.location.department.public_id', read_only=True)
+    department_name = serializers.CharField(source='room.location.department.name', read_only=True)
 
     class Meta:
         model = Consumable

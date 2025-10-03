@@ -232,9 +232,9 @@ class LocationConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
 
     
     
-class LocationAccessoriesView(ExcludeFiltersMixin, viewsets.ModelViewSet):
+class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given location"""
-    serializer_class = LocationAccessorySerializer
+    serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
 
     exclude_filter_fields = ["department", "location"]
@@ -251,6 +251,12 @@ class LocationAccessoriesView(ExcludeFiltersMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__location__public_id=location_id)
+    
+
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):

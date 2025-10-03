@@ -5,12 +5,12 @@ from .rooms import RoomNameSerializer, RoomReadSerializer
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
-    room_id = serializers.CharField(source='room.public_id', default=None)
-    room_name = serializers.CharField(source='room.name', default=None)
-    location_id = serializers.CharField(source='room.location.public_id', default=None)
-    location_name = serializers.CharField(source='room.location.name', default=None)
-    department_id = serializers.CharField(source='room.location.department.public_id', default=None)
-    department_name = serializers.CharField(source='room.location.department.name', default=None)
+    room_id = serializers.CharField(source='room.public_id', default=None, read_only=True)
+    room_name = serializers.CharField(source='room.name', default=None, read_only=True)
+    location_id = serializers.CharField(source='room.location.public_id', default=None, read_only=True)
+    location_name = serializers.CharField(source='room.location.name', default=None, read_only=True)
+    department_id = serializers.CharField(source='room.location.department.public_id', default=None, read_only=True)
+    department_name = serializers.CharField(source='room.location.department.name', default=None, read_only=True)
 
     class Meta:
         model = Equipment

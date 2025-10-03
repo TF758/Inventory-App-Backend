@@ -25,29 +25,15 @@ class AccessoryWriteSerializer(serializers.ModelSerializer):
             'room',
         ]
 
-# Read Serializer
-class AccessoryReadSerializer(serializers.ModelSerializer):
-    room = RoomNameSerializer()
-
-    class Meta:
-        model = Accessory
-        fields = [
-            'public_id',
-            'name',
-            'serial_number',
-            'quantity',
-            'room',
-        ]
-
 class AccessoryFullSerializer(serializers.ModelSerializer):
-    room_id = serializers.CharField(source='room.public_id')
-    room_name = serializers.CharField(source='room.name')
+    room_id = serializers.CharField(source='room.public_id', read_only=True)
+    room_name = serializers.CharField(source='room.name', read_only=True)
 
-    location_id = serializers.CharField(source='room.location.public_id')
-    location_name = serializers.CharField(source='room.location.name')
+    location_id = serializers.CharField(source='room.location.public_id', read_only=True)
+    location_name = serializers.CharField(source='room.location.name', read_only=True)
 
-    department_id = serializers.CharField(source='room.location.department.public_id')
-    department_name = serializers.CharField(source='room.location.department.name')
+    department_id = serializers.CharField(source='room.location.department.public_id', read_only=True)
+    department_name = serializers.CharField(source='room.location.department.name', read_only=True)
 
     class Meta:
         model = Accessory
@@ -63,6 +49,23 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'department_id',
             'department_name'
         ]
+
+    def __init__(self, *args, **kwargs):
+        exclude_room = kwargs.pop('exclude_room', False)
+        exclude_location = kwargs.pop('exclude_location', False)
+        exclude_department = kwargs.pop('exclude_department', False)
+        super().__init__(*args, **kwargs)
+
+
+        if exclude_room:
+            self.fields.pop('room_id', None)
+            self.fields.pop('room_name', None)
+        if exclude_location:
+            self.fields.pop('location_id', None)
+            self.fields.pop('location_name', None)
+        if exclude_department:
+            self.fields.pop('department_id', None)
+            self.fields.pop('department_name', None)
 
 
 class AccessoryBatchWriteSerializer(serializers.ModelSerializer):
@@ -127,7 +130,6 @@ class AccessoryBatchWriteSerializer(serializers.ModelSerializer):
 __all__ = [
     'AccessorySerializer',
     'AccessoryWriteSerializer',
-    'AccessoryReadSerializer',
     'AccessoryFullSerializer',
     'AccessoryBatchWriteSerializer'
 ]
