@@ -57,23 +57,6 @@ class RoomUserLightSerializer(serializers.ModelSerializer):
             'user_id', 'user_email', 'user_fname', 'user_lname','user_job_title','room_name'
         ]
 
-class RoomEquipmentSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Equipment
-        fields = ['public_id', 'name', 'brand', 'model']
-
-
-class RoomConsumableSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Consumable
-        fields = ['public_id', 'name', 'quantity', ]
-
-class RoomAccessorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Accessory
-        fields = ['public_id', 'name', 'serial_number', 'quantity']
-
 
 class RoomComponentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id')
@@ -90,9 +73,6 @@ __all__ = [
     "RoomReadSerializer",
     "RoomWriteSerializer",
     "RoomUserLightSerializer",
-    "RoomEquipmentSerializer",
-    "RoomConsumableSerializer",
-    "RoomAccessorySerializer",
     "RoomComponentSerializer",
     "RoomListSerializer",
 ]

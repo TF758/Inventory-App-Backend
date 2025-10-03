@@ -212,7 +212,7 @@ class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     
 
 class RoomEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomEquipmentSerializer
+    serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
