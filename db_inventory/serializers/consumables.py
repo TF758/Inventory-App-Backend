@@ -4,13 +4,6 @@ from ..models import Consumable, Location, Room
 from .locations import LocationFullSerializer
 from .rooms import RoomNameSerializer
 
-class ConsumableSerializer(serializers.ModelSerializer):
-    location = serializers.PrimaryKeyRelatedField(queryset=Location.objects.all())
-    location_detail = LocationFullSerializer(source="location", read_only=True)
-
-    class Meta:
-        model = Consumable
-        fields = ['public_id', 'name', 'quantity', 'description', "location","location_detail" ]
  
  # Write Serializer
 class ConsumableWriteSerializer(serializers.ModelSerializer):
@@ -24,21 +17,7 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
             'room',
         ]
 
-# Read Serializer
-class ConsumableReadSerializer(serializers.ModelSerializer):
-    room = RoomNameSerializer()
-
-    class Meta:
-        model = Consumable
-        fields = [
-            'public_id',
-            'name',
-            'quantity',
-            'description',
-            'room',
-        ]
-
-class ConsumableLocationReadSerializer(serializers.ModelSerializer):
+class ConsumableAreaReaSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
 
@@ -62,6 +41,23 @@ class ConsumableLocationReadSerializer(serializers.ModelSerializer):
             'department_id',
             'department_name'
         ]
+
+    def __init__(self, *args, **kwargs):
+        exclude_room = kwargs.pop('exclude_room', False)
+        exclude_location = kwargs.pop('exclude_location', False)
+        exclude_department = kwargs.pop('exclude_department', False)
+        super().__init__(*args, **kwargs)
+
+
+        if exclude_room:
+            self.fields.pop('room_id', None)
+            self.fields.pop('room_name', None)
+        if exclude_location:
+            self.fields.pop('location_id', None)
+            self.fields.pop('location_name', None)
+        if exclude_department:
+            self.fields.pop('department_id', None)
+            self.fields.pop('department_name', None)
 
 class ConsumableBatchWriteSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
@@ -118,9 +114,7 @@ class ConsumableBatchWriteSerializer(serializers.ModelSerializer):
 
 
 __all__ = [
-    'ConsumableSerializer',
     'ConsumableWriteSerializer',
-    'ConsumableReadSerializer',
-    'ConsumableLocationReadSerializer',
+    'ConsumableAreaReaSerializer',
     'ConsumableBatchWriteSerializer',
 ]

@@ -110,7 +110,6 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
         return Equipment.objects.filter(room__public_id=room_id)
     
     def get_serializer(self, *args, **kwargs):
-        # Exclude department fields for this department-level view
         kwargs['exclude_department'] = True
         kwargs['exclude_location'] = True
         kwargs['exclude_room'] = True
@@ -119,7 +118,7 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
 
 class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of consumables in a given room"""
-    serializer_class = RoomConsumableSerializer
+    serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -135,6 +134,13 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__public_id=room_id)
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
+    
     
 
 class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):

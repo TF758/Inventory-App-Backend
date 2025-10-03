@@ -1,9 +1,7 @@
 from rest_framework import viewsets
 from ..serializers.consumables import (
-ConsumableReadSerializer,
 ConsumableWriteSerializer,
-ConsumableSerializer,
-ConsumableLocationReadSerializer
+ConsumableAreaReaSerializer
 )
 from ..models import Consumable
 from django_filters.rest_framework import DjangoFilterBackend
@@ -24,7 +22,7 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Consumable objects."""
     
     queryset = Consumable.objects.all()
-    serializer_class = ConsumableSerializer
+    serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -38,7 +36,7 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return ConsumableWriteSerializer
-        return ConsumableLocationReadSerializer
+        return ConsumableAreaReaSerializer
     
 
     def get_queryset(self):

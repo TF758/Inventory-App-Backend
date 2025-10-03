@@ -194,7 +194,7 @@ class DepartmentEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
 
 class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of consumables in a given department"""
-    serializer_class = DepartmentConsumableSerializer
+    serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -211,6 +211,11 @@ class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
         return Consumable.objects.filter(room__location__department__public_id=department_id)
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 

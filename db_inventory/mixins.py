@@ -7,7 +7,7 @@ from rest_framework import status
 from django.db import transaction
 from .serializers.equipment import EquipmentBatchtWriteSerializer, EquipmentReadSerializer
 from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWriteSerializer
-from  .serializers.consumables import ConsumableLocationReadSerializer, ConsumableBatchWriteSerializer
+from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
 
 class ScopeFilterMixin:
@@ -112,7 +112,7 @@ class ConsumableBatchMixin:
                     obj = serializer.save()
                     successes.append({
                         "row": row_number,
-                        "data": ConsumableLocationReadSerializer(obj).data
+                        "data": ConsumableAreaReaSerializer(obj).data
                     })
                 else:
                     successes.append({
