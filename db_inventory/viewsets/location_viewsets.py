@@ -164,7 +164,7 @@ class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
-        return Equipment.objects.filter(room__location__public_id=location_id)
+        return Equipment.objects.filter(room__location__public_id=location_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         kwargs['exclude_department'] = True
@@ -211,9 +211,7 @@ class LocationConsumablesView(ScopeFilterMixin, ExcludeFiltersMixin,viewsets.Mod
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
 
-        print(Location.objects.filter(public_id=location_id).exists())
-
-        return Consumable.objects.filter(room__location__public_id=location_id)
+        return Consumable.objects.filter(room__location__public_id=location_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         kwargs['exclude_department'] = True

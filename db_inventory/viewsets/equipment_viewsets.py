@@ -56,8 +56,7 @@ class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
             ).order_by('starts_with_order', 'name')  # starts-with results first
 
         return qs
-
-
+    
 class EquipmentBatchValidateView(EquipmentBatchMixin, APIView):
     """
     Validate a batch of equipment rows without saving.

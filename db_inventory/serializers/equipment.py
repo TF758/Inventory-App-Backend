@@ -19,6 +19,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             'name',
             'brand',
             'model',
+            'serial_number',
             'room_id',
             'room_name',
             'location_id',
@@ -101,7 +102,7 @@ class EquipmentBatchtWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Multiple rooms with public_id '{value}' exist. This should not happen."
             )
-        return qs.first().public_id  # safe, returns the ID only
+        return qs.first().public_id  
         
     def create(self, validated_data):
         room_public_id = validated_data.pop("room", None)
@@ -113,16 +114,24 @@ class EquipmentBatchtWriteSerializer(serializers.ModelSerializer):
         return instance
 
 class EquipmentWriteSerializer(serializers.ModelSerializer):
+    room = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Room.objects.all(),
+        allow_null=False,
+        required=True,
+    )
+
     class Meta:
         model = Equipment
         fields = [
-            'public_id',
-            'name',
-            'brand',
-            'model',
-            'serial_number',
-            'room',
+            "public_id",      
+            "name",
+            "brand",
+            "model",
+            "serial_number",
+            "room",
         ]
+        read_only_fields = ["public_id"]
 
 
 

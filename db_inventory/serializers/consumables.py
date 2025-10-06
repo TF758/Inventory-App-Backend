@@ -7,10 +7,16 @@ from .rooms import RoomNameSerializer
  
  # Write Serializer
 class ConsumableWriteSerializer(serializers.ModelSerializer):
+    room = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Room.objects.all(),
+        allow_null=False,
+        required=True,
+    )
+    
     class Meta:
         model = Consumable
         fields = [
-            'public_id',
             'name',
             'quantity',
             'description',

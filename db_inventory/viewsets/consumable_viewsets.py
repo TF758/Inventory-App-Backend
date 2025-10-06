@@ -21,7 +21,7 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Consumable objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Consumable objects."""
     
-    queryset = Consumable.objects.all()
+    queryset = Consumable.objects.all().order_by('-id')
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
 

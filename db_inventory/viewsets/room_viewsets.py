@@ -107,7 +107,7 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
-        return Equipment.objects.filter(room__public_id=room_id)
+        return Equipment.objects.filter(room__public_id=room_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         kwargs['exclude_department'] = True
@@ -133,7 +133,7 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
-        return Consumable.objects.filter(room__public_id=room_id)
+        return Consumable.objects.filter(room__public_id=room_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         kwargs['exclude_department'] = True
@@ -159,7 +159,7 @@ class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
-        return Accessory.objects.filter(room__public_id=room_id)
+        return Accessory.objects.filter(room__public_id=room_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         kwargs['exclude_department'] = True
@@ -184,7 +184,7 @@ class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelV
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
-        return Component.objects.filter(equipment__room__public_id=room_id)
+        return Component.objects.filter(equipment__room__public_id=room_id).order_by('-id')
     
 
 class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):

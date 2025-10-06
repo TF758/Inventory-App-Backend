@@ -20,7 +20,7 @@ class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Accessory objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Accessory objects."""
 
-    queryset = Accessory.objects.all()
+    queryset = Accessory.objects.all().order_by('-id')
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]

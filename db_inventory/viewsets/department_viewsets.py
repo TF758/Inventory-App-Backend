@@ -19,7 +19,7 @@ class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Department objects.
     This viewset provides `list`, `create`, actions for Department objects."""
 
-    queryset = Department.objects.all()
+    queryset = Department.objects.all().order_by('-id')
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -168,7 +168,7 @@ class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
-        return Equipment.objects.filter(room__location__department__public_id=department_id)
+        return Equipment.objects.filter(room__location__department__public_id=department_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         # Exclude department fields for this department-level view
@@ -215,7 +215,7 @@ class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
-        return Consumable.objects.filter(room__location__department__public_id=department_id)
+        return Consumable.objects.filter(room__location__department__public_id=department_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         # Exclude department fields for this department-level view
@@ -262,7 +262,7 @@ class DepartmentAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewse
  
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
-        return Accessory.objects.filter(room__location__department__public_id=department_id)
+        return Accessory.objects.filter(room__location__department__public_id=department_id).order_by('-id')
     
     def get_serializer(self, *args, **kwargs):
         # Exclude department fields for this department-level view
@@ -309,7 +309,7 @@ class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewset
 
     def get_queryset(self):
         department_id = self.kwargs.get('public_id')
-        return Component.objects.filter(equipment__room__location__department__public_id=department_id)
+        return Component.objects.filter(equipment__room__location__department__public_id=department_id).order_by('-id')
     
     
 

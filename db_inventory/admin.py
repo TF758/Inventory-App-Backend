@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room, RoleAssignment, UserSession
+from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room, RoleAssignment, UserSession, Accessory
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 admin.site.register(Department)
 admin.site.register(UserLocation)
+admin.site.register(Accessory)
 
 
 @admin.register(UserSession)
@@ -75,4 +76,4 @@ class LocationAdmin(admin.ModelAdmin):
 class ConsumableAdmin(admin.ModelAdmin):
     list_display = ('name',  'quantity', 'public_id')  # adjust fields as per model
     readonly_fields = ('public_id',)
-    fields = ('name','quantity', 'serial_number', 'public_id')
+    fields = ('name','quantity', 'description', 'public_id')
