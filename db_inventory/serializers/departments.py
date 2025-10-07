@@ -32,7 +32,7 @@ class DepartmentWriteSerializer(serializers.ModelSerializer):
         fields = ['name', 'description' ,'img_link']
 
 
-class DepartmentUserLightSerializer(serializers.ModelSerializer):
+class DepartmentUserSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(source='user.public_id')
     user_email = serializers.EmailField(source='user.email')
     user_fname = serializers.CharField(source='user.fname')
@@ -113,7 +113,7 @@ __all__ = [
     "DepartmentListSerializer",
     "DepartmentReadSerializer",
     "DepartmentWriteSerializer",
-    "DepartmentUserLightSerializer",
+    "DepartmentUserSerializer",
     "DepartmentLocationsLightSerializer",
     "DepartmentComponentSerializer"
 ]

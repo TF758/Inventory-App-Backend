@@ -1,11 +1,12 @@
 import django_filters
 from .models import *
 
+
 class UserFilter(django_filters.FilterSet):
-    email = django_filters.CharFilter(lookup_expr= 'istartswith')
-    fname = django_filters.CharFilter(lookup_expr='icontains')
-    lname = django_filters.CharFilter(lookup_expr='icontains')
-    # is_active = django_filters.BooleanFilter()
+    email = django_filters.CharFilter(lookup_expr='istartswith')
+    fname = django_filters.CharFilter(method='filter_fname')
+    lname = django_filters.CharFilter(method='filter_lname')
+    is_active = django_filters.BooleanFilter()
     last_login = django_filters.DateFromToRangeFilter()
     date_joined = django_filters.DateFromToRangeFilter()
 
@@ -15,11 +16,24 @@ class UserFilter(django_filters.FilterSet):
             'email',
             'fname',
             'lname',
-            # 'is_active',
+            'is_active',
             'date_joined',
             'last_login',
         ]
 
+    def filter_fname(self, queryset, name, value):
+        if value and len(value.strip()) < 2:
+            raise ValidationError({"fname": "First name filter must be at least 2 characters."})
+        if value:
+            return queryset.filter(first_name__icontains=value)
+        return queryset
+
+    def filter_lname(self, queryset, name, value):
+        if value and len(value.strip()) < 2:
+            raise ValidationError({"lname": "Last name filter must be at least 2 characters."})
+        if value:
+            return queryset.filter(last_name__icontains=value)
+        return queryset
 
 class DepartmentFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')

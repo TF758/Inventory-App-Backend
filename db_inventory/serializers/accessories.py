@@ -6,10 +6,15 @@ from .rooms import RoomNameSerializer
 
 # Write Serializer
 class AccessoryWriteSerializer(serializers.ModelSerializer):
+    room = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Room.objects.all(),
+        allow_null=False,
+        required=True,
+    )
     class Meta:
         model = Accessory
         fields = [
-            'public_id',
             'name',
             'serial_number',
             'quantity',

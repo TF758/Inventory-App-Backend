@@ -57,7 +57,7 @@ class DepartmentListViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     """Retrieves a list of users in a given department"""
-    serializer_class = DepartmentUserLightSerializer
+    serializer_class = DepartmentUserSerializer
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['user__email']
@@ -90,7 +90,7 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     last 20 users of a department, ordered by most recent (-id).
     Pagination disabled.
     """
-    serializer_class = DepartmentUserLightSerializer
+    serializer_class = DepartmentUserSerializer
     pagination_class = None  # disables global pagination
 
     permission_classes=[DepartmentPermission]

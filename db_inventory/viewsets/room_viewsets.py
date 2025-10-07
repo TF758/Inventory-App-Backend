@@ -64,7 +64,7 @@ class RoomListViewset(ScopeFilterMixin, viewsets.ModelViewSet):
     
 class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given room"""
-    serializer_class = RoomUserLightSerializer
+    serializer_class = RoomUserSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend]
@@ -198,7 +198,7 @@ class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
 
 
 class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomUserLightSerializer
+    serializer_class = RoomUserSerializer
     lookup_field = 'public_id'
     pagination_class = None
 

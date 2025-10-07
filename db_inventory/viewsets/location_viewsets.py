@@ -105,7 +105,7 @@ class LocationRoomsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given location"""
-    serializer_class = LocationUserLightSerializer
+    serializer_class = LocationUserSerializer
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['user__email']
@@ -132,7 +132,7 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
         )
     
 class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationUserLightSerializer
+    serializer_class = LocationUserSerializer
     pagination_class = None
 
     permission_classes =[LocationPermission]
@@ -257,7 +257,7 @@ class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.Mod
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
-        return Accessory.objects.filter(room__location__public_id=location_id)
+        return Accessory.objects.filter(room__location__public_id=location_id).order_by('-id')
     
 
     def get_serializer(self, *args, **kwargs):
