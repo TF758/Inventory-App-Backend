@@ -6,7 +6,7 @@ from ..serializers import *
 from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, UserLocationFilter, ComponentFilter
+from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, AreaUserFilter, ComponentFilter
 from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
 from ..permissions import LocationPermission
@@ -105,14 +105,14 @@ class LocationRoomsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given location"""
-    serializer_class = LocationUserSerializer
+    serializer_class = UserAreaSerializer
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['user__email']
 
     exclude_filter_fields = ["department", "location"]
 
-    filterset_class =  UserLocationFilter
+    filterset_class =  AreaUserFilter
 
     permission_classes =[LocationPermission]
 
@@ -131,8 +131,14 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
             )
         )
     
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        return super().get_serializer(*args, **kwargs)
+
+    
 class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationUserSerializer
+    serializer_class = UserAreaSerializer
     pagination_class = None
 
     permission_classes =[LocationPermission]

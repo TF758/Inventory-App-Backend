@@ -55,17 +55,18 @@ class DepartmentListViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 
 
-class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     """Retrieves a list of users in a given department"""
-    serializer_class = DepartmentUserSerializer
+    serializer_class = UserAreaSerializer
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['user__email']
+    exclude_filter_fields = ["department"]
 
     permission_classes=[DepartmentPermission]
 
 
-    filterset_class = DepartmentUserFilter
+    filterset_class = AreaUserFilter
 
     pagination_class = FlexiblePagination
 
@@ -81,8 +82,14 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
                 'room',
                 'room__location',
                 'room__location__department'
-            )
+            ).order_by('-id')
         )
+    
+    def get_serializer(self, *args, **kwargs):
+        # Exclude department fields for this department-level view
+        kwargs['exclude_department'] = True
+        return super().get_serializer(*args, **kwargs)
+    
     
 class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     """
@@ -90,7 +97,7 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     last 20 users of a department, ordered by most recent (-id).
     Pagination disabled.
     """
-    serializer_class = DepartmentUserSerializer
+    serializer_class = UserAreaSerializer
     pagination_class = None  # disables global pagination
 
     permission_classes=[DepartmentPermission]

@@ -3,7 +3,7 @@ from ..serializers.rooms import  *
 from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocation
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter, UserLocationFilter
+from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter, AreaUserFilter
 from ..utils import ExcludeFiltersMixin
 from ..permissions import *
 from ..mixins import ScopeFilterMixin
@@ -64,14 +64,13 @@ class RoomListViewset(ScopeFilterMixin, viewsets.ModelViewSet):
     
 class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given room"""
-    serializer_class = RoomUserSerializer
+    serializer_class = UserAreaSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend]
-    filterset_class = UserLocationFilter
+    filterset_class = AreaUserFilter
 
     pagination_class = FlexiblePagination
-
 
     exclude_filter_fields = ["department", "location", "room"]
     
@@ -88,7 +87,12 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
                 'room',
             )
         )
-        
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
 
 class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of equipment in a given room"""
@@ -170,7 +174,7 @@ class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
 class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelViewSet):
     """Retrieves a list of components in a given room"""
-    serializer_class = RoomComponentSerializer
+    serializer_class = ComponentSerializer
     lookup_field = 'public_id'
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -188,7 +192,7 @@ class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelV
     
 
 class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomComponentSerializer
+    serializer_class = ComponentSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -198,7 +202,7 @@ class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
 
 
 class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = RoomUserSerializer
+    serializer_class = UserAreaSerializer
     lookup_field = 'public_id'
     pagination_class = None
 
@@ -209,6 +213,12 @@ class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
             .select_related('user', 'room')
             .order_by('-id')[:20]
         )
+    
+    def get_serializer(self, *args, **kwargs):
+        kwargs['exclude_department'] = True
+        kwargs['exclude_location'] = True
+        kwargs['exclude_room'] = True
+        return super().get_serializer(*args, **kwargs)
     
 
 class RoomEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):

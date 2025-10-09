@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import UserFilter
 from ..mixins import ScopeFilterMixin
+from ..pagination import FlexiblePagination
 
 
 class UserModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
@@ -21,6 +22,8 @@ This viewset provides `list`, `create`, actions for User objects."""
     search_fields = ['^email', 'email']
 
     filterset_class = UserFilter
+
+    pagination_class = FlexiblePagination
 
 
     def get_serializer_class(self):

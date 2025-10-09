@@ -41,30 +41,6 @@ class RoomWriteSerializer(serializers.ModelSerializer):
         model = Room
         fields = ['name',  'location']
 
-class RoomUserSerializer(serializers.ModelSerializer):
-    user_id = serializers.CharField(source='user.public_id')
-    user_email = serializers.EmailField(source='user.email')
-    user_fname = serializers.CharField(source='user.fname')
-    user_lname = serializers.CharField(source='user.lname')
-    user_job_title = serializers.CharField(source='user.job_title')
-
-    room_name = serializers.CharField(source='room.name')
-  
-
-    class Meta:
-        model = UserLocation
-        fields = [
-            'user_id', 'user_email', 'user_fname', 'user_lname','user_job_title','room_name'
-        ]
-
-
-class RoomComponentSerializer(serializers.ModelSerializer):
-    equipment_id = serializers.CharField(source='equipment.public_id')
-    equipment_name = serializers.CharField(source='equipment.name')
-
-    class Meta:
-        model = Component
-        fields = ['public_id', 'name', 'quantity', 'model', 'serial_number','equipment_id', 'equipment_name' ]
 
 
 __all__ = [
@@ -72,7 +48,5 @@ __all__ = [
     "RoomNameSerializer",
     "RoomReadSerializer",
     "RoomWriteSerializer",
-    "RoomUserSerializer",
-    "RoomComponentSerializer",
     "RoomListSerializer",
 ]

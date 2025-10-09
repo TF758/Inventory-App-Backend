@@ -1,6 +1,6 @@
 import django_filters
 from .models import *
-
+from django.db.models import Case, When, Value, IntegerField, Q
 
 class UserFilter(django_filters.FilterSet):
     email = django_filters.CharFilter(lookup_expr='istartswith')
@@ -22,17 +22,30 @@ class UserFilter(django_filters.FilterSet):
         ]
 
     def filter_fname(self, queryset, name, value):
-        if value and len(value.strip()) < 2:
-            raise ValidationError({"fname": "First name filter must be at least 2 characters."})
         if value:
-            return queryset.filter(first_name__icontains=value)
+            # Start-with first, then contains
+            queryset = queryset.annotate(
+                starts_with_order=Case(
+                    When(fname__istartswith=value, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField()
+                )
+            ).filter(
+                Q(fname__icontains=value)
+            ).order_by('starts_with_order', 'fname')
         return queryset
 
     def filter_lname(self, queryset, name, value):
-        if value and len(value.strip()) < 2:
-            raise ValidationError({"lname": "Last name filter must be at least 2 characters."})
         if value:
-            return queryset.filter(last_name__icontains=value)
+            queryset = queryset.annotate(
+                starts_with_order=Case(
+                    When(lname__istartswith=value, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField()
+                )
+            ).filter(
+                Q(lname__icontains=value)
+            ).order_by('starts_with_order', 'lname')
         return queryset
 
 class DepartmentFilter(django_filters.FilterSet):
@@ -46,25 +59,64 @@ class DepartmentFilter(django_filters.FilterSet):
             'description',
         ]
 
-class DepartmentUserFilter(django_filters.FilterSet):
-    user_email = django_filters.CharFilter(lookup_expr='istartswith', field_name='user__email')
-    user_fname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__fname')
-    user_lname = django_filters.CharFilter(lookup_expr='icontains', field_name='user__lname')
-    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__name')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__name')
-  
-
+class AreaUserFilter(django_filters.FilterSet):
+    email = django_filters.CharFilter(
+        lookup_expr='istartswith',
+        field_name='user__email'
+    )
+    fname = django_filters.CharFilter(method='filter_fname')
+    lname = django_filters.CharFilter(method='filter_lname')
+    room = django_filters.CharFilter(
+        lookup_expr='icontains',
+        field_name='room__public_id'
+    )
+    location = django_filters.CharFilter(
+        lookup_expr='icontains',
+        field_name='room__location__public_id'
+    )
+    department = django_filters.CharFilter(
+        lookup_expr='icontains',
+        field_name='room__location__department__public_id'
+    )
 
     class Meta:
         model = UserLocation
         fields = [
-            'user_id',
-            'user_email',
-            'user_fname',
-            'user_lname',
+            'user',
+            'email',
+            'fname',
+            'lname',
             'room',
-            'location',     
+            'location',
+            'department',
         ]
+
+    def filter_fname(self, queryset, name, value):
+        if value:
+            queryset = queryset.annotate(
+                starts_with_order=Case(
+                    When(user__fname__istartswith=value, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField()
+                )
+            ).filter(
+                Q(user__fname__icontains=value)
+            ).order_by('starts_with_order', 'user__fname')
+        return queryset
+
+    def filter_lname(self, queryset, name, value):
+        if value:
+            queryset = queryset.annotate(
+                starts_with_order=Case(
+                    When(user__lname__istartswith=value, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField()
+                )
+            ).filter(
+                Q(user__lname__icontains=value)
+            ).order_by('starts_with_order', 'user__lname')
+        return queryset
+
 
 class EquipmentFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
@@ -171,25 +223,6 @@ class ConsumableFilter(django_filters.FilterSet):
         model = Consumable
         fields = [
             'name',
-            'room',
-            'location',
-            'department',
-        ]
-
-class UserLocationFilter (django_filters.FilterSet):
-    email = django_filters.CharFilter(lookup_expr='icontains', field_name="user__email")
-    fname = django_filters.CharFilter(lookup_expr='icontains', field_name="user__fname")
-    lname = django_filters.CharFilter(lookup_expr='icontains', field_name="user__lname")
-    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
-
-    class Meta:
-        models= UserLocation
-        fields = [
-            'email',
-            'fname',
-            'lname',
             'room',
             'location',
             'department',

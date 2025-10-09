@@ -32,30 +32,52 @@ class UserWriteSerializer(serializers.ModelSerializer):
               'email', 'fname', 'lname', 'job_title', 'is_active' ,
         ]     
 
-class UserPublicSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='fname')
-    last_name = serializers.CharField(source='lname')
-    class Meta:
-        model = User
-        fields = [
-            'email', 'first_name', 'last_name', 'job_title']
-        
-        ordering = ['-id']
+class UserAreaSerializer(serializers.ModelSerializer):
+    user_id = serializers.CharField(source='user.public_id')
+    email = serializers.EmailField(source='user.email')
+    fname = serializers.CharField(source='user.fname')
+    lname = serializers.CharField(source='user.lname')
+    job_title = serializers.CharField(source ='user.job_title')
 
+    room_id = serializers.CharField(source='room.public_id')
+    room_name = serializers.CharField(source='room.name')
 
+    location_id = serializers.CharField(source='room.location.public_id')
+    location_name = serializers.CharField(source='room.location.name')
 
-class UserLocationSerializer(serializers.ModelSerializer):
-    user = UserPublicSerializer()
-    room = RoomNameSerializer()
+    department_id = serializers.CharField(source='room.location.department.public_id')
+    department_name = serializers.CharField(source='room.location.department.name')
 
     class Meta:
         model = UserLocation
-        fields = ['public_id', 'user', 'room',]
+        fields = [
+            'user_id', 'email', 'fname', 'lname', 'job_title',
+            'room_id', 'room_name',
+            'location_id', 'location_name',
+            'department_id', 'department_name',
+        ]
+
+
+    def __init__(self, *args, **kwargs):
+        exclude_room = kwargs.pop('exclude_room', False)
+        exclude_location = kwargs.pop('exclude_location', False)
+        exclude_department = kwargs.pop('exclude_department', False)
+        super().__init__(*args, **kwargs)
+
+
+        if exclude_room:
+            self.fields.pop('room_id', None)
+            self.fields.pop('room_name', None)
+        if exclude_location:
+            self.fields.pop('location_id', None)
+            self.fields.pop('location_name', None)
+        if exclude_department:
+            self.fields.pop('department_id', None)
+            self.fields.pop('department_name', None)
+
 
 __all__ = [
-    "UserPrivateSerializer",
-    "UserPublicSerializer",
-    "UserLocationSerializer",
     "UserWriteSerializer",
     "UserReadSerializerFull",
+    "UserAreaSerializer",
 ]
