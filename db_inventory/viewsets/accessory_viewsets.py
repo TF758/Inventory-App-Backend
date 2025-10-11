@@ -3,7 +3,7 @@ from ..serializers.accessories import (
     AccessoryFullSerializer,
     AccessoryWriteSerializer
 )
-from ..models import Accessory
+from ..models import Accessory, Room
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import AccessoryFilter
@@ -14,6 +14,8 @@ from ..mixins import AccessoryBatchMixin
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from ..permissions import AssetPermission, is_in_scope
+from rest_framework.exceptions import PermissionDenied
 
 class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -29,6 +31,8 @@ class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     filterset_class = AccessoryFilter
 
     pagination_class = FlexiblePagination
+
+    permission_classes = [AssetPermission]
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -51,6 +55,25 @@ class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
             ).order_by('starts_with_order', 'name')  # starts-with results first
 
         return qs
+    
+    def perform_create(self, serializer):
+        room_id = self.request.data.get("room")
+        if not room_id:
+            raise PermissionDenied("You must specify a room to create equipment.")
+        
+        room = Room.objects.filter(pk=room_id).first()
+        if not room:
+            raise PermissionDenied("Invalid room ID.")
+
+        active_role = getattr(self.request.user, "active_role", None)
+        if not active_role:
+            raise PermissionDenied("No active role assigned.")
+
+        # Permission check for POST creation scope
+        if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
+            raise PermissionDenied("You do not have permission to create equipment in this room.")
+
+        serializer.save(room=room)
     
 
 class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):

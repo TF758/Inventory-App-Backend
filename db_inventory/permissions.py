@@ -278,7 +278,7 @@ class DepartmentPermission(BasePermission):
     """
 
     method_role_map = {
-        "GET": "DEPARTMENT_VIEWER",     # minimum role to view departments
+        "GET": "ROOM_VIEWER",     # minimum role to view departments
         "POST": "SITE_ADMIN",
         "PUT": "DEPARTMENT_ADMIN",
         "PATCH": "DEPARTMENT_ADMIN",
@@ -320,3 +320,132 @@ class DepartmentPermission(BasePermission):
 
         # Lower-level roles (location/room) cannot access departments
         return False
+    
+
+class AssetPermission(BasePermission):
+    """
+    Generic permission class for Room-scoped assets (Equipment, Accessory, Consumable).
+    Enforces:
+      - Role hierarchy (who can do what)
+      - Scope (where they can do it)
+    """
+
+    # Default permission levels for CRUD operations
+    method_role_map = {
+        "GET": "ROOM_VIEWER",      # can list / view 
+        "POST": "ROOM_CLERK",      # can create items in their room
+        "PUT": "ROOM_ADMIN",       # can modify items
+        "PATCH": "ROOM_ADMIN",
+        "DELETE": "ROOM_ADMIN",    # can delete items
+    }
+
+    def has_permission(self, request, view):
+        """
+        Called for non-object-level checks (e.g., list, create).
+        """
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        required_role = self.method_role_map.get(request.method)
+        if not required_role:
+            return False
+
+        # SITE_ADMIN always allowed
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # For POST (creation), ensure they’re creating within scope (handled in perform_create)
+        return has_hierarchy_permission(active_role.role, required_role)
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Called for object-level checks (retrieve, update, delete).
+        """
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # SITE_ADMIN bypass
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        required_role = self.method_role_map.get(request.method)
+        if not required_role:
+            return False
+
+        # Check both hierarchy and scope
+        return (
+            has_hierarchy_permission(active_role.role, required_role)
+            and is_in_scope(active_role, room=obj.room)
+        )
+    
+
+class UserPermission(BasePermission):
+    """
+    Permission for managing users based on the request.user's active role.
+    """
+
+    method_role_map = {
+        "GET": "DEPARTMENT_VIEWER",    # Can list/retrieve users in scope
+        "POST": "DEPARTMENT_ADMIN",    # Can create users in their department
+        "PUT": "DEPARTMENT_ADMIN",     # Can update users in scope
+        "PATCH": "DEPARTMENT_ADMIN",
+        "DELETE": "DEPARTMENT_ADMIN",  # Can delete users in scope
+    }
+
+    def has_permission(self, request, view):
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+           return False
+
+        required_role = self.method_role_map.get(request.method)
+        if not required_role:
+             return False
+
+        # SITE_ADMIN can always proceed
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Check hierarchy
+        if not has_hierarchy_permission(active_role.role, required_role):
+             return False
+
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # SITE_ADMIN bypasses
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        required_role = self.method_role_map.get(request.method)
+
+        # Check hierarchy
+        if not has_hierarchy_permission(active_role.role, required_role):
+            return False
+
+        # Object-level permission
+        target_role = getattr(obj, "active_role", None)
+
+        # Allow GET if target user has no active_role
+        if request.method == "GET" and target_role is None:
+            return True
+
+        # For other methods, deny if no target_role
+        if not target_role:
+            return False
+
+        # Check scope
+        if not is_in_scope(
+            active_role,
+            room=target_role.room,
+            location=target_role.location,
+            department=target_role.department
+        ):
+            return False
+
+        return True
