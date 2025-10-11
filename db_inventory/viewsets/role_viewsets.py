@@ -103,4 +103,6 @@ class UserRoleCreateView(CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(assigned_by=self.request.user)
+        public_id = self.kwargs.get("public_id")
+        user = get_object_or_404(User, public_id=public_id)
+        serializer.save(user=user, assigned_by=self.request.user)

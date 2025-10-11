@@ -69,12 +69,43 @@ class RoleReadSerializer(serializers.ModelSerializer):
         return "N/A"
 
 class RoleWriteSerializer(serializers.ModelSerializer):
-    """Used for update/create Role Assignments"""
- 
+    """
+    Serializer for creating/updating RoleAssignment.
+    Accepts public_id for user, department, location, room.
+    """
+
+    user = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=User.objects.all()
+    )
+
+    department = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Department.objects.all(),
+        required=False,
+        allow_null=True,
+          default=None     
+    )
+
+    location = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Location.objects.all(),
+        required=False,
+        allow_null=True,
+          default=None     
+    )
+
+    room = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Room.objects.all(),
+        required=False,
+        allow_null=True,
+          default=None      # 
+    )
+
     class Meta:
         model = RoleAssignment
         fields = [
-            
             "user",
             "role",
             "department",
@@ -83,28 +114,60 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             "assigned_by",
             "assigned_date",
         ]
-    
+
+    def validate_user(self, value):
+        # Accept user public_id or PK
+        if isinstance(value, str):
+            try:
+                value = User.objects.get(public_id=value)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User not found.")
+        return value
+
+    def validate_department(self, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                value = Department.objects.get(public_id=value)
+            except Department.DoesNotExist:
+                raise serializers.ValidationError("Department not found.")
+        return value
+
+    def validate_location(self, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                value = Location.objects.get(public_id=value)
+            except Location.DoesNotExist:
+                raise serializers.ValidationError("Location not found.")
+        return value
+
+    def validate_room(self, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            try:
+                value = Room.objects.get(public_id=value)
+            except Room.DoesNotExist:
+                raise serializers.ValidationError("Room not found.")
+        return value
 
     def validate(self, attrs):
-        """
-        Reuse your model clean logic to enforce scope restrictions.
-        """
-        # This allows the model clean() to raise ValidationErrors
+        # Let the model enforce role-specific rules
         instance = RoleAssignment(**attrs)
         instance.clean()
         return attrs
 
     def create(self, validated_data):
-        # Automatically assign the current user as `assigned_by` if request available
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["assigned_by"] = request.user
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Optionally update assigned_by on update
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["assigned_by"] = request.user
         return super().update(instance, validated_data)
-

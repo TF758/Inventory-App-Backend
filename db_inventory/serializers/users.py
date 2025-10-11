@@ -1,16 +1,9 @@
 from rest_framework import serializers
-from .rooms import RoomNameSerializer
-from ..models import User, UserLocation
+from django.db import transaction
+from ..models import User, UserLocation, RoleAssignment, Department, Location, Room
+from django.core.exceptions import ValidationError
 
-class UserPrivateSerializer(serializers.ModelSerializer):
-    current_role = serializers.CharField(source='active_role.get_role_id', read_only=True)
 
-    class Meta:
-        model = User
-        fields = [
-           'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'current_role']
-        
-        ordering = ['-id']
 
 class UserReadSerializerFull(serializers.ModelSerializer):
     """Serilziers known information about a user"""
@@ -33,6 +26,8 @@ class UserWriteSerializer(serializers.ModelSerializer):
         ]     
 
 class UserAreaSerializer(serializers.ModelSerializer):
+
+    """Provide information about a user and thier location"""
     user_id = serializers.CharField(source='user.public_id')
     email = serializers.EmailField(source='user.email')
     fname = serializers.CharField(source='user.fname')
@@ -74,6 +69,7 @@ class UserAreaSerializer(serializers.ModelSerializer):
         if exclude_department:
             self.fields.pop('department_id', None)
             self.fields.pop('department_name', None)
+
 
 
 __all__ = [

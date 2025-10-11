@@ -144,3 +144,5 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
     'delete': 'destroy'
 })
 user_list_create_view = user_viewsets.UserModelViewSet.as_view({'get': 'list', 'post':'create'})
+
+user_role_create = role_viewsets.UserRoleCreateView.as_view()
