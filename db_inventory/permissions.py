@@ -278,7 +278,7 @@ class DepartmentPermission(BasePermission):
     """
 
     method_role_map = {
-        "GET": "ROOM_VIEWER",     # minimum role to view departments
+        "GET": "DEPARTMENT_VIEWER",     # minimum role to view departments
         "POST": "SITE_ADMIN",
         "PUT": "DEPARTMENT_ADMIN",
         "PATCH": "DEPARTMENT_ADMIN",
