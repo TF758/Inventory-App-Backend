@@ -4,10 +4,11 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from ..serializers.roles import *
 from ..models import User, RoleAssignment
 from rest_framework import status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from ..models import RoleAssignment, User
 from rest_framework import viewsets
+from django.shortcuts import get_object_or_404
 
 
 class ActiveRoleViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
@@ -40,48 +41,42 @@ class ActiveRoleViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
         if not role_id:
             raise NotFound("Role ID is required.")
 
-        try:
-            role = RoleAssignment.objects.get(public_id=role_id)
-        except RoleAssignment.DoesNotExist:
-            raise NotFound(f"No role found with public_id: {role_id}")
+        role = get_object_or_404(RoleAssignment, public_id=role_id)
 
         if role.user != request.user:
-            raise PermissionDenied("You cannot activate a role not assigned to you.")
+            raise PermissionDenied("Cannot activate a role not assigned to you.")
 
-        # ✅ update the user, not the role
         request.user.active_role = role
         request.user.save(update_fields=["active_role"])
-
-        return Response(
-            {"active_role": role.public_id},
-            status=status.HTTP_200_OK,
-        )
-    
+        return Response({"active_role": role.public_id})
+        
 
 class MyRoleList(ListAPIView):
     serializer_class = RoleReadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return self.request.user.role_assignments.all()
+        return self.request.user.role_assignments.select_related(
+            'department', 'location', 'room', 'assigned_by'
+        )
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data) 
-
+  
 class RoleDetailView(viewsets.ModelViewSet):
     queryset = RoleAssignment.objects.all()
     permission_classes = [IsAuthenticated]
 
     lookup_field = 'public_id'
 
+    def get_queryset(self):
+        # optimize related objects to avoid N+1 queries
+        return RoleAssignment.objects.select_related(
+            'user', 'department', 'location', 'room', 'assigned_by'
+        )
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return RoleWriteSerializer
         return RoleReadSerializer
-
 
 
 class UserRoleListView(ListAPIView):
@@ -98,5 +93,14 @@ class UserRoleListView(ListAPIView):
             user = User.objects.get(public_id=public_id)
         except User.DoesNotExist:
             return RoleAssignment.objects.none()
-        return RoleAssignment.objects.filter(user=user)
 
+        return RoleAssignment.objects.filter(user=user).select_related(
+            'department', 'location', 'room', 'assigned_by'
+        )
+
+class UserRoleCreateView(CreateAPIView):
+    serializer_class = RoleWriteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(assigned_by=self.request.user)
