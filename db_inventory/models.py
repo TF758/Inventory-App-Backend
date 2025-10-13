@@ -27,11 +27,14 @@ def generate_base62_identifier(length=12):
     return int_to_base62(random_int).rjust(length, BASE62_ALPHABET[0])
 
 def generate_prefixed_public_id(model_class, prefix, length=10):
-    """Generate a unique public_id with a prefix."""
-    while True:
-        candidate = prefix + generate_base62_identifier(length)
+    """Generate a unique Base62 ID using UUID for better performance."""
+    for _ in range(5):  # retry few times
+        u = uuid.uuid4().int >> 64
+        b62 = int_to_base62(u)[:length]
+        candidate = f"{prefix}{b62}"
         if not model_class.objects.filter(public_id=candidate).exists():
             return candidate
+    raise RuntimeError(f"Failed to generate unique public_id for {model_class.__name__}")
 
 class CustomUserManager(UserManager):
     def _create_user(self, email, password, **extra_fields):
@@ -62,7 +65,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
     active_role = models.ForeignKey(
         "RoleAssignment",
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="active_for_users", 
@@ -85,12 +88,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = 'User'
         verbose_name_plural = 'Users'
 
+        indexes = [
+        models.Index(fields=["public_id"]),
+        models.Index(fields=["email"]),
+        models.Index(fields=["role"]),
+        models.Index(fields=["is_active"]),
+    ]
+
 
     def __str__(self):
         return self.email 
 
     def get_full_name(self):
-        return self.fname + ' ' + self.lname if self.fname or self.lname else self.email
+        parts = [self.fname, self.lname]
+        return " ".join(p for p in parts if p).strip() or self.email
 
     def get_short_name(self):
         return self.fname if self.fname else self.email.split('@')[0]
@@ -110,6 +121,12 @@ class Department(models.Model):
     img_link = models.URLField(blank=True, default='')
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["name"]),
+        ]
+
 
     def __str__(self):
         return self.name
@@ -121,8 +138,15 @@ class Department(models.Model):
 
 class Location(models.Model):
     name = models.CharField(max_length=255)
-    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True)
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
+
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["name"]),
+        ]
 
     def __str__(self):
         return self.name + ' @ ' + self.department.name
@@ -137,9 +161,15 @@ class Location(models.Model):
         verbose_name_plural = 'Locations'
 
 class Room(models.Model):
-    location = models.ForeignKey(Location, on_delete=models.PROTECT, related_name='rooms')
+    location = models.ForeignKey(Location, on_delete=models.SET_NULL, related_name='rooms',  null=True,)
     name = models.CharField(max_length=255)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["name"]),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -151,7 +181,7 @@ class Room(models.Model):
 
 class UserLocation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
     date_joined = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -161,6 +191,10 @@ class UserLocation(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.room.name if self.room else 'No Room'}"
+    
+    def clean(self):
+        if self.room and UserLocation.objects.filter(user=self.user, room=self.room).exclude(pk=self.pk).exists():
+            raise ValidationError("This user is already assigned to this room.")
 
 class Equipment(models.Model):
     name = models.CharField(max_length=100)
@@ -168,10 +202,14 @@ class Equipment(models.Model):
     model = models.CharField(max_length=100, blank=True, default="")
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
 
-    # def __str__(self):
-    #     return self.name
+    class Meta:
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["name"]),
+            models.Index(fields=["serial_number"]),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.public_id:
@@ -185,7 +223,14 @@ class Component(models.Model):
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
-    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, null=True, blank=True)
+    equipment = models.ForeignKey(Equipment, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["name"]),
+            models.Index(fields=["serial_number"]),
+        ]
 
     def __str__(self):
         return self.name + ' @ ' + self.equipment.name
@@ -202,6 +247,11 @@ class Consumable(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
+    indexes = [
+        models.Index(fields=["public_id"]),
+        models.Index(fields=["name"]),
+    ]
+
     def __str__(self):
         return self.name
 
@@ -215,7 +265,12 @@ class Accessory(models.Model):
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.IntegerField(default=0)
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True)
+    room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
+
+    indexes = [
+        models.Index(fields=["public_id"]),
+        models.Index(fields=["name"]),
+    ]
 
     def __str__(self):
         return self.name
@@ -247,17 +302,21 @@ class RoleAssignment(models.Model):
     user = models.ForeignKey("User", on_delete=models.CASCADE,  related_name="role_assignments",)
     role = models.CharField(max_length=40, choices=ROLE_CHOICES)
 
-    department = models.ForeignKey("Department", on_delete=models.CASCADE, null=True, blank=True,related_name="role_assignments" )
-    location = models.ForeignKey("Location", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
-    room = models.ForeignKey("Room", on_delete=models.CASCADE, null=True, blank=True, related_name="role_assignments")
+    department = models.ForeignKey("Department", on_delete=models.SET_NULL, null=True, blank=True,related_name="role_assignments" )
+    location = models.ForeignKey("Location", on_delete=models.SET_NULL, null=True, blank=True, related_name="role_assignments")
+    room = models.ForeignKey("Room", on_delete=models.SET_NULL, null=True, blank=True, related_name="role_assignments")
 
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
 
-    assigned_by = models.ForeignKey("User", on_delete=models.CASCADE,  null=True, blank=True )
+    assigned_by = models.ForeignKey("User", on_delete=models.SET_NULL,  null=True, blank=True )
     assigned_date =  models.DateTimeField(default=timezone.now)
 
     class Meta:
         unique_together = ("user", "role", "department", "location", "room")
+        indexes = [
+        models.Index(fields=["public_id"]),
+        models.Index(fields=["role"]),
+    ]
 
     def clean(self):
         """
@@ -350,13 +409,22 @@ class UserSession(models.Model):
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=256, null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
     def mark_revoked(self):
         self.status = self.Status.REVOKED
         self.save(update_fields=["status"])
 
-    def is_active(self):
+    def is_valid(self):
+        """Check if the session is still active and not expired."""
         return self.status == self.Status.ACTIVE and self.expires_at >= timezone.now()
-
+    
+   
     @staticmethod
     def hash_token(raw_token: str) -> str:
         """Hash refresh token before storing or comparing."""
