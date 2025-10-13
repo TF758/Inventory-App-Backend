@@ -180,6 +180,7 @@ class Room(models.Model):
         return f"{self.name} @ {self.location.name}"
 
 class UserLocation(models.Model):
+    public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
     date_joined = models.DateTimeField(default=timezone.now)
@@ -191,6 +192,11 @@ class UserLocation(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.room.name if self.room else 'No Room'}"
+    
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(Equipment, prefix="UL")
+        super().save(*args, **kwargs)
     
     def clean(self):
         if self.room and UserLocation.objects.filter(user=self.user, room=self.room).exclude(pk=self.pk).exists():
