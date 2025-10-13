@@ -1,10 +1,10 @@
 from rest_framework import viewsets
-from ..serializers.users import  UserReadSerializerFull, UserWriteSerializer
+from ..serializers.users import  UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
 from django.db.models import Case, When, Value, IntegerField
-from ..models import User
+from ..models import User, UserLocation
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import UserFilter
+from ..filters import UserFilter, UserLocationFilter
 from ..mixins import ScopeFilterMixin
 from ..pagination import FlexiblePagination
 from ..permissions import UserPermission
@@ -66,4 +66,53 @@ This viewset provides `list`, `create`, actions for User objects."""
         read_data = UserReadSerializerFull(user, context={'request': request}).data
         headers = self.get_success_headers(serializer.data)
         return Response(read_data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+
+class UserLocationViewSet(viewsets.ModelViewSet):
+    """
+    Manage UserLocation records — assigning users to rooms, and viewing their
+    associated location/department hierarchy.
+    """
+
+    queryset = UserLocation.objects.select_related(
+        "user", "room", "room__location", "room__location__department"
+    ).all()
+    serializer_class = UserAreaSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = UserLocationFilter
+  
+
+    def get_serializer_class(self):
+        if self.action in ["update", "partial_update", "create"]:
+            return UserLocationWriteSerializer
+        return UserAreaSerializer
+
+    def get_queryset(self):
+        """
+        Optionally filter by user, room, location, or department via query params.
+        Example: /api/user-locations/?department_id=DPT123ABC
+        """
+        queryset = self.queryset
+        user_id = self.request.query_params.get("user_id")
+        room_id = self.request.query_params.get("room_id")
+        location_id = self.request.query_params.get("location_id")
+        department_id = self.request.query_params.get("department_id")
+
+        if user_id:
+            queryset = queryset.filter(user__public_id=user_id)
+        if room_id:
+            queryset = queryset.filter(room__public_id=room_id)
+        if location_id:
+            queryset = queryset.filter(room__location__public_id=location_id)
+        if department_id:
+            queryset = queryset.filter(room__location__department__public_id=department_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """
+        Create a UserLocation — validation handled by serializer.
+        """
+        serializer.save()
 

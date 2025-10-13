@@ -146,3 +146,11 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
 user_list_create_view = user_viewsets.UserModelViewSet.as_view({'get': 'list', 'post':'create'})
 
 user_role_create = role_viewsets.UserRoleCreateView.as_view()
+
+user_location_list_create_view = user_viewsets.UserLocationViewSet.as_view({'get': 'list', 'post':'create'})
+user_location_id_detail_view = user_viewsets.UserLocationViewSet.as_view({  
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy'
+})

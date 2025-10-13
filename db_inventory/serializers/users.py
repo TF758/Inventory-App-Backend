@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from django.db import transaction
-from ..models import User, UserLocation, RoleAssignment, Department, Location, Room
+from ..models import User, UserLocation, Room
 from django.core.exceptions import ValidationError
-
+from django.utils import timezone
 
 
 class UserReadSerializerFull(serializers.ModelSerializer):
@@ -46,12 +45,13 @@ class UserAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserLocation
         fields = [
+            'public_id',
             'user_id', 'email', 'fname', 'lname', 'job_title',
             'room_id', 'room_name',
             'location_id', 'location_name',
             'department_id', 'department_name',
         ]
-
+        read_only_fields = fields
 
     def __init__(self, *args, **kwargs):
         exclude_room = kwargs.pop('exclude_room', False)
@@ -72,8 +72,66 @@ class UserAreaSerializer(serializers.ModelSerializer):
 
 
 
+class UserLocationWriteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating/updating UserLocation.
+    Supports assigning and unassigning a user from a room.
+    """
+
+    user_id = serializers.CharField(write_only=True)
+    room_id = serializers.CharField(write_only=True, allow_null=True, required=False)
+
+    public_id = serializers.CharField(read_only=True)
+    date_joined = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = UserLocation
+        fields = ['public_id', 'user_id', 'room_id', 'date_joined']
+
+    def validate(self, attrs):
+        user_id = attrs.get('user_id')
+        room_id = attrs.get('room_id', None)
+
+        # Validate user
+        try:
+            user = User.objects.get(public_id=user_id)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"user_id": "Invalid user public_id."})
+
+        # Handle room validation (allow null for unassigning)
+        room = None
+        if room_id:
+            try:
+                room = Room.objects.get(public_id=room_id)
+            except Room.DoesNotExist:
+                raise serializers.ValidationError({"room_id": "Invalid room public_id."})
+
+        # Enforce unique user-room constraint only if room is not null
+        if room is not None:
+            existing = UserLocation.objects.filter(user=user, room=room)
+            if self.instance:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                raise serializers.ValidationError("This user is already assigned to this room.")
+
+        attrs['user'] = user
+        attrs['room'] = room
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('user_id', None)
+        validated_data.pop('room_id', None)
+        validated_data.setdefault('date_joined', timezone.now())
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop('user_id', None)
+        validated_data.pop('room_id', None)
+        return super().update(instance, validated_data)
+
 __all__ = [
     "UserWriteSerializer",
     "UserReadSerializerFull",
     "UserAreaSerializer",
+    "UserLocationWriteSerializer"
 ]

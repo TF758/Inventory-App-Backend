@@ -227,3 +227,50 @@ class ConsumableFilter(django_filters.FilterSet):
             'location',
             'department',
         ]
+
+
+class UserLocationFilter(django_filters.FilterSet):
+    """
+    Filters for UserLocation based on related public_ids and user info.
+    """
+
+    # --- Filter by public IDs ---
+    user_id = django_filters.CharFilter(
+        field_name="user__public_id", lookup_expr="iexact", label="User Public ID"
+    )
+    room_id = django_filters.CharFilter(
+        field_name="room__public_id", lookup_expr="iexact", label="Room Public ID"
+    )
+    location_id = django_filters.CharFilter(
+        field_name="room__location__public_id", lookup_expr="iexact", label="Location Public ID"
+    )
+    department_id = django_filters.CharFilter(
+        field_name="room__location__department__public_id", lookup_expr="iexact", label="Department Public ID"
+    )
+
+    # --- Filter by user info ---
+    email = django_filters.CharFilter(
+        field_name="user__email", lookup_expr="icontains", label="User Email"
+    )
+    fname = django_filters.CharFilter(
+        field_name="user__fname", lookup_expr="icontains", label="First Name"
+    )
+    lname = django_filters.CharFilter(
+        field_name="user__lname", lookup_expr="icontains", label="Last Name"
+    )
+    job_title = django_filters.CharFilter(
+        field_name="user__job_title", lookup_expr="icontains", label="Job Title"
+    )
+
+    class Meta:
+        model = UserLocation
+        fields = [
+            "user_id",
+            "room_id",
+            "location_id",
+            "department_id",
+            "email",
+            "fname",
+            "lname",
+            "job_title",
+        ]
