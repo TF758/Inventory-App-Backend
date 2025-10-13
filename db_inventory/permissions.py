@@ -383,69 +383,85 @@ class AssetPermission(BasePermission):
 
 class UserPermission(BasePermission):
     """
-    Permission for managing users based on the request.user's active role.
+    Permission for User objects based on the request.user's active_role.
+    - GET: user can retrieve users in scope or themselves
+    - POST/PUT/PATCH/DELETE: hierarchy + scope enforced
     """
 
     method_role_map = {
-        "GET": "DEPARTMENT_VIEWER",    # Can list/retrieve users in scope
-        "POST": "DEPARTMENT_ADMIN",    # Can create users in their department
-        "PUT": "DEPARTMENT_ADMIN",     # Can update users in scope
+        "GET": "DEPARTMENT_VIEWER",       # minimum role for general GET
+        "POST": "DEPARTMENT_ADMIN",       # create users
+        "PUT": "DEPARTMENT_ADMIN",        # update users
         "PATCH": "DEPARTMENT_ADMIN",
-        "DELETE": "DEPARTMENT_ADMIN",  # Can delete users in scope
+        "DELETE": "DEPARTMENT_ADMIN",     # delete users
     }
 
     def has_permission(self, request, view):
+        """
+        Non-object level permission (list, create)
+        """
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
-           return False
+            return False
+
+        # SITE_ADMIN always allowed
+        if active_role.role == "SITE_ADMIN":
+            return True
 
         required_role = self.method_role_map.get(request.method)
         if not required_role:
-             return False
+            return False
 
-        # SITE_ADMIN can always proceed
-        if active_role.role == "SITE_ADMIN":
+        # GET on list view: allow, filtering will be applied in get_queryset
+        if request.method == "GET":
             return True
 
-        # Check hierarchy
-        if not has_hierarchy_permission(active_role.role, required_role):
-             return False
-
-        return True
+        # Other methods: check hierarchy
+        return has_hierarchy_permission(active_role.role, required_role)
 
     def has_object_permission(self, request, view, obj):
+        """
+        Object-level permission (retrieve, update, delete)
+        """
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
 
-        # SITE_ADMIN bypasses
+        # SITE_ADMIN always allowed
         if active_role.role == "SITE_ADMIN":
             return True
 
-        required_role = self.method_role_map.get(request.method)
-
-        # Check hierarchy
-        if not has_hierarchy_permission(active_role.role, required_role):
-            return False
-
-        # Object-level permission
-        target_role = getattr(obj, "active_role", None)
-
-        # Allow GET if target user has no active_role
-        if request.method == "GET" and target_role is None:
+        # Self-access always allowed
+        if request.user == obj:
             return True
 
-        # For other methods, deny if no target_role
+        required_role = self.method_role_map.get(request.method)
+        if not required_role:
+            return False
+
+        # GET: only check scope
+        if request.method == "GET":
+            target_role = getattr(obj, "active_role", None)
+            if not target_role:
+                return False
+            return is_in_scope(
+                active_role,
+                room=target_role.room,
+                location=target_role.location,
+                department=target_role.department
+            )
+
+        # POST/PUT/PATCH/DELETE: check both hierarchy and scope
+        target_role = getattr(obj, "active_role", None)
         if not target_role:
             return False
 
-        # Check scope
-        if not is_in_scope(
-            active_role,
-            room=target_role.room,
-            location=target_role.location,
-            department=target_role.department
-        ):
-            return False
-
-        return True
+        return (
+            has_hierarchy_permission(active_role.role, required_role)
+            and is_in_scope(
+                active_role,
+                room=target_role.room,
+                location=target_role.location,
+                department=target_role.department
+            )
+        )

@@ -58,24 +58,24 @@ class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
     
     def perform_create(self, serializer):
-        room_id = self.request.data.get("room")
-        if not room_id:
-            raise PermissionDenied("You must specify a room to create equipment.")
-        
-        room = Room.objects.filter(pk=room_id).first()
-        if not room:
-            raise PermissionDenied("Invalid room ID.")
+            room_public_id = self.request.data.get("room")
+            if not room_public_id:
+                raise PermissionDenied("You must specify a room to create consumable.")
+            
+            # Lookup by public_id
+            room = Room.objects.filter(public_id=room_public_id).first()
+            if not room:
+                raise PermissionDenied("Invalid room public ID.")
 
-        active_role = getattr(self.request.user, "active_role", None)
-        if not active_role:
-            raise PermissionDenied("No active role assigned.")
+            active_role = getattr(self.request.user, "active_role", None)
+            if not active_role:
+                raise PermissionDenied("No active role assigned.")
 
-        # Permission check for POST creation scope
-        if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
-            raise PermissionDenied("You do not have permission to create equipment in this room.")
+            # Permission check
+            if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
+                raise PermissionDenied("You do not have permission to create consumable in this room.")
 
-        serializer.save(room=room)
-    
+            serializer.save(room=room)
 
 class ConsumableBatchValidateView(ConsumableBatchMixin, APIView):
     save_to_db = False
