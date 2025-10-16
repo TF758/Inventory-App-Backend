@@ -154,3 +154,5 @@ user_location_id_detail_view = user_viewsets.UserLocationViewSet.as_view({
     'patch': 'partial_update',
     'delete': 'destroy'
 })
+# --- User Location by User ---
+user_location_by_user_view = user_viewsets.UserLocationByUserView.as_view()

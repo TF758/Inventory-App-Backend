@@ -73,11 +73,6 @@ class UserAreaSerializer(serializers.ModelSerializer):
 
 
 class UserLocationWriteSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating/updating UserLocation.
-    Supports assigning and unassigning a user from a room.
-    """
-
     user_id = serializers.CharField(write_only=True)
     room_id = serializers.CharField(write_only=True, allow_null=True, required=False)
 
@@ -98,7 +93,7 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
         except User.DoesNotExist:
             raise serializers.ValidationError({"user_id": "Invalid user public_id."})
 
-        # Handle room validation (allow null for unassigning)
+        # Validate room (allow null for unassigning)
         room = None
         if room_id:
             try:
@@ -106,13 +101,15 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
             except Room.DoesNotExist:
                 raise serializers.ValidationError({"room_id": "Invalid room public_id."})
 
-        # Enforce unique user-room constraint only if room is not null
+        # Enforce unique user-room constraint
         if room is not None:
             existing = UserLocation.objects.filter(user=user, room=room)
             if self.instance:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
-                raise serializers.ValidationError("This user is already assigned to this room.")
+                raise serializers.ValidationError({
+                    "room_id": "This user is already assigned to this room."
+                })
 
         attrs['user'] = user
         attrs['room'] = room

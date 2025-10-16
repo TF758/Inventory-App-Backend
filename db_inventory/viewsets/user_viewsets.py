@@ -11,6 +11,7 @@ from ..permissions import UserPermission
 from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.views import APIView
 
 class UserModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -81,7 +82,10 @@ class UserLocationViewSet(viewsets.ModelViewSet):
     serializer_class = UserAreaSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = UserLocationFilter
-  
+
+    
+    lookup_field = "public_id"  
+
 
     def get_serializer_class(self):
         if self.action in ["update", "partial_update", "create"]:
@@ -116,3 +120,18 @@ class UserLocationViewSet(viewsets.ModelViewSet):
         """
         serializer.save()
 
+
+class UserLocationByUserView(APIView):
+    """
+    Retrieve the UserLocation assignment for a specific user.
+    """
+
+    def get(self, request, user_id: str):
+        try:
+            assignment = UserLocation.objects.select_related(
+                "user", "room", "room__location", "room__location__department"
+            ).get(user__public_id=user_id)
+            serializer = UserAreaSerializer(assignment)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except UserLocation.DoesNotExist:
+            return Response({"detail": "User has no location assignment"}, status=status.HTTP_404_NOT_FOUND)
