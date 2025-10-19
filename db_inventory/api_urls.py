@@ -20,6 +20,7 @@ urlpatterns = [
      path('user-locations/', user_location_list_create_view, name='userlocation-list-create'),
     path('user-locations/<str:public_id>/', user_location_id_detail_view, name='userlocation-detail'),
     path('user-locations/users/<str:public_id>/', user_location_by_user_view, name='userlocation-by-user'),
+    path('unallocated-users/', unallocated_user_list_view, name='unallocated-user-list'),
 
     path("departments/", include("db_inventory.urls.department_urls")),
 

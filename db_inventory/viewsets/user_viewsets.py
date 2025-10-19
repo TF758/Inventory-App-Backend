@@ -135,3 +135,24 @@ class UserLocationByUserView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except UserLocation.DoesNotExist:
             return Response({"detail": "User has no location assignment"}, status=status.HTTP_404_NOT_FOUND)
+        
+
+
+class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+    """
+    Retrieve users not assigned to any room.
+    """
+
+    queryset = User.objects.filter(userlocation__isnull=True) 
+    serializer_class = UserReadSerializerFull
+
+    model_class = User
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['^email', 'email']
+
+    filterset_class = UserFilter
+
+    pagination_class = FlexiblePagination
+
+    permission_classes = [UserPermission]
