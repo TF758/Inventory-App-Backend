@@ -187,9 +187,15 @@ class UserLocation(models.Model):
     date_joined = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ('user', 'room')
         verbose_name = 'User Room'
         verbose_name_plural = 'User Rooms'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user'],
+                condition=models.Q(is_current=True),
+                name='unique_current_location_per_user'
+            )
+        ]
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.room.name if self.room else 'No Room'}"

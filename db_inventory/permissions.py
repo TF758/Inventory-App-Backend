@@ -109,9 +109,9 @@ def ensure_permission(
 def filter_queryset_by_scope(user: User, queryset, model_class):
     """
     Restrict a queryset to only objects within the user's active role scope.
-    Site admins always see everything.
+    Supports unallocated users and users with no roles.
     """
-    active_role = user.active_role
+    active_role = getattr(user, "active_role", None)
 
     if not active_role:
         return queryset.none()  # no active role, no access
@@ -122,6 +122,9 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
 
     q = Q()
 
+    # --------------------------
+    # ROOM MODEL
+    # --------------------------
     if model_class == Room:
         if active_role.room:
             q |= Q(pk=active_role.room.pk)
@@ -130,23 +133,29 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         elif active_role.department:
             q |= Q(location__department=active_role.department)
 
+    # --------------------------
+    # LOCATION MODEL
+    # --------------------------
     elif model_class == Location:
         if active_role.room:
-        # Room-level roles cannot see any locations
             return queryset.none()
         if active_role.location:
             q |= Q(pk=active_role.location.pk)
         elif active_role.department:
             q |= Q(department=active_role.department)
 
+    # --------------------------
+    # DEPARTMENT MODEL
+    # --------------------------
     elif model_class == Department:
         if active_role.room or active_role.location:
-        # Room or location roles cannot see departments
             return queryset.none()
         if active_role.department:
             q |= Q(pk=active_role.department.pk)
 
-
+    # --------------------------
+    # EQUIPMENT / ACCESSORY / CONSUMABLE / COMPONENT
+    # --------------------------
     elif model_class in (Equipment, Accessory, Consumable):
         if active_role.room:
             q |= Q(room=active_role.room)
@@ -155,22 +164,38 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         elif active_role.department:
             q |= Q(room__location__department=active_role.department)
 
-    elif model_class == Component:
+    elif model_class.__name__ == "Component":
         if active_role.room:
-             q |= Q(equipment__room=active_role.room)
+            q |= Q(equipment__room=active_role.room)
         elif active_role.location:
             q |= Q(equipment__room__location=active_role.location)
         elif active_role.department:
             q |= Q(equipment__room__location__department=active_role.department)
 
+    # --------------------------
+    # USER MODEL (extended)
+    # --------------------------
+    elif model_class.__name__ == "User":
+        user_q = Q()
 
-    elif model_class == User:
-        if active_role.room:
-            q |= Q(role_assignments__room=active_role.room)
+        if active_role.department:
+            user_q |= Q(role_assignments__department=active_role.department)
+            user_q |= Q(user_locations__room__location__department=active_role.department)
+
         elif active_role.location:
-            q |= Q(role_assignments__location=active_role.location)
-        elif active_role.department:
-            q |= Q(role_assignments__department=active_role.department)
+            user_q |= Q(role_assignments__location=active_role.location)
+            user_q |= Q(user_locations__room__location=active_role.location)
+
+        elif active_role.room:
+            user_q |= Q(role_assignments__room=active_role.room)
+            user_q |= Q(user_locations__room=active_role.room)
+
+        # Optional: include users with *no* role/location at all (only for higher scopes)
+        if active_role.department or active_role.role in ("DEPARTMENT_ADMIN", "LOCATION_ADMIN"):
+            user_q |= Q(role_assignments__isnull=True, user_locations__isnull=True)
+
+        q |= user_q
+
     return queryset.filter(q).distinct()
 
 
