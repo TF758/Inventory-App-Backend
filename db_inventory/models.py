@@ -65,7 +65,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
     active_role = models.ForeignKey(
         "RoleAssignment",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="active_for_users", 
@@ -183,6 +183,7 @@ class UserLocation(models.Model):
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
+    is_current = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -195,7 +196,7 @@ class UserLocation(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.public_id:
-            self.public_id = generate_prefixed_public_id(Equipment, prefix="UL")
+            self.public_id = generate_prefixed_public_id(UserLocation, prefix="UL")
         super().save(*args, **kwargs)
     
     def clean(self):
