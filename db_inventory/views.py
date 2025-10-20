@@ -68,6 +68,7 @@ department_locations_light_view = department_viewsets.DepartmentLocationsMiniVie
 department_locations_view = department_viewsets.DepartmentLocationsViewSet.as_view({'get': 'list',})
 department_users_light_view = department_viewsets.DepartmentUsersMiniViewSet.as_view({'get': 'list',})
 department_users_view = department_viewsets.DepartmentUsersViewSet.as_view({'get': 'list',})
+department_roles_view = department_viewsets.DepartmentRolesViewSet.as_view({'get': 'list'})
 
 # --- Equipment ---
 equipment_batch_import_view = equipment_viewsets.EquipmentBatchImportView.as_view()
@@ -101,6 +102,7 @@ locations_equipment_light_view = location_viewsets.LocationEquipmentMiniViewSet.
 locations_equipment_view = location_viewsets.LocationEquipmentView.as_view({'get': 'list'})
 locations_users_light_view = location_viewsets.LocationUsersMiniViewSet.as_view({'get': 'list'})
 locations_users_view = location_viewsets.LocationUsersView.as_view({'get': 'list'})
+location_roles_view = location_viewsets.LocationRolesViewSet.as_view({'get': 'list'})
 
 # --- Role ---
 my_active_role = role_viewsets.ActiveRoleViewSet.as_view({'get': 'retrieve', 'put': 'update'})
@@ -112,6 +114,8 @@ role_detial_view = role_viewsets.RoleDetailView.as_view({
     'delete': 'destroy'
 })
 user_role_list = role_viewsets.UserRoleListView.as_view()
+
+role_assignemnt_list_create_view = role_viewsets.RoleAssignmentViewSet.as_view({'get': 'list', 'post':'create'})
 
 # --- Room ---
 room_accessories_light_view = room_viewsets.RoomAccessoriesMiniViewSet.as_view({'get': 'list'})
@@ -132,6 +136,7 @@ room_list_create_view = room_viewsets.RoomModelViewSet.as_view({'get': 'list', '
 room_list_view = room_viewsets.RoomListViewset.as_view({'get': 'list'})
 room_users_light_view = room_viewsets.RoomUsersMiniViewSet.as_view({'get': 'list'})
 room_users_view = room_viewsets.RoomUsersViewSet.as_view({'get': 'list'})
+room_roles_view = room_viewsets.RoomRolesViewSet.as_view({'get': 'list'})
 
 # --- Serializer ---
 serializer_parameters_view = general_viewsets.SerializerFieldsView.as_view()

@@ -24,4 +24,6 @@ urlpatterns = [
 
     path('<str:public_id>/components-full/', department_components_view, name='department-components'),
     path('<str:public_id>/components-light/', department_components_light_view, name='department-components-light'),
+
+    path('<str:public_id>/roles/', department_roles_view, name='department-roles'),
 ]

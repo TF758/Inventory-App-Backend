@@ -2,8 +2,8 @@ from rest_framework import viewsets
 from ..serializers.locations import *
 from ..serializers.equipment import EquipmentSerializer
 from ..serializers import *
-
-from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component
+from ..serializers.roles import RoleReadSerializer
+from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component, RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, AreaUserFilter, ComponentFilter
@@ -12,6 +12,7 @@ from ..mixins import ScopeFilterMixin
 from ..permissions import LocationPermission
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import BasePagination, FlexiblePagination
+from django.db.models import Q
 
 class LocationModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -334,3 +335,25 @@ class LocationComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelView
             Component.objects.filter(equipment__room__location__public_id=location_id)
             .order_by('-id')[:20]
         )
+
+class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+    """Retrieves a list of users and thier roles in a given location"""
+    serializer_class = RoleReadSerializer
+    lookup_field = 'public_id'
+
+    permission_classes=[LocationPermission]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['role']
+
+    # filterset_class = RoleFilter
+
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+
+        return RoleAssignment.objects.filter(
+            Q(location__public_id=location_id) |
+            Q(room__location__public_id=location_id)
+        ).order_by('-id')

@@ -3,6 +3,7 @@ from rest_framework import viewsets, filters, mixins
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from ..models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation, Room
 from ..serializers import *
+from ..serializers.roles import RoleReadSerializer
 from django.views.generic.detail import SingleObjectMixin
 from rest_framework.generics import ListAPIView
 from ..filters import *
@@ -13,6 +14,7 @@ from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
 from ..permissions import DepartmentPermission
 from ..pagination import  FlexiblePagination
+from django.db.models import Q
 
 class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -333,3 +335,27 @@ class DepartmentComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVi
             Component.objects.filter(equipment__room__location__department__public_id=department_id)
             .order_by('-id')[:20]
         )
+    
+
+class DepartmentRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+    """Retrieves a list of users and thier roles in a given department"""
+    serializer_class = RoleReadSerializer
+    lookup_field = 'public_id'
+
+    permission_classes=[DepartmentPermission]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['role']
+
+    # filterset_class = RoleFilter
+
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        department_id = self.kwargs.get('public_id')
+        
+        return RoleAssignment.objects.filter(
+            Q(department__public_id=department_id) |
+            Q(location__department__public_id=department_id) |
+            Q(room__location__department__public_id=department_id)
+        ).order_by('-id')

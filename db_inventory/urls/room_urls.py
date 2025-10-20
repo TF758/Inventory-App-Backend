@@ -20,4 +20,6 @@ path('<str:public_id>/equipment-light/', room_equipment_light_view, name='room-e
 path('<str:public_id>/consumables-light/', room_consumables_light_view, name='room-consumables-light'),
 path('<str:public_id>/accessories-light/', room_accessories_light_view, name='room-accessories-light'),
 path('<str:public_id>/components-light/', room_components_light_view, name='room-components-light'),
+
+path('<str:public_id>/roles/', room_roles_view, name='room-roles'),
 ]

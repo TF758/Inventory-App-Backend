@@ -9,6 +9,23 @@ from rest_framework.permissions import IsAuthenticated
 from ..models import RoleAssignment, User
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
+from ..mixins import ScopeFilterMixin
+from ..pagination import BasePagination, FlexiblePagination
+
+class RoleAssignmentViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+    """ViewSet for managing RoleAssignment objects.
+    This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for RoleAssignment objects."""
+
+    queryset = RoleAssignment.objects.all().order_by("-assigned_date", "-id")
+    lookup_field = 'public_id'
+
+    pagination_class = FlexiblePagination
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return RoleWriteSerializer
+        return RoleReadSerializer
 
 
 class ActiveRoleViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):

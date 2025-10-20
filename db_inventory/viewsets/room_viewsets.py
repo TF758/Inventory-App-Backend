@@ -10,6 +10,8 @@ from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination
 from ..serializers import *
+from ..serializers.roles import RoleReadSerializer
+from django.db.models import Q
 
 class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
@@ -268,3 +270,22 @@ class RoomAccessoriesMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet)
         kwargs['exclude_room'] = True
         return super().get_serializer(*args, **kwargs)
 
+
+class RoomRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+    """Retrieves a list of users and their roles in a given room"""
+    serializer_class = RoleReadSerializer
+    lookup_field = 'public_id'
+
+    permission_classes = [RoomPermission]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['role']
+
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        room_id = self.kwargs.get('public_id')
+
+        return RoleAssignment.objects.filter(
+            Q(room__public_id=room_id)
+        ).order_by('-id')
