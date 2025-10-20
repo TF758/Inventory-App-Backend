@@ -105,17 +105,27 @@ locations_users_view = location_viewsets.LocationUsersView.as_view({'get': 'list
 location_roles_view = location_viewsets.LocationRolesViewSet.as_view({'get': 'list'})
 
 # --- Role ---
-my_active_role = role_viewsets.ActiveRoleViewSet.as_view({'get': 'retrieve', 'put': 'update'})
-my_role_list = role_viewsets.MyRoleList.as_view()
-role_detial_view = role_viewsets.RoleDetailView.as_view({
+# Active role for logged-in user
+my_active_role = role_viewsets.ActiveRoleViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update'
+})
+
+# User role lists
+my_role_list = role_viewsets.UserRoleList.as_view()  # Handles current user's roles
+user_role_list = role_viewsets.UserRoleList.as_view()  # Handles any user's roles via public_id
+
+# Role assignments CRUD
+role_assignment_list_create_view = role_viewsets.RoleAssignmentViewSet.as_view({
+    'get': 'list',
+    'post': 'create'
+})
+role_detail_view = role_viewsets.RoleAssignmentViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
     'patch': 'partial_update',
     'delete': 'destroy'
 })
-user_role_list = role_viewsets.UserRoleListView.as_view()
-
-role_assignemnt_list_create_view = role_viewsets.RoleAssignmentViewSet.as_view({'get': 'list', 'post':'create'})
 
 # --- Room ---
 room_accessories_light_view = room_viewsets.RoomAccessoriesMiniViewSet.as_view({'get': 'list'})
@@ -149,8 +159,6 @@ user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
     'delete': 'destroy'
 })
 user_list_create_view = user_viewsets.UserModelViewSet.as_view({'get': 'list', 'post':'create'})
-
-user_role_create = role_viewsets.UserRoleCreateView.as_view()
 
 user_location_list_create_view = user_viewsets.UserLocationViewSet.as_view({'get': 'list', 'post':'create'})
 user_location_id_detail_view = user_viewsets.UserLocationViewSet.as_view({  

@@ -25,12 +25,18 @@ class RoleReadSerializer(serializers.ModelSerializer):
     area_type = serializers.SerializerMethodField()
     area_name = serializers.SerializerMethodField()
     assigned_by = serializers.CharField(source="assigned_by.username", read_only=True)
+    user_public_id = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    
+
 
     class Meta:
         model = RoleAssignment
         fields = [
             "id",
             "role",
+            "user_public_id",
+            "username",
             "public_id",
             "area_id",       # <-- generic id (public_id of dept/location/room)
             "area_type",     # <-- tells you which one it is
@@ -67,6 +73,17 @@ class RoleReadSerializer(serializers.ModelSerializer):
         if obj.room:
             return obj.room.name
         return "N/A"
+    
+    def get_user_public_id(self, obj):
+        return obj.user.public_id if obj.user else None
+
+    def get_username(self, obj):
+        user = obj.user
+        if not user:
+            return "N/A"
+        if user.fname and user.lname:
+            return f"{user.fname} {user.lname}"
+        return user.email or "N/A"
 
 class RoleWriteSerializer(serializers.ModelSerializer):
     """

@@ -16,7 +16,6 @@ urlpatterns = [
 
     path('users/', user_list_create_view, name='users'),
     path('users/<str:public_id>/',user_id_detail_view, name='user-detail'),
-    path('users/<public_id>/roles/',user_role_create, name='user-role-create'),
      path('user-locations/', user_location_list_create_view, name='userlocation-list-create'),
     path('user-locations/<str:public_id>/', user_location_id_detail_view, name='userlocation-detail'),
     path('user-locations/users/<str:public_id>/', user_location_by_user_view, name='userlocation-by-user'),
@@ -52,15 +51,17 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
+    path('roles/', role_assignment_list_create_view, name='role-assignment-list-create'),
+    path('roles/<str:public_id>/', role_detail_view, name='role-detail'),
 
-    path('roles/',my_role_list , name='my-role-list'),
-    path('roles/<str:public_id>',role_detial_view , name='role-detail'),
+    # User-specific roles
+    path('my-roles/', my_role_list, name='my-role-list'),
+    path('roles/users/<str:public_id>/', user_role_list, name='user-role-list'),
 
+    # Active role
+    path('roles/me/active-role/', my_active_role, name='my-active-role'),
+    path('roles/me/active-role/<str:role_id>/', my_active_role, name='my-active-role-update'),
 
-    path("roles/me/active-role/", my_active_role, name="my-active-role"),
-    path("roles/me/active-role/<str:role_id>/", my_active_role, name="my-active-role-update"),
-
-    path('roles/users/<str:public_id>',user_role_list , name='user-role-list'),
 
     path('serializer-fields/',serializer_parameters_view , name='get-serializer-fields'),
 
