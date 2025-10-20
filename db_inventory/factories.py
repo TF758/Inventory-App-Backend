@@ -2,6 +2,7 @@ import factory
 from db_inventory.models import User, Department, Location, Equipment, Component, Accessory, Consumable, UserLocation, Room
 from faker import Faker
 import random
+from django.utils import timezone
 
 fake = Faker()
 
@@ -22,7 +23,9 @@ class UserFactory(factory.django.DjangoModelFactory):
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
     job_title = factory.Faker('job')
-    is_active = True
+    is_active = factory.LazyFunction(lambda: random.choices([True, False], weights=[0.85, 0.15])[0])  # 85% active, 15% inactive
+    is_staff = False
+    is_superuser = False
 
 
 class AdminUserFactory(factory.django.DjangoModelFactory):
@@ -64,13 +67,35 @@ class RoomFactory(factory.django.DjangoModelFactory):
     
 
 
+# class UserLocationFactory(factory.django.DjangoModelFactory):
+#     class Meta:
+#         model = UserLocation
+
+#     user = factory.SubFactory(UserFactory)
+#     room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+#     date_joined = factory.LazyFunction(fake.date_time_this_decade)
+#     is_current = False
+
 class UserLocationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = UserLocation
 
-    user = factory.SubFactory(UserFactory)
-    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
-    date_joined = factory.LazyFunction(fake.date_time_this_decade)
+    user = None  # Must be provided when creating
+    room = None  # Optional; if None, user has no location
+    is_current = True
+    date_joined = factory.LazyFunction(lambda: timezone.make_aware(fake.date_time_this_decade()))
+
+    @factory.post_generation
+    def assign_room(obj, create, extracted, **kwargs):
+        """
+        Ensure room assignment is only set if provided.
+        Allows skipping location for some users.
+        """
+        if not create:
+            return
+        if extracted:  # If a room is passed in
+            obj.room = extracted
+            obj.save()
 
 
 class EquipmentFactory(factory.django.DjangoModelFactory):

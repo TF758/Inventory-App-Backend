@@ -164,13 +164,26 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         elif active_role.department:
             q |= Q(room__location__department=active_role.department)
 
-    elif model_class.__name__ == "Component":
+    elif model_class == Component:
         if active_role.room:
             q |= Q(equipment__room=active_role.room)
         elif active_role.location:
             q |= Q(equipment__room__location=active_role.location)
         elif active_role.department:
             q |= Q(equipment__room__location__department=active_role.department)
+
+    elif model_class == RoleAssignment:
+        # Show only role assignments within your scope
+        if active_role.room:
+            q |= Q(room=active_role.room)
+        elif active_role.location:
+            q |= Q(location=active_role.location) | Q(room__location=active_role.location)
+        elif active_role.department:
+            q |= (
+                Q(department=active_role.department)
+                | Q(location__department=active_role.department)
+                | Q(room__location__department=active_role.department)
+            )
 
     # --------------------------
     # USER MODEL (extended)
@@ -195,6 +208,7 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
             user_q |= Q(role_assignments__isnull=True, user_locations__isnull=True)
 
         q |= user_q
+
 
     return queryset.filter(q).distinct()
 

@@ -8,7 +8,7 @@ django.setup()
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from inventory.db_inventory.factories import (
+from db_inventory.factories import (
     UserFactory,
     AdminUserFactory,
     DepartmentFactory,
@@ -53,7 +53,6 @@ MINISTRY_TO_LOCATIONS = {
     "Ministry of Housing and Local Government": HOUSING_LOCATIONS,
 }
 
-
 class Command(BaseCommand):
     help = 'Generate sample data for inventory database safely'
 
@@ -62,7 +61,9 @@ class Command(BaseCommand):
         call_command('flush', '--no-input')
         self.stdout.write(self.style.SUCCESS('Existing data cleared.'))
 
-        # Departments and locations
+        # -------------------------------
+        # Departments and Locations
+        # -------------------------------
         departments = []
         all_locations = []
 
@@ -75,46 +76,75 @@ class Command(BaseCommand):
                 loc = LocationFactory(name=loc_name, department=department)
                 all_locations.append(loc)
 
+        # -------------------------------
         # Rooms
+        # -------------------------------
         rooms = []
         for loc in all_locations:
             count = random.randint(6, 12)
-            for _ in range(count):  # <--- corrected here
+            for _ in range(count):
                 room = RoomFactory(name=f"{faker.word().capitalize()} Room", location=loc)
                 rooms.append(room)
 
-        self.stdout.write(self.style.SUCCESS(f'Created {len(departments)} departments, {len(all_locations)} locations, {len(rooms)} rooms.'))
+        self.stdout.write(self.style.SUCCESS(
+            f'Created {len(departments)} departments, {len(all_locations)} locations, {len(rooms)} rooms.'
+        ))
 
+        # -------------------------------
         # Users
-        total_users = 8000
+        # -------------------------------
+        total_users = 10000
         users = UserFactory.create_batch(total_users)
         self.stdout.write(self.style.SUCCESS(f'Created {len(users)} users.'))
 
         # Create 1 normal admin user
         admin_user = AdminUserFactory()
+        site_admin_role = RoleAssignment.objects.create(
+            user=admin_user,
+            role="SITE_ADMIN",
+            assigned_by=admin_user  # optional
+        )
+        admin_user.active_role = site_admin_role
+        admin_user.save()
         self.stdout.write(self.style.SUCCESS(f'Created 1 normal admin user: {admin_user.email}'))
 
-        # Assign users to rooms and roles
-        role_levels = ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN", "ROOM_CLERK"]
+        # -------------------------------
+        # Assign locations and roles
+        # -------------------------------
+        role_levels = [
+            "DEPARTMENT_ADMIN", "DEPARTMENT_VIEWER",
+            "LOCATION_ADMIN", "LOCATION_VIEWER",
+            "ROOM_ADMIN", "ROOM_CLERK", "ROOM_VIEWER"
+        ]
 
         for user in users:
-            loc = random.choice(all_locations)
-            room = random.choice(list(loc.rooms.all()))
-            UserLocationFactory(user=user, room=room)
+            # Random active/inactive
+            user.is_active = random.random() < 0.9
+            user.save()
 
-            # Random role
-            role = random.choices(role_levels + [None], weights=[0.01, 0.05, 0.1, 0.2, 0.64])[0]
-            if role:
+            # 90% chance to assign location
+            loc = None
+            room = None
+            if random.random() < 0.9 and all_locations:
+                loc = random.choice(all_locations)
+                room = random.choice(list(loc.rooms.all()))
+                UserLocationFactory(user=user, room=room, is_current=True)
+
+            # 90% chance to assign role
+            if random.random() < 0.9:
+                role = random.choice(role_levels)
                 kwargs = {}
-                if role == "DEPARTMENT_ADMIN":
-                    kwargs["department"] = loc.department
-                elif role == "LOCATION_ADMIN":
-                    kwargs["location"] = loc
-                elif role in ["ROOM_ADMIN", "ROOM_CLERK"]:
-                    kwargs["room"] = room
+                if role.startswith("DEPARTMENT"):
+                    kwargs["department"] = loc.department if loc else random.choice(departments)
+                elif role.startswith("LOCATION"):
+                    kwargs["location"] = loc if loc else random.choice(all_locations)
+                elif role.startswith("ROOM"):
+                    kwargs["room"] = room if room else random.choice(rooms)
                 RoleAssignment.objects.create(user=user, role=role, **kwargs)
 
+        # -------------------------------
         # Equipment, Components, Accessories, Consumables
+        # -------------------------------
         equipment = [EquipmentFactory(room=random.choice(rooms)) for _ in range(len(rooms)*3)]
         components = [ComponentFactory(equipment=random.choice(equipment)) for _ in range(len(equipment)*2)]
         accessories = [AccessoryFactory(room=random.choice(rooms)) for _ in range(len(rooms)*2)]

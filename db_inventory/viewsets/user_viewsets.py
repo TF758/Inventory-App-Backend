@@ -54,6 +54,7 @@ This viewset provides `list`, `create`, actions for User objects."""
 
         return qs
     
+
     def create(self, request, *args, **kwargs):
         """
         Custom create method that returns the new user's public_id
