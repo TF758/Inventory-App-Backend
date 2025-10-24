@@ -203,9 +203,16 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
             user_q |= Q(role_assignments__room=active_role.room)
             user_q |= Q(user_locations__room=active_role.room)
 
-        # Optional: include users with *no* role/location at all (only for higher scopes)
-        if active_role.department or active_role.role in ("DEPARTMENT_ADMIN", "LOCATION_ADMIN"):
-            user_q |= Q(role_assignments__isnull=True, user_locations__isnull=True)
+        # Allow admins to see unassigned users created by anyone in their department
+        if active_role.role == "DEPARTMENT_ADMIN" and active_role.department:
+            user_q |= Q(
+                active_role__isnull=True,
+                created_by__role_assignments__department=active_role.department,
+            )
+
+        # Allow site admins to see all users
+        if active_role.role == "SITE_ADMIN":
+            user_q |= Q()
 
         q |= user_q
 
@@ -466,8 +473,8 @@ class UserPermission(BasePermission):
         if not active_role:
             return False
 
-        # SITE_ADMIN always allowed
-        if active_role.role == "SITE_ADMIN":
+        # ADMINS always allowed
+        if active_role.role in ("SITE_ADMIN", "DEPARTMENT_ADMIN"):
             return True
 
         # Self-access always allowed
