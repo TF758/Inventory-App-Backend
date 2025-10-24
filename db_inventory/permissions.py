@@ -204,7 +204,7 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
             user_q |= Q(user_locations__room=active_role.room)
 
         # Allow admins to see unassigned users created by anyone in their department
-        if active_role.role == "DEPARTMENT_ADMIN" and active_role.department:
+        if active_role.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
             user_q |= Q(
                 active_role__isnull=True,
                 created_by__role_assignments__department=active_role.department,

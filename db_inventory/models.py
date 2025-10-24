@@ -189,7 +189,7 @@ class Room(models.Model):
 
 class UserLocation(models.Model):
     public_id = models.CharField(max_length=12, unique=True, editable=False, null=True, db_index=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="user_locations")
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
     is_current = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)

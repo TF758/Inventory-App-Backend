@@ -57,14 +57,16 @@ This viewset provides `list`, `create`, actions for User objects."""
 
     def create(self, request, *args, **kwargs):
         """
-        Custom create method that returns the new user's public_id
-        and summary info after creation.
+        Custom create method that automatically sets `created_by` to the current user
+        and returns the new user's public_id and summary info after creation.
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
 
-        # return newly created user
+        # Pass created_by automatically
+        user = serializer.save(created_by=request.user)
+
+        # Return the newly created user (using the read serializer)
         read_data = UserReadSerializerFull(user, context={'request': request}).data
         headers = self.get_success_headers(serializer.data)
         return Response(read_data, status=status.HTTP_201_CREATED, headers=headers)
@@ -144,16 +146,12 @@ class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     Retrieve users not assigned to any room.
     """
 
-    queryset = User.objects.filter(userlocation__isnull=True) 
+    queryset = User.objects.filter(user_locations__isnull=True)  # ✅ fixed reverse name
     serializer_class = UserReadSerializerFull
-
     model_class = User
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['^email', 'email']
-
     filterset_class = UserFilter
-
     pagination_class = FlexiblePagination
-
     permission_classes = [UserPermission]
