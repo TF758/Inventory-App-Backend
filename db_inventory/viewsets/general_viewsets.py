@@ -13,6 +13,10 @@ from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
 from ..utils import get_serializer_field_info
 from rest_framework.serializers import Serializer
+import logging
+import secrets
+from django.db import IntegrityError, transaction
+from rest_framework.exceptions import APIException, AuthenticationFailed
 
 
 class SessionTokenLoginView(TokenObtainPairView):
@@ -25,27 +29,45 @@ class SessionTokenLoginView(TokenObtainPairView):
         serializer.is_valid(raise_exception=True)
         user = serializer.user
 
-        #Access token (JWT)
-        access_token = str(AccessToken.for_user(user))
-
-        # Opaque refresh token
-        import secrets
+        # Generate opaque refresh token (raw) and its hash
         raw_refresh = secrets.token_urlsafe(64)
-        hashed_refresh = UserSession.hash_token(raw_refresh)
+        try:
+            hashed_refresh = UserSession.hash_token(raw_refresh)
+        except Exception:
+            logger.exception("Failed to hash refresh token for user %s", getattr(user, "pk", None))
+            raise APIException("Failed to generate refresh token.")
 
-       # Save session first
-        session = UserSession.objects.create(
-            user=user,
-            refresh_token_hash=hashed_refresh,
-            expires_at=timezone.localtime(timezone.now()) + timedelta(days=1),
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
-        )
+        # Create session and ensure atomicity — if anything after creation fails, we will remove the session
+        try:
+            with transaction.atomic():
+                session = UserSession.objects.create(
+                    user=user,
+                    refresh_token_hash=hashed_refresh,
+                    expires_at=timezone.localtime(timezone.now()) + timedelta(days=1),
+                    ip_address=request.META.get("REMOTE_ADDR"),
+                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                )
+        except IntegrityError:
+            logger.exception("IntegrityError creating UserSession for user %s", getattr(user, "pk", None))
+            raise APIException("Failed to persist session.")
+        except Exception:
+            logger.exception("Unexpected error creating UserSession for user %s", getattr(user, "pk", None))
+            raise APIException("Failed to create user session.")
 
-        # Access token (JWT) bound to session
-        access_token_obj = AccessToken.for_user(user)
-        access_token_obj["session_id"] = str(session.id)
-        access_token = str(access_token_obj)
+        # Generate access token bound to the created session.
+        # If token creation fails, delete the session to avoid orphans.
+        try:
+            access_token_obj = AccessToken.for_user(user)
+            access_token_obj["session_id"] = str(session.id)
+            access_token = str(access_token_obj)
+        except Exception:
+            # Attempt cleanup of the session; if deletion fails, log and continue raising
+            try:
+                session.delete()
+            except Exception:
+                logger.exception("Failed to delete session %s after token generation failure", getattr(session, "id", None))
+            logger.exception("Failed to generate access token for user %s", getattr(user, "pk", None))
+            raise APIException("Failed to generate access token.")
 
         # Build response including metadata
         response_data = {
@@ -54,7 +76,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             "role_id": user.active_role.public_id if user.active_role else None,
         }
 
-        # Set refresh token as HttpOnly cookie
+        # Set refresh token as HttpOnly cookie only after everything succeeded
         response = Response(response_data, status=200)
         response.set_cookie(
             key="refresh",

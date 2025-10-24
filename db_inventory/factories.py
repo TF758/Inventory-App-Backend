@@ -66,16 +66,6 @@ class RoomFactory(factory.django.DjangoModelFactory):
     location = factory.LazyFunction(lambda: random.choice(Location.objects.all()))
     
 
-
-# class UserLocationFactory(factory.django.DjangoModelFactory):
-#     class Meta:
-#         model = UserLocation
-
-#     user = factory.SubFactory(UserFactory)
-#     room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
-#     date_joined = factory.LazyFunction(fake.date_time_this_decade)
-#     is_current = False
-
 class UserLocationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = UserLocation
