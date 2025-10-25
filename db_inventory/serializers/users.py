@@ -2,6 +2,7 @@ from rest_framework import serializers
 from ..models import User, UserLocation, Room
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.contrib.auth.password_validation import validate_password
 
 
 class UserReadSerializerFull(serializers.ModelSerializer):
@@ -17,12 +18,56 @@ class UserReadSerializerFull(serializers.ModelSerializer):
         read_only_fields = ('public_id', 'last_login')
 
 
-class UserWriteSerializer(serializers.ModelSerializer):   
-     class Meta:
+class UserWriteSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    confirm_password = serializers.CharField(  # 🔹 add confirmation field
+        write_only=True,
+        required=False,
+        style={'input_type': 'password'}
+    )
+
+    class Meta:
         model = User
         fields = [
-              'email', 'fname', 'lname', 'job_title', 'is_active' ,
-        ]     
+            'email', 'fname', 'lname', 'job_title', 'is_active',   'password',
+            'confirm_password',  
+        ]
+
+    def validate(self, attrs):
+        """
+        Ensure password and confirm_password match if password is provided.
+        """
+        password = attrs.get('password')
+        confirm_password = attrs.pop('confirm_password', None)
+
+        if password and confirm_password and password != confirm_password:
+            raise serializers.ValidationError({
+                "confirm_password": "Password fields do not match."
+            })
+
+        return attrs
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
 
 class UserAreaSerializer(serializers.ModelSerializer):
 
