@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import SessionTokenLoginViewSerializer
+from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetConfirmSerializer, PasswordResetRequestSerializer, ChangePasswordSerializer
 from ..serializers.equipment import EquipmentBatchtWriteSerializer
 from ..serializers.consumables import ConsumableBatchWriteSerializer
 from ..serializers.accessories import AccessoryBatchWriteSerializer
@@ -17,7 +17,7 @@ import logging
 import secrets
 from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException, AuthenticationFailed
-
+from rest_framework.permissions import IsAuthenticated
 
 class SessionTokenLoginView(TokenObtainPairView):
     serializer_class = SessionTokenLoginViewSerializer
@@ -214,4 +214,55 @@ class SerializerFieldsView(APIView):
             )
 
         return Response(get_serializer_field_info(serializer_class))
+
+
+class PasswordResetRequestView(APIView):
+
+    permission_classes = [AllowAny]
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"detail": "Password reset email sent."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+
+    permission_classes = [AllowAny] 
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"detail": "Password has been reset successfully."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data, context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Change password
+            serializer.save()
+
+            # Revoke all user sessions (security measure)
+            UserSession.objects.filter(user=request.user, status=UserSession.Status.ACTIVE).update(
+                status=UserSession.Status.REVOKED
+            )
+
+        response = Response(
+            {"detail": "Password changed successfully. All sessions have been logged out."},
+            status=status.HTTP_200_OK,
+        )
+
+        # Optionally clear the refresh cookie
+        response.delete_cookie("refresh", path="/")
+
+        return response

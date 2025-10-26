@@ -1,3 +1,7 @@
+from django.core import signing
+from datetime import timedelta
+from django.utils import timezone
+
 class ExcludeFiltersMixin:
     """
     Allows excluding filter fields from a filterset dynamically.
@@ -48,3 +52,26 @@ def get_serializer_field_info(serializer_class):
         field_info[field_name] = info
 
     return field_info
+
+
+class PasswordResetToken:
+    SALT = 'password_reset_salt'
+    EXPIRATION_MINUTES = 10
+
+    @classmethod
+    def generate_token(cls, user_public_id):
+        data = {
+            'user_id': user_public_id,
+            'timestamp': timezone.now().timestamp(),
+        }
+        return signing.dumps(data, salt=cls.SALT)
+
+    @classmethod
+    def validate_token(cls, token):
+        try:
+            data = signing.loads(token, salt=cls.SALT, max_age=cls.EXPIRATION_MINUTES * 60)
+            return data['user_id']
+        except signing.BadSignature:
+            return None
+        except signing.SignatureExpired:
+            return None

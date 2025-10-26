@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from ..serializers.users import  UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
 from django.db.models import Case, When, Value, IntegerField
-from ..models import User, UserLocation
+from ..models import User, UserLocation, RoleAssignment, Department
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import UserFilter, UserLocationFilter
@@ -42,6 +42,8 @@ This viewset provides `list`, `create`, actions for User objects."""
         qs = super().get_queryset()
         search_term = self.request.query_params.get('search', None)
 
+        
+
         if search_term:
             # Annotate results: 1 if starts with search_term, 2 otherwise
             qs = qs.annotate(
@@ -65,6 +67,22 @@ This viewset provides `list`, `create`, actions for User objects."""
 
         # Pass created_by automatically
         user = serializer.save(created_by=request.user)
+
+        # Assign a default role if creator has an active_role
+        # get a department
+        # assigning a default department for testing
+        default_department = Department.objects.first()
+
+        if not user.active_role and request.user.active_role:
+            default_role = RoleAssignment.objects.create(
+                user=user,
+                role="DEPARTMENT_VIEWER",
+                department=default_department,
+                assigned_by=request.user,
+            )
+            user.active_role = default_role
+            user.is_active = True
+            user.save()
 
         # Return the newly created user (using the read serializer)
         read_data = UserReadSerializerFull(user, context={'request': request}).data
@@ -126,7 +144,7 @@ class UserLocationViewSet(viewsets.ModelViewSet):
 
 class UserLocationByUserView(APIView):
     """
-    Retrieve the UserLocation assignment for a specific user.
+    Retrieves a user's location by using the user's public_id
     """
 
     def get(self, request, user_id: str):

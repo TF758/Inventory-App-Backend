@@ -170,3 +170,13 @@ user_location_id_detail_view = user_viewsets.UserLocationViewSet.as_view({
 # --- User Location by User ---
 user_location_by_user_view = user_viewsets.UserLocationByUserView.as_view()
 unallocated_user_list_view = user_viewsets.UnallocatedUserViewSet.as_view({'get': 'list'})
+
+
+# ---Password Reset ----
+
+password_reset_request = general_viewsets.PasswordResetRequestView.as_view()
+password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view()
+
+# ---Password Change ---
+
+password_change = general_viewsets.ChangePasswordView.as_view()

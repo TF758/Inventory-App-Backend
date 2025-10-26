@@ -175,9 +175,30 @@ CORS_ALLOW_HEADERS = [
 ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=50),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "USER_ID_FIELD": "public_id",
     "USER_ID_CLAIM": "public_id",
 
 }
+
+# hide validators during dev to speed up tests
+AUTH_PASSWORD_VALIDATORS = [
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    #     'OPTIONS': {
+    #         'user_attributes': ('email', 'fname', 'lname'),
+    #     }
+    # },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 3}
+    },
+    # {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    # {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# BACKEND EMAIL SERVICE - WILL REPLACE TO ACTUALLY SEND EMAIL
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'noreply@example.com'
