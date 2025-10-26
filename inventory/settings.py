@@ -197,3 +197,8 @@ AUTH_PASSWORD_VALIDATORS = [
     # {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     # {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+# BACKEND EMAIL SERVICE - WILL REPLACE TO ACTUALLY SEND EMAIL
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'noreply@example.com'

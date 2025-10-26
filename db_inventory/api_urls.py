@@ -10,6 +10,9 @@ from .viewsets import general_viewsets
 
 urlpatterns = [
 
+    path('password-reset/', password_reset_request, name='password_reset'),
+    path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
+
     path('login/',api_login_view, name='custom_login'),
     path('logout/',api_logout, name='logout'),
     path('refresh/', api_token_refresh, name='token_refresh'),

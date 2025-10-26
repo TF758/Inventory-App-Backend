@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import SessionTokenLoginViewSerializer
+from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetConfirmSerializer, PasswordResetRequestSerializer
 from ..serializers.equipment import EquipmentBatchtWriteSerializer
 from ..serializers.consumables import ConsumableBatchWriteSerializer
 from ..serializers.accessories import AccessoryBatchWriteSerializer
@@ -214,4 +214,25 @@ class SerializerFieldsView(APIView):
             )
 
         return Response(get_serializer_field_info(serializer_class))
-    
+
+
+class PasswordResetRequestView(APIView):
+
+    permission_classes = [AllowAny]
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"detail": "Password reset email sent."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+
+    permission_classes = [AllowAny] 
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"detail": "Password has been reset successfully."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
