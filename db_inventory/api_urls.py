@@ -12,6 +12,7 @@ urlpatterns = [
 
     path('password-reset/', password_reset_request, name='password_reset'),
     path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
+    path('password-change/', password_change, name='password_change'),
 
     path('login/',api_login_view, name='custom_login'),
     path('logout/',api_logout, name='logout'),

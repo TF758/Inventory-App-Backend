@@ -176,3 +176,7 @@ unallocated_user_list_view = user_viewsets.UnallocatedUserViewSet.as_view({'get'
 
 password_reset_request = general_viewsets.PasswordResetRequestView.as_view()
 password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view()
+
+# ---Password Change ---
+
+password_change = general_viewsets.ChangePasswordView.as_view()
