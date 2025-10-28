@@ -359,3 +359,29 @@ class DepartmentRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
             Q(location__department__public_id=department_id) |
             Q(room__location__department__public_id=department_id)
         ).order_by('-id')
+    
+
+class DepartmentRoomsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
+    serializer_class = RoomSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+
+    search_fields = ['name']
+    filterset_class = RoomFilter
+    exclude_filter_fields = ["department", "location"]
+
+    permission_classes=[DepartmentPermission]
+
+    pagination_class = FlexiblePagination
+
+    lookup_field = 'public_id'
+
+
+    def get_queryset(self):
+        department_id = self.kwargs.get("public_id")
+
+        return (
+            Room.objects
+            .filter(location__department__public_id=department_id)
+            .select_related("location", "location__department") 
+            .order_by("location__name", "name")
+        )

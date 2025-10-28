@@ -132,8 +132,10 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             "assigned_date",
         ]
 
+        read_only_fields = ["assigned_by", "assigned_date"] 
+
+      # --- Field-level validation ---
     def validate_user(self, value):
-        # Accept user public_id or PK
         if isinstance(value, str):
             try:
                 value = User.objects.get(public_id=value)
@@ -171,12 +173,34 @@ class RoleWriteSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Room not found.")
         return value
 
+    # --- Global validation ---
     def validate(self, attrs):
-        # Let the model enforce role-specific rules
+        user = attrs.get("user")
+        role = attrs.get("role")
+        department = attrs.get("department")
+        location = attrs.get("location")
+        room = attrs.get("room")
+
+     
+        existing = RoleAssignment.objects.filter(
+            user=user,
+            role=role,
+            department=department,
+            location=location,
+            room=room,
+        ).exists()
+
+        if existing:
+            raise serializers.ValidationError({
+                "detail": f"User already has the '{role}' role assigned for this context."
+            })
+
+        # Allow model-level clean() to enforce rules
         instance = RoleAssignment(**attrs)
         instance.clean()
         return attrs
 
+    # --- Create / Update ---
     def create(self, validated_data):
         request = self.context.get("request")
         if request and request.user.is_authenticated:

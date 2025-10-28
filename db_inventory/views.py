@@ -69,6 +69,7 @@ department_locations_view = department_viewsets.DepartmentLocationsViewSet.as_vi
 department_users_light_view = department_viewsets.DepartmentUsersMiniViewSet.as_view({'get': 'list',})
 department_users_view = department_viewsets.DepartmentUsersViewSet.as_view({'get': 'list',})
 department_roles_view = department_viewsets.DepartmentRolesViewSet.as_view({'get': 'list'})
+department_rooms = department_viewsets.DepartmentRoomsViewSet.as_view({'get': 'list'})
 
 # --- Equipment ---
 equipment_batch_import_view = equipment_viewsets.EquipmentBatchImportView.as_view()
