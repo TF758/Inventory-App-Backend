@@ -274,3 +274,32 @@ class UserLocationFilter(django_filters.FilterSet):
             "lname",
             "job_title",
         ]
+
+class RoleAssignmentFilter(django_filters.FilterSet):
+    search = django_filters.CharFilter(method="filter_user_search")
+    role_type = django_filters.CharFilter(field_name="role", lookup_expr="iexact")
+    area_type = django_filters.CharFilter(method="filter_area_type")
+
+    def filter_user_search(self, queryset, name, value):
+        if not value:
+            return queryset
+
+        return queryset.filter(
+            Q(user__fname__icontains=value)
+            | Q(user__lname__icontains=value)
+            | Q(user__email__icontains=value)
+        )
+
+    def filter_area_type(self, queryset, name, value):
+        value = value.lower()
+        if value == "department":
+            return queryset.filter(department__isnull=False)
+        elif value == "location":
+            return queryset.filter(location__isnull=False)
+        elif value == "room":
+            return queryset.filter(room__isnull=False)
+        return queryset.none()  # if invalid area_type
+
+    class Meta:
+        model = RoleAssignment
+        fields = ["role_type", "area_type", "search"]

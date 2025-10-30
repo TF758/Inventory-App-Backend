@@ -11,15 +11,27 @@ from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
 from ..mixins import ScopeFilterMixin
 from ..pagination import BasePagination, FlexiblePagination
+from django_filters.rest_framework import DjangoFilterBackend
+from ..filters import RoleAssignmentFilter
 
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
     """
     Handles listing, creating, retrieving, updating, and deleting RoleAssignment objects.
     """
-    queryset = RoleAssignment.objects.all().order_by("-assigned_date", "-id")
+    queryset = (
+        RoleAssignment.objects
+        .select_related("user", "department", "location", "room")
+        .order_by("-assigned_date", "-id")
+    )
     lookup_field = 'public_id'
     permission_classes = [IsAuthenticated]
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = RoleAssignmentFilter
+
+
+    pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
