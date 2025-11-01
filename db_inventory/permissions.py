@@ -427,15 +427,18 @@ class AssetPermission(BasePermission):
         )
     
 
+from rest_framework.permissions import BasePermission
+
 class UserPermission(BasePermission):
     """
     Permission for User objects based on the request.user's active_role.
-    - GET: user can retrieve users in scope or themselves
+    
+    - GET: user can retrieve themselves or users in scope
     - POST/PUT/PATCH/DELETE: hierarchy + scope enforced
     """
 
     method_role_map = {
-        "GET": "DEPARTMENT_VIEWER",       # minimum role for general GET
+        "GET": "DEPARTMENT_VIEWER",       # minimum role for GET access
         "POST": "DEPARTMENT_ADMIN",       # create users
         "PUT": "DEPARTMENT_ADMIN",        # update users
         "PATCH": "DEPARTMENT_ADMIN",
@@ -443,14 +446,15 @@ class UserPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        """
-        Non-object level permission (list, create)
-        """
+        # GET requests are allowed; object-level permission will handle scope
+        if request.method == "GET":
+            return True
+
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
 
-        # SITE_ADMIN always allowed
+        # SITE_ADMIN bypasses all
         if active_role.role == "SITE_ADMIN":
             return True
 
@@ -458,36 +462,28 @@ class UserPermission(BasePermission):
         if not required_role:
             return False
 
-        # GET on list view: allow, filtering will be applied in get_queryset
-        if request.method == "GET":
-            return True
-
-        # Other methods: check hierarchy
+        # For POST/PUT/PATCH/DELETE, check hierarchy
         return has_hierarchy_permission(active_role.role, required_role)
 
     def has_object_permission(self, request, view, obj):
-        """
-        Object-level permission (retrieve, update, delete)
-        """
         active_role = getattr(request.user, "active_role", None)
-        if not active_role:
-            return False
-
-        # ADMINS always allowed
-        if active_role.role in ("SITE_ADMIN", "DEPARTMENT_ADMIN"):
-            return True
 
         # Self-access always allowed
         if request.user == obj:
+            return True
+
+        # Admins bypass scope
+        if active_role and active_role.role in ("SITE_ADMIN", "DEPARTMENT_ADMIN"):
             return True
 
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        # GET: only check scope
+        target_role = getattr(obj, "active_role", None)
+
+        # For GET: only enforce scope
         if request.method == "GET":
-            target_role = getattr(obj, "active_role", None)
             if not target_role:
                 return False
             return is_in_scope(
@@ -497,11 +493,9 @@ class UserPermission(BasePermission):
                 department=target_role.department
             )
 
-        # POST/PUT/PATCH/DELETE: check both hierarchy and scope
-        target_role = getattr(obj, "active_role", None)
+        # For POST/PUT/PATCH/DELETE: enforce both hierarchy and scope
         if not target_role:
             return False
-
         return (
             has_hierarchy_permission(active_role.role, required_role)
             and is_in_scope(

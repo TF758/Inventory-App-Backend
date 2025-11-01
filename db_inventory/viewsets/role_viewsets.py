@@ -47,6 +47,9 @@ class UserRoleList(ListAPIView):
     serializer_class = RoleReadSerializer
     permission_classes = [IsAuthenticated]
 
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = RoleAssignmentFilter
+
     def get_queryset(self):
         public_id = self.kwargs.get('public_id')
         if public_id:

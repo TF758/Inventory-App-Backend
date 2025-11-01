@@ -357,3 +357,27 @@ class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
             Q(location__public_id=location_id) |
             Q(room__location__public_id=location_id)
         ).order_by('-id')
+    
+
+class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
+    """Retrieves a list of users and thier roles in a given location"""
+    serializer_class = RoleReadSerializer
+    lookup_field = 'public_id'
+
+    permission_classes=[LocationPermission]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ['role']
+
+    # filterset_class = RoleFilter
+
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        location_id = self.kwargs.get('public_id')
+        
+        return RoleAssignment.objects.filter(
+            Q(location__public_id=location_id) |
+            Q(room__location__public_id=location_id)
+        ).order_by('-id')
+    

@@ -74,18 +74,26 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
 
     
     def get_queryset(self):
-        department_id = self.kwargs.get('public_id')
-        return (
+        department_id = self.kwargs.get("public_id")
+
+        queryset = (
             UserLocation.objects.filter(
-                room__location__department__public_id=department_id
+                Q(room__location__department__public_id=department_id)
+                | Q(user__created_by__user_locations__room__location__department__public_id=department_id)
+                | Q(user__role_assignments__department__public_id=department_id)
             )
             .select_related(
-                'user',
-                'room',
-                'room__location',
-                'room__location__department'
-            ).order_by('-id')
+                "user",
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .distinct()
+            .order_by("-id")
         )
+
+        return queryset
+
     
     def get_serializer(self, *args, **kwargs):
         # Exclude department fields for this department-level view
