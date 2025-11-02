@@ -3,6 +3,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
 from .models import RoleAssignment, User, Room, Location, Department, Equipment, Component, Accessory, Consumable
 from django.db.models import Q
+from .utils import user_can_access_role
+from rest_framework.permissions import SAFE_METHODS
 
 
 # Role hierarchy: higher numbers mean more power
@@ -40,33 +42,41 @@ def has_hierarchy_permission(user_role: str, required_role: str) -> bool:
     return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(required_role, -1)
 
 
-def is_in_scope(
-    role_assignment: RoleAssignment,
-    room: Optional[Room] = None,
-    location: Optional[Location] = None,
-    department: Optional[Department] = None,
-) -> bool:
-    """Check whether a role assignment applies to the given object scope."""
-
+def is_in_scope(role_assignment: RoleAssignment,
+                room: Optional[Room] = None,
+                location: Optional[Location] = None,
+                department: Optional[Department] = None) -> bool:
     if not role_assignment:
         return False
 
     if role_assignment.role == "SITE_ADMIN":
         return True
 
-    if department and role_assignment.department == department:
-        return True
+    # Department level
+    if department:
+        if role_assignment.department == department:
+            return True
+        if role_assignment.location and role_assignment.location.department == department:
+            return True
+        if role_assignment.room and role_assignment.room.location.department == department:
+            return True
 
+    # Location level
     if location:
         if role_assignment.location == location:
             return True
         if role_assignment.department and location.department == role_assignment.department:
             return True
+        if role_assignment.room and role_assignment.room.location == location:
+            return True
 
+    # Room level
     if room:
         if role_assignment.room == room:
             return True
-        if role_assignment.location and room.location == role_assignment.location:
+        if role_assignment.location and role_assignment.location == room.location:
+            return True
+        if role_assignment.department and room.location.department == role_assignment.department:
             return True
 
     return False
@@ -505,3 +515,61 @@ class UserPermission(BasePermission):
                 department=target_role.department
             )
         )
+
+
+class RolePermission(BasePermission):
+    """
+    Custom permission to control access to RoleAssignment objects.
+    Uses hierarchical logic from user_can_access_role().
+    """
+
+    def has_permission(self, request, view):
+        """
+        Handles general access (non-object-level), e.g. list/create.
+        """
+        user = request.user
+
+        # Must be authenticated
+        if not user.is_authenticated:
+            return False
+
+        # Superusers and site admins can do anything
+        if user.is_superuser or user.role == "SITE_ADMIN":
+            return True
+
+        # Regular users can only list or view (GET) their own roles
+        if view.action in ["list", "retrieve"]:
+            return True
+
+        # Only admins (at any level) can create/update/delete roles
+        active = getattr(user, "active_role", None)
+        if active and active.role in [
+            "DEPARTMENT_ADMIN",
+            "LOCATION_ADMIN",
+            "ROOM_ADMIN",
+            "SITE_ADMIN",
+        ]:
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Handles access to a specific RoleAssignment (object-level).
+        """
+        user = request.user
+
+        # Safe methods (GET, HEAD, OPTIONS) — can view if within scope
+        if request.method in SAFE_METHODS:
+            return user_can_access_role(user, obj)
+
+        # Mutating methods (POST, PUT, PATCH, DELETE)
+        # Only admins can modify roles in their scope
+        active = getattr(user, "active_role", None)
+        if not active:
+            return False
+
+        if active.role in ["SITE_ADMIN", "DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
+            return user_can_access_role(user, obj)
+
+        return False

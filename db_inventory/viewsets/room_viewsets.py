@@ -27,6 +27,8 @@ class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
     filterset_class = RoomFilter
 
+    permission_classes = [RoomPermission]
+
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -63,6 +65,8 @@ class RoomListViewset(ScopeFilterMixin, viewsets.ModelViewSet):
 
     serializer_class = RoomListSerializer
 
+    permission_classes = [RoomPermission]
+
     
 class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of users in a given room"""
@@ -75,6 +79,8 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
     pagination_class = FlexiblePagination
 
     exclude_filter_fields = ["department", "location", "room"]
+
+    permission_classes = [UserPermission]
     
 
 
@@ -110,6 +116,8 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
 
     pagination_class = FlexiblePagination
 
+    permission_classes = [AssetPermission]
+
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -135,6 +143,8 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
     filterset_class = ConsumableFilter
 
     pagination_class = FlexiblePagination
+
+    permission_classes = [AssetPermission]
 
 
     def get_queryset(self):
@@ -163,6 +173,8 @@ class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
     pagination_class = FlexiblePagination
 
+    permission_classes = [AssetPermission]
+
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Accessory.objects.filter(room__public_id=room_id).order_by('-id')
@@ -188,6 +200,8 @@ class RoomComponentsViewSet(ScopeFilterMixin,ExcludeFiltersMixin,viewsets.ModelV
 
     pagination_class = FlexiblePagination
 
+    permission_classes = [AssetPermission]
+
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
         return Component.objects.filter(equipment__room__public_id=room_id).order_by('-id')
@@ -197,6 +211,7 @@ class RoomComponentsMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
     serializer_class = ComponentSerializer
     lookup_field = 'public_id'
     pagination_class = None
+    permission_classes = [AssetPermission]
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -207,6 +222,7 @@ class RoomUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = UserAreaSerializer
     lookup_field = 'public_id'
     pagination_class = None
+    permission_classes = [UserPermission]
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -227,6 +243,7 @@ class RoomEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = EquipmentSerializer
     lookup_field = 'public_id'
     pagination_class = None
+    permission_classes = [AssetPermission]
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -243,6 +260,7 @@ class RoomConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'
     pagination_class = None
+    permission_classes = [AssetPermission]
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')
@@ -259,6 +277,7 @@ class RoomAccessoriesMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet)
     serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'
     pagination_class = None
+    permission_classes = [AssetPermission]
 
     def get_queryset(self):
         room_id = self.kwargs.get('public_id')

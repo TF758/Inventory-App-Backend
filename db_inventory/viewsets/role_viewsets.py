@@ -13,30 +13,82 @@ from ..mixins import ScopeFilterMixin
 from ..pagination import BasePagination, FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from ..filters import RoleAssignmentFilter
+from ..permissions import RolePermission
+from django.db.models import Q
 
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
     """
     Handles listing, creating, retrieving, updating, and deleting RoleAssignment objects.
     """
-    queryset = (
+    base_queryset = (
         RoleAssignment.objects
         .select_related("user", "department", "location", "room")
         .order_by("-assigned_date", "-id")
     )
-    lookup_field = 'public_id'
-    permission_classes = [IsAuthenticated]
-
+    lookup_field = "public_id"
+    permission_classes = [RolePermission]
     filter_backends = [DjangoFilterBackend]
     filterset_class = RoleAssignmentFilter
-
-
     pagination_class = FlexiblePagination
-
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return RoleWriteSerializer
         return RoleReadSerializer
+    
+    def get_queryset(self):
+        user = self.request.user
+        qs = self.base_queryset
+
+        print("DEBUG --- user:", user.email)
+        print("DEBUG --- is_superuser:", user.is_superuser)
+        print("DEBUG --- active_role:", user.active_role)
+        if user.active_role:
+            print("DEBUG --- active_role.role:", user.active_role.role)
+            print("DEBUG --- department:", user.active_role.department)
+            print("DEBUG --- location:", user.active_role.location)
+            print("DEBUG --- room:", user.active_role.room)
+
+        # --- Superusers or site admins can see everything ---
+        active = getattr(user, "active_role", None)
+        if active and active.role == "SITE_ADMIN":
+            return qs
+
+        # --- Must have an active role ---
+        active = getattr(user, "active_role", None)
+        if not active:
+            # No active role → only their own assignments
+            return qs.filter(user=user)
+
+        role = active.role
+
+        # --- 3️⃣ Filter by scope ---
+        if role == "DEPARTMENT_ADMIN":
+            # See all roles within their department — direct + nested (location/room)
+            return qs.filter(
+                Q(department=active.department)
+                | Q(location__department=active.department)
+                | Q(room__location__department=active.department)
+            )
+
+        elif role == "LOCATION_ADMIN":
+            # See roles within their location — direct + nested (room)
+            return qs.filter(
+                Q(location=active.location)
+                | Q(room__location=active.location)
+            )
+
+        elif role == "ROOM_ADMIN":
+            # See all roles in their room
+            return qs.filter(room=active.room)
+
+        elif role in ["ROOM_CLERK", "ROOM_VIEWER"]:
+            # Can only see their own or others in the same room
+            return qs.filter(Q(user=user) | Q(room=active.room))
+
+        # Default fallback — self only
+        return qs.filter(user=user)
+
 
 
 # --- User Roles List (current user or any user by public_id) ---
