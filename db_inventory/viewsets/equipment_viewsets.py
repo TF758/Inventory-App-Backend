@@ -17,7 +17,7 @@ from rest_framework.decorators import action
 from ..mixins import EquipmentBatchMixin
 from rest_framework.exceptions import PermissionDenied
 from ..pagination import FlexiblePagination
-from ..permissions import AssetPermission, is_in_scope
+from db_inventory.permissions import AssetPermission, is_in_scope
 
 class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 

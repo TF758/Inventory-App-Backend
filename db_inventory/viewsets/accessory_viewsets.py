@@ -14,7 +14,7 @@ from ..mixins import AccessoryBatchMixin
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from ..permissions import AssetPermission, is_in_scope
+from db_inventory.permissions import AssetPermission, is_in_scope
 from rest_framework.exceptions import PermissionDenied
 
 class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):

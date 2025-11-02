@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from ..pagination import FlexiblePagination
 from ..mixins import ConsumableBatchMixin
-from ..permissions import AssetPermission, is_in_scope
+from db_inventory.permissions import AssetPermission, is_in_scope
 
 
 class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):

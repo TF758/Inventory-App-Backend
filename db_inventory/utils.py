@@ -75,3 +75,59 @@ class PasswordResetToken:
             return None
         except signing.SignatureExpired:
             return None
+
+def user_can_access_role(request_user, role_assignment):
+    """Determine if a user can access (view/edit) a given RoleAssignment."""
+    if request_user.is_superuser or request_user.role == "SITE_ADMIN":
+        return True
+
+    # Users can always see their own role assignments
+    if role_assignment.user == request_user:
+        return True
+
+    # Check if the user has an active role and whether it grants access
+    active = getattr(request_user, "active_role", None)
+    if not active:
+        return False
+
+    # Site admin can access everything
+    if active.role == "SITE_ADMIN":
+        return True
+
+    # Department-level access
+    if active.role == "DEPARTMENT_ADMIN":
+        # can access roles within same department
+        if (
+            role_assignment.department and 
+            active.department and 
+            role_assignment.department == active.department
+        ):
+            return True
+
+    # Location-level access
+    if active.role == "LOCATION_ADMIN":
+        if (
+            role_assignment.location and 
+            active.location and 
+            role_assignment.location == active.location
+        ):
+            return True
+
+    # Room-level access
+    if active.role == "ROOM_ADMIN":
+        if (
+            role_assignment.room and 
+            active.room and 
+            role_assignment.room == active.room
+        ):
+            return True
+
+    # Room clerks and viewers can see their own room roles only
+    if active.role in ["ROOM_CLERK", "ROOM_VIEWER"]:
+        if (
+            role_assignment.user == request_user or
+            (role_assignment.room and active.room and role_assignment.room == active.room)
+        ):
+            return True
+
+    return False

@@ -7,11 +7,12 @@ from rest_framework.filters import SearchFilter
 from ..filters import UserFilter, UserLocationFilter
 from ..mixins import ScopeFilterMixin
 from ..pagination import FlexiblePagination
-from ..permissions import UserPermission
-from rest_framework.generics import CreateAPIView
+from db_inventory.permissions import UserPermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope
+from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
 
 class UserModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -38,24 +39,77 @@ This viewset provides `list`, `create`, actions for User objects."""
         return UserReadSerializerFull
     
 
+    # def get_queryset(self):
+    #     qs = super().get_queryset()
+    #     user = self.request.user
+    #     active_role = getattr(user, "active_role", None)
+
+    #     # Always include self
+    #     qs = qs.filter(Q(id=user.id) | Q(active_role__isnull=False))
+
+    #     if active_role:
+    #         # Only filter users within scope for non-self
+    #         scoped_qs = filter_queryset_by_scope(user, qs, User)
+    #         qs = qs.filter(Q(id__in=scoped_qs.values("id")) | Q(id=user.id))
+    #     else:
+    #         # Only self if no role
+    #         qs = qs.filter(id=user.id)
+
+    #     # Search
+    #     search_term = self.request.query_params.get('search', None)
+    #     if search_term:
+    #         qs = qs.annotate(
+    #             starts_with_order=Case(
+    #                 When(fname__istartswith=search_term, then=Value(1)),
+    #                 default=Value(2),
+    #                 output_field=IntegerField()
+    #             )
+    #         ).order_by('starts_with_order', 'email')
+
+    #     return qs.distinct()
+
+
     def get_queryset(self):
-        qs = super().get_queryset()
-        search_term = self.request.query_params.get('search', None)
+        user = self.request.user
+        active_role = getattr(user, "active_role", None)
 
-        
+        # Start with all users (like the "bare minimum" that worked)
+        qs = User.objects.all().order_by("-id")
 
-        if search_term:
-            # Annotate results: 1 if starts with search_term, 2 otherwise
-            qs = qs.annotate(
-                starts_with_order=Case(
-                    When(name__istartswith=search_term, then=Value(1)),
-                    default=Value(2),
-                    output_field=IntegerField()
-                )
-            ).order_by('starts_with_order', 'email')  # starts-with results first
+        # Only apply scoping for list requests
+        if self.action == "list" and active_role:
+            qs = filter_queryset_by_scope(user, qs, User)
 
         return qs
-    
+
+
+    # def get_queryset(self):
+    #         qs = super().get_queryset()
+    #         user = self.request.user
+    #         active_role = getattr(user, "active_role", None)
+
+    #         if active_role:
+    #             # Users in scope
+    #             scoped_qs_ids = filter_queryset_by_scope(user, qs, User).values_list("id", flat=True)
+    #             # Include self + scoped users
+    #             qs = qs.filter(Q(id__in=scoped_qs_ids) | Q(id=user.id))
+    #         else:
+    #             # Only self if no role
+    #             qs = qs.filter(id=user.id)
+
+    #         # Optional: search
+    #         search_term = self.request.query_params.get("search", None)
+    #         if search_term:
+    #             qs = qs.annotate(
+    #                 starts_with_order=Case(
+    #                     When(fname__istartswith=search_term, then=Value(1)),
+    #                     default=Value(2),
+    #                     output_field=IntegerField(),
+    #                 )
+    #             ).order_by("starts_with_order", "email")
+
+    #         return qs.distinct()
+            
 
     def create(self, request, *args, **kwargs):
         """
@@ -71,18 +125,18 @@ This viewset provides `list`, `create`, actions for User objects."""
         # Assign a default role if creator has an active_role
         # get a department
         # assigning a default department for testing
-        default_department = Department.objects.first()
+        # default_department = Department.objects.first()
 
-        if not user.active_role and request.user.active_role:
-            default_role = RoleAssignment.objects.create(
-                user=user,
-                role="DEPARTMENT_VIEWER",
-                department=default_department,
-                assigned_by=request.user,
-            )
-            user.active_role = default_role
-            user.is_active = True
-            user.save()
+        # if not user.active_role and request.user.active_role:
+        #     default_role = RoleAssignment.objects.create(
+        #         user=user,
+        #         role="DEPARTMENT_VIEWER",
+        #         department=default_department,
+        #         assigned_by=request.user,
+        #     )
+        #     user.active_role = default_role
+        user.is_active = True
+        user.save()
 
         # Return the newly created user (using the read serializer)
         read_data = UserReadSerializerFull(user, context={'request': request}).data
@@ -92,53 +146,45 @@ This viewset provides `list`, `create`, actions for User objects."""
 
 
 class UserLocationViewSet(viewsets.ModelViewSet):
-    """
-    Manage UserLocation records — assigning users to rooms, and viewing their
-    associated location/department hierarchy.
-    """
-
     queryset = UserLocation.objects.select_related(
         "user", "room", "room__location", "room__location__department"
-    ).all()
+    ).order_by("-date_joined", "-id")
+
     serializer_class = UserAreaSerializer
-    filter_backends = [DjangoFilterBackend, SearchFilter]
+    lookup_field = "public_id"
+    permission_classes = [UserLocationPermission]
+    filter_backends = [DjangoFilterBackend]
     filterset_class = UserLocationFilter
 
-    
-    lookup_field = "public_id"  
-
-
-    def get_serializer_class(self):
-        if self.action in ["update", "partial_update", "create"]:
-            return UserLocationWriteSerializer
-        return UserAreaSerializer
-
     def get_queryset(self):
-        """
-        Optionally filter by user, room, location, or department via query params.
-        Example: /api/user-locations/?department_id=DPT123ABC
-        """
-        queryset = self.queryset
-        user_id = self.request.query_params.get("user_id")
-        room_id = self.request.query_params.get("room_id")
-        location_id = self.request.query_params.get("location_id")
-        department_id = self.request.query_params.get("department_id")
-
-        if user_id:
-            queryset = queryset.filter(user__public_id=user_id)
-        if room_id:
-            queryset = queryset.filter(room__public_id=room_id)
-        if location_id:
-            queryset = queryset.filter(room__location__public_id=location_id)
-        if department_id:
-            queryset = queryset.filter(room__location__department__public_id=department_id)
-
-        return queryset
+        user = self.request.user
+        return filter_queryset_by_scope(user, super().get_queryset(), UserLocation)
 
     def perform_create(self, serializer):
-        """
-        Create a UserLocation — validation handled by serializer.
-        """
+        user = serializer.validated_data.get("user")
+        room = serializer.validated_data.get("room")
+        is_current = serializer.validated_data.get("is_current", False)
+
+        # Object-level permission check
+        if not self.request.user.has_perm("add_userlocation") and not is_in_scope(self.request.user.active_role, room=room):
+            raise PermissionDenied("Cannot assign user to a room outside your scope.")
+
+        if is_current:
+            UserLocation.objects.filter(user=user, is_current=True).update(is_current=False)
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+        user_location = serializer.instance
+        room = serializer.validated_data.get("room", user_location.room)
+        is_current = serializer.validated_data.get("is_current", user_location.is_current)
+
+        if not self.request.user.has_perm("change_userlocation") and not is_in_scope(self.request.user.active_role, room=room):
+            raise PermissionDenied("Cannot assign user to a room outside your scope.")
+
+        if is_current:
+            UserLocation.objects.filter(user=user_location.user, is_current=True).exclude(pk=user_location.pk).update(is_current=False)
+
         serializer.save()
 
 

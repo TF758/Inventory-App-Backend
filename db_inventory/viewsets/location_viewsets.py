@@ -9,7 +9,7 @@ from rest_framework.filters import SearchFilter
 from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, AreaUserFilter, ComponentFilter
 from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
-from ..permissions import LocationPermission
+from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import BasePagination, FlexiblePagination
 from django.db.models import Q
@@ -115,7 +115,7 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
 
     filterset_class =  AreaUserFilter
 
-    permission_classes =[LocationPermission]
+    permission_classes =[UserPermission]
 
     pagination_class = FlexiblePagination
     
@@ -142,7 +142,7 @@ class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = UserAreaSerializer
     pagination_class = None
 
-    permission_classes =[LocationPermission]
+    permission_classes =[UserPermission]
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
@@ -164,7 +164,7 @@ class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
 
     filterset_class = EquipmentFilter
 
-    permission_classes =[LocationPermission]
+    permission_classes =[AssetPermission]
 
     pagination_class = FlexiblePagination
 
@@ -186,7 +186,7 @@ class LocationEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
-    permission_classes =[LocationPermission]
+    permission_classes =[AssetPermission]
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
@@ -210,7 +210,7 @@ class LocationConsumablesView(ScopeFilterMixin, ExcludeFiltersMixin,viewsets.Mod
 
     filterset_class = ConsumableFilter
 
-    permission_classes =[LocationPermission]
+    permission_classes =[AssetPermission]
 
     pagination_class = FlexiblePagination
 
@@ -233,7 +233,7 @@ class LocationConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
-    permission_classes =[LocationPermission]
+    permission_classes =[AssetPermission]
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
@@ -258,7 +258,7 @@ class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.Mod
 
     filterset_class = AccessoryFilter
 
-    permission_classes =[LocationPermission]
+    permission_classes =[AssetPermission]
 
     pagination_class = FlexiblePagination
 
@@ -281,7 +281,7 @@ class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
 
-    permission_classes =[LocationPermission]
+    permission_classes =[AssetPermission]
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
@@ -299,7 +299,7 @@ class LocationComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.
     serializer_class = LocationComponentSerializer
     lookup_field = 'public_id'
 
-    permission_classes=[LocationPermission]
+    permission_classes=[AssetPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['name']
@@ -327,7 +327,7 @@ class LocationComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelView
     lookup_field = 'public_id'
     pagination_class = None
 
-    permission_classes=[LocationPermission]
+    permission_classes=[AssetPermission]
 
     def get_queryset(self):
         location_id = self.kwargs.get('public_id')
@@ -341,30 +341,7 @@ class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = RoleReadSerializer
     lookup_field = 'public_id'
 
-    permission_classes=[LocationPermission]
-
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['role']
-
-    # filterset_class = RoleFilter
-
-    pagination_class = FlexiblePagination
-
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-
-        return RoleAssignment.objects.filter(
-            Q(location__public_id=location_id) |
-            Q(room__location__public_id=location_id)
-        ).order_by('-id')
-    
-
-class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    """Retrieves a list of users and thier roles in a given location"""
-    serializer_class = RoleReadSerializer
-    lookup_field = 'public_id'
-
-    permission_classes=[LocationPermission]
+    permission_classes=[RolePermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['role']

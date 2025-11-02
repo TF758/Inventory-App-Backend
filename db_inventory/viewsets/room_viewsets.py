@@ -1,11 +1,11 @@
 from rest_framework import viewsets
 from ..serializers.rooms import  *
-from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocation
+from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocation, RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter, AreaUserFilter
 from ..utils import ExcludeFiltersMixin
-from ..permissions import *
+from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
 from ..mixins import ScopeFilterMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination

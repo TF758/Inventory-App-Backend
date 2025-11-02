@@ -13,7 +13,7 @@ from ..mixins import ScopeFilterMixin
 from ..pagination import BasePagination, FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from ..filters import RoleAssignmentFilter
-from ..permissions import RolePermission
+from db_inventory.permissions import RolePermission
 from django.db.models import Q
 
 # --- Role Assignments CRUD ---
