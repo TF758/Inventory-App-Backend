@@ -18,6 +18,7 @@ import secrets
 from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
+from django.conf import settings
 
 logger = logging.getLogger(__name__) 
 
@@ -142,13 +143,13 @@ class RefreshAPIView(APIView):
                 status=200
             )
             response.set_cookie(
-                key="refresh",
-                value=new_raw_refresh,
-                httponly=True,
-                secure=True,
-                samesite="None",
-                path="/",
-            )
+            key="refresh",
+            value=new_raw_refresh,
+            httponly=True,
+            secure=True,
+            samesite='None',
+            path="/",
+        )
             return response
 
         except Exception as e:
@@ -162,28 +163,53 @@ class LogoutAPIView(APIView):
         # Get refresh token from HttpOnly cookie
         raw_refresh = request.COOKIES.get("refresh")
         if not raw_refresh:
-            return Response({"detail": "No refresh token found."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "No refresh token found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Hash the token safely
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
-            return Response({"detail": "Internal server error."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"detail": "Internal server error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # Attempt to find session
         try:
             session = UserSession.objects.get(refresh_token_hash=hashed_refresh)
         except UserSession.DoesNotExist:
-            return Response({"detail": "Invalid or expired session."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # revoke the session
-        session.status = UserSession.Status.REVOKED
-        session.save(update_fields=["status"])
+            return Response(
+                {"detail": "Invalid or expired session."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # produce error message
-         # Delete cookie
-        response = Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+        # Check if session is already revoked
+        if session.status != UserSession.Status.ACTIVE:
+            return Response(
+                {"detail": "Invalid or expired session."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Revoke the session
+        try:
+            session.status = UserSession.Status.REVOKED
+            session.save(update_fields=["status"])
+        except Exception:
+            return Response(
+                {"detail": "Internal server error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Produce response and delete cookie
+        response = Response(
+            {"detail": "Successfully logged out."},
+            status=status.HTTP_200_OK
+        )
         response.delete_cookie("refresh", path="/")
+        return response
 
 
 def get_serializer_field_info(serializer_class: Serializer):

@@ -38,6 +38,8 @@ class UserSessionAdmin(admin.ModelAdmin):
     list_filter = ("status", "created_at")
     search_fields = ("user__username", "ip_address")
 
+    ordering = ("-created_at",)  # "-" means descending order
+
 @admin.register(RoleAssignment)
 class RoleAssignmentAdmin(admin.ModelAdmin):
     list_display = ('user', 'role', 'department', 'location', 'room', 'assigned_by', 'assigned_date', 'public_id')
