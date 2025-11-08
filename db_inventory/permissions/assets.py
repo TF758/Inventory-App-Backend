@@ -4,6 +4,10 @@ from .constants import ROLE_HIERARCHY
 from .helpers import has_hierarchy_permission, is_in_scope
 
 class AssetPermission(BasePermission):
+
+    """Use t0 manage permission for physical assets such as:
+    Equipment, Component, Accessories, Consumables ect"""
+
     method_role_map = {
         "GET": "ROOM_VIEWER",
         "POST": "ROOM_CLERK",
