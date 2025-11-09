@@ -56,12 +56,12 @@ def is_in_scope(role_assignment: RoleAssignment,
     Returns:
         bool: True if the role covers the given resource, otherwise False.
     """
+
     if not role_assignment:
         return False
     if role_assignment.role == "SITE_ADMIN":
         return True
 
-    # Department level
     if department:
         if role_assignment.department == department:
             return True
@@ -70,7 +70,6 @@ def is_in_scope(role_assignment: RoleAssignment,
         if role_assignment.room and role_assignment.room.location.department == department:
             return True
 
-    # Location level
     if location:
         if role_assignment.location == location:
             return True
@@ -79,7 +78,6 @@ def is_in_scope(role_assignment: RoleAssignment,
         if role_assignment.room and role_assignment.room.location == location:
             return True
 
-    # Room level
     if room:
         if role_assignment.room == room:
             return True
