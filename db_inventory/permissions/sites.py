@@ -67,7 +67,7 @@ class RoomPermission(BasePermission):
 
         # GET
         if method == "GET":
-            return is_in_scope(active_role, room=obj) if active_role.role in ["ROOM_VIEWER", "ROOM_ADMIN", "LOCATION_ADMIN", "DEPARTMENT_ADMIN"] else False
+            return is_in_scope(active_role, room=obj) if active_role.role in ["ROOM_VIEWER", "ROOM_ADMIN", "ROOM_CLERK", "LOCATION_ADMIN", "DEPARTMENT_ADMIN"] else False
 
         # PUT/PATCH
         if method in ["PUT", "PATCH"]:
