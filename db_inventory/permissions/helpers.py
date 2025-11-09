@@ -5,6 +5,22 @@ from django.db.models import Q
 from db_inventory.models import RoleAssignment, User, Room, Location, Department, Equipment, Component, Accessory, Consumable
 from .constants import ROLE_HIERARCHY
 
+
+def can_modify(role: str, required_role: str) -> bool:
+    """
+    Returns True if the given role is allowed to perform the action implied by required_role.
+    """
+    if required_role.startswith("ROOM_"):
+        return role in ["ROOM_CLERK", "ROOM_ADMIN", "SITE_ADMIN"]
+    elif required_role.startswith("LOCATION_"):
+        return role in ["LOCATION_ADMIN", "SITE_ADMIN"]
+    elif required_role.startswith("DEPARTMENT_"):
+        return role in ["DEPARTMENT_ADMIN", "SITE_ADMIN"]
+    elif required_role == "SITE_ADMIN":
+        return role == "SITE_ADMIN"
+    return False
+
+
 def get_active_role(user: User) -> Optional[RoleAssignment]:
     """
     Retrieve the active role assignment for a user.
@@ -89,9 +105,21 @@ def check_permission(user: User, required_role: str,
     role = get_active_role(user)
     if not role:
         return False
-    if has_hierarchy_permission(role.role, required_role):
-        return is_in_scope(role, room, location, department)
-    return False
+    
+
+    # hierarchy check
+    if not has_hierarchy_permission(role.role, required_role):
+        return False
+
+    # scope check
+    if not is_in_scope(role, room, location, department):
+        return False
+
+    # prevent view-only roles from performing modify actions
+    if not required_role.endswith("_VIEWER") and not can_modify(role.role, required_role):
+        return False
+
+    return True
 
 def ensure_permission(user: User, required_role: str,
                       room: Optional[Room] = None,

@@ -98,6 +98,11 @@ class LocationReadSerializer(serializers.ModelSerializer):
 
 
 class LocationWriteSerializer(serializers.ModelSerializer):
+    department = serializers.SlugRelatedField(
+        slug_field='public_id',
+        queryset=Department.objects.all()
+    )
+
     class Meta:
         model = Location
         fields = ['name', 'department']
