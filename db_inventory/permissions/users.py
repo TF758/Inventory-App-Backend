@@ -14,36 +14,63 @@ class UserPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
+        # All authenticated users can view (list/retrieve)
         if request.method == "GET":
-            return True
+            return request.user.is_authenticated
+
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
+
         if active_role.role == "SITE_ADMIN":
             return True
+
         required_role = self.method_role_map.get(request.method)
         return has_hierarchy_permission(active_role.role, required_role)
 
     def has_object_permission(self, request, view, obj):
-        active_role = getattr(request.user, "active_role", None)
-        if request.user == obj:
+        user = request.user
+        active_role = getattr(user, "active_role", None)
+
+        # Always allow self
+        if user == obj:
             return True
-        if active_role and active_role.role in ("SITE_ADMIN", "DEPARTMENT_ADMIN"):
+
+        # If no role, can't access anyone else
+        if not active_role:
+            return False
+
+        # Superuser or site admin can access anyone
+        if user.is_superuser or active_role.role == "SITE_ADMIN":
             return True
+
+        # --- READ-ONLY ACCESS ---
+        if request.method in SAFE_METHODS:
+            target_role = getattr(obj, "active_role", None)
+
+            # handle users without active_role
+            room = getattr(target_role, "room", None)
+            location = getattr(target_role, "location", None)
+            department = getattr(target_role, "department", None)
+
+            # Viewer/Clerk/Admin roles can read anyone within their scope
+            return is_in_scope(active_role, room=room, location=location, department=department)
+
+        # --- WRITE ACCESS (admin-level only) ---
         required_role = self.method_role_map.get(request.method)
         target_role = getattr(obj, "active_role", None)
         if not target_role:
             return False
-        if request.method == "GET":
-            return is_in_scope(active_role,
-                               room=target_role.room,
-                               location=target_role.location,
-                               department=target_role.department)
-        return (has_hierarchy_permission(active_role.role, required_role)
-                and is_in_scope(active_role,
-                                room=target_role.room,
-                                location=target_role.location,
-                                department=target_role.department))
+
+        return (
+            has_hierarchy_permission(active_role.role, required_role)
+            and is_in_scope(
+                active_role,
+                room=target_role.room,
+                location=target_role.location,
+                department=target_role.department,
+            )
+        )
 
 class RolePermission(BasePermission):
     def has_permission(self, request, view):
