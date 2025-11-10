@@ -61,7 +61,7 @@ class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
         if not room_id:
             raise PermissionDenied("You must specify a room to create equipment.")
         
-        room = Room.objects.filter(pk=room_id).first()
+        room = Room.objects.filter(public_id=room_id).first()
         if not room:
             raise PermissionDenied("Invalid room ID.")
 
