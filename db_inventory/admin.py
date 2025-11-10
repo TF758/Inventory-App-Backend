@@ -6,7 +6,29 @@ from django.utils.translation import gettext_lazy as _
 # Simple models
 
 admin.site.register(Department)
-admin.site.register(UserLocation)
+
+@admin.register(UserLocation)
+class UserLocationAdmin(admin.ModelAdmin):
+    list_display = ("public_id", "user_full_name", "user_public_id", "room_public_id", "date_joined")
+    search_fields = (
+        "user__fname",
+        "user__lname",
+        "user__public_id",
+        "room__public_id",
+    )
+
+
+    def user_full_name(self, obj):
+        return f"{obj.user.fname} {obj.user.lname}"
+    user_full_name.short_description = "User Name"
+
+    def user_public_id(self, obj):
+        return obj.user.public_id
+    user_public_id.short_description = "User Public ID"
+
+    def room_public_id(self, obj):
+        return obj.room.public_id if obj.room else "-"
+    room_public_id.short_description = "Room Public ID"
 admin.site.register(Accessory)
 
 
@@ -15,6 +37,8 @@ class UserSessionAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "status", "created_at", "last_used_at", "ip_address")
     list_filter = ("status", "created_at")
     search_fields = ("user__username", "ip_address")
+
+    ordering = ("-created_at",)  # "-" means descending order
 
 @admin.register(RoleAssignment)
 class RoleAssignmentAdmin(admin.ModelAdmin):
@@ -26,8 +50,8 @@ class RoleAssignmentAdmin(admin.ModelAdmin):
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "fname", "lname","active_role", "is_staff", "is_active")
-    search_fields = ("email", "fname", "lname")
+    list_display = ("email", "fname", "lname","active_role", "public_id", "is_active", "created_by","is_system_user" )
+    search_fields = ("email", "fname", "lname", "public_id")
     readonly_fields = ("public_id",)
 
     fieldsets = (
@@ -49,6 +73,7 @@ class UserAdmin(BaseUserAdmin):
 class RoomAdmin(admin.ModelAdmin):
     list_display = ('name', 'location')
     readonly_fields = ("public_id",)
+    search_fields = ('name', 'location__name', 'public_id')
 
 
 @admin.register(Equipment)

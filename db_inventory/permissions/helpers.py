@@ -5,13 +5,42 @@ from django.db.models import Q
 from db_inventory.models import RoleAssignment, User, Room, Location, Department, Equipment, Component, Accessory, Consumable
 from .constants import ROLE_HIERARCHY
 
+
+def can_modify(role: str, required_role: str) -> bool:
+    """
+    Returns True if the given role is allowed to perform the action implied by required_role.
+    """
+    if required_role.startswith("ROOM_"):
+        return role in ["ROOM_CLERK", "ROOM_ADMIN", "SITE_ADMIN"]
+    elif required_role.startswith("LOCATION_"):
+        return role in ["LOCATION_ADMIN", "SITE_ADMIN"]
+    elif required_role.startswith("DEPARTMENT_"):
+        return role in ["DEPARTMENT_ADMIN", "SITE_ADMIN"]
+    elif required_role == "SITE_ADMIN":
+        return role == "SITE_ADMIN"
+    return False
+
+
 def get_active_role(user: User) -> Optional[RoleAssignment]:
+    """
+    Retrieve the active role assignment for a user.
+    """
     return getattr(user, "active_role", None)
 
 def get_user_roles(user: User):
+    """
+    Get all role assignments for a given user.
+    """
     return RoleAssignment.objects.filter(user=user)
 
 def has_hierarchy_permission(user_role: str, required_role: str) -> bool:
+    """
+    Check whether a user's role level is equal to or higher than the required role
+    according to the defined role hierarchy.
+
+    Returns:
+        bool: True if user_role >= required_role in hierarchy, otherwise False.
+    """
     if user_role == "SITE_ADMIN":
         return True
     return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(required_role, -1)
@@ -20,12 +49,19 @@ def is_in_scope(role_assignment: RoleAssignment,
                 room: Optional[Room] = None,
                 location: Optional[Location] = None,
                 department: Optional[Department] = None) -> bool:
+    """
+    Determine whether a role assignment has scope over a given resource
+    (room, location, or department).
+
+    Returns:
+        bool: True if the role covers the given resource, otherwise False.
+    """
+
     if not role_assignment:
         return False
     if role_assignment.role == "SITE_ADMIN":
         return True
 
-    # Department level
     if department:
         if role_assignment.department == department:
             return True
@@ -34,7 +70,6 @@ def is_in_scope(role_assignment: RoleAssignment,
         if role_assignment.room and role_assignment.room.location.department == department:
             return True
 
-    # Location level
     if location:
         if role_assignment.location == location:
             return True
@@ -43,7 +78,6 @@ def is_in_scope(role_assignment: RoleAssignment,
         if role_assignment.room and role_assignment.room.location == location:
             return True
 
-    # Room level
     if room:
         if role_assignment.room == room:
             return True
@@ -58,21 +92,55 @@ def check_permission(user: User, required_role: str,
                      room: Optional[Room] = None,
                      location: Optional[Location] = None,
                      department: Optional[Department] = None) -> bool:
+    
+    """
+    Verify that the user's active role satisfies both hierarchy and scope
+    requirements for a given resource.
+
+    Returns:
+        bool: True if the user has permission, otherwise False.
+    """
     role = get_active_role(user)
     if not role:
         return False
-    if has_hierarchy_permission(role.role, required_role):
-        return is_in_scope(role, room, location, department)
-    return False
+    
+
+    # hierarchy check
+    if not has_hierarchy_permission(role.role, required_role):
+        return False
+
+    # scope check
+    if not is_in_scope(role, room, location, department):
+        return False
+
+    # prevent view-only roles from performing modify actions
+    if not required_role.endswith("_VIEWER") and not can_modify(role.role, required_role):
+        return False
+
+    return True
 
 def ensure_permission(user: User, required_role: str,
                       room: Optional[Room] = None,
                       location: Optional[Location] = None,
                       department: Optional[Department] = None):
+    """
+    Raise a PermissionDenied exception if the user lacks the required role
+    or scope for the target resource.
+
+    Raises:
+        PermissionDenied: If the user lacks permission for the resource.
+    """
     if not check_permission(user, required_role, room, location, department):
         raise PermissionDenied(f"Active role lacks {required_role} permission for this resource.")
 
 def filter_queryset_by_scope(user: User, queryset, model_class):
+    """
+    Restrict a queryset to the subset of records the user's active role
+    has scope over (based on department, location, or room).
+
+    Returns:
+        QuerySet: The filtered queryset containing only records within scope.
+    """
     active_role = get_active_role(user)
     if not active_role:
         return queryset.none()
