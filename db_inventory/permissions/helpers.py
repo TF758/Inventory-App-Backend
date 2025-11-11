@@ -6,20 +6,21 @@ from db_inventory.models import RoleAssignment, User, Room, Location, Department
 from .constants import ROLE_HIERARCHY
 
 
-def can_modify(role: str, required_role: str) -> bool:
+def can_modify(user_role: str, target_role: str) -> bool:
     """
-    Returns True if the given role is allowed to perform the action implied by required_role.
+    Returns True if the given role is allowed to perform the action implied by target_role.
+    
+    Rules:
+    - VIEWER roles can be assigned by users of equal or higher hierarchy.
+    - All other roles require the user to be strictly higher in hierarchy.
+    - SITE_ADMIN can assign anything.
     """
-    if required_role.startswith("ROOM_"):
-        return role in ["ROOM_CLERK", "ROOM_ADMIN", "SITE_ADMIN"]
-    elif required_role.startswith("LOCATION_"):
-        return role in ["LOCATION_ADMIN", "SITE_ADMIN"]
-    elif required_role.startswith("DEPARTMENT_"):
-        return role in ["DEPARTMENT_ADMIN", "SITE_ADMIN"]
-    elif required_role == "SITE_ADMIN":
-        return role == "SITE_ADMIN"
-    return False
+    if user_role == "SITE_ADMIN":
+        return True
 
+    if target_role.endswith("_VIEWER"):
+        return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(target_role, -1)
+    return ROLE_HIERARCHY.get(user_role, -1) > ROLE_HIERARCHY.get(target_role, -1)
 
 def get_active_role(user: User) -> Optional[RoleAssignment]:
     """

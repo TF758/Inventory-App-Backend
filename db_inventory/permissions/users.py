@@ -1,7 +1,7 @@
 # myapp/permissions/users.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
-from .helpers import is_in_scope, has_hierarchy_permission
+from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role
 from ..utils import user_can_access_role
 
 class UserPermission(BasePermission):
@@ -71,29 +71,40 @@ class UserPermission(BasePermission):
                 department=target_role.department,
             )
         )
-
 class RolePermission(BasePermission):
     def has_permission(self, request, view):
         user = request.user
         if not user.is_authenticated:
             return False
-        if user.is_superuser or getattr(user, "role", None) == "SITE_ADMIN":
+
+        active = get_active_role(user)
+        if user.is_superuser or (active and active.role == "SITE_ADMIN"):
             return True
-        if view.action in ["list", "retrieve"]:
+
+        if getattr(view, "action", None) in ["list", "retrieve"]:
             return True
-        active = getattr(user, "active_role", None)
-        if active and active.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN", "SITE_ADMIN"]:
+
+        if active and active.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
             return True
+
         return False
 
     def has_object_permission(self, request, view, obj):
         user = request.user
+        active = get_active_role(user)
+
         if request.method in SAFE_METHODS:
-            return user_can_access_role(user, obj)
-        active = getattr(user, "active_role", None)
-        if active and active.role in ["SITE_ADMIN", "DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
-            return user_can_access_role(user, obj)
-        return False
+            result = is_in_scope(active, getattr(obj, "room", None), getattr(obj, "location", None), getattr(obj, "department", None))
+            return result
+
+        if not active:
+            return False
+
+        try:
+            ensure_permission(user, obj.role, getattr(obj, "room", None), getattr(obj, "location", None), getattr(obj, "department", None))
+            return True
+        except Exception as e:
+            return False
 
 class UserLocationPermission(BasePermission):
     method_role_map = {
