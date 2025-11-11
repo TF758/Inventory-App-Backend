@@ -15,6 +15,9 @@ def can_modify(user_role: str, target_role: str) -> bool:
     - All other roles require the user to be strictly higher in hierarchy.
     - SITE_ADMIN can assign anything.
     """
+    if user_role.endswith("_VIEWER") and not target_role.endswith("_VIEWER"):
+        return False
+    
     if user_role == "SITE_ADMIN":
         return True
 
@@ -93,7 +96,6 @@ def check_permission(user: User, required_role: str,
                      room: Optional[Room] = None,
                      location: Optional[Location] = None,
                      department: Optional[Department] = None) -> bool:
-    
     """
     Verify that the user's active role satisfies both hierarchy and scope
     requirements for a given resource.
@@ -101,11 +103,11 @@ def check_permission(user: User, required_role: str,
     Returns:
         bool: True if the user has permission, otherwise False.
     """
-    role = get_active_role(user)
+    
+    role = getattr(user, "active_role", None)
     if not role:
         return False
     
-
     # hierarchy check
     if not has_hierarchy_permission(role.role, required_role):
         return False
