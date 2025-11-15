@@ -31,64 +31,74 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = RoleAssignmentFilter
     pagination_class = FlexiblePagination
+
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return RoleWriteSerializer
         return RoleReadSerializer
-    
+
     def get_queryset(self):
         user = self.request.user
         qs = self.base_queryset
 
-        print("DEBUG --- user:", user.email)
-        print("DEBUG --- is_superuser:", user.is_superuser)
-        print("DEBUG --- active_role:", user.active_role)
-        if user.active_role:
-            print("DEBUG --- active_role.role:", user.active_role.role)
-            print("DEBUG --- department:", user.active_role.department)
-            print("DEBUG --- location:", user.active_role.location)
-            print("DEBUG --- room:", user.active_role.room)
-
-        # --- Superusers or site admins can see everything ---
         active = getattr(user, "active_role", None)
         if active and active.role == "SITE_ADMIN":
             return qs
 
-        # --- Must have an active role ---
-        active = getattr(user, "active_role", None)
         if not active:
-            # No active role → only their own assignments
             return qs.filter(user=user)
 
         role = active.role
 
-        # --- 3️⃣ Filter by scope ---
         if role == "DEPARTMENT_ADMIN":
-            # See all roles within their department — direct + nested (location/room)
             return qs.filter(
                 Q(department=active.department)
                 | Q(location__department=active.department)
                 | Q(room__location__department=active.department)
             )
-
         elif role == "LOCATION_ADMIN":
-            # See roles within their location — direct + nested (room)
             return qs.filter(
                 Q(location=active.location)
                 | Q(room__location=active.location)
             )
-
         elif role == "ROOM_ADMIN":
-            # See all roles in their room
             return qs.filter(room=active.room)
-
         elif role in ["ROOM_CLERK", "ROOM_VIEWER"]:
-            # Can only see their own or others in the same room
             return qs.filter(Q(user=user) | Q(room=active.room))
 
-        # Default fallback — self only
         return qs.filter(user=user)
 
+    # ------------------------------
+    # Enforce permission before serializer.save()
+    # ------------------------------
+    def perform_create(self, serializer):
+        user = self.request.user
+        data = serializer.validated_data
+
+        # Pre-check permissions before saving
+        ensure_permission(
+            user,
+            data['role'],
+            data.get('room'),
+            data.get('location'),
+            data.get('department')
+        )
+
+        serializer.save(assigned_by=user)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        data = serializer.validated_data
+
+        ensure_permission(
+            user,
+            data.get('role', serializer.instance.role),
+            data.get('room', serializer.instance.room),
+            data.get('location', serializer.instance.location),
+            data.get('department', serializer.instance.department)
+        )
+
+        serializer.save(assigned_by=user)
 
 
 # --- User Roles List (current user or any user by public_id) ---

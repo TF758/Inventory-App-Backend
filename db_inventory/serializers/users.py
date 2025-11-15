@@ -136,25 +136,31 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
         fields = ['public_id', 'user_id', 'room_id', 'date_joined']
 
     def validate(self, attrs):
+        # On update, 'user_id' may not be in attrs, use instance.user if missing
         user_id = attrs.get('user_id')
+        if not user_id and self.instance:
+            user = self.instance.user
+        elif user_id:
+            try:
+                user = User.objects.get(public_id=user_id)
+            except User.DoesNotExist:
+                raise serializers.ValidationError({"user_id": "Invalid user public_id."})
+        else:
+            raise serializers.ValidationError({"user_id": "This field is required."})
+
+        # room validation
         room_id = attrs.get('room_id', None)
-
-        # Validate user
-        try:
-            user = User.objects.get(public_id=user_id)
-        except User.DoesNotExist:
-            raise serializers.ValidationError({"user_id": "Invalid user public_id."})
-
-        # Validate room (allow null for unassigning)
         room = None
         if room_id:
             try:
                 room = Room.objects.get(public_id=room_id)
             except Room.DoesNotExist:
                 raise serializers.ValidationError({"room_id": "Invalid room public_id."})
+        elif self.instance:
+            room = self.instance.room
 
-        # Enforce unique user-room constraint
-        if room is not None:
+        # unique user-room check
+        if room:
             existing = UserLocation.objects.filter(user=user, room=room)
             if self.instance:
                 existing = existing.exclude(pk=self.instance.pk)

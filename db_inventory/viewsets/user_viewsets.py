@@ -156,36 +156,47 @@ class UserLocationViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserLocationFilter
 
+    def get_object(self):
+        obj = super().get_object()  # fetch object ignoring scope
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def get_queryset(self):
-        user = self.request.user
-        return filter_queryset_by_scope(user, super().get_queryset(), UserLocation)
+        if self.action == "list":
+            # Only list objects within scope
+            return filter_queryset_by_scope(self.request.user, super().get_queryset(), UserLocation)
+        # For detail actions, return all objects (permission check will handle scope)
+        return super().get_queryset()
+    
+    def get_serializer_class(self):
+        if self.action in ["update", "partial_update", "create"]:
+            return UserLocationWriteSerializer
+        return UserAreaSerializer
 
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        read_serializer = UserAreaSerializer(serializer.instance, context=self.get_serializer_context())
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+    
     def perform_create(self, serializer):
-        user = serializer.validated_data.get("user")
         room = serializer.validated_data.get("room")
-        is_current = serializer.validated_data.get("is_current", False)
-
-        # Object-level permission check
-        if not self.request.user.has_perm("add_userlocation") and not is_in_scope(self.request.user.active_role, room=room):
+        if not self.request.user.has_perm("add_userlocation") and \
+        not is_in_scope(self.request.user.active_role, room=room):
             raise PermissionDenied("Cannot assign user to a room outside your scope.")
-
-        if is_current:
-            UserLocation.objects.filter(user=user, is_current=True).update(is_current=False)
 
         serializer.save()
 
-    def perform_update(self, serializer):
-        user_location = serializer.instance
-        room = serializer.validated_data.get("room", user_location.room)
-        is_current = serializer.validated_data.get("is_current", user_location.is_current)
-
-        if not self.request.user.has_perm("change_userlocation") and not is_in_scope(self.request.user.active_role, room=room):
-            raise PermissionDenied("Cannot assign user to a room outside your scope.")
-
-        if is_current:
-            UserLocation.objects.filter(user=user_location.user, is_current=True).exclude(pk=user_location.pk).update(is_current=False)
-
-        serializer.save()
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        read_serializer = UserAreaSerializer(instance, context=self.get_serializer_context())
+        return Response(read_serializer.data)
 
 
 class UserLocationByUserView(APIView):

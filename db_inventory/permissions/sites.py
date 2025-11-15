@@ -107,9 +107,13 @@ class LocationPermission(BasePermission):
         if not active_role:
             return False
 
-        # SITE_ADMIN bypasses everything
+        # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
+
+        # VIEWER roles can only GET
+        if active_role.role.endswith("_VIEWER") and request.method != "GET":
+            return False
 
         # For POST, extract department from request data
         if request.method == "POST":
@@ -120,32 +124,37 @@ class LocationPermission(BasePermission):
             if not department:
                 return False
 
-            # DEPARTMENT_ADMIN: bypass hierarchy but respect department
             if active_role.role == "DEPARTMENT_ADMIN":
                 return is_in_scope(active_role, department=department)
 
-            # Other roles: use full check
             return check_permission(request.user, required_role, department=department)
 
-        # For GET/PUT/PATCH/DELETE, rely on object-level permission
         return True
 
-    def has_object_permission(self, request, view, obj: Location) -> bool:
+    def has_object_permission(self, request, view, obj) -> bool:
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
 
-        # SITE_ADMIN bypasses everything
+        # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
 
+        # VIEWER roles can only GET
+        if active_role.role.endswith("_VIEWER") and request.method != "GET":
+            return False
+
         required_role = self.method_role_map.get(request.method)
 
-        # DEPARTMENT_ADMIN bypasses hierarchy but still needs to be in their department
+        # DEPARTMENT_ADMIN can operate within department scope
         if active_role.role == "DEPARTMENT_ADMIN":
-            return is_in_scope(active_role, location=obj)  # only check scope
+            return is_in_scope(active_role, location=obj)
 
-        # For other roles, use full check_permission (hierarchy + scope)
+        # LOCATION_ADMIN can operate within their location
+        if active_role.role == "LOCATION_ADMIN":
+            return is_in_scope(active_role, location=obj)
+
+        # Other roles (including LOCATION_VIEWER) use check_permission
         return check_permission(request.user, required_role, location=obj)
 
 

@@ -1,8 +1,9 @@
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
-from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from ..models import RoleAssignment, Location, Department, Room, User
-
+from db_inventory.permissions.helpers import ensure_permission
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers
+from db_inventory.models import RoleAssignment
 
 
 class ActiveRoleSerializer(serializers.ModelSerializer):
@@ -90,7 +91,6 @@ class RoleWriteSerializer(serializers.ModelSerializer):
     Serializer for creating/updating RoleAssignment.
     Accepts public_id for user, department, location, room.
     """
-
     user = serializers.SlugRelatedField(
         slug_field="public_id",
         queryset=User.objects.all()
@@ -101,7 +101,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         queryset=Department.objects.all(),
         required=False,
         allow_null=True,
-          default=None     
+        default=None
     )
 
     location = serializers.SlugRelatedField(
@@ -109,7 +109,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         queryset=Location.objects.all(),
         required=False,
         allow_null=True,
-          default=None     
+        default=None
     )
 
     room = serializers.SlugRelatedField(
@@ -117,7 +117,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         queryset=Room.objects.all(),
         required=False,
         allow_null=True,
-          default=None      # 
+        default=None
     )
 
     class Meta:
@@ -131,10 +131,9 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             "assigned_by",
             "assigned_date",
         ]
+        read_only_fields = ["assigned_by", "assigned_date"]
 
-        read_only_fields = ["assigned_by", "assigned_date"] 
-
-      # --- Field-level validation ---
+    # --- Field-level validation ---
     def validate_user(self, value):
         if isinstance(value, str):
             try:
@@ -174,32 +173,73 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         return value
 
     # --- Global validation ---
+    
     def validate(self, attrs):
-        user = attrs.get("user")
+        request = self.context.get("request")
+        user = request.user if request else None
         role = attrs.get("role")
-        department = attrs.get("department")
-        location = attrs.get("location")
         room = attrs.get("room")
+        location = attrs.get("location")
+        department = attrs.get("department")
 
-     
+        # --- Get the target user safely (works for PATCH and POST)
+        target_user = attrs.get("user") or getattr(self.instance, "user", None)
+        # --- Default scoping based on current user's active role ---
+        active_role = getattr(user, "active_role", None)
+        if role.startswith("DEPARTMENT_") and not department and active_role and active_role.department:
+            department = active_role.department
+            print(f"[DEBUG] Defaulted department to active role: {department}")
+
+        if role.startswith("LOCATION_") and not location and active_role and active_role.location:
+            location = active_role.location
+            print(f"[DEBUG] Defaulted location to active role: {location}")
+
+        if role.startswith("ROOM_") and not room and active_role and active_role.room:
+            room = active_role.room
+        # --- Permission enforcement ---
+        try:
+            ensure_permission(
+                user,
+                role,
+                room=room,
+                location=location,
+                department=department,
+            )
+        except Exception as e:
+            raise
+
+        # --- Update attrs so they're passed correctly downstream ---
+        attrs.update({
+            "room": room,
+            "location": location,
+            "department": department,
+        })
+
+        # --- Validate model-level consistency (scope sanity) ---
+        try:
+            temp = RoleAssignment(**attrs)
+            temp.clean()
+        except DjangoValidationError as e:
+            msg = getattr(e, "message_dict", None) or getattr(e, "messages", None) or str(e)
+            raise serializers.ValidationError(msg)
+
+        # --- Prevent duplicate role assignments ---
         existing = RoleAssignment.objects.filter(
-            user=user,
+            user=target_user,
             role=role,
-            department=department,
-            location=location,
             room=room,
-        ).exists()
+            location=location,
+            department=department,
+        )
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
 
-        if existing:
-            raise serializers.ValidationError({
-                "detail": f"User already has the '{role}' role assigned for this context."
-            })
+        if existing.exists():
+            raise serializers.ValidationError(
+                "User already has this role in the specified scope."
+            )
 
-        # Allow model-level clean() to enforce rules
-        instance = RoleAssignment(**attrs)
-        instance.clean()
         return attrs
-
     # --- Create / Update ---
     def create(self, validated_data):
         request = self.context.get("request")
