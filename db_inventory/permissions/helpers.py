@@ -2,7 +2,7 @@
 from typing import Optional
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
-from db_inventory.models import RoleAssignment, User, Room, Location, Department, Equipment, Component, Accessory, Consumable
+from db_inventory.models import *
 from .constants import ROLE_HIERARCHY
 
 
@@ -202,6 +202,14 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
                 | Q(location__department=active_role.department)
                 | Q(room__location__department=active_role.department)
             )
+
+    elif model_class == UserLocation:
+        if active_role.department:
+            q |= Q(room__location__department=active_role.department)
+        elif active_role.location:
+            q |= Q(room__location=active_role.location)
+        elif active_role.room:
+            q |= Q(room=active_role.room)
 
     elif model_class.__name__ == "User":
         user_q = Q()

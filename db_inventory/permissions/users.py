@@ -108,8 +108,10 @@ class RolePermission(BasePermission):
 
 class UserLocationPermission(BasePermission):
     method_role_map = {
-        "GET": "ROOM_VIEWER",
-        "POST": "ROOM_ADMIN",
+        "GET": "ROOM_VIEWER",    # minimum role to read
+        "HEAD": "ROOM_VIEWER",
+        "OPTIONS": "ROOM_VIEWER",
+        "POST": "ROOM_ADMIN",    # minimum role to write
         "PUT": "ROOM_ADMIN",
         "PATCH": "ROOM_ADMIN",
         "DELETE": "ROOM_ADMIN",
@@ -119,20 +121,48 @@ class UserLocationPermission(BasePermission):
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
+
+        # Site admin can always do anything
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Explicitly block any viewer roles from write methods
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and "_VIEWER" in active_role.role:
+            return False
+
+        # Otherwise, check hierarchy
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
-        if active_role.role == "SITE_ADMIN":
-            return True
+
         return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
 
     def has_object_permission(self, request, view, obj):
         active_role = getattr(request.user, "active_role", None)
-        required_role = self.method_role_map.get(request.method)
-        if not active_role or not required_role:
+        if not active_role:
             return False
+
+        # Site admin can always do anything
         if active_role.role == "SITE_ADMIN":
             return True
+
+        # Block viewers from write methods
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and "_VIEWER" in active_role.role:
+            return False
+
+        # Check hierarchy
+        required_role = self.method_role_map.get(request.method)
+        if not required_role:
+            return False
         if ROLE_HIERARCHY.get(active_role.role, 0) < ROLE_HIERARCHY.get(required_role, 0):
             return False
-        return is_in_scope(active_role, room=obj.room)
+
+        # Scope check for the object
+        if "ROOM" in active_role.role:
+            return is_in_scope(active_role, room=obj.room)
+        elif "LOCATION" in active_role.role:
+            return is_in_scope(active_role, location=obj.room.location)
+        elif "DEPARTMENT" in active_role.role:
+            return is_in_scope(active_role, department=obj.room.location.department)
+
+        return False
