@@ -353,6 +353,7 @@ class DepartmentRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes=[RolePermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = RoleAssignmentFilter
     search_fields = ['role']
 
     # filterset_class = RoleFilter

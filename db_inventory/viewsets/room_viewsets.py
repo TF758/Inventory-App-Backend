@@ -3,7 +3,7 @@ from ..serializers.rooms import  *
 from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocation, RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import ComponentFilter, EquipmentFilter, ConsumableFilter,AccessoryFilter,RoomFilter, AreaUserFilter
+from ..filters import *
 from ..utils import ExcludeFiltersMixin
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
 from ..mixins import ScopeFilterMixin
@@ -298,6 +298,7 @@ class RoomRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [RoomPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = RoleAssignmentFilter
     search_fields = ['role']
 
     pagination_class = FlexiblePagination

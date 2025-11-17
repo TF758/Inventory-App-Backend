@@ -277,7 +277,7 @@ class UserLocationFilter(django_filters.FilterSet):
 
 class RoleAssignmentFilter(django_filters.FilterSet):
     search = django_filters.CharFilter(method="filter_user_search")
-    role_type = django_filters.CharFilter(field_name="role", lookup_expr="iexact")
+    role = django_filters.CharFilter(field_name="role", lookup_expr="iexact")
     area_type = django_filters.CharFilter(method="filter_area_type")
 
     def filter_user_search(self, queryset, name, value):
@@ -302,4 +302,4 @@ class RoleAssignmentFilter(django_filters.FilterSet):
 
     class Meta:
         model = RoleAssignment
-        fields = ["role_type", "area_type", "search"]
+        fields = ["role", "area_type", "search"]

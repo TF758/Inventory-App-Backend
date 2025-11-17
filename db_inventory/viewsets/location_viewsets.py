@@ -6,7 +6,7 @@ from ..serializers.roles import RoleReadSerializer
 from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component, RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import LocationFilter, RoomFilter, ConsumableFilter, EquipmentFilter, AccessoryFilter, AreaUserFilter, ComponentFilter
+from ..filters import *
 from ..utils import ExcludeFiltersMixin
 from ..mixins import ScopeFilterMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
@@ -344,6 +344,7 @@ class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes=[RolePermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = RoleAssignmentFilter
     search_fields = ['role']
 
     # filterset_class = RoleFilter
