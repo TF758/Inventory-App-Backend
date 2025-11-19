@@ -181,3 +181,5 @@ password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view(
 # ---Password Change ---
 
 password_change = general_viewsets.ChangePasswordView.as_view()
+
+create_full_user_view = user_viewsets.FullUserCreateView.as_view()

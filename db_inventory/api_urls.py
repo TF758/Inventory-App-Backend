@@ -18,6 +18,7 @@ urlpatterns = [
     path('logout/',api_logout, name='logout'),
     path('refresh/', api_token_refresh, name='session_refresh'),
 
+    path('users/create-full/', create_full_user_view, name='create-full-user'),
     path('users/', user_list_create_view, name='users'),
     path('users/<str:public_id>/',user_id_detail_view, name='user-detail'),
      path('user-locations/', user_location_list_create_view, name='userlocation-list-create'),

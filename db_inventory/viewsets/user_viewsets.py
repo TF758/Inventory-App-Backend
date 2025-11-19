@@ -1,18 +1,20 @@
 from rest_framework import viewsets
 from ..serializers.users import  UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
-from django.db.models import Case, When, Value, IntegerField
-from ..models import User, UserLocation, RoleAssignment, Department
+from db_inventory.serializers.roles import RoleWriteSerializer
+from rest_framework import status, views
+from django.db import transaction
+from db_inventory.models import User, UserLocation, RoleAssignment, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import UserFilter, UserLocationFilter
 from ..mixins import ScopeFilterMixin
 from ..pagination import FlexiblePagination
-from db_inventory.permissions import UserPermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope
+from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope
 from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 class UserModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -230,3 +232,112 @@ class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     filterset_class = UserFilter
     pagination_class = FlexiblePagination
     permission_classes = [UserPermission]
+
+
+
+class FullUserCreateView(views.APIView):
+    """
+    Create a User, assign a UserLocation, and assign a Role atomically.
+    Payload format:
+    {
+        "user": { ...user fields... },
+        "user_location": "room_public_id",        # optional
+        "role": { ...role fields (excluding 'user') }
+    }
+    """
+
+    def post(self, request, *args, **kwargs):
+        payload = request.data
+        user_data = payload.get("user", {})
+        user_location_public_id = payload.get("user_location")
+        role_data = payload.get("role", {})
+
+        # --- Permission checks for authenticated user ---
+        user_perm = UserPermission()
+        location_perm = UserLocationPermission()
+        role_perm = RolePermission()
+
+        if not request.user.is_authenticated:
+            raise PermissionDenied("Authentication required.")
+
+        with transaction.atomic():
+            # --- 1️⃣ Create User ---
+            user_serializer = UserWriteSerializer(data=user_data)
+            user_serializer.is_valid(raise_exception=True)
+            user = user_serializer.save()
+
+            # --- 2️⃣ Assign UserLocation if provided ---
+            user_location_instance = None
+            if user_location_public_id:
+                location_data = {
+                    "user_id": user.public_id,
+                    "room_id": user_location_public_id
+                }
+                ul_serializer = UserLocationWriteSerializer(data=location_data)
+                ul_serializer.is_valid(raise_exception=True)
+
+                # Check object-level permission
+                temp_ul = UserLocation(user=user, room=ul_serializer.validated_data["room"])
+                if not location_perm.has_object_permission(request, self, temp_ul):
+                    raise PermissionDenied("You do not have permission to assign this location.")
+
+                user_location_instance = ul_serializer.save()
+
+            # --- 3️⃣ Assign Role ---
+            role_data_for_check = role_data.copy()
+
+            # Resolve foreign keys to actual model instances
+            department_id = role_data_for_check.pop("department", None)
+            location_id = role_data_for_check.pop("location", None)
+            room_id = role_data_for_check.pop("room", None)
+
+            department = None
+            location = None
+            room = None
+
+            if department_id:
+                try:
+                    department = Department.objects.get(public_id=department_id)
+                except Department.DoesNotExist:
+                    raise ValidationError({"department": "Invalid department public_id."})
+
+            if location_id:
+                try:
+                    location = Location.objects.get(public_id=location_id)
+                except Location.DoesNotExist:
+                    raise ValidationError({"location": "Invalid location public_id."})
+
+            if room_id:
+                try:
+                    room = Room.objects.get(public_id=room_id)
+                except Room.DoesNotExist:
+                    raise ValidationError({"room": "Invalid room public_id."})
+
+            # Build temporary role instance for permission check
+            temp_role = RoleAssignment(
+                user=user,
+                role=role_data_for_check.get("role"),
+                department=department,
+                location=location,
+                room=room
+            )
+
+            # Check object-level permission
+            if not role_perm.has_object_permission(request, self, temp_role):
+                raise PermissionDenied("You do not have permission to assign this role.")
+
+            # Use serializer to save (assign user automatically)
+            role_data_for_save = role_data.copy()
+            role_data_for_save["user"] = user.public_id
+            role_serializer = RoleWriteSerializer(data=role_data_for_save, context={"request": request})
+            role_serializer.is_valid(raise_exception=True)
+            role_assignment = role_serializer.save()
+
+        # --- Build response ---
+        response_data = {
+            "user": UserWriteSerializer(user).data,
+            "user_location": UserLocationWriteSerializer(user_location_instance).data if user_location_instance else None,
+            "role_assignment": RoleWriteSerializer(role_assignment).data
+        }
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
