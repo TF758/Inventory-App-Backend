@@ -188,3 +188,9 @@ password_change = general_viewsets.ChangePasswordView.as_view()
 user_session_revoke_all_view = auth_viewsets.UserSessionViewSet.as_view({
     'post': 'revoke_all'
 })
+
+# Lock/Unlock User Accounts
+user_lock_unlock_view = auth_viewsets.UserLockViewSet.as_view({
+    'post': 'lock',
+    'post': 'unlock'
+})

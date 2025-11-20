@@ -44,3 +44,46 @@ class UserSessionViewSet(viewsets.GenericViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+
+class UserLockViewSet(viewsets.GenericViewSet):
+    """
+    Admin-only ViewSet to lock or unlock user accounts.
+    Locking automatically revokes all active sessions.
+    """
+    queryset = User.objects.all()
+   
+    lookup_field = "public_id"
+
+    @action(detail=True, methods=["post"])
+    def lock(self, request, public_id=None):
+        user = get_object_or_404(User, public_id=public_id)
+        if user.is_locked:
+            return Response({"detail": "User account is already locked."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Lock the account
+        user.is_locked = True
+        user.save(update_fields=["is_locked"])
+
+        # Revoke all active sessions
+        UserSession.objects.filter(user=user, status=UserSession.Status.ACTIVE).update(
+            status=UserSession.Status.REVOKED
+        )
+
+        return Response({"detail": f"User {user.email} has been locked and logged out."},
+                        status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def unlock(self, request, public_id=None):
+        user = get_object_or_404(User, public_id=public_id)
+        if not user.is_locked:
+            return Response({"detail": "User account is not locked."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Unlock the account
+        user.is_locked = False
+        user.save(update_fields=["is_locked"])
+
+        return Response({"detail": f"User {user.email} has been unlocked."},
+                        status=status.HTTP_200_OK)

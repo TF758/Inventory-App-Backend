@@ -97,6 +97,8 @@ class RefreshAPIView(APIView):
     authentication_classes = []              
 
     def post(self, request):
+
+        
         try:
             raw_refresh = request.COOKIES.get("refresh")
             if not raw_refresh:
@@ -115,6 +117,19 @@ class RefreshAPIView(APIView):
 
             user = session.user
 
+            if user.is_locked:
+                # Revoke all active sessions for the user
+                UserSession.objects.filter(user=user, status=UserSession.Status.ACTIVE).update(
+                    status=UserSession.Status.REVOKED
+                )
+
+                # Optionally delete the current refresh cookie
+                response = Response(
+                    {"detail": "Your account has been locked. Please contact your administrator."},
+                    status=403
+                )
+                response.delete_cookie("refresh", path="/")
+                return response
             try:
                 access_token = AccessToken.for_user(user)
             except Exception as e:

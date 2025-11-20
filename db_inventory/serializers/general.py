@@ -16,18 +16,31 @@ User = get_user_model()
 
 class SessionTokenLoginViewSerializer(TokenObtainSerializer):
     """
-    Only authenticates the user and returns metadata.
-    Does NOT generate refresh JWTs (we use DB-backed opaque refresh tokens).
+    Authenticates the user, applies custom lock checks,
+    and returns ONLY user metadata.
     """
 
     def validate(self, attrs):
-        data = super().validate(attrs)  # only authenticates the user
+        # This calls authenticate() and sets self.user
+        data = super().validate(attrs)
 
+        user = self.user
+
+        # Custom checks
+        if user.is_locked:
+            raise serializers.ValidationError(
+                "Your account has been locked. Please contact your administrator."
+            )
+
+        if not user.is_active:
+            raise serializers.ValidationError(
+                "Your account is inactive. Please contact support."
+            )
+
+        # Return  metadata 
         return {
-            "public_id": str(self.user.public_id),
-            "role_id": (
-                self.user.active_role.public_id if self.user.active_role else None
-            ),
+            "public_id": str(user.public_id),
+            "role_id": user.active_role.public_id if user.active_role else None,
         }
 
 

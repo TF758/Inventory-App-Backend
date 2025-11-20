@@ -77,6 +77,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         related_name="created_users"
     )
+    is_locked = models.BooleanField(default=False)
     is_system_user = models.BooleanField(default=False)  # for test/demo/system accounts
 
     is_active = models.BooleanField(default=True)
