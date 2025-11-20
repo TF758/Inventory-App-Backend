@@ -238,12 +238,6 @@ class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 class FullUserCreateView(views.APIView):
     """
     Create a User, assign a UserLocation, and assign a Role atomically.
-    Payload format:
-    {
-        "user": { ...user fields... },
-        "user_location": "room_public_id",        # optional
-        "role": { ...role fields (excluding 'user') }
-    }
     """
 
     def post(self, request, *args, **kwargs):
@@ -252,7 +246,8 @@ class FullUserCreateView(views.APIView):
         user_location_public_id = payload.get("user_location")
         role_data = payload.get("role", {})
 
-        # --- Permission checks for authenticated user ---
+
+        # --- Permission checks ---
         user_perm = UserPermission()
         location_perm = UserLocationPermission()
         role_perm = RolePermission()
@@ -261,6 +256,7 @@ class FullUserCreateView(views.APIView):
             raise PermissionDenied("Authentication required.")
 
         with transaction.atomic():
+
             # --- 1️⃣ Create User ---
             user_serializer = UserWriteSerializer(data=user_data)
             user_serializer.is_valid(raise_exception=True)
@@ -273,62 +269,67 @@ class FullUserCreateView(views.APIView):
                     "user_id": user.public_id,
                     "room_id": user_location_public_id
                 }
-                ul_serializer = UserLocationWriteSerializer(data=location_data)
+                ul_serializer = UserLocationWriteSerializer(data=location_data, context={"request": request})
                 ul_serializer.is_valid(raise_exception=True)
 
-                # Check object-level permission
                 temp_ul = UserLocation(user=user, room=ul_serializer.validated_data["room"])
                 if not location_perm.has_object_permission(request, self, temp_ul):
                     raise PermissionDenied("You do not have permission to assign this location.")
 
                 user_location_instance = ul_serializer.save()
 
-            # --- 3️⃣ Assign Role ---
+            # --- 3️⃣ Assign Role ---  <-- FIXED: moved out of the above block
+
             role_data_for_check = role_data.copy()
+            role_name = role_data_for_check.get("role")
 
-            # Resolve foreign keys to actual model instances
-            department_id = role_data_for_check.pop("department", None)
-            location_id = role_data_for_check.pop("location", None)
-            room_id = role_data_for_check.pop("room", None)
-
-            department = None
-            location = None
-            room = None
-
-            if department_id:
+            # Resolve foreign keys dynamically
+            def resolve_model(model, public_id, label):
+                if not public_id:
+                    return None
                 try:
-                    department = Department.objects.get(public_id=department_id)
-                except Department.DoesNotExist:
-                    raise ValidationError({"department": "Invalid department public_id."})
+                    return model.objects.get(public_id=public_id)
+                except model.DoesNotExist:
+                    raise ValidationError({label: f"Invalid {label} public_id."})
 
-            if location_id:
-                try:
-                    location = Location.objects.get(public_id=location_id)
-                except Location.DoesNotExist:
-                    raise ValidationError({"location": "Invalid location public_id."})
+            department = resolve_model(Department, role_data_for_check.get("department"), "department")
+            location   = resolve_model(Location,   role_data_for_check.get("location"),   "location")
+            room       = resolve_model(Room,       role_data_for_check.get("room"),       "room")
 
-            if room_id:
-                try:
-                    room = Room.objects.get(public_id=room_id)
-                except Room.DoesNotExist:
-                    raise ValidationError({"room": "Invalid room public_id."})
+            # --- DYNAMIC SCOPING FIX ---
+            if role_name.startswith("ROOM_"):
+                department = None
+                location = None
 
-            # Build temporary role instance for permission check
+            elif role_name.startswith("LOCATION_"):
+                department = None
+                room = None
+
+            elif role_name.startswith("DEPARTMENT_"):
+                location = None
+                room = None
+
+            # --- TEMP OBJECT FOR PERMISSION CHECK ---
             temp_role = RoleAssignment(
                 user=user,
-                role=role_data_for_check.get("role"),
+                role=role_name,
                 department=department,
                 location=location,
-                room=room
+                room=room,
             )
 
-            # Check object-level permission
             if not role_perm.has_object_permission(request, self, temp_role):
                 raise PermissionDenied("You do not have permission to assign this role.")
 
-            # Use serializer to save (assign user automatically)
-            role_data_for_save = role_data.copy()
-            role_data_for_save["user"] = user.public_id
+            # --- FINAL SAVE PAYLOAD ---
+            role_data_for_save = {
+                "user": user.public_id,
+                "role": role_name,
+                "department": department.public_id if department else None,
+                "location": location.public_id if location else None,
+                "room": room.public_id if room else None,
+            }
+
             role_serializer = RoleWriteSerializer(data=role_data_for_save, context={"request": request})
             role_serializer.is_valid(raise_exception=True)
             role_assignment = role_serializer.save()
@@ -339,5 +340,4 @@ class FullUserCreateView(views.APIView):
             "user_location": UserLocationWriteSerializer(user_location_instance).data if user_location_instance else None,
             "role_assignment": RoleWriteSerializer(role_assignment).data
         }
-
         return Response(response_data, status=status.HTTP_201_CREATED)
