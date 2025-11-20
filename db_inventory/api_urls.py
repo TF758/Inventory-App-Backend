@@ -70,5 +70,9 @@ urlpatterns = [
 
     path('serializer-fields/',serializer_parameters_view , name='get-serializer-fields'),
 
+    # User Sessions ---
+    path('auth/sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
+
+
 
 ]

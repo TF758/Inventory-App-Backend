@@ -9,6 +9,7 @@ from .viewsets import (
     accessory_viewsets,
     general_viewsets,
     role_viewsets,
+    auth_viewsets
 )
 
 # --- General ---
@@ -153,6 +154,7 @@ room_roles_view = room_viewsets.RoomRolesViewSet.as_view({'get': 'list'})
 serializer_parameters_view = general_viewsets.SerializerFieldsView.as_view()
 
 # --- User ---
+create_full_user_view = user_viewsets.FullUserCreateView.as_view()
 user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
@@ -182,4 +184,7 @@ password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view(
 
 password_change = general_viewsets.ChangePasswordView.as_view()
 
-create_full_user_view = user_viewsets.FullUserCreateView.as_view()
+# --- User Sessions ---
+user_session_revoke_all_view = auth_viewsets.UserSessionViewSet.as_view({
+    'post': 'revoke_all'
+})
