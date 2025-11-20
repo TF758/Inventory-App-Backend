@@ -4,6 +4,7 @@ from db_inventory.permissions.helpers import ensure_permission
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from db_inventory.models import RoleAssignment
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 
 class ActiveRoleSerializer(serializers.ModelSerializer):
@@ -188,11 +189,17 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         active_role = getattr(user, "active_role", None)
         if role.startswith("DEPARTMENT_") and not department and active_role and active_role.department:
             department = active_role.department
-            print(f"[DEBUG] Defaulted department to active role: {department}")
 
+        if (user and active_role and active_role.role == "DEPARTMENT_ADMIN" and role.startswith("ROOM_")):
+            # The room MUST belong to their department
+            if room and room.location.department != active_role.department:
+                raise PermissionDenied("Cannot assign ROOM role outside your department")
+
+            # NEVER set department for room roles
+            department = None
+            
         if role.startswith("LOCATION_") and not location and active_role and active_role.location:
             location = active_role.location
-            print(f"[DEBUG] Defaulted location to active role: {location}")
 
         if role.startswith("ROOM_") and not room and active_role and active_role.room:
             room = active_role.room

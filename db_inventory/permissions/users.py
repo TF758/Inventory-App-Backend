@@ -4,7 +4,14 @@ from .constants import ROLE_HIERARCHY
 from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role
 from ..utils import user_can_access_role
 
+
 class UserPermission(BasePermission):
+    """
+    Permission class for User objects.
+    Enforces department-level scope via active_role and can be later extended
+    to use UserLocation for multi-department inference.
+    """
+
     method_role_map = {
         "GET": "DEPARTMENT_VIEWER",
         "POST": "DEPARTMENT_ADMIN",
@@ -14,7 +21,7 @@ class UserPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        # All authenticated users can view (list/retrieve)
+        # All authenticated users can GET (list/retrieve)
         if request.method == "GET":
             return request.user.is_authenticated
 
@@ -22,6 +29,7 @@ class UserPermission(BasePermission):
         if not active_role:
             return False
 
+        # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
 
@@ -32,31 +40,29 @@ class UserPermission(BasePermission):
         user = request.user
         active_role = getattr(user, "active_role", None)
 
-        # Always allow self
+        # Always allow a user to access themselves
         if user == obj:
             return True
 
-        # If no role, can't access anyone else
+        # No role, cannot access others
         if not active_role:
             return False
 
-        # Superuser or site admin can access anyone
+        # Superuser or SITE_ADMIN bypass
         if user.is_superuser or active_role.role == "SITE_ADMIN":
             return True
 
-        # --- READ-ONLY ACCESS ---
+        # --- READ-ONLY access ---
         if request.method in SAFE_METHODS:
             target_role = getattr(obj, "active_role", None)
+            room = getattr(target_role, "room", None) if target_role else None
+            location = getattr(target_role, "location", None) if target_role else None
+            department = getattr(target_role, "department", None) if target_role else None
 
-            # handle users without active_role
-            room = getattr(target_role, "room", None)
-            location = getattr(target_role, "location", None)
-            department = getattr(target_role, "department", None)
-
-            # Viewer/Clerk/Admin roles can read anyone within their scope
+            # Scope check: allow if target user is within scope
             return is_in_scope(active_role, room=room, location=location, department=department)
 
-        # --- WRITE ACCESS (admin-level only) ---
+        # --- WRITE access ---
         required_role = self.method_role_map.get(request.method)
         target_role = getattr(obj, "active_role", None)
         if not target_role:
@@ -71,6 +77,7 @@ class UserPermission(BasePermission):
                 department=target_role.department,
             )
         )
+    
 class RolePermission(BasePermission):
     def has_permission(self, request, view):
         user = request.user
