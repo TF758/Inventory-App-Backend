@@ -74,8 +74,8 @@ urlpatterns = [
     path('auth/sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
 
     # Lock/Unlock User Accounts
-    path('auth/users/<str:public_id>/lock/', user_lock_unlock_view, name='user-lock'),
-    path('auth/users/<str:public_id>/unlock/', user_lock_unlock_view, name='user-unlock'),
+    path('auth/users/<str:public_id>/lock/', user_lock_view, name='user-lock'),
+    path('auth/users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
 
 
 

@@ -189,8 +189,12 @@ user_session_revoke_all_view = auth_viewsets.UserSessionViewSet.as_view({
     'post': 'revoke_all'
 })
 
-# Lock/Unlock User Accounts
-user_lock_unlock_view = auth_viewsets.UserLockViewSet.as_view({
-    'post': 'lock',
+# Lock user
+user_lock_view = auth_viewsets.UserLockViewSet.as_view({
+    'post': 'lock'
+})
+
+# Unlock user
+user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
     'post': 'unlock'
 })
