@@ -51,13 +51,16 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         if not User.objects.filter(email=value).exists():
             raise serializers.ValidationError("User with this email does not exist.")
         return value
+    
+    def get_user(self):
+        return User.objects.get(email=self.validated_data["email"])
 
     def save(self):
-        user = User.objects.get(email=self.validated_data["email"])
+        user = self.get_user()
 
         token = PasswordResetToken.generate_token(user.public_id)
 
-        reset_link = f"http://127.0.0.1:8000/api/password-reset/confirm/?token={token}"
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
         send_mail(
             subject="Password Reset Request",
             message=f"Use the following link to reset your password (valid 10 mins):\n{reset_link}",

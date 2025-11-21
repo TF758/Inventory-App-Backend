@@ -1,6 +1,7 @@
 from django.core import signing
 from datetime import timedelta
 from django.utils import timezone
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
 class ExcludeFiltersMixin:
     """
@@ -55,26 +56,25 @@ def get_serializer_field_info(serializer_class):
 
 
 class PasswordResetToken:
-    SALT = 'password_reset_salt'
-    EXPIRATION_MINUTES = 10
+    signer = TimestampSigner(salt="password-reset")
 
-    @classmethod
-    def generate_token(cls, user_public_id):
-        data = {
-            'user_id': user_public_id,
-            'timestamp': timezone.now().timestamp(),
-        }
-        return signing.dumps(data, salt=cls.SALT)
+    @staticmethod
+    def generate_token(public_id: str) -> str:
+        return PasswordResetToken.signer.sign(public_id)
 
-    @classmethod
-    def validate_token(cls, token):
+    @staticmethod
+    def validate_token(token: str, max_age_seconds: int = 600) -> str:
+        """
+        Returns the public_id if valid.
+        Raises SignatureExpired or BadSignature if invalid.
+        """
         try:
-            data = signing.loads(token, salt=cls.SALT, max_age=cls.EXPIRATION_MINUTES * 60)
-            return data['user_id']
-        except signing.BadSignature:
-            return None
-        except signing.SignatureExpired:
-            return None
+            public_id = PasswordResetToken.signer.unsign(token, max_age=max_age_seconds)
+            return public_id
+        except SignatureExpired:
+            raise SignatureExpired("Reset link has expired.")
+        except BadSignature:
+            raise BadSignature("Invalid or corrupted reset link.")
 
 def user_can_access_role(user, role_obj):
     """

@@ -207,3 +207,5 @@ DEFAULT_FROM_EMAIL = 'noreply@example.com'
 # COOKIE_SECURE = not DEBUG   # True in production, False in dev
 COOKIE_SECURE = not DEBUG   # True in production, False in dev
 COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'  # Lax works in dev for localhost
+
+FRONTEND_URL = 'http://localhost:5173'  # React dev server URL

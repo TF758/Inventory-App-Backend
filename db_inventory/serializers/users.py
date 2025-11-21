@@ -22,14 +22,14 @@ class UserWriteSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
         required=False,
-        allow_blank=True,   # 👈 THIS IS THE FIX
+        allow_blank=True,  
         validators=[validate_password],
         style={'input_type': 'password'}
     )
     confirm_password = serializers.CharField(  
         write_only=True,
         required=False,
-        allow_blank=True,   # 👈 SAME HERE
+        allow_blank=True, 
         style={'input_type': 'password'}
     )
 

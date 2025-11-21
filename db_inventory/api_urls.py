@@ -10,10 +10,7 @@ from .viewsets import general_viewsets
 
 urlpatterns = [
 
-    path('password-reset/', password_reset_request, name='password_reset'),
-    path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
-    path('password-change/', password_change, name='password_change'),
-
+ 
     path('login/',api_login_view, name='login'),
     path('logout/',api_logout, name='logout'),
     path('refresh/', api_token_refresh, name='session_refresh'),
@@ -76,6 +73,11 @@ urlpatterns = [
     # Lock/Unlock User Accounts
     path('auth/users/<str:public_id>/lock/', user_lock_view, name='user-lock'),
     path('auth/users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
+
+    path('password-reset/request/', password_reset_request, name='password-reset-request'),
+    path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
+    path('password-change/', password_change, name='password_change'),
+
 
 
 

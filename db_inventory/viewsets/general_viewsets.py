@@ -1,12 +1,12 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetConfirmSerializer, PasswordResetRequestSerializer, ChangePasswordSerializer
+from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer, ChangePasswordSerializer, PasswordResetConfirmSerializer
 from ..serializers.equipment import EquipmentBatchtWriteSerializer
 from ..serializers.consumables import ConsumableBatchWriteSerializer
 from ..serializers.accessories import AccessoryBatchWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import UserSession
+from ..models import UserSession, User
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import AccessToken
@@ -19,6 +19,9 @@ from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
+from django.core.signing import BadSignature, SignatureExpired
+from django.shortcuts import get_object_or_404
+from db_inventory.utils import PasswordResetToken
 
 logger = logging.getLogger(__name__) 
 
@@ -275,29 +278,28 @@ class SerializerFieldsView(APIView):
 
         return Response(get_serializer_field_info(serializer_class))
 
-
 class PasswordResetRequestView(APIView):
 
     permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"detail": "Password reset email sent."}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Password reset email sent."}, status=200)
 
 class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
 
-    permission_classes = [AllowAny] 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"detail": "Password has been reset successfully."}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
+        return Response(
+            {"detail": "Password has been reset successfully."},
+            status=status.HTTP_200_OK
+        )
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
