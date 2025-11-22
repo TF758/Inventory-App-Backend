@@ -300,6 +300,24 @@ class PasswordResetConfirmView(APIView):
             {"detail": "Password has been reset successfully."},
             status=status.HTTP_200_OK
         )
+    
+class PasswordResetValidateView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.data.get("token")
+        if not token:
+            return Response({"status": "invalid"}, status=400)
+        
+        result = PasswordResetToken.validate_token(token)
+        if result["status"] == "valid":
+            return Response({"status": "valid"})
+        elif result["status"] == "expired":
+            return Response({"status": "expired"}, status=400)
+        else:
+            return Response({"status": "invalid"}, status=400)
+
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 

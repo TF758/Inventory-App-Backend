@@ -75,6 +75,7 @@ urlpatterns = [
     path('auth/users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
 
     path('password-reset/request/', password_reset_request, name='password-reset-request'),
+     path("password-reset/validate/", password_reset_validate, name="password-reset-validate"),
     path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
     path('password-change/', password_change, name='password_change'),
 

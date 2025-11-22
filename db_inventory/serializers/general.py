@@ -1,9 +1,6 @@
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
-from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from ..models import  User, UserSession
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
-from .roles import RoleReadSerializer
 from django.contrib.auth import get_user_model
 from ..utils import PasswordResetToken
 from django.contrib.auth.hashers import make_password
@@ -11,6 +8,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.db import transaction
+
 
 User = get_user_model()
 
@@ -87,27 +85,25 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return data
 
     def save(self):
-        user_public_id = PasswordResetToken.validate_token(self.validated_data["token"])
-        if not user_public_id:
-            raise serializers.ValidationError("Invalid or expired token.")
+        token_status = PasswordResetToken.validate_token(self.validated_data["token"])
 
-        try:
-            user = User.objects.get(public_id=user_public_id)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("User not found.")
+        if token_status["status"] == "expired":
+            raise serializers.ValidationError("Reset link has expired.")
+        if token_status["status"] == "invalid":
+            raise serializers.ValidationError("Invalid reset link.")
+
+        user = User.objects.get(public_id=token_status["public_id"])
 
         with transaction.atomic():
             user.password = make_password(self.validated_data["new_password"])
             user.save(update_fields=["password"])
 
-            # Revoke all active sessions for security
+            # Revoke all active sessions
             UserSession.objects.filter(
-                user=user,
-                status=UserSession.Status.ACTIVE
+                user=user, status=UserSession.Status.ACTIVE
             ).update(status=UserSession.Status.REVOKED)
 
         return user
-
 
 class ChangePasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True)

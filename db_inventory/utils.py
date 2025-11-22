@@ -63,18 +63,20 @@ class PasswordResetToken:
         return PasswordResetToken.signer.sign(public_id)
 
     @staticmethod
-    def validate_token(token: str, max_age_seconds: int = 600) -> str:
+    def validate_token(token: str, max_age_seconds: int = 600) -> dict:
         """
-        Returns the public_id if valid.
-        Raises SignatureExpired or BadSignature if invalid.
+        Returns a dict:
+        - {"status": "valid", "public_id": str}
+        - {"status": "expired"}
+        - {"status": "invalid"}
         """
         try:
             public_id = PasswordResetToken.signer.unsign(token, max_age=max_age_seconds)
-            return public_id
+            return {"status": "valid", "public_id": public_id}
         except SignatureExpired:
-            raise SignatureExpired("Reset link has expired.")
+            return {"status": "expired"}
         except BadSignature:
-            raise BadSignature("Invalid or corrupted reset link.")
+            return {"status": "invalid"}
 
 def user_can_access_role(user, role_obj):
     """

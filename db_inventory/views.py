@@ -184,6 +184,9 @@ password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view(
 
 password_change = general_viewsets.ChangePasswordView.as_view()
 
+# ---Validate Password Reset Token ---
+password_reset_validate = general_viewsets.PasswordResetValidateView.as_view()
+
 # --- User Sessions ---
 user_session_revoke_all_view = auth_viewsets.UserSessionViewSet.as_view({
     'post': 'revoke_all'
