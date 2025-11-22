@@ -53,7 +53,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         return value
     
     def get_user(self):
-        return User.objects.get(email=self.validated_data["email"])
+        return User.objects.filter(email=self.validated_data["email"]).first()
 
     def save(self):
         user = self.get_user()
@@ -62,12 +62,19 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
         send_mail(
-            subject="Password Reset Request",
-            message=f"Use the following link to reset your password (valid 10 mins):\n{reset_link}",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+                subject="Password Reset Instructions",
+                message=f"""
+            You requested a password reset. Please use the link below to reset your password. 
+            This link will expire in 10 minutes.
+
+            {reset_link}
+
+            If you did not request a password reset, you can safely ignore this email.
+            """,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     token = serializers.CharField()
