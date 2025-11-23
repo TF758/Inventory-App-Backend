@@ -4,8 +4,6 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .viewsets import general_viewsets
-
 
 
 urlpatterns = [
@@ -28,7 +26,6 @@ urlpatterns = [
     path("locations/", include("db_inventory.urls.location_urls")),
 
     path("rooms/", include("db_inventory.urls.room_urls")),
-
 
 
     path('equipments/', equipment_list_create_view, name='equipments'),
@@ -74,12 +71,24 @@ urlpatterns = [
     path('auth/users/<str:public_id>/lock/', user_lock_view, name='user-lock'),
     path('auth/users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
 
+    # Admin triggers a password reset (temp password + optional email)
+    path(
+        'auth/users/<str:user_public_id>/reset-password/',
+        admin_reset_user_password_view,
+        name='admin-reset-user-password'
+    ),
+
+    # User submits temp password + new password to complete reset
+    path(
+        'auth/password-reset/confirm-temp/',
+        temp_password_change_view,
+        name='temp-password-login'
+    ),
+
+
     path('password-reset/request/', password_reset_request, name='password-reset-request'),
-     path("password-reset/validate/", password_reset_validate, name="password-reset-validate"),
+    path("password-reset/validate/", password_reset_validate, name="password-reset-validate"),
     path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
     path('password-change/', password_change, name='password_change'),
-
-
-
 
 ]

@@ -6,7 +6,6 @@ from ..utils import PasswordResetToken
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from django.conf import settings
-from django.contrib.auth import password_validation
 from django.db import transaction
 
 
@@ -33,6 +32,11 @@ class SessionTokenLoginViewSerializer(TokenObtainSerializer):
         if not user.is_active:
             raise serializers.ValidationError(
                 "Your account is inactive. Please contact support."
+            )
+        
+        if user.force_password_change:
+            raise serializers.ValidationError(
+                "You must reset your temporary password before logging in."
             )
 
         # Return  metadata 
@@ -105,30 +109,3 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         return user
 
-class ChangePasswordSerializer(serializers.Serializer):
-    current_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True)
-    confirm_password = serializers.CharField(write_only=True)
-
-    def validate_current_password(self, value):
-        user = self.context['request'].user
-        # check that the user sending it is the current logged in user
-        if not user or not user.is_authenticated:
-            raise serializers.ValidationError("User not authenticated.")
-        if not user.check_password(value):
-            raise serializers.ValidationError("Current password is incorrect.")
-        return value
-
-    def validate(self, data):
-        if data["new_password"] != data["confirm_password"]:
-            raise serializers.ValidationError("Passwords do not match.")
-        password_validation.validate_password(
-            data["new_password"], self.context["request"].user
-        )
-        return data
-
-    def save(self, **kwargs):
-        user = self.context["request"].user
-        user.set_password(self.validated_data["new_password"])
-        user.save()
-        return user

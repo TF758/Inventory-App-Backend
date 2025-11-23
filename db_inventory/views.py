@@ -182,13 +182,13 @@ password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view(
 
 # ---Password Change ---
 
-password_change = general_viewsets.ChangePasswordView.as_view()
+password_change = auth_viewsets.ChangePasswordView.as_view()
 
 # ---Validate Password Reset Token ---
 password_reset_validate = general_viewsets.PasswordResetValidateView.as_view()
 
 # --- User Sessions ---
-user_session_revoke_all_view = auth_viewsets.UserSessionViewSet.as_view({
+user_session_revoke_all_view = auth_viewsets.RevokeUserSessionsViewset.as_view({
     'post': 'revoke_all'
 })
 
@@ -201,3 +201,9 @@ user_lock_view = auth_viewsets.UserLockViewSet.as_view({
 user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
     'post': 'unlock'
 })
+
+# Admin reset user password
+admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()
+
+# New Password with Temp Password
+temp_password_change_view = auth_viewsets.TempPasswordLoginView.as_view()

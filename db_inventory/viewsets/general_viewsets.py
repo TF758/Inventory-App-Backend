@@ -1,12 +1,12 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer, ChangePasswordSerializer, PasswordResetConfirmSerializer
+from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from ..serializers.equipment import EquipmentBatchtWriteSerializer
 from ..serializers.consumables import ConsumableBatchWriteSerializer
 from ..serializers.accessories import AccessoryBatchWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import UserSession, User
+from ..models import UserSession
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import AccessToken
@@ -16,11 +16,7 @@ from rest_framework.serializers import Serializer
 import logging
 import secrets
 from django.db import IntegrityError, transaction
-from rest_framework.exceptions import APIException, AuthenticationFailed
-from rest_framework.permissions import IsAuthenticated
-from django.conf import settings
-from django.core.signing import BadSignature, SignatureExpired
-from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import APIException
 from db_inventory.utils import PasswordResetToken
 
 logger = logging.getLogger(__name__) 
@@ -280,6 +276,8 @@ class SerializerFieldsView(APIView):
 
 class PasswordResetRequestView(APIView):
 
+    """Initiate password reset by sending email with reset link."""
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -289,6 +287,9 @@ class PasswordResetRequestView(APIView):
         return Response({"detail": "Password reset email sent."}, status=200)
 
 class PasswordResetConfirmView(APIView):
+
+    """Confirm password reset using token and set new password."""
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -302,6 +303,9 @@ class PasswordResetConfirmView(APIView):
         )
     
 class PasswordResetValidateView(APIView):
+
+    """Validate password reset token."""
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -318,31 +322,3 @@ class PasswordResetValidateView(APIView):
             return Response({"status": "invalid"}, status=400)
 
 
-class ChangePasswordView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = ChangePasswordSerializer(
-            data=request.data, context={"request": request}
-        )
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        with transaction.atomic():
-            # Change password
-            serializer.save()
-
-            # Revoke all user sessions (security measure)
-            UserSession.objects.filter(user=request.user, status=UserSession.Status.ACTIVE).update(
-                status=UserSession.Status.REVOKED
-            )
-
-        response = Response(
-            {"detail": "Password changed successfully. All sessions have been logged out."},
-            status=status.HTTP_200_OK,
-        )
-
-        # Optionally clear the refresh cookie
-        response.delete_cookie("refresh", path="/")
-
-        return response

@@ -3,11 +3,18 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+import hashlib
+import secrets
+from django.utils import timezone
+from django.core.mail import send_mail
+from django.db import IntegrityError, transaction
+from rest_framework.views import APIView
+from db_inventory.models import PasswordResetEvent , UserSession, User
+from db_inventory.serializers.auth import TempPasswordChangeSerializer, ChangePasswordSerializer
+from rest_framework import permissions
 
-from db_inventory.models import UserSession, User
 
-
-class UserSessionViewSet(viewsets.GenericViewSet):
+class RevokeUserSessionsViewset(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     """
     Custom ViewSet for revoking sessions.
@@ -87,3 +94,112 @@ class UserLockViewSet(viewsets.GenericViewSet):
 
         return Response({"detail": f"User {user.email} has been unlocked."},
                         status=status.HTTP_200_OK)
+
+
+class AdminResetUserPasswordView(APIView):
+    """
+    Admin triggers a password reset for a user using public_id.
+    Sends email and also returns temp password to admin in case email fails.
+    """
+    
+
+    def post(self, request, user_public_id):
+        try:
+            user = User.objects.get(public_id=user_public_id)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Generate a temporary password
+        temp_password = secrets.token_urlsafe(8)  # ~12 chars
+        temp_password_hash = hashlib.sha256(temp_password.encode()).hexdigest()
+
+        # Create reset event
+        expires_at = timezone.now() + timezone.timedelta(hours=1)
+        event = PasswordResetEvent.objects.create(
+            user=user,
+            admin=request.user,
+            temp_password_hash=temp_password_hash,
+            expires_at=expires_at
+        )
+
+        # Flag the user to force password change
+        user.force_password_change = True
+        user.save(update_fields=["force_password_change"])
+
+        # Send email (optional; fallback is admin manual delivery)
+        try:
+            send_mail(
+                subject="Your Temporary Password",
+                message=f"Your temporary password is: {temp_password}\nIt expires at {expires_at}.",
+                from_email="noreply@example.com",
+                recipient_list=[user.email],
+            )
+        except Exception:
+            # Log email failure, fallback to manual delivery
+            pass
+
+        # Return temp password to admin for manual delivery if needed
+        return Response({
+            "detail": "Temporary password created and email sent (if delivery succeeded).",
+            "temp_password": temp_password  # only visible to admin
+        }, status=status.HTTP_200_OK)
+    
+
+class TempPasswordLoginView(APIView):
+    """
+    User logs in with a temporary password and is required to set a new password.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    def post(self, request):
+        email = request.data.get("email")
+        serializer = TempPasswordChangeSerializer(data=request.data, context={"email": email})
+        serializer.is_valid(raise_exception=True)
+
+        event = serializer.validated_data["reset_event"]
+        user = event.user
+        new_password = serializer.validated_data["new_password"]
+
+        # Update user password and clear force_password_change
+        user.set_password(new_password)
+        user.force_password_change = False
+        user.save(update_fields=["password", "force_password_change"])
+
+        # Mark event as used
+        event.used_at = timezone.now()
+        event.save(update_fields=["used_at"])
+
+        return Response({"detail": "Password changed successfully, you may now log in with the new password."})
+    
+
+class ChangePasswordView(APIView):
+
+    """Allows an authneticated user to change thier password."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data, context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            # Change password
+            serializer.save()
+
+            # Revoke all user sessions (security measure)
+            UserSession.objects.filter(user=request.user, status=UserSession.Status.ACTIVE).update(
+                status=UserSession.Status.REVOKED
+            )
+
+        response = Response(
+            {"detail": "Password changed successfully. All sessions have been logged out."},
+            status=status.HTTP_200_OK,
+        )
+
+        # Optionally clear the refresh cookie
+        response.delete_cookie("refresh", path="/")
+
+        return response
