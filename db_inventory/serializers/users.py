@@ -85,6 +85,10 @@ class UserAreaSerializer(serializers.ModelSerializer):
     lname = serializers.CharField(source='user.lname')
     job_title = serializers.CharField(source ='user.job_title')
 
+    is_active = serializers.BooleanField(source='user.is_active')
+    is_locked = serializers.BooleanField(source='user.is_locked')
+    
+
     room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
 
@@ -98,7 +102,7 @@ class UserAreaSerializer(serializers.ModelSerializer):
         model = UserLocation
         fields = [
             'public_id',
-            'user_id', 'email', 'fname', 'lname', 'job_title',
+            'user_id', 'email', 'fname', 'lname', 'job_title', 'is_active', 'is_locked',
             'room_id', 'room_name',
             'location_id', 'location_name',
             'department_id', 'department_name',
