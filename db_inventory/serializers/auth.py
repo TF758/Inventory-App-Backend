@@ -1,7 +1,14 @@
 from rest_framework import serializers
 from django.utils import timezone
-from db_inventory.models import PasswordResetEvent
+from db_inventory.models import PasswordResetEvent, User, UserSession, PasswordResetEvent
 from django.contrib.auth import password_validation
+from django.conf import settings
+from db_inventory.utils import PasswordResetToken
+from django.core.mail import send_mail
+from django.db import transaction
+from django.contrib.auth.hashers import make_password
+
+
 
 class TempPasswordChangeSerializer(serializers.Serializer):
     temp_password = serializers.CharField(write_only=True)
@@ -55,4 +62,114 @@ class ChangePasswordSerializer(serializers.Serializer):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.save()
+        return user
+    
+
+
+class AdminPasswordResetSerializer(serializers.Serializer):
+    user_public_id = serializers.CharField()
+
+    def validate_user_public_id(self, value):
+        try:
+            self.user = User.objects.get(public_id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+        if not self.user.is_active:
+            raise serializers.ValidationError("Cannot reset password for inactive user.")
+
+        return value
+
+    def save(self, admin):
+        # Generate reset token
+        token = PasswordResetToken.generate_token(self.user.public_id)
+
+        # Reset link (admin-triggered)
+        reset_link = f"{settings.FRONTEND_URL}/password-reset?token={token}"
+
+        # Create audit event
+        expires_at = timezone.now() + timezone.timedelta(minutes=10)
+        PasswordResetEvent.objects.create(
+            user=self.user,
+            admin=admin,
+            reset_token=token,
+            expires_at=expires_at
+        )
+
+        # Revoke all active sessions
+        UserSession.objects.filter(
+            user=self.user, 
+            status=UserSession.Status.ACTIVE
+        ).update(status=UserSession.Status.REVOKED)
+
+        # Send email
+        send_mail(
+            subject="Password Reset Instructions",
+            message=f"""
+            Your account password has been reset by an administrator.
+
+            Set your new password here (expires at {expires_at}):
+
+            {reset_link}
+
+            If you did not expect this, contact support immediately.
+            """,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[self.user.email],
+                    )
+
+        return reset_link
+    
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data["new_password"] != data["confirm_password"]:
+            raise serializers.ValidationError({
+                "code": "PASSWORD_MISMATCH",
+                "detail": "Passwords do not match."
+            })
+        return data
+
+    def save(self):
+        token_status = PasswordResetToken.validate_token(self.validated_data["token"])
+
+        if token_status["status"] == "expired":
+            raise serializers.ValidationError({
+                "code": "TOKEN_EXPIRED",
+                "detail": "Your reset link has expired."
+            })
+        if token_status["status"] == "invalid":
+            raise serializers.ValidationError({
+                "code": "TOKEN_INVALID",
+                "detail": "The reset link is invalid."
+            })
+
+        user = User.objects.get(public_id=token_status["public_id"])
+
+        if user.is_locked:
+            raise serializers.ValidationError({
+                "code": "ACCOUNT_LOCKED",
+                "detail": "Your account has been locked. Please contact your administrator."
+            })
+
+        if not user.is_active:
+            raise serializers.ValidationError({
+                "code": "ACCOUNT_INACTIVE",
+                "detail": "Your account is inactive. Please contact support."
+            })
+
+        # Update password and clear force_password_change
+        user.password = make_password(self.validated_data["new_password"])
+        user.force_password_change = False
+        user.save(update_fields=["password", "force_password_change"])
+
+        # Revoke all active sessions
+        UserSession.objects.filter(
+            user=user, status=UserSession.Status.ACTIVE
+        ).update(status=UserSession.Status.REVOKED)
+
         return user

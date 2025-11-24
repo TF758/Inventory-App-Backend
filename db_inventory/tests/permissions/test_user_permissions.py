@@ -6,6 +6,8 @@ from db_inventory.factories import AdminUserFactory, DepartmentFactory, Location
 
 class UserPermissionSiteAdminTest(APITestCase):
 
+    """Testing UserPermission class for Site Admins"""
+
     def setUp(self):
         # --- Create Site Admin ---
         self.site_admin = AdminUserFactory()
@@ -100,6 +102,8 @@ class UserPermissionSiteAdminTest(APITestCase):
 
 
 class DepartmentAdminUserPermissionTest(APITestCase):
+
+    """Testing UserPermission class for Department Admins"""
 
     def setUp(self):
         # --- Create Department ---

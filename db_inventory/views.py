@@ -204,6 +204,3 @@ user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
 
 # Admin reset user password
 admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()
-
-# New Password with Temp Password
-temp_password_change_view = auth_viewsets.TempPasswordLoginView.as_view()

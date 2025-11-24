@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer
 from ..serializers.equipment import EquipmentBatchtWriteSerializer
 from ..serializers.consumables import ConsumableBatchWriteSerializer
 from ..serializers.accessories import AccessoryBatchWriteSerializer
@@ -18,6 +18,8 @@ import secrets
 from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException
 from db_inventory.utils import PasswordResetToken
+from db_inventory.serializers.auth import PasswordResetConfirmSerializer
+
 
 logger = logging.getLogger(__name__) 
 
@@ -28,7 +30,7 @@ class SessionTokenLoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         # Authenticate user via serializer
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        serializer.is_valid(raise_exception=True)  # Will automatically raise ForcePasswordChangeException if needed
         user = serializer.user
 
         # Generate opaque refresh token (raw) and its hash
@@ -57,13 +59,11 @@ class SessionTokenLoginView(TokenObtainPairView):
             raise APIException("Failed to create user session.")
 
         # Generate access token bound to the created session.
-        # If token creation fails, delete the session to avoid orphans.
         try:
             access_token_obj = AccessToken.for_user(user)
             access_token_obj["session_id"] = str(session.id)
             access_token = str(access_token_obj)
         except Exception:
-            # Attempt cleanup of the session; if deletion fails, log and continue raising
             try:
                 session.delete()
             except Exception:
@@ -287,10 +287,11 @@ class PasswordResetRequestView(APIView):
         return Response({"detail": "Password reset email sent."}, status=200)
 
 class PasswordResetConfirmView(APIView):
+    """
+    Confirm password reset (user or admin triggered) and set new password.
+    """
 
-    """Confirm password reset using token and set new password."""
-
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny]  # If you want admins to also use it, adjust permissions
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
@@ -303,7 +304,6 @@ class PasswordResetConfirmView(APIView):
         )
     
 class PasswordResetValidateView(APIView):
-
     """Validate password reset token."""
 
     permission_classes = [AllowAny]
@@ -311,14 +311,24 @@ class PasswordResetValidateView(APIView):
     def post(self, request):
         token = request.data.get("token")
         if not token:
-            return Response({"status": "invalid"}, status=400)
-        
+            return Response(
+                {"code": "TOKEN_MISSING", "detail": "No token provided."},
+                status=400,
+            )
+
         result = PasswordResetToken.validate_token(token)
+
         if result["status"] == "valid":
             return Response({"status": "valid"})
         elif result["status"] == "expired":
-            return Response({"status": "expired"}, status=400)
+            return Response(
+                {"code": "TOKEN_EXPIRED", "detail": "This password reset link has expired."},
+                status=400,
+            )
         else:
-            return Response({"status": "invalid"}, status=400)
+            return Response(
+                {"code": "TOKEN_INVALID", "detail": "This password reset link is invalid."},
+                status=400,
+            )
 
 

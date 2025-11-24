@@ -1,6 +1,3 @@
-from django.core import signing
-from datetime import timedelta
-from django.utils import timezone
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
 class ExcludeFiltersMixin:
@@ -60,7 +57,8 @@ class PasswordResetToken:
 
     @staticmethod
     def generate_token(public_id: str) -> str:
-        return PasswordResetToken.signer.sign(public_id)
+        token = PasswordResetToken.signer.sign(public_id)
+        return token
 
     @staticmethod
     def validate_token(token: str, max_age_seconds: int = 600) -> dict:

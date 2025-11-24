@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import  User, UserSession
+from ..models import  User, UserSession, PasswordResetEvent
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from django.contrib.auth import get_user_model
 from ..utils import PasswordResetToken
@@ -7,44 +7,46 @@ from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
 
 
 User = get_user_model()
-
 class SessionTokenLoginViewSerializer(TokenObtainSerializer):
     """
     Authenticates the user, applies custom lock checks,
-    and returns ONLY user metadata.
+    and returns ONLY user metadata. Handles forced password reset
+    using a secure one-time token instead of exposing temp password.
     """
 
     def validate(self, attrs):
-        # This calls authenticate() and sets self.user
+        # Call base validation to authenticate user
         data = super().validate(attrs)
-
         user = self.user
 
-        # Custom checks
         if user.is_locked:
-            raise serializers.ValidationError(
-                "Your account has been locked. Please contact your administrator."
-            )
+            raise serializers.ValidationError({
+                "code": "ACCOUNT_LOCKED",
+                "detail": "Your account has been locked. Please contact your administrator."
+            })
 
         if not user.is_active:
-            raise serializers.ValidationError(
-                "Your account is inactive. Please contact support."
-            )
-        
-        if user.force_password_change:
-            raise serializers.ValidationError(
-                "You must reset your temporary password before logging in."
-            )
+            raise serializers.ValidationError({
+                "code": "ACCOUNT_INACTIVE",
+                "detail": "Your account is inactive. Please contact support."
+            })
 
-        # Return  metadata 
+        if user.force_password_change:
+            raise serializers.ValidationError({
+                "code": "FORCE_PASSWORD_CHANGE",
+                "detail": "You must reset your temporary password before logging in.",
+                "email": user.email,
+            })
+
         return {
             "public_id": str(user.public_id),
             "role_id": user.active_role.public_id if user.active_role else None,
         }
-
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -62,7 +64,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
         token = PasswordResetToken.generate_token(user.public_id)
 
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        reset_link = f"{settings.FRONTEND_URL}/password-reset?token={token}"
         send_mail(
                 subject="Password Reset Instructions",
                 message=f"""
@@ -77,35 +79,4 @@ class PasswordResetRequestSerializer(serializers.Serializer):
                 recipient_list=[user.email],
                 fail_silently=False,
             )
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    token = serializers.CharField()
-    new_password = serializers.CharField(write_only=True, min_length=8)
-    confirm_password = serializers.CharField(write_only=True)
-
-    def validate(self, data):
-        if data["new_password"] != data["confirm_password"]:
-            raise serializers.ValidationError("Passwords do not match.")
-        return data
-
-    def save(self):
-        token_status = PasswordResetToken.validate_token(self.validated_data["token"])
-
-        if token_status["status"] == "expired":
-            raise serializers.ValidationError("Reset link has expired.")
-        if token_status["status"] == "invalid":
-            raise serializers.ValidationError("Invalid reset link.")
-
-        user = User.objects.get(public_id=token_status["public_id"])
-
-        with transaction.atomic():
-            user.password = make_password(self.validated_data["new_password"])
-            user.save(update_fields=["password"])
-
-            # Revoke all active sessions
-            UserSession.objects.filter(
-                user=user, status=UserSession.Status.ACTIVE
-            ).update(status=UserSession.Status.REVOKED)
-
-        return user
 

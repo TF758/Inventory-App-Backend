@@ -79,16 +79,12 @@ urlpatterns = [
     ),
 
     # User submits temp password + new password to complete reset
-    path(
-        'auth/password-reset/confirm-temp/',
-        temp_password_change_view,
-        name='temp-password-login'
-    ),
-
 
     path('password-reset/request/', password_reset_request, name='password-reset-request'),
-    path("password-reset/validate/", password_reset_validate, name="password-reset-validate"),
     path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
     path('password-change/', password_change, name='password_change'),
+
+    # used to confirm validity of password reset token
+    path("reset-password/validate-token/", password_reset_validate, name="password-reset-validate"),
 
 ]
