@@ -13,7 +13,7 @@ class UserReadSerializerFull(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active' ,'current_role'
+            'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active', 'is_locked', 'current_role', 'force_password_change',
         ]
         read_only_fields = ('public_id', 'last_login')
 
@@ -22,14 +22,14 @@ class UserWriteSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
         required=False,
-        allow_blank=True,   # 👈 THIS IS THE FIX
+        allow_blank=True,  
         validators=[validate_password],
         style={'input_type': 'password'}
     )
     confirm_password = serializers.CharField(  
         write_only=True,
         required=False,
-        allow_blank=True,   # 👈 SAME HERE
+        allow_blank=True, 
         style={'input_type': 'password'}
     )
 
@@ -85,6 +85,10 @@ class UserAreaSerializer(serializers.ModelSerializer):
     lname = serializers.CharField(source='user.lname')
     job_title = serializers.CharField(source ='user.job_title')
 
+    is_active = serializers.BooleanField(source='user.is_active')
+    is_locked = serializers.BooleanField(source='user.is_locked')
+    
+
     room_id = serializers.CharField(source='room.public_id')
     room_name = serializers.CharField(source='room.name')
 
@@ -98,7 +102,7 @@ class UserAreaSerializer(serializers.ModelSerializer):
         model = UserLocation
         fields = [
             'public_id',
-            'user_id', 'email', 'fname', 'lname', 'job_title',
+            'user_id', 'email', 'fname', 'lname', 'job_title', 'is_active', 'is_locked',
             'room_id', 'room_name',
             'location_id', 'location_name',
             'department_id', 'department_name',

@@ -6,6 +6,8 @@ from db_inventory.factories import AdminUserFactory, DepartmentFactory, Location
 
 class UserPermissionSiteAdminTest(APITestCase):
 
+    """Testing UserPermission class for Site Admins"""
+
     def setUp(self):
         # --- Create Site Admin ---
         self.site_admin = AdminUserFactory()
@@ -101,59 +103,53 @@ class UserPermissionSiteAdminTest(APITestCase):
 
 class DepartmentAdminUserPermissionTest(APITestCase):
 
+    """Testing UserPermission class for Department Admins"""
+
     def setUp(self):
-        # Create Department
+        # --- Create Department ---
         self.department = DepartmentFactory(name="IT Department")
         self.department.save()
 
-        # Create Department Admin
+        # --- Create Department Admin User ---
         self.dept_admin = UserFactory()
         self.dept_admin.set_password("StrongP@ssw0rd!")
         self.dept_admin.save()
 
-        # Assign DEPARTMENT_ADMIN role
         self.dept_admin_role = RoleAssignment.objects.create(
             user=self.dept_admin,
             role="DEPARTMENT_ADMIN",
             department=self.department,
-            location=None,
-            room=None,
             assigned_by=self.dept_admin
         )
         self.dept_admin.active_role = self.dept_admin_role
         self.dept_admin.save()
 
-        # Create Location & Room in that department
+        # --- Create Location & Room in the department ---
         self.location = LocationFactory(department=self.department, name="Main Office")
         self.room = RoomFactory(location=self.location, name="Server Room")
 
-        # Create a regular user to operate on
+        # --- Create a regular user with proper role inside the department ---
         self.user = UserFactory()
         self.user_role = RoleAssignment.objects.create(
             user=self.user,
             role="ROOM_ADMIN",
-            department=None,
-            location=None,
             room=self.room,
             assigned_by=self.dept_admin
         )
         self.user.active_role = self.user_role
         self.user.save()
 
-        # Login as department admin
+        # --- Force login for department admin ---
         self.client.force_login(self.dept_admin)
 
-        # URL endpoints
+        # --- URL endpoints ---
         self.user_list_url = reverse("users")
         self.user_detail_url = reverse("user-detail", kwargs={"public_id": self.user.public_id})
 
     def test_department_admin_crud_user(self):
-        """
-        Department admin should be able to GET, POST, PUT, PATCH, DELETE users
-        **within their department**, but cannot touch users outside the department.
-        """
+        """Department admin should CRUD users within their department"""
 
-        # --- GET /users/ ---
+        # --- GET list ---
         response = self.client.get(self.user_list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -171,17 +167,27 @@ class DepartmentAdminUserPermissionTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         created_user_public_id = response.data["public_id"]
+        created_user = User.objects.get(public_id=created_user_public_id)
 
-        # --- PUT / PATCH /users/<id>/ ---
-        update_payload = {"job_title": "Updated Title"}
+        # Assign a department-level role for scope
+        ra = RoleAssignment.objects.create(
+            user=created_user,
+            role="DEPARTMENT_VIEWER",
+            department=self.department,
+            assigned_by=self.dept_admin
+        )
+        created_user.active_role = ra
+        created_user.save()
 
+        # --- PUT /users/<id>/ ---
         put_response = self.client.put(
             reverse("user-detail", kwargs={"public_id": created_user_public_id}),
-            update_payload,
+            {"job_title": "Updated Title"},
             format="json"
         )
         self.assertEqual(put_response.status_code, status.HTTP_200_OK)
 
+        # --- PATCH /users/<id>/ ---
         patch_response = self.client.patch(
             reverse("user-detail", kwargs={"public_id": created_user_public_id}),
             {"job_title": "Patched Title"},
@@ -194,32 +200,33 @@ class DepartmentAdminUserPermissionTest(APITestCase):
             reverse("user-detail", kwargs={"public_id": created_user_public_id})
         )
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(public_id=created_user_public_id).exists())
 
     def test_department_admin_cannot_crud_outside_department(self):
-            # Create user outside their department
-            other_department = DepartmentFactory(name="HR")
-            other_location = LocationFactory(department=other_department, name="HR Office")
-            other_room = RoomFactory(location=other_location, name="HR Room")
+        """Department admin should NOT modify users outside their department"""
 
-            outside_user = UserFactory()
-            RoleAssignment.objects.create(
-                user=outside_user,
-                role="ROOM_ADMIN",
-                department=None,
-                location=None,
-                room=other_room,
-                assigned_by=self.dept_admin
-            )
-            outside_user.active_role = outside_user.roleassignment_set.first()
-            outside_user.save()
+        # --- Create user in another department ---
+        other_department = DepartmentFactory(name="HR")
+        other_location = LocationFactory(department=other_department, name="HR Office")
+        other_room = RoomFactory(location=other_location, name="HR Room")
 
-            url = reverse("user-detail", kwargs={"public_id": outside_user.public_id})
+        outside_user = UserFactory()
+        ra = RoleAssignment.objects.create(
+            user=outside_user,
+            role="ROOM_ADMIN",
+            room=other_room,
+            assigned_by=self.dept_admin
+        )
+        outside_user.active_role = ra
+        outside_user.save()
 
-            # PUT / PATCH / DELETE should be forbidden
-            put_resp = self.client.put(url, {"fname": "Hacked"}, format="json")
-            patch_resp = self.client.patch(url, {"fname": "Hacked"}, format="json")
-            del_resp = self.client.delete(url)
+        url = reverse("user-detail", kwargs={"public_id": outside_user.public_id})
 
-            self.assertIn(put_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
-            self.assertIn(patch_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
-            self.assertIn(del_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
+        # PUT / PATCH / DELETE should be forbidden
+        put_resp = self.client.put(url, {"fname": "Hacked"}, format="json")
+        patch_resp = self.client.patch(url, {"fname": "Hacked"}, format="json")
+        del_resp = self.client.delete(url)
+
+        self.assertIn(put_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
+        self.assertIn(patch_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
+        self.assertIn(del_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])

@@ -4,16 +4,11 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .viewsets import general_viewsets
-
 
 
 urlpatterns = [
 
-    path('password-reset/', password_reset_request, name='password_reset'),
-    path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
-    path('password-change/', password_change, name='password_change'),
-
+ 
     path('login/',api_login_view, name='login'),
     path('logout/',api_logout, name='logout'),
     path('refresh/', api_token_refresh, name='session_refresh'),
@@ -31,7 +26,6 @@ urlpatterns = [
     path("locations/", include("db_inventory.urls.location_urls")),
 
     path("rooms/", include("db_inventory.urls.room_urls")),
-
 
 
     path('equipments/', equipment_list_create_view, name='equipments'),
@@ -70,5 +64,27 @@ urlpatterns = [
 
     path('serializer-fields/',serializer_parameters_view , name='get-serializer-fields'),
 
+    # User Sessions ---
+    path('auth/sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
+
+    # Lock/Unlock User Accounts
+    path('auth/users/<str:public_id>/lock/', user_lock_view, name='user-lock'),
+    path('auth/users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
+
+    # Admin triggers a password reset (temp password + optional email)
+    path(
+        'auth/users/<str:user_public_id>/reset-password/',
+        admin_reset_user_password_view,
+        name='admin-reset-user-password'
+    ),
+
+    # User submits temp password + new password to complete reset
+
+    path('password-reset/request/', password_reset_request, name='password-reset-request'),
+    path('password-reset/confirm/', password_reset_confirmation, name='password-reset-confirm'),
+    path('password-change/', password_change, name='password_change'),
+
+    # used to confirm validity of password reset token
+    path("reset-password/validate-token/", password_reset_validate, name="password-reset-validate"),
 
 ]

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Department, UserLocation, Location, Equipment, Component, Consumable, Room, RoleAssignment, UserSession, Accessory
+from .models import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
@@ -50,14 +50,14 @@ class RoleAssignmentAdmin(admin.ModelAdmin):
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "fname", "lname","active_role", "public_id", "is_active", "created_by","is_system_user" )
+    list_display = ("email", "fname", "lname","active_role", "public_id", "is_active",'is_locked', "created_by","is_system_user", "force_password_change" )
     search_fields = ("email", "fname", "lname", "public_id")
     readonly_fields = ("public_id",)
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Personal info", {"fields": ("fname", "lname", "job_title", "role")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Permissions", {"fields": ("is_active", 'is_locked', "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
 
@@ -102,3 +102,23 @@ class ConsumableAdmin(admin.ModelAdmin):
     list_display = ('name',  'quantity', 'public_id')  # adjust fields as per model
     readonly_fields = ('public_id',)
     fields = ('name','quantity', 'description', 'public_id')
+
+
+@admin.register(PasswordResetEvent)
+class PasswordResetEventAdmin(admin.ModelAdmin):
+    list_display = (
+        'user', 
+        'expires_at', 
+        'used_at', 
+        'created_at', 
+        'is_valid_display'
+    )
+    list_filter = ('expires_at', 'used_at', 'created_at')
+    search_fields = ('user__username', 'user__email')
+    readonly_fields = ('reset_token', 'created_at', 'used_at')
+    ordering = ('-created_at',)
+
+    def is_valid_display(self, obj):
+        return obj.is_valid()
+    is_valid_display.boolean = True
+    is_valid_display.short_description = 'Valid'

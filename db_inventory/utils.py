@@ -1,6 +1,10 @@
-from django.core import signing
-from datetime import timedelta
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.utils import timezone
+from db_inventory.models import PasswordResetEvent, User
+from django.utils import timezone
+import secrets
+from datetime import timedelta
+from django.db import transaction
 
 class ExcludeFiltersMixin:
     """
@@ -55,27 +59,79 @@ def get_serializer_field_info(serializer_class):
 
 
 class PasswordResetToken:
-    SALT = 'password_reset_salt'
-    EXPIRATION_MINUTES = 10
+    EXPIRY_MINUTES = 10
 
-    @classmethod
-    def generate_token(cls, user_public_id):
-        data = {
-            'user_id': user_public_id,
-            'timestamp': timezone.now().timestamp(),
-        }
-        return signing.dumps(data, salt=cls.SALT)
+    def __init__(self):
+        self.signer = TimestampSigner(salt="password-reset")
 
-    @classmethod
-    def validate_token(cls, token):
+    def generate_token(self, user_public_id: str, admin_public_id: str | None = None) -> PasswordResetEvent:
+        """
+        Creates a new password-reset token for a user.
+        Invalidates previous active tokens.
+        Returns the created PasswordResetEvent instance.
+        """
+
+        # Fetch the acting user
         try:
-            data = signing.loads(token, salt=cls.SALT, max_age=cls.EXPIRATION_MINUTES * 60)
-            return data['user_id']
-        except signing.BadSignature:
-            return None
-        except signing.SignatureExpired:
+            user = User.objects.get(public_id=user_public_id)
+        except User.DoesNotExist:
+            raise ValueError("User not found")
+
+        admin_user = None
+        if admin_public_id:
+            try:
+                admin_user = User.objects.get(public_id=admin_public_id)
+            except User.DoesNotExist:
+                raise ValueError("Admin user not found")
+
+        with transaction.atomic():
+            # 1. Invalidate older active tokens
+            (
+                PasswordResetEvent.objects
+                .filter(user=user, is_active=True, used_at__isnull=True)
+                .update(is_active=False)
+            )
+
+            # 2. Generate secure random token
+            raw_token = secrets.token_urlsafe(32)
+
+            # We sign the token with a timestamp to prevent tampering
+            signed_token = self.signer.sign(f"{user.public_id}:{raw_token}")
+
+            # 3. Create new reset event
+            event = PasswordResetEvent.objects.create(
+                user=user,
+                admin=admin_user,
+                token=signed_token,
+                expires_at=timezone.now() + timedelta(minutes=self.EXPIRY_MINUTES),
+                is_active=True,
+            )
+
+        return event
+
+    def verify_token(self, signed_token: str) -> PasswordResetEvent | None:
+        """
+        Verifies the token signature & checks DB validity.
+        Returns the valid PasswordResetEvent or None.
+        """
+
+        try:
+            # Ensure signature is correct
+            value = self.signer.unsign(signed_token, max_age=self.EXPIRY_MINUTES * 60)
+            user_public_id, raw_token = value.split(":", 1)
+        except Exception:
             return None
 
+        try:
+            event = PasswordResetEvent.objects.get(token=signed_token)
+        except PasswordResetEvent.DoesNotExist:
+            return None
+
+        if not event.is_active or not event.is_valid():
+            return None
+
+        return event
+    
 def user_can_access_role(user, role_obj):
     """
     Checks if the user's active_role allows read access to the given RoleAssignment.

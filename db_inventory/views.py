@@ -9,6 +9,7 @@ from .viewsets import (
     accessory_viewsets,
     general_viewsets,
     role_viewsets,
+    auth_viewsets
 )
 
 # --- General ---
@@ -153,6 +154,7 @@ room_roles_view = room_viewsets.RoomRolesViewSet.as_view({'get': 'list'})
 serializer_parameters_view = general_viewsets.SerializerFieldsView.as_view()
 
 # --- User ---
+create_full_user_view = user_viewsets.FullUserCreateView.as_view()
 user_id_detail_view = user_viewsets.UserModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
@@ -180,6 +182,25 @@ password_reset_confirmation = general_viewsets.PasswordResetConfirmView.as_view(
 
 # ---Password Change ---
 
-password_change = general_viewsets.ChangePasswordView.as_view()
+password_change = auth_viewsets.ChangePasswordView.as_view()
 
-create_full_user_view = user_viewsets.FullUserCreateView.as_view()
+# ---Validate Password Reset Token ---
+password_reset_validate = general_viewsets.PasswordResetValidateView.as_view()
+
+# --- User Sessions ---
+user_session_revoke_all_view = auth_viewsets.RevokeUserSessionsViewset.as_view({
+    'post': 'revoke_all'
+})
+
+# Lock user
+user_lock_view = auth_viewsets.UserLockViewSet.as_view({
+    'post': 'lock'
+})
+
+# Unlock user
+user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
+    'post': 'unlock'
+})
+
+# Admin reset user password
+admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()

@@ -77,8 +77,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         related_name="created_users"
     )
+    is_locked = models.BooleanField(default=False)
     is_system_user = models.BooleanField(default=False)  # for test/demo/system accounts
-
+    force_password_change = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
@@ -453,3 +454,23 @@ class UserSession(models.Model):
 
     def __str__(self):
         return f"Session {self.id} for {self.user} ({self.status})"
+    
+
+class PasswordResetEvent(models.Model):
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name="password_reset_events")
+    admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="admin_password_resets")
+    token = models.CharField(max_length=255, db_index=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)  # <- new
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        return (
+            self.used_at is None
+            and self.expires_at >= timezone.now()
+        )
+
+    def mark_used(self):
+        self.used_at = timezone.now()
+        self.save(update_fields=["used_at"])
