@@ -24,6 +24,7 @@ class UserFactory(factory.django.DjangoModelFactory):
     lname = factory.Faker('last_name')
     job_title = factory.Faker('job')
     is_active = factory.LazyFunction(lambda: random.choices([True, False], weights=[0.85, 0.15])[0])  # 85% active, 15% inactive
+    public_id = factory.Sequence(lambda n: f"UID{n:08d}")
     is_staff = False
     is_superuser = False
 
