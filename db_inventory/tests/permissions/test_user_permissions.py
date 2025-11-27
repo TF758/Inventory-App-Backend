@@ -3,6 +3,8 @@ from rest_framework import status
 from django.urls import reverse
 from db_inventory.models import User, RoleAssignment, Department
 from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, UserFactory, RoomFactory
+from rest_framework.test import force_authenticate
+
 
 class UserPermissionSiteAdminTest(APITestCase):
 
@@ -140,7 +142,8 @@ class DepartmentAdminUserPermissionTest(APITestCase):
         self.user.save()
 
         # --- Force login for department admin ---
-        self.client.force_login(self.dept_admin)
+        # self.client.force_login(self.dept_admin)
+        self.client.force_authenticate(self.dept_admin)
 
         # --- URL endpoints ---
         self.user_list_url = reverse("users")

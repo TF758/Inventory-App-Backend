@@ -115,7 +115,7 @@ class PasswordResetEventAdmin(admin.ModelAdmin):
     )
     list_filter = ('expires_at', 'used_at', 'created_at')
     search_fields = ('user__username', 'user__email')
-    readonly_fields = ('reset_token', 'created_at', 'used_at')
+    readonly_fields = ('token', 'created_at', 'used_at')
     ordering = ('-created_at',)
 
     def is_valid_display(self, obj):
