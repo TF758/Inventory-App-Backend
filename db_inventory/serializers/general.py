@@ -52,31 +52,42 @@ class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
-        if not User.objects.filter(email=value).exists():
+        # Case-insensitive lookup
+        try:
+            self.user = User.objects.get(email__iexact=value)
+        except User.DoesNotExist:
             raise serializers.ValidationError("User with this email does not exist.")
         return value
-    
-    def get_user(self):
-        return User.objects.filter(email=self.validated_data["email"]).first()
 
     def save(self):
-        user = self.get_user()
+        user = self.user
 
-        token = PasswordResetToken.generate_token(user.public_id)
+      
+        token_service = PasswordResetToken()
+        event = token_service.generate_token(user_public_id=user.public_id)
+        token = event.token  # signed token string
 
         reset_link = f"{settings.FRONTEND_URL}/password-reset?token={token}"
-        send_mail(
+
+        try:
+            send_mail(
                 subject="Password Reset Instructions",
                 message=f"""
-            You requested a password reset. Please use the link below to reset your password. 
-            This link will expire in 10 minutes.
+                You requested a password reset.
 
-            {reset_link}
+                Your link (expires in 10 minutes):
 
-            If you did not request a password reset, you can safely ignore this email.
-            """,
+                {reset_link}
+
+                If you did not request this, you can ignore this email.
+                """,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
                 fail_silently=False,
             )
+        except Exception:
+            raise serializers.ValidationError(
+                {"detail": "Could not send password reset email, please try again later."}
+            )
 
+        return reset_link

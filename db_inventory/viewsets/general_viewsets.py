@@ -316,19 +316,16 @@ class PasswordResetValidateView(APIView):
                 status=400,
             )
 
-        result = PasswordResetToken.validate_token(token)
+        payload = PasswordResetToken().verify_token(token)
 
-        if result["status"] == "valid":
-            return Response({"status": "valid"})
-        elif result["status"] == "expired":
+        if payload is None:
+            # Could be expired or invalid; we can distinguish based on internal checks
             return Response(
-                {"code": "TOKEN_EXPIRED", "detail": "This password reset link has expired."},
+                {"code": "TOKEN_INVALID", "detail": "This password reset link is invalid or expired."},
                 status=400,
             )
-        else:
-            return Response(
-                {"code": "TOKEN_INVALID", "detail": "This password reset link is invalid."},
-                status=400,
-            )
+
+        # Token is valid → return success
+        return Response({"status": "valid"}, status=200)
 
 

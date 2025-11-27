@@ -81,7 +81,7 @@ urlpatterns = [
     # User submits temp password + new password to complete reset
 
     path('password-reset/request/', password_reset_request, name='password-reset-request'),
-    path('password-reset/confirm/', password_reset_confirmation, name='password_reset_confirm'),
+    path('password-reset/confirm/', password_reset_confirmation, name='password-reset-confirm'),
     path('password-change/', password_change, name='password_change'),
 
     # used to confirm validity of password reset token
