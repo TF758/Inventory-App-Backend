@@ -457,17 +457,20 @@ class UserSession(models.Model):
     
 
 class PasswordResetEvent(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_events")
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name="password_reset_events")
     admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="admin_password_resets")
-    reset_token = models.CharField(max_length=64, unique=True, editable=False)
+    token = models.CharField(max_length=255, db_index=True)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)  # <- new
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def save(self, *args, **kwargs):
-        if not self.reset_token:
-            self.reset_token = secrets.token_urlsafe(32)
-        super().save(*args, **kwargs)
-
     def is_valid(self):
-        return self.used_at is None and self.expires_at >= timezone.now()
+        return (
+            self.used_at is None
+            and self.expires_at >= timezone.now()
+        )
+
+    def mark_used(self):
+        self.used_at = timezone.now()
+        self.save(update_fields=["used_at"])
