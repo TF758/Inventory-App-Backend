@@ -1,189 +1,154 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
-from db_inventory.models import User, RoleAssignment, Department, Location, Room
+from db_inventory.models import User, RoleAssignment, Department, Location, Room, UserLocation
 from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory
 import uuid
 
-class FullUserCreateAPITest(APITestCase):
+class SiteAdminFullUserCreateTest(APITestCase):
+    """Verify that SITE_ADMIN can create users anywhere"""
 
     def setUp(self):
-        # --- Admin user ---
-        self.admin = AdminUserFactory()
-        self.client.force_login(self.admin)
-
-        # Ensure admin has SITE_ADMIN role
+        # --- Create SITE_ADMIN ---
+        self.site_admin = AdminUserFactory()
         self.site_admin_role = RoleAssignment.objects.create(
-            user=self.admin,
+            user=self.site_admin,
             role="SITE_ADMIN",
             department=None,
             location=None,
             room=None,
-            assigned_by=self.admin
+            assigned_by=self.site_admin
         )
-        self.admin.active_role = self.site_admin_role
-        self.admin.save()
+        self.site_admin.active_role = self.site_admin_role
+        self.site_admin.save()
 
-        # --- Department / Location / Room ---
-        self.department = DepartmentFactory(name = "IT Department")
-        self.department.save()
-        self.location = LocationFactory(department=self.department, name="Main Office")
-        self.location.save()
-        self.room = RoomFactory(location=self.location , name="Server Room")
-        self.room.save()
+        self.client.force_login(self.site_admin)
 
-        # Endpoint
+        # --- Department, Location, Room ---
+        self.department = DepartmentFactory(name="IT")
+        self.location = LocationFactory(department=self.department, name="HQ")
+        self.room = RoomFactory(location=self.location, name="Server Room")
+
+        # --- Endpoint ---
         self.url = reverse("create-full-user")
 
-    def test_create_full_user(self):
-        # Payload uses public_id
+    def test_site_admin_can_create_user_anywhere(self):
         payload = {
             "user": {
-                "email": "alice@example.com",
+                "email": "alice.site@example.com",
                 "fname": "Alice",
-                "lname": "Smith",
-                "job_title": "Asset Manager",
+                "lname": "Site",
+                "job_title": "Engineer",
                 "is_active": True,
                 "password": "StrongP@ssw0rd!",
                 "confirm_password": "StrongP@ssw0rd!"
             },
-            "user_location": self.room.public_id,  
+            "user_location": self.room.public_id,
             "role": {
-                "role": "DEPARTMENT_ADMIN",
-                "department": self.department.public_id,
+                "role": "ROOM_ADMIN",
+                "department": None,
                 "location": None,
-                "room": None
+                "room": self.room.public_id
             }
         }
-   
+
         response = self.client.post(self.url, payload, format="json")
-
-        # --- Assertions ---
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
         data = response.data
+        self.assertEqual(data["user"]["email"], "alice.site@example.com")
+        self.assertEqual(data["role_assignment"]["role"], "ROOM_ADMIN")
+        # Fetch the UserLocation for the newly created user
+        ul_instance = UserLocation.objects.get(user__email="alice.site@example.com")
 
-        # User
-        self.assertIn("user", data)
-        self.assertEqual(data["user"]["email"], "alice@example.com")
-
-        # User Location
-        user_location_data = data["user_location"]
-        self.assertIsNotNone(user_location_data)
-        self.assertIn("public_id", user_location_data)
-        self.assertEqual(user_location_data["public_id"], self.room.userlocation_set.first().public_id)
-
-        # Role assignment
-        self.assertIn("role_assignment", data)
-        self.assertEqual(data["role_assignment"]["role"], "DEPARTMENT_ADMIN")
-        self.assertEqual(data["role_assignment"]["department"], self.department.public_id)
+        # Assert it exists and matches the expected room
+        self.assertIsNotNone(ul_instance)
+        self.assertEqual(ul_instance.room, self.room)
 
 
-
-class DepartmentAdminUserCreateAPITest(APITestCase):
+class DepartmentAdminFullUserCreateTest(APITestCase):
+    """Verify that DEPARTMENT_ADMIN can create users only within their department"""
 
     def setUp(self):
-        # --- Create department ---
-        self.department = DepartmentFactory(name="IT Department")
+        # --- Create Department ---
+        self.department = DepartmentFactory(name="IT")
         self.department.save()
+        self.other_department = DepartmentFactory(name="HR")
+        self.other_department.save()
 
-        # --- Create department admin user ---
+        # --- Department Admin ---
         self.dept_admin = User.objects.create_user(
             email="deptadmin@example.com",
             password="StrongP@ssw0rd!",
             fname="Dept",
             lname="Admin",
-            job_title="Department Manager",
+            job_title="Manager",
             is_active=True
         )
-
-        # --- Assign DEPARTMENT_ADMIN role to department admin ---
         self.dept_admin_role = RoleAssignment.objects.create(
             user=self.dept_admin,
             role="DEPARTMENT_ADMIN",
-            department=self.department,   # restrict to this department
+            department=self.department,
             location=None,
             room=None,
             assigned_by=self.dept_admin
         )
         self.dept_admin.active_role = self.dept_admin_role
         self.dept_admin.save()
-
-        # --- Force login as department admin ---
         self.client.force_login(self.dept_admin)
 
-        # --- Create Location & Room inside the department ---
-        self.location = LocationFactory(department=self.department, name="Main Office")
+        # --- Locations & Rooms ---
+        self.location = LocationFactory(department=self.department, name="HQ")
         self.location.save()
         self.room = RoomFactory(location=self.location, name="Server Room")
         self.room.save()
 
-        # --- Endpoint to create full user ---
+        self.other_location = LocationFactory(department=self.other_department, name="HR Office")
+        self.other_location.save()
+        self.other_room = RoomFactory(location=self.other_location, name="Conf Room")
+        self.other_room.save()
+
+        # --- Endpoint ---
         self.url = reverse("create-full-user")
 
-    def test_create_user_as_department_admin(self):
-        # Payload for new user
+    def test_dept_admin_can_create_user_in_department(self):
+        """Department Admin can create a user in a room within their department"""
         payload = {
             "user": {
-                "email": "bob@example.com",
+                "email": "bob.dept@example.com",
                 "fname": "Bob",
-                "lname": "Johnson",
+                "lname": "Dept",
                 "job_title": "Technician",
                 "is_active": True,
                 "password": "StrongP@ssw0rd!",
                 "confirm_password": "StrongP@ssw0rd!"
             },
-            "user_location": self.room.public_id,  
+            "user_location": self.room.public_id,
             "role": {
                 "role": "ROOM_ADMIN",
-                "department": None,  
+                "department": None,
                 "location": None,
-                "room": self.room.public_id 
+                "room": self.room.public_id
             }
         }
 
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
         data = response.data
-
-        # --- User ---
-        self.assertIn("user", data)
-        self.assertEqual(data["user"]["email"], "bob@example.com")
-
-        # --- User Location ---
-        user_location_data = data.get("user_location")
-        self.assertIsNotNone(user_location_data)
-        self.assertIn("public_id", user_location_data)
-
-        # Match the created UserLocation
-        actual_ul = self.room.userlocation_set.first()
-        self.assertEqual(user_location_data["public_id"], actual_ul.public_id)
-
-        # --- Role assignment ---
-        self.assertIn("role_assignment", data)
+        self.assertEqual(data["user"]["email"], "bob.dept@example.com")
         self.assertEqual(data["role_assignment"]["role"], "ROOM_ADMIN")
-        self.assertIsNone(data["role_assignment"]["department"])
 
-    def test_dept_admin_cannot_create_user_outside_their_department(self):
-        """
-        Department Admin should NOT be able to create a user
-        in a room that belongs to another department.
-        """
+        # Confirm UserLocation created correctly
+        ul_instance = UserLocation.objects.get(user__email="bob.dept@example.com")
+        self.assertIsNotNone(ul_instance)
+        self.assertEqual(ul_instance.room, self.room)
 
-        # --- Create a different department ---
-        other_department = DepartmentFactory(name="HR Department")
-        other_department.save()
-
-        # --- Create location + room OUTSIDE admin's department ---
-        other_location = LocationFactory(department=other_department, name="HR Office")
-        other_location.save()
-
-        other_room = RoomFactory(location=other_location, name="Conf Room")
-        other_room.save()
-
-        # --- Payload attempts to use other_room (NOT allowed) ---
+    def test_dept_admin_cannot_create_user_outside_department(self):
+        """Department Admin cannot create users in another department"""
         payload = {
             "user": {
-                "email": "outsider@example.com",
+                "email": "outsider.dept@example.com",
                 "fname": "Out",
                 "lname": "Sider",
                 "job_title": "HR Staff",
@@ -191,47 +156,31 @@ class DepartmentAdminUserCreateAPITest(APITestCase):
                 "password": "StrongP@ssw0rd!",
                 "confirm_password": "StrongP@ssw0rd!"
             },
-            "user_location": other_room.public_id,  # room in WRONG department
+            "user_location": self.other_room.public_id,
             "role": {
                 "role": "ROOM_ADMIN",
-                "department": other_department.public_id,  # trying to set foreign dept
+                "department": None,
                 "location": None,
-                "room": other_room.public_id
+                "room": self.other_room.public_id
             }
         }
 
         response = self.client.post(self.url, payload, format="json")
-
-        # Ensure forbidden / invalid
         self.assertIn(response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN])
 
-        # Inspect error message to ensure it's scope related
-        self.assertTrue(
-            "outside your department" in str(response.data).lower()
-            or "permission" in str(response.data).lower()
-            or "not allowed" in str(response.data).lower()
-        )
-
-class LocationAdminUserCreateAPITest(APITestCase):
+class LocationAdminFullUserCreateTest(APITestCase):
+    """Verify that LOCATION_ADMIN cannot create users via the full-user endpoint"""
 
     def setUp(self):
         # --- Departments ---
-        self.department = DepartmentFactory(name="IT Department")
+        self.department = DepartmentFactory(name="IT")
         self.department.save()
-        self.other_department = DepartmentFactory(name="HR Department")
-        self.other_department.save()
 
-        # --- Locations ---
+        # --- Locations & Rooms ---
         self.location = LocationFactory(department=self.department, name="Main Office")
         self.location.save()
-        self.other_location = LocationFactory(department=self.other_department, name="HR Office")
-        self.other_location.save()
-
-        # --- Rooms ---
         self.room = RoomFactory(location=self.location, name="Server Room")
         self.room.save()
-        self.other_room = RoomFactory(location=self.other_location, name="Conf Room")
-        self.other_room.save()
 
         # --- Location Admin user ---
         self.location_admin = User.objects.create_user(
@@ -252,11 +201,13 @@ class LocationAdminUserCreateAPITest(APITestCase):
         )
         self.location_admin.active_role = self.location_admin_role
         self.location_admin.save()
+        self.client.force_login(self.location_admin)
 
         # --- Endpoint ---
         self.url = reverse("create-full-user")
 
-    def test_location_admin_can_create_user_in_location(self):
+    def test_location_admin_cannot_create_user_in_location(self):
+        """Location Admin cannot create users via this endpoint, even in their location"""
         payload = {
             "user": {
                 "email": "alice.loc@example.com",
@@ -271,52 +222,56 @@ class LocationAdminUserCreateAPITest(APITestCase):
             "role": {
                 "role": "ROOM_ADMIN",
                 "department": None,
-                "location": self.location.public_id,
+                "location": None,
                 "room": self.room.public_id
             }
         }
-        self.client.force_login(self.location_admin)
+
         response = self.client.post(self.url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_admin_cannot_create_user_outside_location(self):
+        """Location Admin also cannot create users in rooms outside their location"""
+        other_room = RoomFactory(location=self.location, name="Conf Room")
+        other_room.save()
+
         payload = {
             "user": {
                 "email": "outsider.loc@example.com",
                 "fname": "Out",
                 "lname": "Sider",
-                "job_title": "HR Staff",
+                "job_title": "Technician",
                 "is_active": True,
                 "password": "StrongP@ssw0rd!",
                 "confirm_password": "StrongP@ssw0rd!"
             },
-            "user_location": self.other_room.public_id,
+            "user_location": other_room.public_id,
             "role": {
                 "role": "ROOM_ADMIN",
                 "department": None,
-                "location": self.other_location.public_id,
-                "room": self.other_room.public_id
+                "location": None,
+                "room": other_room.public_id
             }
         }
-        self.client.force_login(self.location_admin)
+
         response = self.client.post(self.url, payload, format="json")
-        self.assertIn(response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN])
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-
-class RoomAdminUserCreateAPITest(APITestCase):
+class RoomAdminFullUserCreateTest(APITestCase):
+    """Verify that ROOM_ADMIN cannot create users via the full-user endpoint"""
 
     def setUp(self):
-        # --- Create department ---
-        self.department = DepartmentFactory(name="IT Department")
+        # --- Department ---
+        self.department = DepartmentFactory(name="IT")
         self.department.save()
 
-        # --- Create Location & Room ---
+        # --- Location & Room ---
         self.location = LocationFactory(department=self.department, name="Main Office")
         self.location.save()
         self.room = RoomFactory(location=self.location, name="Server Room")
         self.room.save()
 
-        # --- Create Room Admin user ---
+        # --- Room Admin user ---
         self.room_admin = User.objects.create_user(
             email="roomadmin@example.com",
             password="StrongP@ssw0rd!",
@@ -325,8 +280,6 @@ class RoomAdminUserCreateAPITest(APITestCase):
             job_title="Room Manager",
             is_active=True
         )
-
-        # --- Assign ROOM_ADMIN role ---
         self.room_admin_role = RoleAssignment.objects.create(
             user=self.room_admin,
             role="ROOM_ADMIN",
@@ -338,13 +291,14 @@ class RoomAdminUserCreateAPITest(APITestCase):
         self.room_admin.active_role = self.room_admin_role
         self.room_admin.save()
 
-        # --- Force login as room admin ---
+        # --- Force login ---
         self.client.force_login(self.room_admin)
 
         # --- Endpoint ---
         self.url = reverse("create-full-user")
 
-    def test_room_admin_can_create_user_in_room(self):
+    def test_room_admin_cannot_create_user_in_room(self):
+        """Room Admin cannot create a user in their own room"""
         payload = {
             "user": {
                 "email": "alice.room@example.com",
@@ -365,15 +319,10 @@ class RoomAdminUserCreateAPITest(APITestCase):
         }
 
         response = self.client.post(self.url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        data = response.data
-        self.assertEqual(data["user"]["email"], "alice.room@example.com")
-        self.assertEqual(data["role_assignment"]["role"], "ROOM_CLERK")
-        self.assertEqual(data["role_assignment"]["room"], self.room.public_id)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_admin_cannot_create_user_outside_room(self):
-        # --- Create a new room outside admin's room ---
+        """Room Admin cannot create a user in another room"""
         other_room = RoomFactory(location=self.location, name="Conf Room")
         other_room.save()
 
@@ -397,9 +346,4 @@ class RoomAdminUserCreateAPITest(APITestCase):
         }
 
         response = self.client.post(self.url, payload, format="json")
-        self.assertIn(response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN])
-        self.assertTrue(
-            "outside your department" in str(response.data).lower() or
-            "permission" in str(response.data).lower() or
-            "not allowed" in str(response.data).lower()
-        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

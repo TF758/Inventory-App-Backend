@@ -221,3 +221,50 @@ class UserLocationPermission(BasePermission):
             return is_in_scope(active_role, department=obj.room.location.department)
 
         return False
+    
+
+class FullUserCreatePermission(BasePermission):
+    """
+    Permission for the FullUserCreateView.
+
+    Rules:
+    - SITE_ADMIN can always create users/roles/assign locations anywhere.
+    - DEPARTMENT_ADMIN can create users/roles/assign locations in their department.
+    - LOCATION_ADMIN cannot create new users (can only update existing users in their location).
+    - ROOM_ADMIN cannot create or delete users (can only update users in their room).
+    """
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # SITE_ADMIN bypass
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Only DEPARTMENT_ADMIN can create full users
+        if request.method == "POST":
+            return has_hierarchy_permission(active_role.role, "DEPARTMENT_ADMIN")
+
+        # Other methods (GET/PUT/PATCH/DELETE) are not allowed here
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Object-level permission for FullUserCreateView.
+        This view mainly uses POST, so object-level checks are rare.
+        """
+        active_role = getattr(request.user, "active_role", None)
+        if not active_role:
+            return False
+
+        # SITE_ADMIN bypass
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Other object-level checks could be implemented here if needed
+        return False

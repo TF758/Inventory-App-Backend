@@ -9,7 +9,7 @@ from rest_framework.filters import SearchFilter
 from ..filters import UserFilter, UserLocationFilter
 from ..mixins import ScopeFilterMixin
 from ..pagination import FlexiblePagination
-from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope
+from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
 from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
@@ -238,7 +238,14 @@ class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 class FullUserCreateView(views.APIView):
     """
     Create a User, assign a UserLocation, and assign a Role atomically.
+    This endpoint enforces:
+      - SITE_ADMIN: can create users anywhere
+      - DEPARTMENT_ADMIN: can create users only inside their department
+      - LOCATION_ADMIN: cannot use this endpoint
+      - ROOM_ADMIN: cannot use this endpoint
     """
+
+    permission_classes = [FullUserCreatePermission]
 
     def post(self, request, *args, **kwargs):
         payload = request.data
@@ -246,57 +253,69 @@ class FullUserCreateView(views.APIView):
         user_location_public_id = payload.get("user_location")
         role_data = payload.get("role", {})
 
-
-        # --- Permission checks ---
-        user_perm = UserPermission()
-        location_perm = UserLocationPermission()
-        role_perm = RolePermission()
-
         if not request.user.is_authenticated:
             raise PermissionDenied("Authentication required.")
 
+        user_location_instance = None
+
         with transaction.atomic():
 
-            # --- 1️⃣ Create User ---
+            # ------------------------------------
+            # 1️⃣ Create User
+            # ------------------------------------
             user_serializer = UserWriteSerializer(data=user_data)
             user_serializer.is_valid(raise_exception=True)
             user = user_serializer.save()
 
-            # --- 2️⃣ Assign UserLocation if provided ---
-            user_location_instance = None
+            # ------------------------------------
+            # 2️⃣ Assign UserLocation 
+            # ------------------------------------
             if user_location_public_id:
-                location_data = {
+                ul_data = {
                     "user_id": user.public_id,
-                    "room_id": user_location_public_id
+                    "room_id": user_location_public_id,
                 }
-                ul_serializer = UserLocationWriteSerializer(data=location_data, context={"request": request})
+
+                ul_serializer = UserLocationWriteSerializer(
+                    data=ul_data, context={"request": request}
+                )
                 ul_serializer.is_valid(raise_exception=True)
 
-                temp_ul = UserLocation(user=user, room=ul_serializer.validated_data["room"])
-                if not location_perm.has_object_permission(request, self, temp_ul):
-                    raise PermissionDenied("You do not have permission to assign this location.")
+                # Permission check using temporary mock object
+                temp_ul = UserLocation(
+                    user=user,
+                    room=ul_serializer.validated_data["room"]
+                )
+
+                if not UserLocationPermission().has_object_permission(
+                    request, self, temp_ul
+                ):
+                    raise PermissionDenied(
+                        "You do not have permission to assign this location."
+                    )
 
                 user_location_instance = ul_serializer.save()
 
-            # --- 3️⃣ Assign Role ---  <-- FIXED: moved out of the above block
+            # ------------------------------------
+            # 3️⃣ Assign Role
+            # ------------------------------------
+            role_name = role_data.get("role")
 
-            role_data_for_check = role_data.copy()
-            role_name = role_data_for_check.get("role")
-
-            # Resolve foreign keys dynamically
-            def resolve_model(model, public_id, label):
+            def resolve(model, public_id):
                 if not public_id:
                     return None
                 try:
                     return model.objects.get(public_id=public_id)
                 except model.DoesNotExist:
-                    raise ValidationError({label: f"Invalid {label} public_id."})
+                    raise ValidationError(
+                        {model.__name__.lower(): "Invalid public_id"}
+                    )
 
-            department = resolve_model(Department, role_data_for_check.get("department"), "department")
-            location   = resolve_model(Location,   role_data_for_check.get("location"),   "location")
-            room       = resolve_model(Room,       role_data_for_check.get("room"),       "room")
+            department = resolve(Department, role_data.get("department"))
+            location = resolve(Location, role_data.get("location"))
+            room = resolve(Room, role_data.get("room"))
 
-            # --- DYNAMIC SCOPING FIX ---
+            # Correct business logic: normalize scope based on role level
             if role_name.startswith("ROOM_"):
                 department = None
                 location = None
@@ -309,7 +328,7 @@ class FullUserCreateView(views.APIView):
                 location = None
                 room = None
 
-            # --- TEMP OBJECT FOR PERMISSION CHECK ---
+            # Permission using temp RoleAssignment
             temp_role = RoleAssignment(
                 user=user,
                 role=role_name,
@@ -318,11 +337,11 @@ class FullUserCreateView(views.APIView):
                 room=room,
             )
 
-            if not role_perm.has_object_permission(request, self, temp_role):
+            if not RolePermission().has_object_permission(request, self, temp_role):
                 raise PermissionDenied("You do not have permission to assign this role.")
 
-            # --- FINAL SAVE PAYLOAD ---
-            role_data_for_save = {
+            # Final save payload
+            final_role_payload = {
                 "user": user.public_id,
                 "role": role_name,
                 "department": department.public_id if department else None,
@@ -330,14 +349,24 @@ class FullUserCreateView(views.APIView):
                 "room": room.public_id if room else None,
             }
 
-            role_serializer = RoleWriteSerializer(data=role_data_for_save, context={"request": request})
+            role_serializer = RoleWriteSerializer(
+                data=final_role_payload, context={"request": request}
+            )
             role_serializer.is_valid(raise_exception=True)
             role_assignment = role_serializer.save()
 
-        # --- Build response ---
-        response_data = {
-            "user": UserWriteSerializer(user).data,
-            "user_location": UserLocationWriteSerializer(user_location_instance).data if user_location_instance else None,
-            "role_assignment": RoleWriteSerializer(role_assignment).data
-        }
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        # ------------------------------------
+
+        # ------------------------------------
+        return Response(
+            {
+                "user": UserWriteSerializer(user).data,
+                "user_location": (
+                    UserLocationWriteSerializer(user_location_instance).data
+                    if user_location_instance
+                    else None
+                ),
+                "role_assignment": RoleWriteSerializer(role_assignment).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
