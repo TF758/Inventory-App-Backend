@@ -174,63 +174,95 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         return value
 
     # --- Global validation ---
-    
     def validate(self, attrs):
         request = self.context.get("request")
         user = request.user if request else None
-        role = attrs.get("role")
+
+        # --- Extract role string safely ---
+        role_data = attrs.get("role") or request.data.get("role")
+
+        if isinstance(role_data, dict):
+            role = role_data.get("role")
+        else:
+            role = role_data
+
+        if role is None:
+            if self.instance:
+                role = self.instance.role
+            else:
+                raise serializers.ValidationError("Role must be provided.")
+
+        # --- Resolve scope fields ---
         room = attrs.get("room")
         location = attrs.get("location")
         department = attrs.get("department")
 
-        # --- Get the target user safely (works for PATCH and POST)
+        # --- Target user (handles POST + PATCH) ---
         target_user = attrs.get("user") or getattr(self.instance, "user", None)
-        # --- Default scoping based on current user's active role ---
+
+        # --- Active role of the acting user ---
         active_role = getattr(user, "active_role", None)
+
+        # Auto-assign department for dept-admin assigning dept roles
         if role.startswith("DEPARTMENT_") and not department and active_role and active_role.department:
             department = active_role.department
 
+        # --- DEPARTMENT_ADMIN assigning ROOM roles ---
         if (user and active_role and active_role.role == "DEPARTMENT_ADMIN" and role.startswith("ROOM_")):
-            # The room MUST belong to their department
             if room and room.location.department != active_role.department:
                 raise PermissionDenied("Cannot assign ROOM role outside your department")
+            department = None  # clearing department for room role
 
-            # NEVER set department for room roles
-            department = None
-            
+        # --- LOCATION_ADMIN assigning ROOM roles ---
+        if (user and active_role and active_role.role == "LOCATION_ADMIN" and role.startswith("ROOM_")):
+
+            # Room must belong to their location
+            if room and room.location != active_role.location:
+                raise PermissionDenied("Cannot assign ROOM role outside your location")
+
+            # Prevent location-moving
+            if location and location != active_role.location:
+                raise PermissionDenied("Cannot change location outside your scope")
+
+            location = None  # clearing location for room role
+
+        # Auto-assign location for location roles
         if role.startswith("LOCATION_") and not location and active_role and active_role.location:
             location = active_role.location
 
+        # Auto-assign room for room roles
         if role.startswith("ROOM_") and not room and active_role and active_role.room:
             room = active_role.room
-        # --- Permission enforcement ---
-        try:
-            ensure_permission(
-                user,
-                role,
-                room=room,
-                location=location,
-                department=department,
-            )
-        except Exception as e:
-            raise
 
-        # --- Update attrs so they're passed correctly downstream ---
+        # --- Run permission engine ---
+        ensure_permission(
+            user,
+            role,
+            room=room,
+            location=location,
+            department=department,
+        )
+
+        # Update attrs
         attrs.update({
             "room": room,
             "location": location,
             "department": department,
         })
 
-        # --- Validate model-level consistency (scope sanity) ---
+        # --- Validate model-level clean() ---
         try:
             temp = RoleAssignment(**attrs)
             temp.clean()
         except DjangoValidationError as e:
-            msg = getattr(e, "message_dict", None) or getattr(e, "messages", None) or str(e)
+            msg = (
+                getattr(e, "message_dict", None)
+                or getattr(e, "messages", None)
+                or str(e)
+            )
             raise serializers.ValidationError(msg)
 
-        # --- Prevent duplicate role assignments ---
+        # --- Prevent duplicates ---
         existing = RoleAssignment.objects.filter(
             user=target_user,
             role=role,
@@ -242,9 +274,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             existing = existing.exclude(pk=self.instance.pk)
 
         if existing.exists():
-            raise serializers.ValidationError(
-                "User already has this role in the specified scope."
-            )
+            raise serializers.ValidationError("User already has this role in the specified scope.")
 
         return attrs
     # --- Create / Update ---
