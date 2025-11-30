@@ -3,6 +3,7 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from .models import UserSession
+from django.utils import timezone
 
 class SessionJWTAuthentication(JWTAuthentication):
     """
@@ -30,6 +31,11 @@ class SessionJWTAuthentication(JWTAuthentication):
             raise AuthenticationFailed(
                 "Session does not exist or has been revoked.", code="invalid_session"
             )
+        
+        if session.expires_at <= timezone.now():
+            session.status = UserSession.Status.EXPIRED
+            session.save(update_fields=["status"])
+            raise AuthenticationFailed("Session has expired.", code="expired_session")
 
         if session.status != UserSession.Status.ACTIVE:
             raise AuthenticationFailed(
