@@ -1,13 +1,15 @@
 from rest_framework.permissions import BasePermission
 from .constants import ROLE_HIERARCHY
 from db_inventory.models import Department, Location, Room
-from .helpers import has_hierarchy_permission, is_in_scope, check_permission
+from .helpers import  is_in_scope, check_permission, is_viewer_role, is_admin_role, has_hierarchy_permission
+
 
 class RoomPermission(BasePermission):
     """
     Permission class for Room objects.
     Handles ROOM_VIEWER, ROOM_ADMIN, LOCATION_ADMIN, DEPARTMENT_ADMIN, SITE_ADMIN.
     """
+
     method_role_map = {
         "POST": "LOCATION_ADMIN",   # create room
         "PUT": "ROOM_ADMIN",        # update room
@@ -25,8 +27,13 @@ class RoomPermission(BasePermission):
         if not active_role:
             return False
 
+        # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
+
+        # Block VIEWER roles from write methods
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
+            return False
 
         # POST (create room)
         if request.method == "POST":
@@ -37,47 +44,44 @@ class RoomPermission(BasePermission):
             if not location:
                 return False
 
-            # DEPARTMENT_ADMIN: only rooms within their department
-            if active_role.role == "DEPARTMENT_ADMIN":
+            # Scope check for DEPARTMENT_ADMIN or LOCATION_ADMIN
+            if active_role.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN"]:
                 return is_in_scope(active_role, location=location)
 
-            # LOCATION_ADMIN: only rooms within their location
-            if active_role.role == "LOCATION_ADMIN":
-                return is_in_scope(active_role, location=location)
-
-            # ROOM_ADMIN cannot create
+            # ROOM_ADMIN cannot create rooms
             return False
 
-        # other methods (GET/PUT/PATCH/DELETE) defer to object-level permission
+        # Other methods defer to object-level permissions
         return True
-    
+
     def has_object_permission(self, request, view, obj: Room):
-        """
-        Check object-level permission for GET, PUT, PATCH, DELETE.
-        """
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
 
-        # SITE_ADMIN bypasses all
+        # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
 
         method = request.method
 
-        # GET
+        # GET: viewers and admins can view rooms in scope
         if method == "GET":
-            return is_in_scope(active_role, room=obj) if active_role.role in ["ROOM_VIEWER", "ROOM_ADMIN", "ROOM_CLERK", "LOCATION_ADMIN", "DEPARTMENT_ADMIN"] else False
+            if is_viewer_role(active_role.role) or is_admin_role(active_role.role):
+                return is_in_scope(active_role, room=obj)
+            return False
 
-        # PUT/PATCH
+        # PUT/PATCH: ROOM_ADMIN, LOCATION_ADMIN, DEPARTMENT_ADMIN
         if method in ["PUT", "PATCH"]:
-            # Only ROOM_ADMIN (their room), LOCATION_ADMIN (any room in location), DEPARTMENT_ADMIN (any room in dept)
-            return is_in_scope(active_role, room=obj) if active_role.role in ["ROOM_ADMIN", "LOCATION_ADMIN", "DEPARTMENT_ADMIN"] else False
+            if active_role.role in ["ROOM_ADMIN", "LOCATION_ADMIN", "DEPARTMENT_ADMIN"]:
+                return is_in_scope(active_role, room=obj)
+            return False
 
-        # DELETE
+        # DELETE: LOCATION_ADMIN or DEPARTMENT_ADMIN
         if method == "DELETE":
-            # Only LOCATION_ADMIN or DEPARTMENT_ADMIN can delete rooms in scope
-            return is_in_scope(active_role, room=obj) if active_role.role in ["LOCATION_ADMIN", "DEPARTMENT_ADMIN"] else False
+            if active_role.role in ["LOCATION_ADMIN", "DEPARTMENT_ADMIN"]:
+                return is_in_scope(active_role, room=obj)
+            return False
 
         return False
 
@@ -85,9 +89,11 @@ class RoomPermission(BasePermission):
     
 class LocationPermission(BasePermission):
     """
-    Permission for Location objects based on the user's active_role:
-      - Enforces role hierarchy and object scope
-      - SITE_ADMIN bypasses all checks
+    Permission class for Location objects.
+    
+    - VIEWER roles can only read (GET/HEAD/OPTIONS)
+    - Other roles operate according to hierarchy and object scope
+    - SITE_ADMIN bypasses all checks
     """
 
     method_role_map: dict[str, str] = {
@@ -111,11 +117,11 @@ class LocationPermission(BasePermission):
         if active_role.role == "SITE_ADMIN":
             return True
 
-        # VIEWER roles can only GET
-        if active_role.role.endswith("_VIEWER") and request.method != "GET":
+        # Block viewers from any write operation
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
             return False
 
-        # For POST, extract department from request data
+        # For POST, check department scope
         if request.method == "POST":
             dept_id = request.data.get("department")
             if not dept_id:
@@ -124,14 +130,17 @@ class LocationPermission(BasePermission):
             if not department:
                 return False
 
+            # DEPARTMENT_ADMIN can create locations within their department
             if active_role.role == "DEPARTMENT_ADMIN":
                 return is_in_scope(active_role, department=department)
 
-            return check_permission(request.user, required_role, department=department)
+            # Other roles: rely on hierarchy check
+            return has_hierarchy_permission(active_role.role, required_role)
 
+        # For GET, PUT, PATCH, DELETE: defer to object-level checks
         return True
 
-    def has_object_permission(self, request, view, obj) -> bool:
+    def has_object_permission(self, request, view, obj: Location) -> bool:
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
@@ -140,11 +149,13 @@ class LocationPermission(BasePermission):
         if active_role.role == "SITE_ADMIN":
             return True
 
-        # VIEWER roles can only GET
-        if active_role.role.endswith("_VIEWER") and request.method != "GET":
+        # Block viewers from any write operation
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
             return False
 
         required_role = self.method_role_map.get(request.method)
+        if not required_role:
+            return False
 
         # DEPARTMENT_ADMIN can operate within department scope
         if active_role.role == "DEPARTMENT_ADMIN":
@@ -154,19 +165,22 @@ class LocationPermission(BasePermission):
         if active_role.role == "LOCATION_ADMIN":
             return is_in_scope(active_role, location=obj)
 
-        # Other roles (including LOCATION_VIEWER) use check_permission
-        return check_permission(request.user, required_role, location=obj)
+        # Other roles: hierarchy check
+        return has_hierarchy_permission(active_role.role, required_role)
 
 
 class DepartmentPermission(BasePermission):
     """
-    Permission for Department objects based on the user's active_role:
-      - All methods enforce hierarchy and object scope
+    Permission class for Department objects.
+
+    - VIEWER roles can only GET
+    - Other roles operate according to hierarchy and object scope
+    - SITE_ADMIN bypasses all checks
     """
 
     method_role_map = {
         "GET": "DEPARTMENT_VIEWER",     # minimum role to view departments
-        "POST": "SITE_ADMIN",
+        "POST": "SITE_ADMIN",           # create new department
         "PUT": "DEPARTMENT_ADMIN",
         "PATCH": "DEPARTMENT_ADMIN",
         "DELETE": "SITE_ADMIN",
@@ -181,11 +195,19 @@ class DepartmentPermission(BasePermission):
         if not active_role:
             return False
 
-        # POST requires SITE_ADMIN and department is not relevant yet
+        # SITE_ADMIN bypass
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        # Block VIEWER roles from any write operation
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
+            return False
+
+        # POST requires SITE_ADMIN explicitly
         if request.method == "POST":
             return active_role.role == "SITE_ADMIN"
 
-        # All other methods: enforce hierarchy
+        # Other methods: enforce hierarchy
         return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
 
     def has_object_permission(self, request, view, obj):
@@ -197,9 +219,13 @@ class DepartmentPermission(BasePermission):
         if not active_role:
             return False
 
-        # SITE_ADMIN bypasses everything
+        # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
+
+        # Block VIEWER roles from write operations
+        if request.method in ("PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
+            return False
 
         # Object-level scope: department active role must match
         if active_role.department and obj == active_role.department:
@@ -207,4 +233,3 @@ class DepartmentPermission(BasePermission):
 
         # Lower-level roles (location/room) cannot access departments
         return False
-    

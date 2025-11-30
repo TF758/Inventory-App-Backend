@@ -1,9 +1,20 @@
 # myapp/permissions/users.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
-from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role
+from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role
 from ..utils import user_can_access_role
 from db_inventory.models import Room, Location, Department
+
+ROLE_ASSIGNMENT_RULES = {
+    "ROOM_ADMIN": ["ROOM_VIEWER", "ROOM_CLERK"],
+    "LOCATION_ADMIN": ["ROOM_VIEWER", "ROOM_CLERK","ROOM_ADMIN", "LOCATION_VIEWER"],
+    "DEPARTMENT_ADMIN": [
+        "ROOM_VIEWER", "ROOM_CLERK", "ROOM_ADMIN",
+        "LOCATION_VIEWER", "LOCATION_ADMIN",
+        "DEPARTMENT_VIEWER", "DEPARTMENT_ADMIN"
+    ],
+    # SITE_ADMIN or superuser are unrestricted, so no rule needed
+}
 
 
 class UserPermission(BasePermission):
@@ -93,10 +104,12 @@ class RolePermission(BasePermission):
         if getattr(view, "action", None) in ["list", "retrieve"]:
             return True
 
-        if request.method == "POST" and active and active.role == "ROOM_ADMIN":
-            new_role = request.data.get("role")
-            if new_role not in ["ROOM_VIEWER", "ROOM_CLERK"]:
-                return False
+        if request.method == "POST" and active:
+            allowed = ROLE_ASSIGNMENT_RULES.get(active.role)
+            if allowed:
+                new_role = request.data.get("role")
+                if new_role not in allowed:
+                    return False
 
         if active and active.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
             return True
@@ -132,7 +145,8 @@ class RolePermission(BasePermission):
             new_role = new_role_data
             new_room = new_location = new_department = None
 
-        if active.role == "ROOM_ADMIN" and new_role not in ["ROOM_VIEWER", "ROOM_CLERK"]:
+        allowed = ROLE_ASSIGNMENT_RULES.get(active.role)
+        if allowed and new_role not in allowed:
             return False
 
         try:
@@ -167,11 +181,11 @@ class UserLocationPermission(BasePermission):
         if active_role.role == "SITE_ADMIN":
             return True
 
-        # Explicitly block any viewer roles from write methods
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and "_VIEWER" in active_role.role:
+        # Block viewers from any write operations
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
             return False
 
-        # Otherwise, check hierarchy
+        # Check role hierarchy
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
@@ -183,12 +197,12 @@ class UserLocationPermission(BasePermission):
         if not active_role:
             return False
 
-        # Site admin can always do anything
+        # Site admin bypass
         if active_role.role == "SITE_ADMIN":
             return True
 
-        # Block viewers from write methods
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and "_VIEWER" in active_role.role:
+        # Block viewers from write operations
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
             return False
 
         # Check hierarchy

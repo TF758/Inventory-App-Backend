@@ -248,3 +248,56 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         q |= user_q
 
     return queryset.filter(q).distinct()
+
+def is_viewer_role(role: str) -> bool:
+    """
+    Determines if a given role is a Viewer role.
+
+    Viewer roles are intended to have read-only access,
+    meaning they should not perform any write, update, or delete operations.
+
+    Args:
+        role (str): The role string to check, e.g., "ROOM_VIEWER", "DEPARTMENT_ADMIN"
+
+    Returns:
+        bool: True if the role is a viewer role, False otherwise.
+    """
+    if not role:
+        # No role provided, cannot be a viewer
+        return False
+
+    # Normalize to uppercase to be case-insensitive
+    role = role.upper()
+
+    # Viewer roles follow the naming convention *_VIEWER
+    return role.endswith("_VIEWER")
+
+
+def is_admin_role(role: str) -> bool:
+    """
+    Determines if a given role has administrative/write access.
+
+    Admin roles are allowed to perform write, update, or delete operations.
+    This excludes viewer roles which are read-only.
+
+    Args:
+        role (str): The role string to check, e.g., "ROOM_ADMIN", "DEPARTMENT_VIEWER"
+
+    Returns:
+        bool: True if the role has write/admin access, False if it's read-only (viewer) or invalid.
+    """
+    if not role:
+        return False
+
+    role = role.upper()
+
+    # Viewer roles are always read-only
+    if role.endswith("_VIEWER"):
+        return False
+
+    # Ensure the role exists in ROLE_HIERARCHY
+    if role not in ROLE_HIERARCHY:
+        return False
+
+    # Any non-viewer role in the hierarchy is considered an admin/write role
+    return True
