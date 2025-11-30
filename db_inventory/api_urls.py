@@ -8,6 +8,8 @@ from rest_framework_simplejwt.views import (
 
 urlpatterns = [
 
+    path("auth/", include("db_inventory.urls.auth_urls")),
+
  
     path('login/',api_login_view, name='login'),
     path('logout/',api_logout, name='logout'),
@@ -63,20 +65,6 @@ urlpatterns = [
 
 
     path('serializer-fields/',serializer_parameters_view , name='get-serializer-fields'),
-
-    # User Sessions ---
-    path('auth/sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
-
-    # Lock/Unlock User Accounts
-    path('auth/users/<str:public_id>/lock/', user_lock_view, name='user-lock'),
-    path('auth/users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
-
-    # Admin triggers a password reset (temp password + optional email)
-    path(
-        'auth/users/<str:user_public_id>/reset-password/',
-        admin_reset_user_password_view,
-        name='admin-reset-user-password'
-    ),
 
     # User submits temp password + new password to complete reset
 
