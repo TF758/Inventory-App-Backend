@@ -135,9 +135,9 @@ class DepartmentAdminUserCreateAPITest(APITestCase):
             "user_location": self.room.public_id,  
             "role": {
                 "role": "ROOM_ADMIN",
-                "department": self.department.public_id,  # must match admin's department
+                "department": None,  
                 "location": None,
-                "room": self.room.public_id  # must provide room for ROOM_ roles
+                "room": self.room.public_id 
             }
         }
 
