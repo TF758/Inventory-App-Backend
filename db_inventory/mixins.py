@@ -31,11 +31,11 @@ class ScopeFilterMixin:
         if active_role.role == "SITE_ADMIN":
             return queryset
         
-        if model_class in [Location, Department] and active_role.room:
-            raise PermissionDenied("Room-level roles cannot access this endpoint.")
+        # if model_class in [Location, Department] and active_role.room:
+        #     raise PermissionDenied("Room-level roles cannot access this endpoint.")
         
-        if model_class in [Department] and active_role.location:
-            raise PermissionDenied("Location-level roles cannot access this endpoint.")
+        # if model_class in [Department] and active_role.location:
+        #     raise PermissionDenied("Location-level roles cannot access this endpoint.")
 
         # Only filter for list action
         if self.action == "list":

@@ -3,6 +3,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
 from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role
 from ..utils import user_can_access_role
+from db_inventory.models import Room, Location, Department
 
 
 class UserPermission(BasePermission):
@@ -85,30 +86,63 @@ class RolePermission(BasePermission):
             return False
 
         active = get_active_role(user)
+
         if user.is_superuser or (active and active.role == "SITE_ADMIN"):
             return True
 
         if getattr(view, "action", None) in ["list", "retrieve"]:
             return True
 
+        if request.method == "POST" and active and active.role == "ROOM_ADMIN":
+            new_role = request.data.get("role")
+            if new_role not in ["ROOM_VIEWER", "ROOM_CLERK"]:
+                return False
+
         if active and active.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
             return True
-
         return False
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         active = get_active_role(user)
 
+        if user.is_superuser or (active and active.role == "SITE_ADMIN"):
+            return True
+
         if request.method in SAFE_METHODS:
-            result = is_in_scope(active, getattr(obj, "room", None), getattr(obj, "location", None), getattr(obj, "department", None))
+            result = is_in_scope(active, obj.room, obj.location, obj.department)
             return result
 
-        if not active:
+        # Write operations: check NEW incoming data instead of old obj
+        new_role_data = request.data.get("role", obj.role)
+        if isinstance(new_role_data, dict):
+            new_role = new_role_data.get("role")  # <-- extract string
+            new_room = None
+            new_location = None
+            new_department = None
+
+            # Convert public_id to actual model instances
+            if "room" in new_role_data and new_role_data["room"]:
+                new_room = Room.objects.filter(public_id=new_role_data["room"]).first()
+            if "location" in new_role_data and new_role_data["location"]:
+                new_location = Location.objects.filter(public_id=new_role_data["location"]).first()
+            if "department" in new_role_data and new_role_data["department"]:
+                new_department = Department.objects.filter(public_id=new_role_data["department"]).first()
+        else:
+            new_role = new_role_data
+            new_room = new_location = new_department = None
+
+        if active.role == "ROOM_ADMIN" and new_role not in ["ROOM_VIEWER", "ROOM_CLERK"]:
             return False
 
         try:
-            ensure_permission(user, obj.role, getattr(obj, "room", None), getattr(obj, "location", None), getattr(obj, "department", None))
+            ensure_permission(
+                user,
+                new_role,
+                new_room or getattr(obj, "room", None),
+                new_location or getattr(obj, "location", None),
+                new_department or getattr(obj, "department", None)
+            )
             return True
         except Exception as e:
             return False
