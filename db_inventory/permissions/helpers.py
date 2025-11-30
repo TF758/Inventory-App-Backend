@@ -23,7 +23,7 @@ def can_modify(user_role: str, target_role: str) -> bool:
 
     if target_role.endswith("_VIEWER"):
         return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(target_role, -1)
-    return ROLE_HIERARCHY.get(user_role, -1) > ROLE_HIERARCHY.get(target_role, -1)
+    return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(target_role, -1)
 
 def get_active_role(user: User) -> Optional[RoleAssignment]:
     """
@@ -119,6 +119,9 @@ def check_permission(user: User, required_role: str,
     role = getattr(user, "active_role", None)
     if not role:
         return False
+    
+    if role.role == "SITE_ADMIN":
+        return True
     
     # hierarchy check
     if not has_hierarchy_permission(role.role, required_role):
