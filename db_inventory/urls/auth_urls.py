@@ -7,14 +7,6 @@ from rest_framework_simplejwt.views import (
 
 
 urlpatterns = [
-
-    path("metrics/general/", admin_general_metrics, name="admin_metrics_general"),
-    path("metrics/login/", login_metrics_overview, name="admin_metrics_login"),
-    path("metrics/users/", user_metrics_overview, name="admin_metrics_users"),
-    path("metrics/security/", security_metrics_overview, name="admin_metrics_security"),
-    path("metrics/roles/", role_assignment_metrics_overview, name="admin_metrics_roles"),
-
-
     # User Sessions ---
     path('sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
 

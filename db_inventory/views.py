@@ -1,3 +1,4 @@
+from inventory_metrics.viewsets import admin_metrics_viewset
 from .viewsets import (
     user_viewsets,
     department_viewsets,
@@ -9,8 +10,7 @@ from .viewsets import (
     accessory_viewsets,
     general_viewsets,
     role_viewsets,
-    auth_viewsets,
-    admin_metrics_viewset
+    auth_viewsets
 )
 
 # --- General ---
@@ -205,20 +205,3 @@ user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
 
 # Admin reset user password
 admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()
-
-
-# Site Admin Metrics
-
-admin_general_metrics = admin_metrics_viewset.AdminMetricsOverview.as_view()
-
-# Login metrics
-login_metrics_overview = admin_metrics_viewset.LoginMetricsOverview.as_view()
-
-# User metrics
-user_metrics_overview = admin_metrics_viewset.UserMetricsOverview.as_view()
-
-# Security metrics
-security_metrics_overview = admin_metrics_viewset.SecurityMetricsOverview.as_view()
-
-# Role assignment metrics
-role_assignment_metrics_overview = admin_metrics_viewset.RoleAssignmentMetricsOverview.as_view()
