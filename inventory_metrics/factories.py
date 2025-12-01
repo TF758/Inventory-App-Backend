@@ -9,6 +9,7 @@ from inventory_metrics.models import (
     DailyRoleMetrics,
     DailyDepartmentSnapshot,
     DailyLocationSnapshot,
+    DailyLoginMetrics
 )
 
 # --------------------------
@@ -67,6 +68,23 @@ class DailyRoleMetricsFactory(factory.django.DjangoModelFactory):
     ]))
     total_users_with_role = fuzzy.FuzzyInteger(0, 5000)
     total_users_active_with_role = fuzzy.FuzzyInteger(0, 5000)
+
+class DailyLoginMetricsFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = DailyLoginMetrics
+
+    date = factory.Faker("date_this_year")
+    total_logins = factory.Faker("random_int", min=50, max=500)
+    unique_users_logged_in = factory.Faker("random_int", min=20, max=300)
+    failed_logins = factory.Faker("random_int", min=0, max=50)
+    lockouts = factory.Faker("random_int", min=0, max=10)
+
+    active_sessions = factory.Faker("random_int", min=10, max=200)
+    revoked_sessions = factory.Faker("random_int", min=0, max=50)
+    expired_sessions = factory.Faker("random_int", min=10, max=200)
+
+    password_resets_started = factory.Faker("random_int", min=0, max=20)
+    password_resets_completed = factory.Faker("random_int", min=0, max=15)
 
 # --------------------------
 # Daily Department Snapshot

@@ -76,7 +76,34 @@ class DailyRoleMetrics(models.Model):
 
     def __str__(self):
         return f"{self.date} - {self.role}"
-    
+
+class DailyLoginMetrics(models.Model):
+    date = models.DateField(unique=True, db_index=True)
+
+    # Login events
+    total_logins = models.IntegerField()
+    unique_users_logged_in = models.IntegerField()
+    failed_logins = models.IntegerField()
+    lockouts = models.IntegerField()
+
+    # Session-related
+    active_sessions = models.IntegerField()
+    revoked_sessions = models.IntegerField()
+    expired_sessions = models.IntegerField()
+
+    # Password recovery
+    password_resets_started = models.IntegerField()
+    password_resets_completed = models.IntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date"]
+        verbose_name = "Daily Login Metric"
+        verbose_name_plural = "Daily Login Metrics"
+
+    def __str__(self):
+        return f"DailyLoginMetrics - {self.date}"    
 
 class DailyDepartmentSnapshot(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="daily_snapshots")

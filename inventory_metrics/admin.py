@@ -4,7 +4,7 @@ from inventory_metrics.models import (
     DailySecurityMetrics,
     DailyRoleMetrics,
     DailyDepartmentSnapshot,
-    DailyLocationSnapshot
+    DailyLocationSnapshot, DailyLoginMetrics
 )
 
 @admin.register(DailySystemMetrics)
@@ -81,3 +81,9 @@ class DailyLocationSnapshotAdmin(admin.ModelAdmin):
     ]
     list_filter = ["snapshot_date", "location"]
     search_fields = ["location__name"]
+
+@admin.register(DailyLoginMetrics)
+class DailyLoginMetricsAdmin(admin.ModelAdmin):
+    list_display = ("date", "total_logins", "unique_users_logged_in", "failed_logins", "lockouts")
+    list_filter = ("date",)
+    ordering = ("-date",)
