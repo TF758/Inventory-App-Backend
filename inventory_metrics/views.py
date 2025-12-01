@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from inventory_metrics.viewsets import admin_metrics_viewset
+from inventory_metrics.viewsets import admin_metrics_viewset, time_series_viewsets
+
 
 # Create your views here.
 # Site Admin Metrics
@@ -17,3 +18,12 @@ security_metrics_overview = admin_metrics_viewset.SecurityMetricsOverview.as_vie
 
 # Role assignment metrics
 role_assignment_metrics_overview = admin_metrics_viewset.RoleAssignmentMetricsOverview.as_view()
+
+# Timeseries Viewsets
+
+system_metric_timeseries = time_series_viewsets.SystemMetricsViewSet.as_view({"get": "list"})
+security_metric_timeseries = time_series_viewsets.SecurityMetricsViewSet.as_view({"get": "list"})
+login_metric_timeseries = time_series_viewsets.LoginMetricsViewSet.as_view({"get": "list"})
+role_metric_timeseries = time_series_viewsets.RoleMetricsViewSet.as_view({"get": "list"})
+department_metric_timeseries = time_series_viewsets.DepartmentSnapshotViewSet.as_view({"get": "list"})
+location_metric_timeseries = time_series_viewsets.LocationSnapshotViewSet.as_view({"get": "list"})

@@ -14,7 +14,7 @@ from inventory_metrics.models import (
     DailySecurityMetrics,
     DailyRoleMetrics,
     DailyDepartmentSnapshot,
-    DailyLocationSnapshot,
+    DailyLocationSnapshot,DailyLoginMetrics
 )
 
 from inventory_metrics.factories import (
@@ -22,7 +22,7 @@ from inventory_metrics.factories import (
     DailySecurityMetricsFactory,
     DailyRoleMetricsFactory,
     DailyDepartmentSnapshotFactory,
-    DailyLocationSnapshotFactory,
+    DailyLocationSnapshotFactory,DailyLoginMetricsFactory
 )
 
 
@@ -46,6 +46,7 @@ class Command(BaseCommand):
         DailyRoleMetrics.objects.all().delete()
         DailyDepartmentSnapshot.objects.all().delete()
         DailyLocationSnapshot.objects.all().delete()
+        DailyLoginMetrics.objects.all().delete()
 
         self.stdout.write(self.style.SUCCESS("Metrics cleared."))
 
@@ -81,6 +82,7 @@ class Command(BaseCommand):
         role_metrics_batch = []
         dept_snapshots_batch = []
         loc_snapshots_batch = []
+        login_metrics_batch = []
 
         # -------------------------------------------------
         # 3. Generate 4 months of fluctuating history
@@ -126,6 +128,23 @@ class Command(BaseCommand):
                     expired_password_resets=random.randint(0, 8),
                     users_multiple_active_sessions=random.randint(0, 50),
                     users_with_revoked_sessions=random.randint(0, 30)
+                )
+            )
+
+            login_metrics_batch.append(
+                DailyLoginMetricsFactory.build(
+                    date=snapshot_date,
+                    total_logins=vary(total_active_users, 0.15),
+                    unique_users_logged_in=vary(total_active_users, 0.10),
+                    failed_logins=random.randint(0, 40),
+                    lockouts=random.randint(0, 8),
+
+                    active_sessions=vary(active_sessions, 0.10),
+                    revoked_sessions=vary(revoked_sessions, 0.15),
+                    expired_sessions=random.randint(0, total_sessions // 10),
+
+                    password_resets_started=random.randint(0, 20),
+                    password_resets_completed=random.randint(0, 15),
                 )
             )
 
@@ -215,6 +234,7 @@ class Command(BaseCommand):
                         total_accessories_quantity=vary(loc_accessories_qty, 0.05),
                     )
                 )
+                
 
         # -------------------------------------------------
         # 4. Bulk create all data
@@ -227,5 +247,5 @@ class Command(BaseCommand):
             DailyRoleMetrics.objects.bulk_create(role_metrics_batch, batch_size=BATCH_SIZE)
             DailyDepartmentSnapshot.objects.bulk_create(dept_snapshots_batch, batch_size=BATCH_SIZE)
             DailyLocationSnapshot.objects.bulk_create(loc_snapshots_batch, batch_size=BATCH_SIZE)
-
+            DailyLoginMetrics.objects.bulk_create(login_metrics_batch, batch_size=BATCH_SIZE)
         self.stdout.write(self.style.SUCCESS("✓ 4 months of realistic historical metrics generated successfully."))
