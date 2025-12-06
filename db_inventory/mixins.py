@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from .permissions import filter_queryset_by_scope
 from rest_framework.exceptions import PermissionDenied
-from .models import Location, Department, Equipment, Accessory
+from db_inventory.models import AuditLog, Equipment, Accessory
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
@@ -9,6 +9,8 @@ from .serializers.equipment import EquipmentBatchtWriteSerializer,EquipmentSeria
 from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWriteSerializer
 from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
+from django.utils import timezone
+
 
 class ScopeFilterMixin:
     """
@@ -170,3 +172,43 @@ class AccessoryBatchMixin:
                 errors.append({"row": row_number, "errors": serializer.errors})
 
         return successes, errors
+    
+class AuditMixin:
+    """
+    Automatically logs create, update, and delete actions for ModelViewSets.
+    Just add this mixin before the ModelViewSet.
+    """
+
+    def _log_audit(self, event_type, obj, description="", request=None):
+        if obj is None:
+            return
+
+        user = getattr(request, "user", None)
+        target_model = obj.__class__.__name__
+        target_id = getattr(obj, "public_id", getattr(obj, "id", None))
+        ip_address = request.META.get("REMOTE_ADDR") if request else None
+        user_agent = request.META.get("HTTP_USER_AGENT") if request else None
+
+        AuditLog.objects.create(
+            user=user,
+            event_type=event_type,
+            target_model=target_model,
+            target_id=target_id,
+            description=description,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            created_at=timezone.now()
+        )
+
+    # --- Overrides for DRF ModelViewSet actions ---
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        self._log_audit(event_type=AuditLog.Events.MODEL_CREATED, obj=obj, request=self.request)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        self._log_audit(event_type=AuditLog.Events.MODEL_UPDATED, obj=obj, request=self.request)
+
+    def perform_destroy(self, instance):
+        self._log_audit(event_type=AuditLog.Events.MODEL_DELETED, obj=instance, request=self.request)
+        instance.delete()

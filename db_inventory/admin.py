@@ -122,3 +122,52 @@ class PasswordResetEventAdmin(admin.ModelAdmin):
         return obj.is_valid()
     is_valid_display.boolean = True
     is_valid_display.short_description = 'Valid'
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "event_type",
+        "user",
+        "target_model",
+        "target_id",
+        "created_at",
+        "ip_address",
+        "user_agent",
+    )
+    list_filter = (
+        "event_type",
+        "user",
+        "created_at",
+    )
+    search_fields = (
+        "user__email",
+        "target_model",
+        "target_id",
+        "description",
+        "ip_address",
+        "user_agent",
+    )
+    readonly_fields = (
+        "user",
+        "event_type",
+        "target_model",
+        "target_id",
+        "description",
+        "ip_address",
+        "user_agent",
+        "created_at",
+    )
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request):
+        # Prevent manual addition via admin
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # Prevent editing
+        return False
+
+    # def has_delete_permission(self, request, obj=None):
+    #     # Prevent deletion
+    #     return False

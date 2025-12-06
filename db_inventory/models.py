@@ -474,3 +474,46 @@ class PasswordResetEvent(models.Model):
     def mark_used(self):
         self.used_at = timezone.now()
         self.save(update_fields=["used_at"])
+
+class AuditLog(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="audit_logs"
+    )
+    event_type = models.CharField(
+        max_length=100,
+        help_text="Type of event (create, update, delete, login, etc.)"
+    )
+    target_model = models.CharField(max_length=100, null=True, blank=True)
+    target_id = models.CharField(max_length=100, null=True, blank=True)
+    description = models.TextField(blank=True, default="")
+    metadata = models.JSONField(null=True, blank=True, help_text="Extra structured info like changes")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["event_type"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["user"]),
+            models.Index(fields=["target_model", "target_id"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.event_type} by {self.user} @ {self.created_at}"
+
+    # Optional: helper constants for common events
+    class Events:
+        LOGIN = "login"
+        LOGOUT = "logout"
+        USER_CREATED = "user_created"
+        USER_UPDATED = "user_updated"
+        USER_DELETED = "user_deleted"
+        PASSWORD_RESET = "password_reset"
+        ROLE_ASSIGNED = "role_assigned"
+        MODEL_CREATED = "model_created"
+        MODEL_UPDATED = "model_updated"
+        MODEL_DELETED = "model_deleted"
+        USER_MOVED = "user_moved"
