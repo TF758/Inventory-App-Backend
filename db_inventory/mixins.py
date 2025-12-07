@@ -175,40 +175,73 @@ class AccessoryBatchMixin:
     
 class AuditMixin:
     """
-    Automatically logs create, update, and delete actions for ModelViewSets.
-    Just add this mixin before the ModelViewSet.
+    Mixin to automatically track and record user actions on models.
+    Logs create, update, and delete events, including user identity,
+    request metadata, and scope (department, location, room) inferred
+    from the target object. Designed for audit trails and compliance.
     """
 
-    def _log_audit(self, event_type, obj, description="", request=None):
-        if obj is None:
-            return
+    def _log_audit(self, event_type, target=None, description="", metadata=None):
 
-        user = getattr(request, "user", None)
-        target_model = obj.__class__.__name__
-        target_id = getattr(obj, "public_id", getattr(obj, "id", None))
-        ip_address = request.META.get("REMOTE_ADDR") if request else None
-        user_agent = request.META.get("HTTP_USER_AGENT") if request else None
+        room = location = department = None
+        room_name = location_name = department_name = None
+
+        if target:
+            # Determine hierarchy from object
+            if hasattr(target, "room") and target.room:
+                room = target.room
+                room_name = room.name
+
+                if room.location:
+                    location = room.location
+                    location_name = location.name
+
+                    if location.department:
+                        department = location.department
+                        department_name = department.name
+            
+            elif hasattr(target, "location") and target.location:
+                location = target.location
+                location_name = location.name
+
+                if location.department:
+                    department = location.department
+                    department_name = department.name
+
+            elif hasattr(target, "department") and target.department:
+                department = target.department
+                department_name = department.name
 
         AuditLog.objects.create(
-            user=user,
+            user=self.request.user,
             event_type=event_type,
-            target_model=target_model,
-            target_id=target_id,
-            description=description,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            created_at=timezone.now()
-        )
+            target_model=target.__class__.__name__ if target else None,
+            target_id=getattr(target, "public_id", None),
+            target_name=str(target),
 
-    # --- Overrides for DRF ModelViewSet actions ---
+            department=department,
+            department_name=department_name,
+
+            location=location,
+            location_name=location_name,
+
+            room=room,
+            room_name=room_name,
+
+            description=description,
+            metadata=metadata or {},
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+            user_agent=self.request.META.get("HTTP_USER_AGENT", ""),
+        )
+        # --- DRF hooks ---
     def perform_create(self, serializer):
         obj = serializer.save()
-        self._log_audit(event_type=AuditLog.Events.MODEL_CREATED, obj=obj, request=self.request)
+        self._log_audit(event_type=AuditLog.Events.MODEL_CREATED, target=obj)
 
     def perform_update(self, serializer):
         obj = serializer.save()
-        self._log_audit(event_type=AuditLog.Events.MODEL_UPDATED, obj=obj, request=self.request)
+        self._log_audit(event_type=AuditLog.Events.MODEL_UPDATED, target=obj)
 
     def perform_destroy(self, instance):
-        self._log_audit(event_type=AuditLog.Events.MODEL_DELETED, obj=instance, request=self.request)
+        self._log_audit(event_type=AuditLog.Events.MODEL_DELETED, target=instance)
         instance.delete()

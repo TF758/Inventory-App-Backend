@@ -480,26 +480,49 @@ class AuditLog(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="audit_logs"
     )
-    event_type = models.CharField(
-        max_length=100,
-        help_text="Type of event (create, update, delete, login, etc.)"
-    )
+
+    event_type = models.CharField(max_length=100)
+
+    # Target info
     target_model = models.CharField(max_length=100, null=True, blank=True)
-    target_id = models.CharField(max_length=100, null=True, blank=True)
+    target_id = models.CharField(max_length=100, null=True, blank=True)  # public_id snapshot
+    target_name = models.CharField(max_length=255, null=True, blank=True)   # snapshot of name
+
+    # Scope — FK (for filtering), plus snapshot (for historical consistency)
+    department = models.ForeignKey(
+        'Department', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="audit_logs"
+    )
+    department_name = models.CharField(max_length=100, null=True, blank=True)
+
+    location = models.ForeignKey(
+        'Location', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="audit_logs"
+    )
+    location_name = models.CharField(max_length=255, null=True, blank=True)
+
+    room = models.ForeignKey(
+        'Room', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="audit_logs"
+    )
+    room_name = models.CharField(max_length=255, null=True, blank=True)
+
+    # Extra info
     description = models.TextField(blank=True, default="")
-    metadata = models.JSONField(null=True, blank=True, help_text="Extra structured info like changes")
+    metadata = models.JSONField(null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=255, null=True, blank=True)
+
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["event_type"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["user"]),
             models.Index(fields=["target_model", "target_id"]),
         ]
-        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.event_type} by {self.user} @ {self.created_at}"
