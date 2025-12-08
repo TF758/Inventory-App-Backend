@@ -476,6 +476,7 @@ class PasswordResetEvent(models.Model):
         self.save(update_fields=["used_at"])
 
 class AuditLog(models.Model):
+    public_id = models.CharField(max_length=15, unique=True, editable=False, db_index=True)
     user = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="audit_logs"
@@ -518,6 +519,11 @@ class AuditLog(models.Model):
 
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(AuditLog, prefix="LOG")
+        super().save(*args, **kwargs)
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [
@@ -529,6 +535,11 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.event_type} by {self.user} @ {self.created_at}"
+    
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(AuditLog, prefix="LOG")
+        super().save(*args, **kwargs)
 
     # Optional: helper constants for common events
     class Events:

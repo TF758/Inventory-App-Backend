@@ -171,7 +171,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class AuditLogSerializer(serializers.ModelSerializer):
     # --- Readable FK outputs ---
-    user = serializers.StringRelatedField(read_only=True)
     department = serializers.StringRelatedField(read_only=True)
     location = serializers.StringRelatedField(read_only=True)
     room = serializers.StringRelatedField(read_only=True)
@@ -179,7 +178,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditLog
         fields = [
-            "id",
+            "public_id",
 
             # Event info
             "event_type",
@@ -212,12 +211,11 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
 
 class AuditLogLightSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField(read_only=True)
-
+   
     class Meta:
         model = AuditLog
         fields = [
-            "id",
+            "public_id",
             "event_type",
             "created_at",
             "user_email",

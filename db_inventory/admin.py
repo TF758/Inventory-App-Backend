@@ -163,6 +163,7 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         # Core info
+        'public_id',
         "event_type",
         "user",
         "created_at",
@@ -192,7 +193,7 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Event Information", {
-            "fields": ("event_type", "created_at", "user")
+            "fields": ("public_id", "event_type", "created_at", "user_email", "user_public_id")
         }),
         ("Target Object", {
             "fields": (

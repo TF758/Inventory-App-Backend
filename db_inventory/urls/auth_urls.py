@@ -20,6 +20,7 @@ urlpatterns = [
         admin_reset_user_password_view,
         name='admin-reset-user-password'
     ),
+    path ('logs/',admin_logs, name='user-log-records' )
 
 
 ]

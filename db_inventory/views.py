@@ -205,3 +205,5 @@ user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
 
 # Admin reset user password
 admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()
+
+admin_logs = auth_viewsets.AuditLogViewSet.as_view({'get': 'list'})

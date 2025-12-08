@@ -176,7 +176,6 @@ class AuditLogViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
         "department_name",
         "location_name",
         "room_name",
-        "user",
     ]
 
     # Search
