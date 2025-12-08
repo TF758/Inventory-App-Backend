@@ -6,12 +6,12 @@ from ..models import Component
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import ComponentFilter
-from ..mixins import ScopeFilterMixin
+from db_inventory.mixins import ScopeFilterMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination
 
 
-class ComponentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class ComponentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Component objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Component objects."""

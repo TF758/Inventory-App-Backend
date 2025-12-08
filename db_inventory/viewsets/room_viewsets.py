@@ -6,14 +6,15 @@ from rest_framework.filters import SearchFilter
 from ..filters import *
 from ..utils import ExcludeFiltersMixin
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
-from ..mixins import ScopeFilterMixin
+from db_inventory.mixins import ScopeFilterMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination
 from ..serializers import *
 from ..serializers.roles import RoleReadSerializer
 from django.db.models import Q
 
-class RoomModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+
+class RoomModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Room objects."""
         

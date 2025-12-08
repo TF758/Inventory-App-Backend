@@ -15,8 +15,9 @@ from ..mixins import ScopeFilterMixin
 from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
 from ..pagination import  FlexiblePagination
 from django.db.models import Q
+from db_inventory.mixins import AuditMixin
 
-class DepartmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class DepartmentModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Department objects.
     This viewset provides `list`, `create`, actions for Department objects."""
