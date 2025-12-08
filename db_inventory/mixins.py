@@ -182,6 +182,7 @@ class AuditMixin:
     """
 
     def _log_audit(self, event_type, target=None, description="", metadata=None):
+        user = getattr(self.request, "user", None)
 
         room = location = department = None
         room_name = location_name = department_name = None
@@ -214,6 +215,8 @@ class AuditMixin:
 
         AuditLog.objects.create(
             user=self.request.user,
+            user_public_id=user.public_id if user else None,
+            user_email=user.email if user else None,
             event_type=event_type,
             target_model=target.__class__.__name__ if target else None,
             target_id=getattr(target, "public_id", None),

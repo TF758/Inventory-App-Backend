@@ -190,6 +190,14 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         if active_role.department:
             q |= Q(pk=active_role.department.pk)
 
+    elif model_class == AuditLog:
+        if active_role.room:
+            q |= Q(room=active_role.room)
+        elif active_role.location:
+            q |= Q(location=active_role.location)
+        elif active_role.department:
+            q |= Q(department=active_role.department)
+
     elif model_class in (Equipment, Accessory, Consumable):
         if active_role.room:
             q |= Q(room=active_role.room)

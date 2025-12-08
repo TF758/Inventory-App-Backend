@@ -480,6 +480,9 @@ class AuditLog(models.Model):
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="audit_logs"
     )
+    user_public_id = models.CharField(max_length=15, null=True, blank=True)
+    user_email = models.EmailField(null=True, blank=True)
+
 
     event_type = models.CharField(max_length=100)
 

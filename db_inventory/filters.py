@@ -303,3 +303,29 @@ class RoleAssignmentFilter(django_filters.FilterSet):
     class Meta:
         model = RoleAssignment
         fields = ["role", "area_type", "search"]
+
+class AuditLogFilter(django_filters.FilterSet):
+    # Filter by email directly
+    user_email = django_filters.CharFilter(field_name="user_email", lookup_expr="icontains")
+    
+    # Filter by other fields as before
+    event_type = django_filters.CharFilter(field_name="event_type", lookup_expr="iexact")
+    target_model = django_filters.CharFilter(field_name="target_model", lookup_expr="icontains")
+    department = django_filters.CharFilter(field_name="department__public_id", lookup_expr="iexact")
+    location = django_filters.CharFilter(field_name="location__public_id", lookup_expr="iexact")
+    room = django_filters.CharFilter(field_name="room__public_id", lookup_expr="iexact")
+    created_at_after = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
+    created_at_before = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            "user_email",
+            "event_type",
+            "target_model",
+            "department",
+            "location",
+            "room",
+            "created_at_after",
+            "created_at_before",
+        ]
