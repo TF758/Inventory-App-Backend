@@ -15,8 +15,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from db_inventory.mixins import AuditMixin
 
-class UserModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing User objects.
 This viewset provides `list`, `create`, actions for User objects."""
@@ -41,36 +42,6 @@ This viewset provides `list`, `create`, actions for User objects."""
         return UserReadSerializerFull
     
 
-    # def get_queryset(self):
-    #     qs = super().get_queryset()
-    #     user = self.request.user
-    #     active_role = getattr(user, "active_role", None)
-
-    #     # Always include self
-    #     qs = qs.filter(Q(id=user.id) | Q(active_role__isnull=False))
-
-    #     if active_role:
-    #         # Only filter users within scope for non-self
-    #         scoped_qs = filter_queryset_by_scope(user, qs, User)
-    #         qs = qs.filter(Q(id__in=scoped_qs.values("id")) | Q(id=user.id))
-    #     else:
-    #         # Only self if no role
-    #         qs = qs.filter(id=user.id)
-
-    #     # Search
-    #     search_term = self.request.query_params.get('search', None)
-    #     if search_term:
-    #         qs = qs.annotate(
-    #             starts_with_order=Case(
-    #                 When(fname__istartswith=search_term, then=Value(1)),
-    #                 default=Value(2),
-    #                 output_field=IntegerField()
-    #             )
-    #         ).order_by('starts_with_order', 'email')
-
-    #     return qs.distinct()
-
-
     def get_queryset(self):
         user = self.request.user
         active_role = getattr(user, "active_role", None)
@@ -85,32 +56,6 @@ This viewset provides `list`, `create`, actions for User objects."""
         return qs
 
 
-    # def get_queryset(self):
-    #         qs = super().get_queryset()
-    #         user = self.request.user
-    #         active_role = getattr(user, "active_role", None)
-
-    #         if active_role:
-    #             # Users in scope
-    #             scoped_qs_ids = filter_queryset_by_scope(user, qs, User).values_list("id", flat=True)
-    #             # Include self + scoped users
-    #             qs = qs.filter(Q(id__in=scoped_qs_ids) | Q(id=user.id))
-    #         else:
-    #             # Only self if no role
-    #             qs = qs.filter(id=user.id)
-
-    #         # Optional: search
-    #         search_term = self.request.query_params.get("search", None)
-    #         if search_term:
-    #             qs = qs.annotate(
-    #                 starts_with_order=Case(
-    #                     When(fname__istartswith=search_term, then=Value(1)),
-    #                     default=Value(2),
-    #                     output_field=IntegerField(),
-    #                 )
-    #             ).order_by("starts_with_order", "email")
-
-    #         return qs.distinct()
             
 
     def create(self, request, *args, **kwargs):
@@ -235,7 +180,7 @@ class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
 
 
 
-class FullUserCreateView(views.APIView):
+class FullUserCreateView(AuditMixin,views.APIView):
     """
     Create a User, assign a UserLocation, and assign a Role atomically.
     This endpoint enforces:

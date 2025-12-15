@@ -233,6 +233,9 @@ class Equipment(models.Model):
             models.Index(fields=["serial_number"]),
         ]
 
+    def __str__(self):
+        return self.name + ' - ' + self.public_id
+
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Equipment, prefix="EQ")
