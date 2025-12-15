@@ -1,8 +1,10 @@
-from django.urls import path
+from django.urls import include, path
 from inventory_metrics.views import *
 
 
 urlpatterns = [
+
+    path("reports/", include("inventory_metrics.urls.report_urls")),
 
     path("general/", admin_general_metrics, name="admin_metrics_general"),
     path("login/", login_metrics_overview, name="admin_metrics_login"),

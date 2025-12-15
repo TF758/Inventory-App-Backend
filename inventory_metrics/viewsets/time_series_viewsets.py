@@ -1,6 +1,7 @@
 from inventory_metrics.serializers import *
 from inventory_metrics.models import *
 from inventory_metrics.utils import TimeSeriesViewset
+from inventory_metrics.serializers.daily_metrics import *
 
 class SystemMetricsViewSet(TimeSeriesViewset):
     queryset = DailySystemMetrics.objects.all()

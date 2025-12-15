@@ -27,3 +27,10 @@ login_metric_timeseries = time_series_viewsets.LoginMetricsViewSet.as_view({"get
 role_metric_timeseries = time_series_viewsets.RoleMetricsViewSet.as_view({"get": "list"})
 department_metric_timeseries = time_series_viewsets.DepartmentSnapshotViewSet.as_view({"get": "list"})
 location_metric_timeseries = time_series_viewsets.LocationSnapshotViewSet.as_view({"get": "list"})
+
+
+# REPORT VIEWS
+
+from inventory_metrics.viewsets.user_reports import UserSummaryReport
+
+user_summary_report = UserSummaryReport.as_view()
