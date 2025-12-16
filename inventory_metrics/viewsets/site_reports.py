@@ -26,22 +26,34 @@ class SiteAssetExcelReportAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        site_type = data['site_type']
-        site_id = data['site_id']
+        # Extract site info from the nested 'site' object
+        site_data = data['site']
+        siteType = site_data['siteType']
+        siteId = site_data['siteId']
+
         asset_types = data['asset_types']
         requested_file_name = data.get('file_name', 'site_assets')  # sanitized in serializer
 
-        site_model = self.site_model_map[site_type]
-        site_obj = get_object_or_404(site_model, public_id=site_id)
+        # Fetch the corresponding site object
+        site_model = self.site_model_map[siteType]
+        site_obj = get_object_or_404(site_model, public_id=siteId)
 
-        excel_file = generate_site_asset_excel(site_obj, asset_types)
-
+        # Generate Excel file
+        excel_file = excel_file = generate_site_asset_excel(
+                                site_type=siteType,
+                                site_obj=site_obj,
+                                asset_types=asset_types,
+                                generated_by=request.user,
+                            )
+        # Add timestamp to filename
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         final_file_name = f"{requested_file_name}_{timestamp}.xlsx"
 
+        # Return as downloadable response
         response = HttpResponse(
             excel_file,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         response['Content-Disposition'] = f'attachment; filename="{final_file_name}"'
+        response['Access-Control-Expose-Headers'] = 'Content-Disposition'
         return response

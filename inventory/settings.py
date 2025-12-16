@@ -188,6 +188,7 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "accept",
     "origin",
+     "Content-Disposition",
 ]
 
 SIMPLE_JWT = {
