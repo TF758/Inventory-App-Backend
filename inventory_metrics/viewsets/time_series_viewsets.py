@@ -3,6 +3,8 @@ from inventory_metrics.models import *
 from inventory_metrics.utils import TimeSeriesViewset
 from inventory_metrics.serializers.daily_metrics import *
 
+# TO DO: IMPLEMENT THESE VIEWS TO TRACK DAILY STATS 
+
 class SystemMetricsViewSet(TimeSeriesViewset):
     queryset = DailySystemMetrics.objects.all()
     serializer_class = DailySystemMetricsSerializer

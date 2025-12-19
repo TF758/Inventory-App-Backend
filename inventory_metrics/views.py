@@ -32,8 +32,10 @@ location_metric_timeseries = time_series_viewsets.LocationSnapshotViewSet.as_vie
 # REPORT VIEWS
 
 from inventory_metrics.viewsets.user_reports import UserSummaryReport
-from inventory_metrics.viewsets.site_reports import SiteAssetExcelReportAPIView
+from inventory_metrics.viewsets.site_reports import SiteAssetExcelReportAPIView, SiteAuditLogReportAPIView
 
 user_summary_report = UserSummaryReport.as_view()
 
 site_asset_report = SiteAssetExcelReportAPIView.as_view()
+
+site_audit_report  = SiteAuditLogReportAPIView.as_view()
