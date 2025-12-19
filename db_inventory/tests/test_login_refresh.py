@@ -382,9 +382,7 @@ class RefreshTokenViewTests(TestCase):
 
 
     def test_expired_session_returns_401(self):
-        """Expired session should not refresh."""
         login_response = self._login_and_attach_cookie()
-        # Attach the refresh cookie
         self.client.cookies["refresh"] = login_response.cookies["refresh"].value
 
         # Expire the session
@@ -394,7 +392,31 @@ class RefreshTokenViewTests(TestCase):
 
         response = self.client.post(self.refresh_url, format="json")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn("Invalid or expired session", response.json()["detail"])
+        self.assertIn("expired", response.json()["detail"])
+
+        # NEW: ensure the session status is updated
+        session.refresh_from_db()
+        self.assertEqual(session.status, UserSession.Status.EXPIRED)
+
+
+    def test_access_token_fails_when_session_expired(self):
+        login_response = self._login_and_attach_cookie()
+        self.client.cookies["refresh"] = login_response.cookies["refresh"].value
+
+        # Expire the session
+        session = UserSession.objects.filter(user=self.user).first()
+        session.expires_at = timezone.now() - timedelta(minutes=1)
+        session.save(update_fields=["expires_at"])
+
+        # Use the JWT from login
+        token_str = login_response.json()["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token_str}")
+
+        # Make a request to a protected endpoint
+        protected_url = reverse("departments")  # replace with an actual view
+        response = self.client.get(protected_url)
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("expired", response.json()["detail"])
 
 
     def test_revoked_session_returns_401(self):
@@ -480,7 +502,6 @@ class RefreshTokenViewTests(TestCase):
             response = self.client.post(self.refresh_url, format="json")
 
 
-
     def test_concurrent_refresh_only_first_succeeds(self):
         """If two refreshes use same cookie, only the first one works."""
         login_response = self._login_and_attach_cookie()
@@ -495,3 +516,39 @@ class RefreshTokenViewTests(TestCase):
         response2 = self.client.post(self.refresh_url, format="json")
         self.assertEqual(response2.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn("Invalid or expired session", response2.json()["detail"])
+
+    def test_refresh_rotates_token_and_invalidates_old_one(self):
+        """After rotation, old refresh cookie no longer works, and session is updated in DB."""
+
+        # Perform login and attach refresh cookie
+        login_response = self._login_and_attach_cookie()
+        old_cookie_value = login_response.cookies["refresh"].value
+
+        # Get the session before refresh
+        session = UserSession.objects.filter(user=self.user).first()
+        old_hash = session.refresh_token_hash
+        old_expiry = session.expires_at
+
+        # First refresh request succeeds
+        response = self.client.post(self.refresh_url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        new_cookie_value = response.cookies["refresh"].value
+
+        # Refresh session from DB
+        session.refresh_from_db()
+        
+        # Check DB changes
+        self.assertNotEqual(session.refresh_token_hash, old_hash, "Refresh token hash should be rotated")
+        self.assertGreater(session.expires_at, old_expiry, "Session expiry should be extended")
+        self.assertEqual(session.status, UserSession.Status.ACTIVE, "Session should remain active after rotation")
+
+        # Old cookie should no longer work
+        self.client.cookies["refresh"] = old_cookie_value
+        response2 = self.client.post(self.refresh_url, format="json")
+        self.assertEqual(response2.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Invalid or expired session", response2.json()["detail"])
+
+        # New cookie should work
+        self.client.cookies["refresh"] = new_cookie_value
+        response3 = self.client.post(self.refresh_url, format="json")
+        self.assertEqual(response3.status_code, status.HTTP_200_OK)

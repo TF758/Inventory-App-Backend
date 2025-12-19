@@ -14,11 +14,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from ..pagination import FlexiblePagination
-from ..mixins import ConsumableBatchMixin
+from db_inventory.mixins import ConsumableBatchMixin, AuditMixin
 from db_inventory.permissions import AssetPermission, is_in_scope
 
 
-class ConsumableModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Consumable objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Consumable objects."""
     

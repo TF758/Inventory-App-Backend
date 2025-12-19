@@ -3,7 +3,7 @@ from ..serializers.equipment import (
 EquipmentWriteSerializer
 ,EquipmentSerializer
 )
-from ..models import Equipment, Room
+from ..models import Equipment, Room, AuditLog
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from ..filters import EquipmentFilter
@@ -14,12 +14,12 @@ from rest_framework import status
 from rest_framework.views import APIView
 from django.db import transaction
 from rest_framework.decorators import action
-from ..mixins import EquipmentBatchMixin
+from ..mixins import EquipmentBatchMixin, AuditMixin
 from rest_framework.exceptions import PermissionDenied
 from ..pagination import FlexiblePagination
 from db_inventory.permissions import AssetPermission, is_in_scope
 
-class EquipmentModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Equipment objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Equipment objects."""

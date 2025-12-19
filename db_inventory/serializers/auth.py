@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from db_inventory.models import PasswordResetEvent, User, UserSession, PasswordResetEvent
+from db_inventory.models import PasswordResetEvent, User, UserSession, PasswordResetEvent, AuditLog
 from django.contrib.auth import password_validation
 from django.conf import settings
 from db_inventory.utils import PasswordResetToken
@@ -167,3 +167,68 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         ).update(status=UserSession.Status.REVOKED)
 
         return user
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    # --- Readable FK outputs ---
+    department = serializers.StringRelatedField(read_only=True)
+    location = serializers.StringRelatedField(read_only=True)
+    room = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            "public_id",
+
+            # Event info
+            "event_type",
+            "created_at",
+            "user_public_id",
+            "user_email",
+
+            # Target object
+            "target_model",
+            "target_id",
+            "target_name",
+            "description",
+            "metadata",
+
+            # Scope (FK + snapshot values)
+            "department",
+            "department_name",
+            "location",
+            "location_name",
+            "room",
+            "room_name",
+
+            # Technical info
+            "ip_address",
+            "user_agent",
+        ]
+
+        read_only_fields = fields
+
+
+
+class AuditLogLightSerializer(serializers.ModelSerializer):
+   
+    class Meta:
+        model = AuditLog
+        fields = [
+            "public_id",
+            "event_type",
+            "created_at",
+            "user_email",
+
+            # Target info
+            "target_model",
+            "target_id",
+            "target_name",
+
+            # Scope snapshot names (always valid, even if FK deleted)
+            "department_name",
+            "location_name",
+            "room_name",
+        ]
+
+        read_only_fields = fields

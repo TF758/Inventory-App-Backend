@@ -16,8 +16,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.permissions import AssetPermission, is_in_scope
 from rest_framework.exceptions import PermissionDenied
+from db_inventory.mixins import AuditMixin
 
-class AccessoryModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Accessory objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Accessory objects."""

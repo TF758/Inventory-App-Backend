@@ -13,8 +13,9 @@ from db_inventory.permissions import LocationPermission, AssetPermission, RolePe
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import BasePagination, FlexiblePagination
 from django.db.models import Q
+from db_inventory.mixins import AuditMixin
 
-class LocationModelViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
+class LocationModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Location objects.
     This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Location objects."""

@@ -109,10 +109,15 @@ class RefreshAPIView(APIView):
                 session = UserSession.objects.get(
                     refresh_token_hash=hashed_refresh,
                     status=UserSession.Status.ACTIVE,
-                    expires_at__gt=timezone.now()
                 )
             except UserSession.DoesNotExist:
                 return Response({"detail": "Invalid or expired session."}, status=401)
+            
+            # Check for expiration
+            if session.expires_at <= timezone.now():
+                session.status = UserSession.Status.EXPIRED
+                session.save(update_fields=["status"])
+                return Response({"detail": "Session has expired."}, status=401)
 
             user = session.user
 

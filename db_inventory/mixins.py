@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from .permissions import filter_queryset_by_scope
 from rest_framework.exceptions import PermissionDenied
-from .models import Location, Department, Equipment, Accessory
+from db_inventory.models import AuditLog, Equipment, Accessory
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
@@ -9,6 +9,8 @@ from .serializers.equipment import EquipmentBatchtWriteSerializer,EquipmentSeria
 from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWriteSerializer
 from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
+from django.utils import timezone
+
 
 class ScopeFilterMixin:
     """
@@ -170,3 +172,79 @@ class AccessoryBatchMixin:
                 errors.append({"row": row_number, "errors": serializer.errors})
 
         return successes, errors
+    
+class AuditMixin:
+    """
+    Mixin to automatically track and record user actions on models.
+    Logs create, update, and delete events, including user identity,
+    request metadata, and scope (department, location, room) inferred
+    from the target object. Designed for audit trails and compliance.
+    """
+
+    def _log_audit(self, event_type, target=None, description="", metadata=None):
+        user = getattr(self.request, "user", None)
+
+        room = location = department = None
+        room_name = location_name = department_name = None
+
+        if target:
+            # Determine hierarchy from object
+            if hasattr(target, "room") and target.room:
+                room = target.room
+                room_name = room.name
+
+                if room.location:
+                    location = room.location
+                    location_name = location.name
+
+                    if location.department:
+                        department = location.department
+                        department_name = department.name
+            
+            elif hasattr(target, "location") and target.location:
+                location = target.location
+                location_name = location.name
+
+                if location.department:
+                    department = location.department
+                    department_name = department.name
+
+            elif hasattr(target, "department") and target.department:
+                department = target.department
+                department_name = department.name
+
+        AuditLog.objects.create(
+            user=self.request.user,
+            user_public_id=user.public_id if user else None,
+            user_email=user.email if user else None,
+            event_type=event_type,
+            target_model=target.__class__.__name__ if target else None,
+            target_id=getattr(target, "public_id", None),
+            target_name=str(target),
+
+            department=department,
+            department_name=department_name,
+
+            location=location,
+            location_name=location_name,
+
+            room=room,
+            room_name=room_name,
+
+            description=description,
+            metadata=metadata or {},
+            ip_address=self.request.META.get("REMOTE_ADDR"),
+            user_agent=self.request.META.get("HTTP_USER_AGENT", ""),
+        )
+        # --- DRF hooks ---
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        self._log_audit(event_type=AuditLog.Events.MODEL_CREATED, target=obj)
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        self._log_audit(event_type=AuditLog.Events.MODEL_UPDATED, target=obj)
+
+    def perform_destroy(self, instance):
+        self._log_audit(event_type=AuditLog.Events.MODEL_DELETED, target=instance)
+        instance.delete()

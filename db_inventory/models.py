@@ -233,6 +233,9 @@ class Equipment(models.Model):
             models.Index(fields=["serial_number"]),
         ]
 
+    def __str__(self):
+        return self.name + ' - ' + self.public_id
+
     def save(self, *args, **kwargs):
         if not self.public_id:
             self.public_id = generate_prefixed_public_id(Equipment, prefix="EQ")
@@ -474,3 +477,83 @@ class PasswordResetEvent(models.Model):
     def mark_used(self):
         self.used_at = timezone.now()
         self.save(update_fields=["used_at"])
+
+class AuditLog(models.Model):
+    public_id = models.CharField(max_length=15, unique=True, editable=False, db_index=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="audit_logs"
+    )
+    user_public_id = models.CharField(max_length=15, null=True, blank=True)
+    user_email = models.EmailField(null=True, blank=True)
+
+
+    event_type = models.CharField(max_length=100)
+
+    # Target info
+    target_model = models.CharField(max_length=100, null=True, blank=True)
+    target_id = models.CharField(max_length=100, null=True, blank=True)  # public_id snapshot
+    target_name = models.CharField(max_length=255, null=True, blank=True)   # snapshot of name
+
+    # Scope — FK (for filtering), plus snapshot (for historical consistency)
+    department = models.ForeignKey(
+        'Department', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="audit_logs"
+    )
+    department_name = models.CharField(max_length=100, null=True, blank=True)
+
+    location = models.ForeignKey(
+        'Location', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="audit_logs"
+    )
+    location_name = models.CharField(max_length=255, null=True, blank=True)
+
+    room = models.ForeignKey(
+        'Room', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="audit_logs"
+    )
+    room_name = models.CharField(max_length=255, null=True, blank=True)
+
+    # Extra info
+    description = models.TextField(blank=True, default="")
+    metadata = models.JSONField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, null=True, blank=True)
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(AuditLog, prefix="LOG")
+        super().save(*args, **kwargs)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["event_type"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["user"]),
+            models.Index(fields=["target_model", "target_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} by {self.user} @ {self.created_at}"
+    
+    def save(self, *args, **kwargs):
+        if not self.public_id:
+            self.public_id = generate_prefixed_public_id(AuditLog, prefix="LOG")
+        super().save(*args, **kwargs)
+
+    # Optional: helper constants for common events
+    class Events:
+        LOGIN = "login"
+        LOGOUT = "logout"
+        USER_CREATED = "user_created"
+        USER_UPDATED = "user_updated"
+        USER_DELETED = "user_deleted"
+        PASSWORD_RESET = "password_reset"
+        ROLE_ASSIGNED = "role_assigned"
+        MODEL_CREATED = "model_created"
+        MODEL_UPDATED = "model_updated"
+        MODEL_DELETED = "model_deleted"
+        USER_MOVED = "user_moved"

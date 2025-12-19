@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'db_inventory',
+    'inventory_metrics',
 
     'rest_framework',
     'rest_framework_simplejwt',
@@ -187,6 +188,7 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "accept",
     "origin",
+     "Content-Disposition",
 ]
 
 SIMPLE_JWT = {
