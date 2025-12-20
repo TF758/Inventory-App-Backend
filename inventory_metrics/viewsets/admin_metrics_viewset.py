@@ -5,6 +5,7 @@ from db_inventory.models import *
 from datetime import timedelta
 from django.db.models import Count, Q
 from db_inventory.permissions import ROLE_HIERARCHY
+from django.utils import timezone
 
 # provides snapshot data for application
 
