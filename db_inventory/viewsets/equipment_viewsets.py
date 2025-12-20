@@ -1,22 +1,19 @@
 from rest_framework import viewsets
-from ..serializers.equipment import (
+from db_inventory.serializers.equipment import (
 EquipmentWriteSerializer
 ,EquipmentSerializer
 )
-from ..models import Equipment, Room, AuditLog
+from db_inventory.models import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import EquipmentFilter
-from ..mixins import ScopeFilterMixin
+from db_inventory.filters import EquipmentFilter
+from db_inventory.mixins import ScopeFilterMixin,EquipmentBatchMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from django.db import transaction
-from rest_framework.decorators import action
-from ..mixins import EquipmentBatchMixin, AuditMixin
 from rest_framework.exceptions import PermissionDenied
-from ..pagination import FlexiblePagination
+from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import AssetPermission, is_in_scope
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):

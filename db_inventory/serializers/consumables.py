@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
-from ..models import Consumable, Location, Room
-from .locations import LocationFullSerializer
-from .rooms import RoomNameSerializer
+from db_inventory.models.assets import Consumable
+from db_inventory.models.site import Location, Room
+
 
  
  # Write Serializer

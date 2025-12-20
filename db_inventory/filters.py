@@ -1,5 +1,5 @@
 import django_filters
-from .models import *
+from db_inventory.models import *
 from django.db.models import Case, When, Value, IntegerField, Q
 
 class UserFilter(django_filters.FilterSet):

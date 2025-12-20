@@ -1,5 +1,10 @@
 from django.contrib import admin
-from .models import *
+from db_inventory.models.site import *
+from db_inventory.models.assets import *
+from db_inventory.models.users import *
+from db_inventory.models.security import *
+from db_inventory.models.roles import *
+from db_inventory.models.audit import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 

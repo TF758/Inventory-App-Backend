@@ -1,17 +1,20 @@
 from rest_framework import viewsets
-from ..serializers.locations import *
-from ..serializers.equipment import EquipmentSerializer
-from ..serializers import *
-from ..serializers.roles import RoleReadSerializer
-from ..models import Location, Room, UserLocation, Equipment, Consumable, Accessory, Component, RoleAssignment
+from db_inventory.serializers.equipment import EquipmentSerializer
+from db_inventory.serializers.roles import RoleReadSerializer
+from db_inventory.serializers.locations import LocationWriteSerializer, LocationRoomSerializer, LocationReadSerializer, LocationListSerializer, LocationComponentSerializer
+from db_inventory.serializers.users import UserAreaSerializer
+from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
+from db_inventory.serializers.accessories import AccessoryFullSerializer
+from db_inventory.models.assets import Equipment, Consumable, Accessory, Component
+from db_inventory.models.site import Location, Room, UserLocation
+from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import *
-from ..utils import ExcludeFiltersMixin
-from ..mixins import ScopeFilterMixin
+from db_inventory.filters import *
+from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
-from ..pagination import BasePagination, FlexiblePagination
+from db_inventory.pagination import FlexiblePagination
 from django.db.models import Q
 from db_inventory.mixins import AuditMixin
 

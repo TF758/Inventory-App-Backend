@@ -1,8 +1,7 @@
 
 from rest_framework import serializers
-from ..models import Equipment, Room
-from .rooms import RoomNameSerializer, RoomReadSerializer
-
+from  db_inventory.models.assets import Equipment
+from db_inventory.models.site import  Room
 
 class EquipmentSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source='room.public_id', default=None, read_only=True)

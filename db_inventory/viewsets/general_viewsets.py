@@ -1,23 +1,23 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from ..serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer
-from ..serializers.equipment import EquipmentBatchtWriteSerializer
-from ..serializers.consumables import ConsumableBatchWriteSerializer
-from ..serializers.accessories import AccessoryBatchWriteSerializer
+from db_inventory.serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer
+from db_inventory.serializers.equipment import EquipmentBatchtWriteSerializer
+from db_inventory.serializers.consumables import ConsumableBatchWriteSerializer
+from db_inventory.serializers.accessories import AccessoryBatchWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from ..models import UserSession
+from db_inventory.models.security import UserSession
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
-from ..utils import get_serializer_field_info
+from db_inventory.utils.serializers import get_serializer_field_info
 from rest_framework.serializers import Serializer
 import logging
 import secrets
 from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException
-from db_inventory.utils import PasswordResetToken
+from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.serializers.auth import PasswordResetConfirmSerializer
 
 

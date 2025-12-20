@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from ..models import User, UserLocation, Room
-from django.core.exceptions import ValidationError
+from db_inventory.models.users import User
+from db_inventory.models.site import Room, UserLocation
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 

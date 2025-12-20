@@ -1,16 +1,14 @@
 from rest_framework import viewsets
-from ..serializers.rooms import  *
-from ..models import Room, Equipment, Consumable,Accessory,Component,UserLocation, RoleAssignment
+from db_inventory.serializers.rooms import  *
+from db_inventory.models import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import *
-from ..utils import ExcludeFiltersMixin
+from db_inventory.filters import *
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
-from db_inventory.mixins import ScopeFilterMixin, AuditMixin
+from db_inventory.mixins import ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin
 from django.db.models import Case, When, Value, IntegerField
-from ..pagination import FlexiblePagination
-from ..serializers import *
-from ..serializers.roles import RoleReadSerializer
+from db_inventory.pagination import FlexiblePagination
+from db_inventory.serializers import *
 from django.db.models import Q
 
 

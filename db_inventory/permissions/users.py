@@ -2,8 +2,7 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
 from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role
-from ..utils import user_can_access_role
-from db_inventory.models import Room, Location, Department
+from db_inventory.models.site import Room, Location, Department
 
 ROLE_ASSIGNMENT_RULES = {
     "ROOM_ADMIN": ["ROOM_VIEWER", "ROOM_CLERK"],

@@ -1,11 +1,11 @@
 from rest_framework import viewsets
-from ..serializers.components import (
+from db_inventory.serializers.components import (
    ComponentWriteSerializer, ComponentSerializer
 )
 from ..models import Component
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import ComponentFilter
+from db_inventory.filters import ComponentFilter
 from db_inventory.mixins import ScopeFilterMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination

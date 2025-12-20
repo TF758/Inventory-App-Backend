@@ -1,18 +1,18 @@
-from rest_framework import viewsets, mixins, permissions, status
+from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.exceptions import NotFound, PermissionDenied
-from ..serializers.roles import *
-from ..models import User, RoleAssignment
+from rest_framework.exceptions import PermissionDenied
+from db_inventory.serializers.roles import *
+from db_inventory.models.users import User
+from db_inventory.models.roles import RoleAssignment
+from db_inventory.permissions.helpers import ensure_permission
 from rest_framework import status
-from rest_framework.generics import ListAPIView, CreateAPIView
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
-from ..models import RoleAssignment, User
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
-from ..mixins import ScopeFilterMixin
-from ..pagination import BasePagination, FlexiblePagination
+from db_inventory.pagination import  FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
-from ..filters import RoleAssignmentFilter
+from db_inventory.filters import RoleAssignmentFilter
 from db_inventory.permissions import RolePermission
 from django.db.models import Q
 

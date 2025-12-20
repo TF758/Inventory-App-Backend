@@ -3,12 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, User, AuditLog
-from db_inventory.serializers.auth import ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AuditLogSerializer
-from rest_framework import permissions
+from db_inventory.serializers.auth import ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter

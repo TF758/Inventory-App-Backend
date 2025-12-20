@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from ..models import * 
+from db_inventory.models.site import Department, Location, UserLocation
+from db_inventory.models.assets import Component
 
 
 

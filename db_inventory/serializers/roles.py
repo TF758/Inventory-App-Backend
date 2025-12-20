@@ -1,10 +1,11 @@
 from rest_framework import serializers
-from ..models import RoleAssignment, Location, Department, Room, User
+from db_inventory.models.users import User
+from db_inventory.models.site import Department, Location, Room
+from db_inventory.models.roles import RoleAssignment
 from db_inventory.permissions.helpers import ensure_permission
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
-from db_inventory.models import RoleAssignment
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 
 
 class ActiveRoleSerializer(serializers.ModelSerializer):
@@ -289,3 +290,9 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             validated_data["assigned_by"] = request.user
         return super().update(instance, validated_data)
+
+__all__ = [
+    "RoleReadSerializer",
+    "RoleWriteSerializer",
+    "ActiveRoleSerializer",
+]

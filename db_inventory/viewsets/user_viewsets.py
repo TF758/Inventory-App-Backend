@@ -1,14 +1,16 @@
 from rest_framework import viewsets
-from ..serializers.users import  UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
+from db_inventory.serializers.users import  UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
 from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
 from db_inventory.models import User, UserLocation, RoleAssignment, Room, Department, Location
+from db_inventory.models.roles import RoleAssignment
+from db_inventory.models.site import UserLocation, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import UserFilter, UserLocationFilter
-from ..mixins import ScopeFilterMixin
-from ..pagination import FlexiblePagination
+from db_inventory.filters import UserFilter, UserLocationFilter
+from db_inventory.mixins import ScopeFilterMixin
+from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
 from django.db.models import Q
 from rest_framework.response import Response

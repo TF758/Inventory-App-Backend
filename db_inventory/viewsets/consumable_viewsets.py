@@ -1,20 +1,19 @@
 from rest_framework import viewsets
-from ..serializers.consumables import (
+from db_inventory.serializers.consumables import (
 ConsumableWriteSerializer,
 ConsumableAreaReaSerializer
 )
-from ..models import Consumable, Room
+from db_inventory.models import Consumable, Room
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import ConsumableFilter
-from ..mixins import ScopeFilterMixin
+from db_inventory.filters import ConsumableFilter
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
-from ..pagination import FlexiblePagination
-from db_inventory.mixins import ConsumableBatchMixin, AuditMixin
+from db_inventory.pagination import FlexiblePagination
+from db_inventory.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMixin
 from db_inventory.permissions import AssetPermission, is_in_scope
 
 

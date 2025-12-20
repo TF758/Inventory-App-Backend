@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 from .constants import ROLE_HIERARCHY
-from db_inventory.models import Department, Location, Room
+from db_inventory.models.site import Department, Location, Room
 from .helpers import  is_in_scope, check_permission, is_viewer_role, is_admin_role, has_hierarchy_permission
 
 

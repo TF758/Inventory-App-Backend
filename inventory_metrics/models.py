@@ -1,5 +1,5 @@
 from django.db import models
-from db_inventory.models import Department, Location
+from db_inventory.models.site import Department, Location
 from django.utils import timezone
 # Create your models here.
 

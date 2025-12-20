@@ -1,16 +1,12 @@
 from rest_framework import viewsets
-from ..serializers.accessories import (
-    AccessoryFullSerializer,
-    AccessoryWriteSerializer
-)
-from ..models import Accessory, Room
+from db_inventory.models import Accessory,Room
+from db_inventory.serializers.accessories import *
+from db_inventory.mixins import ScopeFilterMixin, AccessoryBatchMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from ..filters import AccessoryFilter
-from ..mixins import ScopeFilterMixin
+from db_inventory.filters import AccessoryFilter
 from django.db.models import Case, When, Value, IntegerField
 from ..pagination import FlexiblePagination
-from ..mixins import AccessoryBatchMixin
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status

@@ -2,8 +2,7 @@
 from rest_framework.permissions import BasePermission
 from .constants import ROLE_HIERARCHY
 from .helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
-from ..models import Room
-
+from db_inventory.models.site import Room
 
 class AssetPermission(BasePermission):
     """

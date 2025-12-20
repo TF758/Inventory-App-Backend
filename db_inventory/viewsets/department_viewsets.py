@@ -1,21 +1,22 @@
-from django.shortcuts import render
-from rest_framework import viewsets, filters, mixins
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from ..models import Consumable, User, Department, Location, Equipment, Component, Accessory, UserLocation, Room
-from ..serializers import *
-from ..serializers.roles import RoleReadSerializer
-from django.views.generic.detail import SingleObjectMixin
-from rest_framework.generics import ListAPIView
-from ..filters import *
+from rest_framework import viewsets
+from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserLocation, Room
+from db_inventory.serializers.roles import RoleReadSerializer
+from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
-from ..utils import ExcludeFiltersMixin
-from ..mixins import ScopeFilterMixin
+from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin
 from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
-from ..pagination import  FlexiblePagination
+from db_inventory.pagination import  FlexiblePagination
 from django.db.models import Q
-from db_inventory.mixins import AuditMixin
+from db_inventory.serializers.departments import *
+from db_inventory.serializers.equipment import EquipmentSerializer
+from db_inventory.serializers.users import UserAreaSerializer
+from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
+from db_inventory.serializers.accessories import AccessoryFullSerializer
+from db_inventory.serializers.rooms import RoomSerializer
+
+
 
 class DepartmentModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
