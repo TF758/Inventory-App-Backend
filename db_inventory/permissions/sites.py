@@ -10,7 +10,7 @@ class RoomPermission(BasePermission):
     Handles ROOM_VIEWER, ROOM_ADMIN, LOCATION_ADMIN, DEPARTMENT_ADMIN, SITE_ADMIN.
     """
 
-    method_role_map = {
+    minimum_role_by_method = {
         "POST": "LOCATION_ADMIN",   # create room
         "PUT": "ROOM_ADMIN",        # update room
         "PATCH": "ROOM_ADMIN",      # partial update
@@ -19,7 +19,7 @@ class RoomPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        required_role = self.method_role_map.get(request.method)
+        required_role = self.minimum_role_by_method.get(request.method)
         if not required_role:
             return False
 
@@ -68,8 +68,14 @@ class RoomPermission(BasePermission):
         # GET: viewers and admins can view rooms in scope
         if method == "GET":
             if is_viewer_role(active_role.role) or is_admin_role(active_role.role):
-                return is_in_scope(active_role, room=obj)
+                return is_in_scope(active_role, 
+                room=obj)
             return False
+        
+        # only department admin can change location
+        if method in ["PUT", "PATCH"]:
+            if "location" in request.data:
+                return active_role.role in ["DEPARTMENT_ADMIN", "SITE_ADMIN"] and is_in_scope(active_role, room=obj)
 
         # PUT/PATCH: ROOM_ADMIN, LOCATION_ADMIN, DEPARTMENT_ADMIN
         if method in ["PUT", "PATCH"]:
@@ -96,7 +102,7 @@ class LocationPermission(BasePermission):
     - SITE_ADMIN bypasses all checks
     """
 
-    method_role_map: dict[str, str] = {
+    minimum_role_by_method: dict[str, str] = {
         "GET": "LOCATION_VIEWER",
         "POST": "DEPARTMENT_ADMIN",
         "PUT": "LOCATION_ADMIN",
@@ -105,7 +111,7 @@ class LocationPermission(BasePermission):
     }
 
     def has_permission(self, request, view) -> bool:
-        required_role = self.method_role_map.get(request.method)
+        required_role = self.minimum_role_by_method.get(request.method)
         if not required_role:
             return False
 
@@ -153,9 +159,15 @@ class LocationPermission(BasePermission):
         if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
             return False
 
-        required_role = self.method_role_map.get(request.method)
+        required_role = self.minimum_role_by_method.get(request.method)
         if not required_role:
             return False
+        
+
+        # only site admin can change a location department
+        if request.method in ["PUT", "PATCH"]:
+            if "department" in request.data:
+                return active_role.role == "SITE_ADMIN"
 
         # DEPARTMENT_ADMIN can operate within department scope
         if active_role.role == "DEPARTMENT_ADMIN":
@@ -178,7 +190,7 @@ class DepartmentPermission(BasePermission):
     - SITE_ADMIN bypasses all checks
     """
 
-    method_role_map = {
+    minimum_role_by_method = {
         "GET": "DEPARTMENT_VIEWER",     # minimum role to view departments
         "POST": "SITE_ADMIN",           # create new department
         "PUT": "DEPARTMENT_ADMIN",
@@ -187,7 +199,7 @@ class DepartmentPermission(BasePermission):
     }
 
     def has_permission(self, request, view):
-        required_role = self.method_role_map.get(request.method)
+        required_role = self.minimum_role_by_method.get(request.method)
         if not required_role:
             return False
 
@@ -211,7 +223,7 @@ class DepartmentPermission(BasePermission):
         return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
 
     def has_object_permission(self, request, view, obj):
-        required_role = self.method_role_map.get(request.method)
+        required_role = self.minimum_role_by_method.get(request.method)
         if not required_role:
             return False
 
@@ -226,6 +238,11 @@ class DepartmentPermission(BasePermission):
         # Block VIEWER roles from write operations
         if request.method in ("PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
             return False
+        
+        # only site admin can chnage a department name
+        if request.method in ["PUT", "PATCH"]:
+            if "name" in request.data:
+                return active_role.role == "SITE_ADMIN"
 
         # Object-level scope: department active role must match
         if active_role.department and obj == active_role.department:
