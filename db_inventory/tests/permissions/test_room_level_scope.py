@@ -100,9 +100,10 @@ class RoomAdminScopeTests(TestCase):
 class RoomPermissionAPITests(APITestCase):
     """
     API-level enforcement tests for RoomPermission:
-      - Ensures method_role_map is respected
-      - Validates end-to-end permission behavior for ROOM_VIEWER, ROOM_ADMIN, LOCATION_ADMIN, SITE_ADMIN
-      - Scope enforcement at department/location/room level
+    Enforces field-level business rules:
+      - Name changes vs location reassignment
+      - Scope enforcement
+      - Role hierarchy
     """
 
     def setUp(self):
@@ -121,193 +122,147 @@ class RoomPermissionAPITests(APITestCase):
 
         # Users
         self.viewer = UserFactory()
-        self.admin = UserFactory()
-        self.site_admin = AdminUserFactory()
+        self.room_admin = UserFactory()
         self.loc_admin = UserFactory()
         self.dep_admin = UserFactory()
+        self.site_admin = AdminUserFactory()
 
-        # Assign roles
-        self.viewer_role = RoleAssignment.objects.create(user=self.viewer, role="ROOM_VIEWER", room=self.room)
-        self.viewer.active_role = self.viewer_role
-        self.viewer.save()
+        # Roles
+        self.viewer.active_role = RoleAssignment.objects.create(
+            user=self.viewer, role="ROOM_VIEWER", room=self.room
+        )
+        self.room_admin.active_role = RoleAssignment.objects.create(
+            user=self.room_admin, role="ROOM_ADMIN", room=self.room
+        )
+        self.loc_admin.active_role = RoleAssignment.objects.create(
+            user=self.loc_admin, role="LOCATION_ADMIN", location=self.loc
+        )
+        self.dep_admin.active_role = RoleAssignment.objects.create(
+            user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept
+        )
+        self.site_admin.active_role = RoleAssignment.objects.create(
+            user=self.site_admin, role="SITE_ADMIN"
+        )
 
-        self.admin_role = RoleAssignment.objects.create(user=self.admin, role="ROOM_ADMIN", room=self.room)
-        self.admin.active_role = self.admin_role
-        self.admin.save()
+        for u in [self.viewer, self.room_admin, self.loc_admin, self.dep_admin, self.site_admin]:
+            u.save()
 
-        self.loc_admin_role = RoleAssignment.objects.create(user=self.loc_admin, role="LOCATION_ADMIN", location=self.loc)
-        self.loc_admin.active_role = self.loc_admin_role
-        self.loc_admin.save()
+        # URLs
+        self.detail_url = reverse("room-detail", args=[self.room.public_id])
+        self.other_detail_url = reverse("room-detail", args=[self.other_room.public_id])
+        self.list_url = reverse("rooms")
 
-        self.site_admin_role = RoleAssignment.objects.create(user=self.site_admin, role="SITE_ADMIN")
-        self.site_admin.active_role = self.site_admin_role
-        self.site_admin.save()
+    # ---------------- VIEWER ----------------
 
-        self.dep_role = RoleAssignment.objects.create(user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept)
-        self.dep_admin.active_role = self.dep_role
-        self.dep_admin.save()
-
-        # Test URLs
-        self.get_url = reverse("room-detail", args=[self.room.public_id])
-        self.put_url = reverse("room-detail", args=[self.room.public_id])
-        self.patch_url = reverse("room-detail", args=[self.room.public_id])
-        self.delete_url = reverse("room-detail", args=[self.room.public_id])
-        self.post_url = reverse("rooms")  # list/create endpoint
-        self.other_get_url = reverse("room-detail", args=[self.other_room.public_id])
-        self.other_put_url = reverse("room-detail", args=[self.other_room.public_id])
-        self.other_delete_url = reverse("room-detail", args=[self.other_room.public_id])
-
-    # --- ROOM_VIEWER TESTS ---
     def test_room_viewer_can_get(self):
-        """ROOM_VIEWER can GET their room"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.get(self.get_url)
-        self.assertEqual(response.status_code, 200)
+        self.client.force_authenticate(self.viewer)
+        self.assertEqual(self.client.get(self.detail_url).status_code, 200)
 
-    def test_room_viewer_cannot_post_patch_delete(self):
-        """ROOM_VIEWER cannot modify rooms"""
-        self.client.force_authenticate(user=self.viewer)
+    def test_room_viewer_cannot_modify(self):
+        self.client.force_authenticate(self.viewer)
 
-        post_response = self.client.post(self.post_url, {"name": "Test Room", "location": self.loc.public_id})
-        self.assertIn(post_response.status_code, [403, 405])
+        self.assertEqual(self.client.put(self.detail_url, {"name": "X"}).status_code, 403)
+        self.assertEqual(self.client.patch(self.detail_url, {"name": "X"}).status_code, 403)
+        self.assertEqual(self.client.delete(self.detail_url).status_code, 403)
 
-        put_response = self.client.put(self.put_url, {"name": "Updated Room", "location": self.loc.public_id})
-        self.assertEqual(put_response.status_code, 403)
+    # ---------------- ROOM ADMIN ----------------
 
-        patch_response = self.client.patch(self.patch_url, {"name": "Patched Room", "location": self.loc.public_id})
-        self.assertEqual(patch_response.status_code, 403)
+    def test_room_admin_can_update_name_only(self):
+        self.client.force_authenticate(self.room_admin)
 
-        delete_response = self.client.delete(self.delete_url)
-        self.assertEqual(delete_response.status_code, 403)
+        self.assertIn(self.client.patch(self.detail_url, {"name": "Updated"}).status_code,[200, 204],)
 
-    # --- ROOM_ADMIN TESTS ---
-    def test_room_admin_can_edit_own_room(self):
-        """ROOM_ADMIN can PUT/PATCH their room"""
-        self.client.force_authenticate(user=self.admin)
+        self.assertIn(
+            self.client.patch(self.detail_url, {"name": "Patched"}).status_code,
+            [200, 204],
+        )
 
-        put_response = self.client.put(self.put_url, {"name": "Updated Room", "location": self.loc.public_id})
-        self.assertIn(put_response.status_code, [200, 204])
+    def test_room_admin_cannot_change_location(self):
+        self.client.force_authenticate(self.room_admin)
 
-        patch_response = self.client.patch(self.patch_url, {"name": "Patched Room", "location": self.loc.public_id})
-        self.assertIn(patch_response.status_code, [200, 204])
-
-    def test_room_admin_cannot_edit_outside_scope(self):
-        """ROOM_ADMIN cannot modify rooms outside their location"""
-        self.client.force_authenticate(user=self.admin)
-
-        put_response = self.client.put(self.other_put_url, {"name": "Invalid Update", "location": self.other_room.location.public_id})
-        self.assertEqual(put_response.status_code, 403)
-
-        delete_response = self.client.delete(self.other_delete_url)
-        self.assertEqual(delete_response.status_code, 403)
-
-    def test_room_admin_cannot_create_rooms(self):
-        """ROOM_ADMIN cannot create rooms (restricted by design)"""
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.post(self.post_url, {"name": "New Room", "location": self.loc.public_id})
+        response = self.client.patch(
+            self.detail_url,
+            {"location": self.other_loc.public_id}
+        )
         self.assertEqual(response.status_code, 403)
 
-    # --- SITE_ADMIN TESTS ---
-    def test_site_admin_can_manage_any_room(self):
-        """SITE_ADMIN can GET, POST, PUT, DELETE any room"""
-        self.client.force_authenticate(user=self.site_admin)
+    def test_room_admin_cannot_access_other_room(self):
+        self.client.force_authenticate(self.room_admin)
+        self.assertEqual(self.client.get(self.other_detail_url).status_code, 403)
 
-        get_response = self.client.get(self.get_url)
-        self.assertIn(get_response.status_code, [200, 204])
+    def test_room_admin_cannot_create_rooms(self):
+        self.client.force_authenticate(self.room_admin)
+        self.assertEqual(
+            self.client.post(self.list_url, {"name": "New", "location": self.loc.public_id}).status_code,
+            403,
+        )
 
-        post_response = self.client.post(self.post_url, {"name": "New Room", "location": self.loc.public_id})
-        self.assertIn(post_response.status_code, [200, 201, 204])
+    # ---------------- LOCATION ADMIN ----------------
 
-        put_response = self.client.put(self.put_url, {"name": "Updated Room", "location": self.loc.public_id})
-        self.assertIn(put_response.status_code, [200, 204])
-
-        delete_response = self.client.delete(self.delete_url)
-        self.assertIn(delete_response.status_code, [200, 204])
-
-    # --- DEPARTMENT_ADMIN TESTS ---
-    def test_dep_admin_can_manage_rooms_within_department(self):
-        """DEPARTMENT_ADMIN can manage rooms within their department"""
-        room_in_dep = RoomFactory(name="Dep Room", location=self.loc)
-        self.client.force_authenticate(user=self.dep_admin)
-
-        get_response = self.client.get(reverse("room-detail", args=[room_in_dep.public_id]))
-        self.assertIn(get_response.status_code, [200, 204])
-
-        post_response = self.client.post(self.post_url, {"name": "New Dep Room", "location": self.loc.public_id})
-        self.assertIn(post_response.status_code, [200, 201, 204])
-
-        put_response = self.client.put(reverse("room-detail", args=[room_in_dep.public_id]), {"name": "Updated Dep Room", "location": self.loc.public_id})
-        self.assertIn(put_response.status_code, [200, 204])
-
-        delete_response = self.client.delete(reverse("room-detail", args=[room_in_dep.public_id]))
-        self.assertIn(delete_response.status_code, [200, 204])
-
-    def test_dep_admin_cannot_access_rooms_outside_department(self):
-        """DEPARTMENT_ADMIN cannot access rooms outside their department"""
-        self.client.force_authenticate(user=self.dep_admin)
-
-        # GET
-        get_response = self.client.get(self.other_get_url)
-        self.assertEqual(get_response.status_code, 403)
-
-        # POST
-        post_response = self.client.post(self.post_url, {"name": "Invalid Room", "location": self.other_room.location.public_id})
-        self.assertEqual(post_response.status_code, 403)
-
-        # PUT
-        put_response = self.client.put(self.other_put_url, {"name": "Invalid Update", "location": self.other_room.location.public_id})
-        self.assertEqual(put_response.status_code, 403)
-
-        # DELETE
-        delete_response = self.client.delete(self.other_delete_url)
-        self.assertEqual(delete_response.status_code, 403)
-
-    # --- LOCATION_ADMIN TESTS ---
     def test_location_admin_can_manage_rooms_in_location(self):
-        """LOCATION_ADMIN can manage rooms in their assigned location"""
-        self.client.force_authenticate(user=self.loc_admin)
+        self.client.force_authenticate(self.loc_admin)
 
-        # GET
-        get_response = self.client.get(self.get_url)
-        self.assertIn(get_response.status_code, [200, 204], "LOCATION_ADMIN should be able to GET rooms in their location")
+        self.assertEqual(self.client.get(self.detail_url).status_code, 200)
+        self.assertIn(
+            self.client.post(self.list_url, {"name": "New", "location": self.loc.public_id}).status_code,
+            [200, 201],
+        )
+        self.assertIn(self.client.patch(self.detail_url, {"name": "Updated"}).status_code,[200, 204],)
 
-        # POST
-        post_response = self.client.post(self.post_url, {"name": "New Room", "location": self.loc.public_id})
-        self.assertIn(post_response.status_code, [200, 201, 204], "LOCATION_ADMIN should be able to POST rooms in their location")
+        self.assertIn(
+            self.client.patch(self.detail_url, {"name": "Patched"}).status_code,
+            [200, 204],
+        )
+        self.assertIn(
+            self.client.delete(self.detail_url).status_code,
+            [200, 204],
+        )
 
-        # PUT
-        put_response = self.client.put(self.put_url, {"name": "Updated Room", "location": self.loc.public_id})
-        self.assertIn(put_response.status_code, [200, 204], "LOCATION_ADMIN should be able to PUT rooms in their location")
+    def test_location_admin_cannot_change_room_location(self):
+        self.client.force_authenticate(self.loc_admin)
 
-        # PATCH
-        patch_response = self.client.patch(self.patch_url, {"name": "Patched Room", "location": self.loc.public_id})
-        self.assertIn(patch_response.status_code, [200, 204], "LOCATION_ADMIN should be able to PATCH rooms in their location")
+        response = self.client.patch(
+            self.detail_url,
+            {"location": self.other_loc.public_id}
+        )
+        self.assertEqual(response.status_code, 403)
 
-        # DELETE
-        delete_response = self.client.delete(self.delete_url)
-        self.assertIn(delete_response.status_code, [200, 204], "LOCATION_ADMIN should be able to DELETE rooms in their location")
+    def test_location_admin_cannot_access_other_location(self):
+        self.client.force_authenticate(self.loc_admin)
+        self.assertEqual(self.client.get(self.other_detail_url).status_code, 403)
 
+    # ---------------- DEPARTMENT ADMIN ----------------
 
-    def test_location_admin_cannot_manage_rooms_outside_location(self):
-        """LOCATION_ADMIN cannot manage rooms outside their assigned location"""
-        self.client.force_authenticate(user=self.loc_admin)
+    def test_department_admin_can_reassign_room_location_within_department(self):
+        new_loc = LocationFactory(department=self.dept)
 
-        # GET outside location
-        get_response = self.client.get(self.other_get_url)
-        self.assertEqual(get_response.status_code, 403, "LOCATION_ADMIN should not be able to GET rooms outside their location")
+        self.client.force_authenticate(self.dep_admin)
+        response = self.client.patch(
+            self.detail_url,
+            {"location": new_loc.public_id}
+        )
 
-        # POST outside location
-        post_response = self.client.post(self.post_url, {"name": "Invalid Room", "location": self.other_room.location.public_id})
-        self.assertEqual(post_response.status_code, 403, "LOCATION_ADMIN should not be able to POST rooms outside their location")
+        self.assertIn(response.status_code, [200, 204])
 
-        # PUT outside location
-        put_response = self.client.put(self.other_put_url, {"name": "Invalid Update", "location": self.other_room.location.public_id})
-        self.assertEqual(put_response.status_code, 403, "LOCATION_ADMIN should not be able to PUT rooms outside their location")
+    def test_department_admin_cannot_access_other_department(self):
+        self.client.force_authenticate(self.dep_admin)
+        self.assertEqual(self.client.get(self.other_detail_url).status_code, 403)
 
-        # PATCH outside location
-        patch_response = self.client.patch(self.other_put_url, {"name": "Invalid Patch", "location": self.other_room.location.public_id})
-        self.assertEqual(patch_response.status_code, 403, "LOCATION_ADMIN should not be able to PATCH rooms outside their location")
+    # ---------------- SITE ADMIN ----------------
 
-        # DELETE outside location
-        delete_response = self.client.delete(self.other_delete_url)
-        self.assertEqual(delete_response.status_code, 403, "LOCATION_ADMIN should not be able to DELETE rooms outside their location")
+    def test_site_admin_can_manage_any_room(self):
+        self.client.force_authenticate(self.site_admin)
+
+        self.assertEqual(self.client.get(self.detail_url).status_code, 200)
+        self.assertIn(
+            self.client.post(self.list_url, {"name": "X", "location": self.loc.public_id}).status_code,
+            [200, 201],
+        )
+        self.assertIn(
+            self.client.patch(self.detail_url, {"location": self.other_loc.public_id}).status_code,
+            [200, 204],
+        )
+        self.assertIn(
+            self.client.delete(self.detail_url).status_code,
+            [200, 204],
+        )

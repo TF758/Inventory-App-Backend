@@ -15,6 +15,7 @@ from db_inventory.serializers.users import UserAreaSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.serializers.rooms import RoomSerializer
+from django.contrib.contenttypes.models import ContentType
 
 
 

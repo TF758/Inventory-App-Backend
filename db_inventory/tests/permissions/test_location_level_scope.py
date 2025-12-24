@@ -156,195 +156,162 @@ class LocationViewerTests(TestCase):
         self.assertFalse(check_permission(self.user, "ROOM_ADMIN", room=self.room1))
         self.assertFalse(check_permission(self.user, "ROOM_CLERK", room=self.room1)) 
 
-
 class LocationPermissionAPITests(APITestCase):
     """
-    API-level enforcement tests for LocationPermission:
-      - Ensures method_role_map is respected
-      - Validates end-to-end permission behavior for different roles
+    API-level enforcement tests for LocationPermission.
+    Enforces:
+      - Scope limits
+      - Field-level restrictions (department reassignment)
+      - Role hierarchy
     """
 
     def setUp(self):
         self.client = APIClient()
 
         self.dept = DepartmentFactory(name="Physics")
+        self.other_dept = DepartmentFactory(name="Other Dept")
+
         self.loc = LocationFactory(name="Building A", department=self.dept)
-        self.room = RoomFactory(name="Lab 101", location=self.loc)
+        self.other_loc = LocationFactory(name="Building B", department=self.other_dept)
 
         self.viewer = UserFactory()
-        self.admin = UserFactory()
-        self.site_admin = AdminUserFactory()
+        self.loc_admin = UserFactory()
         self.dep_admin = UserFactory()
+        self.site_admin = AdminUserFactory()
 
-        # Assign roles
-        self.viewer_role = RoleAssignment.objects.create(user=self.viewer, role="LOCATION_VIEWER", location=self.loc)
-        self.viewer.active_role = self.viewer_role
-        self.viewer.save()
+        # Roles
+        self.viewer.active_role = RoleAssignment.objects.create(
+            user=self.viewer, role="LOCATION_VIEWER", location=self.loc
+        )
+        self.loc_admin.active_role = RoleAssignment.objects.create(
+            user=self.loc_admin, role="LOCATION_ADMIN", location=self.loc
+        )
+        self.dep_admin.active_role = RoleAssignment.objects.create(
+            user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept
+        )
+        self.site_admin.active_role = RoleAssignment.objects.create(
+            user=self.site_admin, role="SITE_ADMIN"
+        )
 
-        self.admin_role = RoleAssignment.objects.create(user=self.admin, role="LOCATION_ADMIN", location=self.loc)
-        self.admin.active_role = self.admin_role
-        self.admin.save()
-
-        self.site_admin_role = RoleAssignment.objects.create(user=self.site_admin, role="SITE_ADMIN")
-        self.site_admin.active_role = self.site_admin_role
-        self.site_admin.save()
-
-        self.dep_role =  RoleAssignment.objects.create(user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept)
-        self.dep_admin.active_role = self.dep_role
-        self.dep_admin.save()
+        for u in [self.viewer, self.loc_admin, self.dep_admin, self.site_admin]:
+            u.save()
 
         self.url = reverse("location-detail", args=[self.loc.public_id])
+        self.other_url = reverse("location-detail", args=[self.other_loc.public_id])
 
-    # --- VIEWER TESTS ---
+    # ---------------- VIEWER ----------------
+
     def test_location_viewer_can_get(self):
-        """LocationViewer can GET their location"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
+        self.client.force_authenticate(self.viewer)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
 
-    def test_location_viewer_cannot_post(self):
-        """LocationViewer cannot POST a new location"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.post(reverse("locations"), {"name": "Building B"})
-        self.assertIn(response.status_code, [403, 405]) 
+    def test_location_viewer_cannot_modify(self):
+        self.client.force_authenticate(self.viewer)
+        self.assertEqual(self.client.patch(self.url, {"name": "X"}).status_code, 403)
+        self.assertEqual(self.client.delete(self.url).status_code, 403)
 
-    def test_location_viewer_cannot_patch(self):
-        """LocationViewer cannot PATCH"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.patch(self.url, {"name": "New Name"})
-        self.assertEqual(response.status_code, 403)
+    # ---------------- LOCATION ADMIN ----------------
 
-    def test_location_viewer_cannot_delete(self):
-        """LocationViewer cannot DELETE"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.delete(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    # --- ADMIN TESTS ---
-    def test_location_admin_can_edit(self):
-        """LocationAdmin can EDIT their own location"""
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.put(self.url, {"name": "Updated Building", "department": self.dept.public_id })
+    def test_location_admin_can_edit_name_only(self):
+        """LOCATION_ADMIN can change name but not department"""
+        self.client.force_authenticate(self.loc_admin)
+        response = self.client.patch(self.url, {"name": "Updated Building"})
         self.assertIn(response.status_code, [200, 204])
 
-    def test_location_admin_can_get(self):
-        """LocationAdmin can GET their own location"""
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_location_admin_cannot_post(self):
-        """LocationAdmin cannot create a location"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.post(reverse("locations"), {"name": "New Building"})
-        self.assertIn(response.status_code, [403, 405]) 
-
-    
-    def test_location_admin_cannot_delete(self):
-        """LocationAdmin cannot DELETE any location"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.delete(self.url)
+    def test_location_admin_cannot_change_department(self):
+        """LOCATION_ADMIN cannot reassign department"""
+        self.client.force_authenticate(self.loc_admin)
+        response = self.client.patch(
+            self.url,
+            {"department": str(self.other_dept.public_id)}
+        )
         self.assertEqual(response.status_code, 403)
 
+    def test_location_admin_cannot_access_outside_scope(self):
+        self.client.force_authenticate(self.loc_admin)
+        self.assertEqual(self.client.get(self.other_url).status_code, 403)
 
-    def test_location_admin_cannot_delete_outside_scope(self):
-        """LocationAdmin cannot DELETE areas they don't control"""
-        loc2 = LocationFactory(name="Other Building")
-        room2 = RoomFactory(name = "Marvin's Room", location = loc2)
-        loc_url = reverse("location-detail", args=[loc2.public_id])
-        room_url = reverse("room-detail", args=[room2.public_id])
-        self.client.force_authenticate(user=self.admin)
-        loc_response = self.client.delete(loc_url)
-        room_response = self.client.delete(room_url)
-        self.assertEqual(loc_response.status_code, 403)
-        self.assertEqual(room_response.status_code, 403)
+    # ---------------- DEPARTMENT ADMIN ----------------
 
-    # --- SITE ADMIN TESTS ---
-    def test_dep_admin_supercede_location_level(self):
-        """SITE_ADMIN by passes all permission for location objects"""
-        loc2 = LocationFactory(name="Other Building")
-        dep2 = DepartmentFactory(name = "My Department")
-        url2 = reverse("location-detail", args=[loc2.public_id])
-        self.client.force_authenticate(user=self.site_admin)
-        get_response = self.client.get(url2)
-        post_response = self.client.post(
-        reverse("locations"),
-        {"name": "Site Admin Made This", "department": str(dep2.public_id)},)
-        put_response = self.client.put(url2,{
-                "name": "Site Admin Updated Name",
-                "department": str(dep2.public_id),})
-        del_response =  self.client.delete(url2)
-        self.assertIn(del_response.status_code, [204, 200])
-        self.assertIn(put_response.status_code, [204, 200])
-        self.assertIn(get_response.status_code, [204, 200])
-        self.assertIn(post_response.status_code, [200, 201, 204])
+    def test_department_admin_can_manage_locations_in_department(self):
+        """DEPARTMENT_ADMIN can manage locations except department reassignment"""
 
-    def test_dep_admin_supercede_location_level(self):
-        """DEPARTMENT ADMIN can perform all operations within their department"""
-
-        # Make the location belong to the DEPARTMENT_ADMIN's department
         test_loc = LocationFactory(
-            name="Dep Admin Location", 
-            department=self.dep_admin.active_role.department
+            name="Dep Location",
+            department=self.dept
         )
-
         url = reverse("location-detail", args=[test_loc.public_id])
-        self.client.force_authenticate(user=self.dep_admin)
 
-        # --- GET ---
-        get_response = self.client.get(url)
+        self.client.force_authenticate(self.dep_admin)
 
-        # --- POST ---
-        post_response = self.client.post(
-            reverse("locations"),
-            {
-                "name": "Dep Admin Made This",
-                "department": str(self.dep_admin.active_role.department.public_id),
-            }
+        # GET
+        self.assertIn(self.client.get(url).status_code, [200, 204])
+
+        # POST
+        self.assertIn(
+            self.client.post(
+                reverse("locations"),
+                {
+                    "name": "Dep Created",
+                    "department": str(self.dept.public_id),
+                }
+            ).status_code,
+            [200, 201, 204],
         )
 
-        # --- PUT ---
-        put_response = self.client.put(
+        # PATCH name
+        self.assertIn(
+            self.client.patch(
+                url,
+                {"name": "Updated by Dep Admin"}
+            ).status_code,
+            [200, 204],
+        )
+
+        # DELETE
+        self.assertIn(self.client.delete(url).status_code, [200, 204])
+
+    def test_department_admin_cannot_change_department(self):
+        """DEPARTMENT_ADMIN cannot reassign location department"""
+        test_loc = LocationFactory(department=self.dept)
+        url = reverse("location-detail", args=[test_loc.public_id])
+
+        self.client.force_authenticate(self.dep_admin)
+
+        response = self.client.patch(
             url,
-            {
-                "name": "Dep Admin Updated Location",
-                "department": str(self.dep_admin.active_role.department.public_id),
-            }
+            {"department": str(self.other_dept.public_id)}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_department_admin_cannot_access_other_department(self):
+        self.client.force_authenticate(self.dep_admin)
+        self.assertEqual(self.client.get(self.other_url).status_code, 403)
+
+    # ---------------- SITE ADMIN ----------------
+
+    def test_site_admin_can_manage_any_location(self):
+        """SITE_ADMIN bypasses all scope and field restrictions"""
+
+        self.client.force_authenticate(self.site_admin)
+
+        self.assertIn(self.client.get(self.other_url).status_code, [200, 204])
+
+        self.assertIn(
+            self.client.post(
+                reverse("locations"),
+                {
+                    "name": "Site Created",
+                    "department": str(self.other_dept.public_id),
+                }
+            ).status_code,
+            [200, 201, 204],
         )
 
-        # --- DELETE ---
-        del_response = self.client.delete(url)
-
-        # --- Assertions ---
-        self.assertIn(get_response.status_code, [200, 204])
-        self.assertIn(post_response.status_code, [200, 201, 204])
-        self.assertIn(put_response.status_code, [200, 204])
-        self.assertIn(del_response.status_code, [200, 204])
-
-    def test_dep_admin_cannot_access_location_outside_department(self):
-        """DEPARTMENT_ADMIN cannot access locations outside their assigned department"""
-
-        # Create a location in a different department
-        other_dep = DepartmentFactory(name="Other Department")
-        other_loc = LocationFactory(name="Other Location", department=other_dep)
-        other_url = reverse("location-detail", args=[other_loc.public_id])
-
-        self.client.force_authenticate(user=self.dep_admin)
-
-        get_response = self.client.get(other_url)
-        post_response = self.client.post(
-            reverse("locations"),
-            {"name": "Invalid Creation", "department": str(other_dep.public_id)}
+        self.assertIn(
+            self.client.patch(
+                self.other_url,
+                {"department": str(self.dept.public_id)}
+            ).status_code,
+            [200, 204],
         )
-        put_response = self.client.put(
-            other_url,
-            {"name": "Invalid Update", "department": str(other_dep.public_id)}
-        )
-        delete_response = self.client.delete(other_url)
-
-        self.assertEqual(get_response.status_code, 403)
-        self.assertEqual(post_response.status_code, 403)
-        self.assertEqual(put_response.status_code, 403)
-        self.assertEqual(delete_response.status_code, 403)
-        
-

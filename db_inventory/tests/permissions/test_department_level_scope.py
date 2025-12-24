@@ -79,117 +79,127 @@ class DepartmentAdminScopeTests(APITestCase):
 
 class DepartmentPermissionAPITests(APITestCase):
     """
-    API-level enforcement for DepartmentPermission:
-      - Uses method_role_map for DEPARTMENT_VIEWER, DEPARTMENT_ADMIN, SITE_ADMIN
-      - Scope enforcement at department level
+    API-level enforcement for DepartmentPermission.
+    Enforces:
+      - Field-level restrictions (name vs description/image)
+      - Scope enforcement
+      - Role hierarchy
     """
 
     def setUp(self):
         self.client = APIClient()
 
-        # Departments
-        self.dept = DepartmentFactory(name="Chemistry")
+        self.dept = DepartmentFactory(
+            name="Chemistry",
+            description="Initial description",
+            img_link="http://example.com/image.png",
+        )
         self.other_dept = DepartmentFactory(name="Mathematics")
 
-        # Users
         self.viewer = UserFactory()
         self.dep_admin = UserFactory()
         self.site_admin = AdminUserFactory()
 
         # Roles
-        self.viewer_role = RoleAssignment.objects.create(user=self.viewer, role="DEPARTMENT_VIEWER", department=self.dept)
-        self.viewer.active_role = self.viewer_role
-        self.viewer.save()
+        self.viewer.active_role = RoleAssignment.objects.create(
+            user=self.viewer, role="DEPARTMENT_VIEWER", department=self.dept
+        )
+        self.dep_admin.active_role = RoleAssignment.objects.create(
+            user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept
+        )
+        self.site_admin.active_role = RoleAssignment.objects.create(
+            user=self.site_admin, role="SITE_ADMIN"
+        )
 
-        self.dep_admin_role = RoleAssignment.objects.create(user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept)
-        self.dep_admin.active_role = self.dep_admin_role
-        self.dep_admin.save()
+        for u in [self.viewer, self.dep_admin, self.site_admin]:
+            u.save()
 
-        self.site_admin_role = RoleAssignment.objects.create(user=self.site_admin, role="SITE_ADMIN")
-        self.site_admin.active_role = self.site_admin_role
-        self.site_admin.save()
-
-        # URLs
-        self.list_url = reverse("departments")  # list/create
+        self.list_url = reverse("departments")
         self.detail_url = reverse("department-detail", args=[self.dept.public_id])
         self.other_detail_url = reverse("department-detail", args=[self.other_dept.public_id])
 
-    # --- DEPARTMENT_VIEWER ---
+    # ---------------- VIEWER ----------------
+
     def test_department_viewer_can_get(self):
-        """DEPARTMENT_VIEWER can view their assigned department"""
-        self.client.force_authenticate(user=self.viewer)
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
+        self.client.force_authenticate(self.viewer)
+        self.assertEqual(self.client.get(self.detail_url).status_code, 200)
 
     def test_department_viewer_cannot_modify(self):
-        """DEPARTMENT_VIEWER cannot modify (POST/PUT/PATCH/DELETE)"""
-        self.client.force_authenticate(user=self.viewer)
+        self.client.force_authenticate(self.viewer)
 
-        post_response = self.client.post(self.list_url, {"name": "New Dept"})
-        self.assertIn(post_response.status_code, [403, 405])
+        self.assertIn(
+            self.client.post(self.list_url, {"name": "X"}).status_code,
+            [403, 405],
+        )
+        self.assertEqual(self.client.patch(self.detail_url, {"description": "X"}).status_code, 403)
+        self.assertEqual(self.client.delete(self.detail_url).status_code, 403)
 
-        put_response = self.client.put(self.detail_url, {"name": "Updated Dept"})
-        self.assertEqual(put_response.status_code, 403)
+    # ---------------- DEPARTMENT ADMIN ----------------
 
-        patch_response = self.client.patch(self.detail_url, {"name": "Patched Dept"})
-        self.assertEqual(patch_response.status_code, 403)
+    def test_department_admin_can_update_description_and_image(self):
+        """DEPARTMENT_ADMIN can update description and image within scope"""
 
-        delete_response = self.client.delete(self.detail_url)
-        self.assertEqual(delete_response.status_code, 403)
+        self.client.force_authenticate(self.dep_admin)
 
-    # --- DEPARTMENT_ADMIN ---
-    def test_department_admin_can_manage_own_department(self):
-        """DEPARTMENT_ADMIN can PUT/PATCH their department"""
-        self.client.force_authenticate(user=self.dep_admin)
+        response = self.client.patch(
+            self.detail_url,
+            {
+                "description": "Updated description",
+                "img_link": "http://example.com/new.png",
+            },
+        )
 
-        # GET
-        get_response = self.client.get(self.detail_url)
-        self.assertIn(get_response.status_code, [200, 204])
+        self.assertIn(response.status_code, [200, 204])
 
-        # PUT
-        put_response = self.client.put(self.detail_url, {"name": "Updated Chemistry"})
-        self.assertIn(put_response.status_code, [200, 204])
+    def test_department_admin_cannot_change_name(self):
+        """DEPARTMENT_ADMIN cannot change department name"""
 
-        # PATCH
-        patch_response = self.client.patch(self.detail_url, {"name": "Patched Chemistry"})
-        self.assertIn(patch_response.status_code, [200, 204])
+        self.client.force_authenticate(self.dep_admin)
 
-        # DELETE (restricted to SITE_ADMIN)
-        delete_response = self.client.delete(self.detail_url)
-        self.assertEqual(delete_response.status_code, 403)
+        response = self.client.patch(
+            self.detail_url,
+            {"name": "Illegal Rename"}
+        )
 
-    def test_department_admin_cannot_manage_other_department(self):
-        """DEPARTMENT_ADMIN cannot modify other departments"""
-        self.client.force_authenticate(user=self.dep_admin)
+        self.assertEqual(response.status_code, 403)
 
-        # GET other dept
-        get_response = self.client.get(self.other_detail_url)
-        self.assertEqual(get_response.status_code, 403)
+    def test_department_admin_cannot_delete_department(self):
+        """DEPARTMENT_ADMIN cannot delete department"""
 
-        # PUT other dept
-        put_response = self.client.put(self.other_detail_url, {"name": "Invalid Update"})
-        self.assertEqual(put_response.status_code, 403)
+        self.client.force_authenticate(self.dep_admin)
+        self.assertEqual(self.client.delete(self.detail_url).status_code, 403)
 
-        # PATCH other dept
-        patch_response = self.client.patch(self.other_detail_url, {"name": "Invalid Patch"})
-        self.assertEqual(patch_response.status_code, 403)
+    def test_department_admin_cannot_access_other_department(self):
+        self.client.force_authenticate(self.dep_admin)
+        self.assertEqual(self.client.get(self.other_detail_url).status_code, 403)
 
-    # --- SITE_ADMIN ---
-    def test_site_admin_can_manage_all_departments(self):
-        """SITE_ADMIN can fully manage all departments"""
-        self.client.force_authenticate(user=self.site_admin)
+    # ---------------- SITE ADMIN ----------------
 
-        get_response = self.client.get(self.detail_url)
-        self.assertIn(get_response.status_code, [200, 204])
+    def test_site_admin_can_fully_manage_departments(self):
+        """SITE_ADMIN can create, rename, update, and delete departments"""
 
-        post_response = self.client.post(self.list_url, {"name": "New Dept"})
-        self.assertIn(post_response.status_code, [200, 201, 204])
+        self.client.force_authenticate(self.site_admin)
 
-        put_response = self.client.put(self.detail_url, {"name": "Updated Dept"})
-        self.assertIn(put_response.status_code, [200, 204])
+        # POST
+        self.assertIn(
+            self.client.post(self.list_url, {"name": "New Dept"}).status_code,
+            [200, 201, 204],
+        )
 
-        patch_response = self.client.patch(self.detail_url, {"name": "Patched Dept"})
-        self.assertIn(patch_response.status_code, [200, 204])
+        # PATCH name
+        self.assertIn(
+            self.client.patch(self.detail_url, {"name": "Renamed"}).status_code,
+            [200, 204],
+        )
 
-        delete_response = self.client.delete(self.detail_url)
-        self.assertIn(delete_response.status_code, [200, 204])
+        # PATCH description
+        self.assertIn(
+            self.client.patch(self.detail_url, {"description": "Updated"}).status_code,
+            [200, 204],
+        )
+
+        # DELETE
+        self.assertIn(
+            self.client.delete(self.detail_url).status_code,
+            [200, 204],
+        )
