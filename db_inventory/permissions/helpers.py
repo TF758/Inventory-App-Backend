@@ -8,22 +8,21 @@ from .constants import ROLE_HIERARCHY
 
 def can_modify(user_role: str, target_role: str) -> bool:
     """
-    Returns True if the given role is allowed to perform the action implied by target_role.
-    
-    Rules:
-    - VIEWER roles can be assigned by users of equal or higher hierarchy.
-    - All other roles require the user to be strictly higher in hierarchy.
-    - SITE_ADMIN can assign anything.
+    A user may only assign roles strictly LOWER than their own.
+    SITE_ADMIN may assign anything.
     """
-    if user_role.endswith("_VIEWER") and not target_role.endswith("_VIEWER"):
+
+    if not user_role or not target_role:
         return False
-    
+
     if user_role == "SITE_ADMIN":
         return True
 
-    if target_role.endswith("_VIEWER"):
-        return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(target_role, -1)
-    return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(target_role, -1)
+    user_rank = ROLE_HIERARCHY.get(user_role, -1)
+    target_rank = ROLE_HIERARCHY.get(target_role, -1)
+
+    # must be strictly higher
+    return user_rank > target_rank
 
 def get_active_role(user: User) -> Optional[RoleAssignment]:
     """

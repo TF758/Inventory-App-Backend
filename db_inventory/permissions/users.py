@@ -3,6 +3,8 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
 from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role
 from db_inventory.models.site import Room, Location, Department
+from db_inventory.models.roles import RoleAssignment
+from rest_framework.exceptions import PermissionDenied
 
 ROLE_ASSIGNMENT_RULES = {
     "ROOM_ADMIN": ["ROOM_VIEWER", "ROOM_CLERK"],
@@ -10,7 +12,7 @@ ROLE_ASSIGNMENT_RULES = {
     "DEPARTMENT_ADMIN": [
         "ROOM_VIEWER", "ROOM_CLERK", "ROOM_ADMIN",
         "LOCATION_VIEWER", "LOCATION_ADMIN",
-        "DEPARTMENT_VIEWER", "DEPARTMENT_ADMIN"
+        "DEPARTMENT_VIEWER",
     ],
     # SITE_ADMIN or superuser are unrestricted, so no rule needed
 }
@@ -89,77 +91,116 @@ class UserPermission(BasePermission):
             )
         )
     
+
+
+
 class RolePermission(BasePermission):
+    """
+    Permission class for RoleAssignment objects.
+
+    Enforces:
+    - SITE_ADMIN full bypass
+    - Viewer roles have no access
+    - Admins may CREATE / UPDATE / DELETE roles
+      they could have CREATED in the same scope
+    - No same-rank or upward role manipulation
+    - Peer admins are invisible via queryset filtering
+    """
+
+    # -------------------------
+    # REQUEST-LEVEL PERMISSION
+    # -------------------------
+
     def has_permission(self, request, view):
         user = request.user
-        if not user.is_authenticated:
+        if not user or not user.is_authenticated:
             return False
 
         active = get_active_role(user)
 
-        if user.is_superuser or (active and active.role == "SITE_ADMIN"):
+        # SITE_ADMIN bypass
+        if active and active.role == "SITE_ADMIN":
             return True
 
-        if getattr(view, "action", None) in ["list", "retrieve"]:
+        # Viewers cannot see or manage roles
+        if not active or is_viewer_role(active.role):
+            return False
+
+        # READ is allowed (scope enforced later)
+        if request.method in SAFE_METHODS:
             return True
 
-        if request.method == "POST" and active:
-            allowed = ROLE_ASSIGNMENT_RULES.get(active.role)
-            if allowed:
-                new_role = request.data.get("role")
-                if new_role not in allowed:
-                    return False
+        # CREATE / UPDATE / DELETE
+        # Defer full validation to object-level + ensure_permission
+        return active.role in [
+            "ROOM_ADMIN",
+            "LOCATION_ADMIN",
+            "DEPARTMENT_ADMIN",
+        ]
 
-        if active and active.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
-            return True
-        return False
+    # -------------------------
+    # OBJECT-LEVEL PERMISSION
+    # -------------------------
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request, view, obj: RoleAssignment):
         user = request.user
         active = get_active_role(user)
 
-        if user.is_superuser or (active and active.role == "SITE_ADMIN"):
+        if not active:
+            return False
+
+        # SITE_ADMIN bypass
+        if active.role == "SITE_ADMIN":
             return True
 
+        # -------------------------
+        # READ
+        # -------------------------
         if request.method in SAFE_METHODS:
-            result = is_in_scope(active, obj.room, obj.location, obj.department)
-            return result
+            return is_in_scope(
+                active,
+                room=obj.room,
+                location=obj.location,
+                department=obj.department,
+            )
 
-        # Write operations: check NEW incoming data instead of old obj
-        new_role_data = request.data.get("role", obj.role)
-        if isinstance(new_role_data, dict):
-            new_role = new_role_data.get("role")  # <-- extract string
-            new_room = None
-            new_location = None
-            new_department = None
+        # -------------------------
+        # WRITE (PUT / PATCH / DELETE)
+        # -------------------------
 
-            # Convert public_id to actual model instances
-            if "room" in new_role_data and new_role_data["room"]:
-                new_room = Room.objects.filter(public_id=new_role_data["room"]).first()
-            if "location" in new_role_data and new_role_data["location"]:
-                new_location = Location.objects.filter(public_id=new_role_data["location"]).first()
-            if "department" in new_role_data and new_role_data["department"]:
-                new_department = Department.objects.filter(public_id=new_role_data["department"]).first()
-        else:
-            new_role = new_role_data
-            new_room = new_location = new_department = None
-
-        allowed = ROLE_ASSIGNMENT_RULES.get(active.role)
-        if allowed and new_role not in allowed:
+        # Cannot touch same-rank or higher EXISTING roles
+        if ROLE_HIERARCHY.get(obj.role, 0) >= ROLE_HIERARCHY.get(active.role, 0):
             return False
+
+        # Determine intended new role
+        new_role = request.data.get("role", obj.role)
+
+        # Determine intended new scope (treat update as reassignment)
+        new_room = None
+        new_location = None
+        new_department = None
+
+        if "room" in request.data:
+            new_room = Room.objects.filter(public_id=request.data["room"]).first()
+
+        if "location" in request.data:
+            new_location = Location.objects.filter(public_id=request.data["location"]).first()
+
+        if "department" in request.data:
+            new_department = Department.objects.filter(public_id=request.data["department"]).first()
 
         try:
             ensure_permission(
                 user,
                 new_role,
-                new_room or getattr(obj, "room", None),
-                new_location or getattr(obj, "location", None),
-                new_department or getattr(obj, "department", None)
+                room=new_room,
+                location=new_location,
+                department=new_department,
             )
             return True
-        except Exception as e:
+        except PermissionDenied:
             return False
-
+        
 class UserLocationPermission(BasePermission):
     method_role_map = {
         "GET": "ROOM_VIEWER",    # minimum role to read

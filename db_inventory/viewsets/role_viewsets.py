@@ -16,6 +16,8 @@ from db_inventory.filters import RoleAssignmentFilter
 from db_inventory.permissions import RolePermission
 from django.db.models import Q
 
+from db_inventory.permissions.constants import ROLE_HIERARCHY
+
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
     """
@@ -37,36 +39,62 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             return RoleWriteSerializer
         return RoleReadSerializer
 
+    
     def get_queryset(self):
         user = self.request.user
         qs = self.base_queryset
 
         active = getattr(user, "active_role", None)
+
+        # SITE_ADMIN sees everything
         if active and active.role == "SITE_ADMIN":
             return qs
 
-        if not active:
-            return qs.filter(user=user)
+        # No active role OR viewer/clerk roles see NOTHING
+        if not active or active.role in ["ROOM_VIEWER", "ROOM_CLERK"]:
+            return qs.none()
 
-        role = active.role
+        active_rank = ROLE_HIERARCHY.get(active.role, -1)
 
-        if role == "DEPARTMENT_ADMIN":
+        # DEPARTMENT_ADMIN
+        if active.role == "DEPARTMENT_ADMIN":
             return qs.filter(
-                Q(department=active.department)
-                | Q(location__department=active.department)
-                | Q(room__location__department=active.department)
+                (
+                    Q(department=active.department)
+                    | Q(location__department=active.department)
+                    | Q(room__location__department=active.department)
+                )
+            ).exclude(
+                role__in=[
+                    r for r, rank in ROLE_HIERARCHY.items()
+                    if rank >= active_rank
+                ]
             )
-        elif role == "LOCATION_ADMIN":
+
+        # LOCATION_ADMIN
+        if active.role == "LOCATION_ADMIN":
             return qs.filter(
                 Q(location=active.location)
                 | Q(room__location=active.location)
+            ).exclude(
+                role__in=[
+                    r for r, rank in ROLE_HIERARCHY.items()
+                    if rank >= active_rank
+                ]
             )
-        elif role == "ROOM_ADMIN":
-            return qs.filter(room=active.room)
-        elif role in ["ROOM_CLERK", "ROOM_VIEWER"]:
-            return qs.filter(Q(user=user) | Q(room=active.room))
 
-        return qs.filter(user=user)
+        # ROOM_ADMIN
+        if active.role == "ROOM_ADMIN":
+            return qs.filter(
+                room=active.room
+            ).exclude(
+                role__in=[
+                    r for r, rank in ROLE_HIERARCHY.items()
+                    if rank >= active_rank
+                ]
+            )
+
+        return qs.none()
 
     # ------------------------------
     # Enforce permission before serializer.save()
@@ -99,6 +127,17 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
         )
 
         serializer.save(assigned_by=user)
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        ensure_permission(
+            user,
+            instance.role,
+            instance.room,
+            instance.location,
+            instance.department
+        )
+        instance.delete()
 
 
 # --- User Roles List (current user or any user by public_id) ---
