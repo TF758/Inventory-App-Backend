@@ -6,10 +6,12 @@ from db_inventory.models.site import Department, Location,Room
 from django.db import models
 from db_inventory.models.users import User
 from django.utils import timezone
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
-\
+
 class AuditLog(PublicIDModel):
-    """
+    """ 
     audit log for security, and traceability.
 
     """
@@ -171,5 +173,103 @@ class AuditLog(PublicIDModel):
         MODEL_UPDATED = "model_updated"
         MODEL_DELETED = "model_deleted"
 
+        MODEL_RELOCATED = "model_relocated"
+
         USER_MOVED = "user_moved"
         EXPORT_GENERATED = "export_generated"
+
+
+class SiteNameChangeHistory(models.Model):
+    """
+    Records explicit rename events for site entities
+    (Department, Location, Room), keyed by public_id.
+    """
+
+    class SiteType(models.TextChoices):
+        DEPARTMENT = "department", "Department"
+        LOCATION = "location", "Location"
+        ROOM = "room", "Room"
+
+    site_type = models.CharField(max_length=20,choices=SiteType.choices,db_index=True,)
+
+
+    object_public_id = models.CharField( max_length=15,db_index=True,help_text="Public ID of the renamed site entity",)
+
+    old_name = models.CharField(max_length=255)
+    new_name = models.CharField(max_length=255)
+
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="site_name_change_histories",
+    )
+    user_email = models.EmailField(null=True, blank=True)
+
+    reason = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["site_type", "object_public_id"]),
+            models.Index(fields=["changed_at"]),
+        ]
+        ordering = ["-changed_at"]
+
+    def __str__(self):
+        return f"{self.site_type}: {self.old_name} → {self.new_name}"
+    
+
+class SiteRelocationHistory(models.Model):
+    """
+    Records structural relocation of site entities:
+    - Location moved between Departments
+    - Room moved between Locations
+
+    All *_name fields are snapshots taken at the time of relocation.
+    """
+
+    class SiteType(models.TextChoices):
+        LOCATION = "location", "Location"
+        ROOM = "room", "Room"
+
+    site_type = models.CharField(max_length=20,choices=SiteType.choices,db_index=True,)
+
+    # Moved object (public identity)
+    object_public_id = models.CharField(max_length=15,db_index=True,help_text="Public ID of the relocated site entity",)
+    object_name = models.CharField(max_length=255,help_text="Name of the site at time of relocation", null=True)
+
+    # From → To (public identity + snapshot names)
+    from_parent_public_id = models.CharField(max_length=15,help_text="Previous parent site public ID",)
+    from_parent_name = models.CharField(max_length=255,help_text="Previous parent site name at time of relocation", null=True)
+
+    to_parent_public_id = models.CharField(max_length=15,help_text="New parent site public ID",)
+    to_parent_name = models.CharField(max_length=255,help_text="New parent site name at time of relocation", null=True)
+
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="site_relocations",
+    )
+    user_email = models.EmailField(null=True, blank=True)
+
+    reason = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["site_type", "object_public_id"]),
+            models.Index(fields=["changed_at"]),
+        ]
+        ordering = ["-changed_at"]
+
+    def __str__(self):
+        return (
+            f"{self.site_type}: {self.object_name} "
+            f"({self.from_parent_name} → {self.to_parent_name})"
+        )

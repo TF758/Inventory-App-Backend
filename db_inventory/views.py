@@ -207,3 +207,9 @@ user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
 admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()
 
 admin_logs = auth_viewsets.AuditLogViewSet.as_view({'get': 'list'})
+
+# rename a site
+site_rename_view = auth_viewsets.SiteNameChangeAPIView.as_view()
+
+# relocate a site
+site_relocate_view = auth_viewsets.SiteRelocationAPIView.as_view()

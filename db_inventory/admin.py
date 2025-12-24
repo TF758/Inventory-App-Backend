@@ -10,6 +10,10 @@ from django.utils.translation import gettext_lazy as _
 
 # Simple models
 
+admin.site.register(SiteNameChangeHistory)
+
+admin.site.register(SiteRelocationHistory)
+
 admin.site.register(Department)
 
 @admin.register(UserLocation)
@@ -246,3 +250,4 @@ class AuditLogAdmin(admin.ModelAdmin):
     #         return qs.filter(department=dept)
     #
     #     # No department → restrict 
+

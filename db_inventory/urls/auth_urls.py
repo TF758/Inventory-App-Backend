@@ -16,11 +16,16 @@ urlpatterns = [
 
     # Admin triggers a password reset (temp password + optional email)
     path(
-        'ausers/<str:user_public_id>/reset-password/',
+        'users/<str:user_public_id>/reset-password/',
         admin_reset_user_password_view,
         name='admin-reset-user-password'
     ),
-    path ('logs/',admin_logs, name='user-log-records' )
+    path ('logs/',admin_logs, name='user-log-records' ),
+
+    # rename site
+    path('site/rename/', site_rename_view, name='site-rename'),
+    # relocate site
+    path('site/relocate/', site_relocate_view, name='site-relocate')
 
 
 ]

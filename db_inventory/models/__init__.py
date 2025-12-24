@@ -6,4 +6,4 @@ from .site import Department, Location, Room, UserLocation
 from .assets import Equipment, Component, Consumable, Accessory
 from .roles import RoleAssignment
 from .security import UserSession
-from .audit import AuditLog
+from .audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
