@@ -138,9 +138,12 @@ class AssetPermissionTestBase:
             "GET_out": [403],
             "POST_in": [201],
             "POST_out": [403],
-            "PUT_in": [403], "PUT_out": [403],
-            "PATCH_in": [403], "PATCH_out": [403],
-            "DELETE_in": [403], "DELETE_out": [403],
+            "PUT_in": [200, 204],
+            "PUT_out": [403],
+            "PATCH_in": [200, 204],
+            "PATCH_out": [403],
+            "DELETE_in": [403],
+            "DELETE_out": [403],
         }
 
     def _expected_room_admin(self):

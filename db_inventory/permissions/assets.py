@@ -16,8 +16,8 @@ class AssetPermission(BasePermission):
     method_role_map = {
         "GET": "ROOM_VIEWER",
         "POST": "ROOM_CLERK",
-        "PUT": "ROOM_ADMIN",
-        "PATCH": "ROOM_ADMIN",
+        "PUT": "ROOM_CLERK",
+        "PATCH": "ROOM_CLERK",
         "DELETE": "ROOM_ADMIN",
     }
 
