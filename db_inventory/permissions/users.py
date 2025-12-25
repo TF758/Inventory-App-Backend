@@ -21,75 +21,102 @@ ROLE_ASSIGNMENT_RULES = {
 class UserPermission(BasePermission):
     """
     Permission class for User objects.
-    Enforces department-level scope via active_role and can be later extended
-    to use UserLocation for multi-department inference.
+
+    Rules:
+    - All authenticated users may view users
+    - Users may edit themselves
+    - Admins may edit users within scope
+    - Only SITE_ADMIN and DEPARTMENT_ADMIN may delete users
+    - Deletion is scope-restricted and self-deletion is forbidden
     """
 
-    method_role_map = {
-        "GET": "DEPARTMENT_VIEWER",
-        "POST": "DEPARTMENT_ADMIN",
-        "PUT": "DEPARTMENT_ADMIN",
-        "PATCH": "DEPARTMENT_ADMIN",
-        "DELETE": "DEPARTMENT_ADMIN",
-    }
+    # ----------------------
+    # REQUEST-LEVEL
+    # ----------------------
 
     def has_permission(self, request, view):
-        # All authenticated users can GET (list/retrieve)
-        if request.method == "GET":
-            return request.user.is_authenticated
-
-        active_role = getattr(request.user, "active_role", None)
-        if not active_role:
+        user = request.user
+        if not user or not user.is_authenticated:
             return False
 
-        # SITE_ADMIN bypass
-        if active_role.role == "SITE_ADMIN":
+        active_role = getattr(user, "active_role", None)
+
+        # READ is open to all authenticated users
+        if request.method in SAFE_METHODS:
             return True
 
-        required_role = self.method_role_map.get(request.method)
-        return has_hierarchy_permission(active_role.role, required_role)
+        # CREATE user
+        if request.method == "POST":
+            return (
+                active_role
+                and active_role.role in ["SITE_ADMIN", "DEPARTMENT_ADMIN"]
+            )
+
+        # UPDATE / DELETE handled at object level
+        return True
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         active_role = getattr(user, "active_role", None)
 
-        # Always allow a user to access themselves
+        # ------------------
+        # SELF ACCESS
+        # ------------------
         if user == obj:
+            if request.method == "DELETE":
+                return False
             return True
 
-        # No role, cannot access others
         if not active_role:
             return False
 
-        # Superuser or SITE_ADMIN bypass
-        if user.is_superuser or active_role.role == "SITE_ADMIN":
+        # SITE ADMIN
+        if active_role.role == "SITE_ADMIN":
             return True
 
-        # --- READ-ONLY access ---
+        # ------------------
+        # 🔒 LOCKING USERS (SPECIAL CASE)
+        # ------------------
+        if request.method in ["PUT", "PATCH"] and "is_locked" in request.data:
+            return active_role.role == "DEPARTMENT_ADMIN"
+
+        # ------------------
+        # READ
+        # ------------------
         if request.method in SAFE_METHODS:
             target_role = getattr(obj, "active_role", None)
-            room = getattr(target_role, "room", None) if target_role else None
-            location = getattr(target_role, "location", None) if target_role else None
-            department = getattr(target_role, "department", None) if target_role else None
+            if not target_role:
+                return False
 
-            # Scope check: allow if target user is within scope
-            return is_in_scope(active_role, room=room, location=location, department=department)
-
-        # --- WRITE access ---
-        required_role = self.method_role_map.get(request.method)
-        target_role = getattr(obj, "active_role", None)
-        if not target_role:
-            return False
-
-        return (
-            has_hierarchy_permission(active_role.role, required_role)
-            and is_in_scope(
+            return is_in_scope(
                 active_role,
                 room=target_role.room,
                 location=target_role.location,
                 department=target_role.department,
             )
-        )
+
+        # ------------------
+        # WRITE / DELETE
+        # ------------------
+        if active_role.role != "DEPARTMENT_ADMIN":
+            return False
+
+        target_role = getattr(obj, "active_role", None)
+        if not target_role:
+            return False
+
+        if not is_in_scope(
+            active_role,
+            room=target_role.room,
+            location=target_role.location,
+            department=target_role.department,
+        ):
+            return False
+
+        if request.method == "DELETE":
+            return True
+
+        return True
     
 
 
@@ -122,16 +149,29 @@ class RolePermission(BasePermission):
         if active and active.role == "SITE_ADMIN":
             return True
 
-        # Viewers cannot see or manage roles
+        # Viewers cannot do anything
         if not active or is_viewer_role(active.role):
             return False
 
-        # READ is allowed (scope enforced later)
+        # READ allowed (scoped later)
         if request.method in SAFE_METHODS:
             return True
 
-        # CREATE / UPDATE / DELETE
-        # Defer full validation to object-level + ensure_permission
+        # -------------------------
+        # CREATE (POST) — CRITICAL FIX
+        # -------------------------
+        if request.method == "POST":
+            requested_role = request.data.get("role")
+            if not requested_role:
+                return False
+
+            # ❌ Prevent same-rank or upward role creation
+            if ROLE_HIERARCHY.get(requested_role, 0) >= ROLE_HIERARCHY.get(active.role, 0):
+                return False
+
+            return True
+
+        # UPDATE / DELETE — defer to object-level
         return active.role in [
             "ROOM_ADMIN",
             "LOCATION_ADMIN",
@@ -174,6 +214,12 @@ class RolePermission(BasePermission):
 
         # Determine intended new role
         new_role = request.data.get("role", obj.role)
+
+        # Prevent same-rank or upward role manipulation
+        new_role = request.data.get("role", obj.role)
+        if ROLE_HIERARCHY.get(new_role, 0) >= ROLE_HIERARCHY.get(active.role, 0):
+            return False
+
 
         # Determine intended new scope (treat update as reassignment)
         new_room = None
@@ -267,31 +313,24 @@ class FullUserCreatePermission(BasePermission):
     """
     Permission for FullUserCreateView.
 
-    This permission only controls ACCESS to the endpoint.
-    All authority decisions are enforced downstream by:
-    - UserLocationPermission
-    - RolePermission
-    - RoleWriteSerializer
+    Rules:
+    - SITE_ADMIN: allowed
+    - DEPARTMENT_ADMIN: allowed
+    - LOCATION_ADMIN: denied
+    - ROOM_ADMIN: denied
+    - VIEWER / no role: denied
     """
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        if not request.user.is_authenticated:
             return False
 
         active = getattr(request.user, "active_role", None)
         if not active:
             return False
 
-        # Viewers are never allowed
-        if is_viewer_role(active.role):
-            return False
-
-        # Any admin role may attempt to use this endpoint
-        if request.method == "POST":
-            return is_admin_role(active.role)
-
-        return False
-
-    def has_object_permission(self, request, view, obj):
-        # Object-level checks are delegated downstream
-        return True
+        # Explicit allow-list (DO NOT use hierarchy here)
+        return active.role in [
+            "SITE_ADMIN",
+            "DEPARTMENT_ADMIN",
+        ]

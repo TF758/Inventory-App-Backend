@@ -18,7 +18,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from db_inventory.mixins import AuditMixin
-from db_inventory.permissions.helpers import is_viewer_role
+from db_inventory.permissions.helpers import is_viewer_role, ensure_permission
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -253,10 +253,17 @@ class FullUserCreateView(AuditMixin,views.APIView):
                 room=room,
             )
 
-            if not RolePermission().has_object_permission(request, self, temp_role):
-                raise PermissionDenied(
-                    "You do not have permission to assign this role."
+            
+            try:
+                ensure_permission(
+                    request.user,
+                    role_name,
+                    room=room,
+                    location=location,
+                    department=department,
                 )
+            except PermissionDenied:
+                raise PermissionDenied("You do not have permission to assign this role.")
 
             role_serializer = RoleWriteSerializer(
                 data={
