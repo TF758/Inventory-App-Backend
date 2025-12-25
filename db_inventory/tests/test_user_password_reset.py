@@ -1,4 +1,3 @@
-import json
 from django.urls import reverse
 from django.test import TestCase
 from django.utils import timezone
@@ -9,7 +8,7 @@ from unittest.mock import patch
 
 from db_inventory.models import User, PasswordResetEvent
 from db_inventory.factories import UserFactory
-from db_inventory.utils import PasswordResetToken
+from db_inventory.utils.tokens import PasswordResetToken
 
 
 # ----------------------------------------------------------------------
@@ -120,7 +119,7 @@ class PasswordResetConfirmTests(APITestCase):
         )
         self.url = reverse("password-reset-confirm")
 
-    @patch("db_inventory.utils.PasswordResetToken.verify_token", return_value=None)
+    @patch("db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=None)
     def test_confirm_expired_token(self, mock_verify):
         """
         Expired or invalid tokens both result in: TOKEN_INVALID
@@ -136,7 +135,7 @@ class PasswordResetConfirmTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "TOKEN_INVALID")
 
-    @patch("db_inventory.utils.PasswordResetToken.verify_token", return_value=None)
+    @patch("db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=None)
     def test_confirm_invalid_token(self, mock_verify):
         data = {
             "token": "invalid-token",

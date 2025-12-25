@@ -233,3 +233,118 @@ class DepartmentAdminUserPermissionTest(APITestCase):
         self.assertIn(put_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
         self.assertIn(patch_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
         self.assertIn(del_resp.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_400_BAD_REQUEST])
+
+class UserSelfPermissionTest(APITestCase):
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.user.set_password("StrongP@ssw0rd!")
+        self.user.save()
+
+        self.client.force_authenticate(self.user)
+        self.detail_url = reverse("user-detail", kwargs={"public_id": self.user.public_id})
+
+    def test_user_can_edit_self(self):
+        response = self.client.patch(
+            self.detail_url,
+            {"job_title": "Updated by self"},
+            format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_user_cannot_delete_self(self):
+        response = self.client.delete(self.detail_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+class LocationAdminUserPermissionTest(APITestCase):
+
+    def setUp(self):
+        self.department = DepartmentFactory()
+        self.location = LocationFactory(department=self.department)
+        self.room = RoomFactory(location=self.location)
+
+        self.loc_admin = UserFactory()
+        self.loc_role = RoleAssignment.objects.create(
+            user=self.loc_admin,
+            role="LOCATION_ADMIN",
+            location=self.location
+        )
+        self.loc_admin.active_role = self.loc_role
+        self.loc_admin.save()
+
+        self.target_user = UserFactory()
+        ra = RoleAssignment.objects.create(
+            user=self.target_user,
+            role="ROOM_VIEWER",
+            room=self.room
+        )
+        self.target_user.active_role = ra
+        self.target_user.save()
+
+        self.client.force_authenticate(self.loc_admin)
+        self.list_url = reverse("users")
+        self.detail_url = reverse("user-detail", kwargs={"public_id": self.target_user.public_id})
+
+    def test_location_admin_can_view_users(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_location_admin_cannot_create_user(self):
+        response = self.client.post(self.list_url, {"email": "x@y.com"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_location_admin_cannot_delete_user(self):
+        response = self.client.delete(self.detail_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+class ViewerUserPermissionTest(APITestCase):
+
+    def setUp(self):
+        self.department = DepartmentFactory()
+        self.viewer = UserFactory()
+        ra = RoleAssignment.objects.create(
+            user=self.viewer,
+            role="DEPARTMENT_VIEWER",
+            department=self.department
+        )
+        self.viewer.active_role = ra
+        self.viewer.save()
+
+        self.other_user = UserFactory()
+        self.client.force_authenticate(self.viewer)
+
+        self.list_url = reverse("users")
+        self.detail_url = reverse("user-detail", kwargs={"public_id": self.other_user.public_id})
+
+    def test_viewer_can_view_users(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_viewer_cannot_modify_users(self):
+        patch = self.client.patch(self.detail_url, {"fname": "Nope"})
+        delete = self.client.delete(self.detail_url)
+
+        self.assertEqual(patch.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(delete.status_code, status.HTTP_403_FORBIDDEN)
+
+class UserLockPermissionTest(APITestCase):
+
+    def setUp(self):
+        self.department = DepartmentFactory()
+        self.dep_admin = UserFactory()
+        ra = RoleAssignment.objects.create(
+            user=self.dep_admin,
+            role="DEPARTMENT_ADMIN",
+            department=self.department
+        )
+        self.dep_admin.active_role = ra
+        self.dep_admin.save()
+
+        self.user = UserFactory()
+        self.client.force_authenticate(self.dep_admin)
+
+        self.url = reverse("user-detail", kwargs={"public_id": self.user.public_id})
+
+    def test_department_admin_can_lock_user(self):
+        response = self.client.patch(self.url, {"is_locked": True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

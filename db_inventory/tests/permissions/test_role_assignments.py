@@ -114,26 +114,23 @@ class TestRoleAssignmentPermissions(RoleAssignmentTestBase):
         res = self.client.post(self.list_url(), payload, format="json")
         self.assert_response_status(res, [status.HTTP_403_FORBIDDEN])
 
-    def test_location_admin_cannot_patch_to_department_role(self):
-        """LOCATION_ADMIN cannot PATCH role to department-level."""
+    def test_location_admin_cannot_assign_department_roles(self):
+        """LOCATION_ADMIN cannot assign or escalate to department or site roles."""
         self.as_user(self.loc_admin)
 
-        role_obj = RoleAssignment.objects.create(
-            user=self.room_viewer,
-            role="LOCATION_VIEWER",
-            location=self.location,
-            assigned_by=self.site_admin,
-        )
+        payload = {
+            "user": self.room_viewer.public_id,
+            "role": "DEPARTMENT_VIEWER",
+            "location": self.location.public_id,
+        }
 
-        res = self.client.patch(
-            self.detail_url(role_obj.public_id),
-            {"role": "DEPARTMENT_VIEWER", "department": self.department.public_id},
-            format="json"
-        )
+        res = self.client.post(self.list_url(), payload, format="json")
+
+        # Authority failure → 403
         self.assert_response_status(res, [status.HTTP_403_FORBIDDEN])
 
-    # ----------------------
-    # DEPARTMENT ADMIN
+        # ----------------------
+        # DEPARTMENT ADMIN
     # ----------------------
 
     def test_department_admin_can_manage_lower_roles_only(self):
