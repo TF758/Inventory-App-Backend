@@ -18,6 +18,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from db_inventory.mixins import AuditMixin
+from db_inventory.permissions.helpers import is_viewer_role
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -71,19 +72,6 @@ This viewset provides `list`, `create`, actions for User objects."""
         # Pass created_by automatically
         user = serializer.save(created_by=request.user)
 
-        # Assign a default role if creator has an active_role
-        # get a department
-        # assigning a default department for testing
-        # default_department = Department.objects.first()
-
-        # if not user.active_role and request.user.active_role:
-        #     default_role = RoleAssignment.objects.create(
-        #         user=user,
-        #         role="DEPARTMENT_VIEWER",
-        #         department=default_department,
-        #         assigned_by=request.user,
-        #     )
-        #     user.active_role = default_role
         user.is_active = True
         user.save()
 
@@ -200,35 +188,26 @@ class FullUserCreateView(AuditMixin,views.APIView):
         user_location_public_id = payload.get("user_location")
         role_data = payload.get("role", {})
 
-        if not request.user.is_authenticated:
-            raise PermissionDenied("Authentication required.")
-
         user_location_instance = None
 
         with transaction.atomic():
 
-            # ------------------------------------
             # 1️⃣ Create User
-            # ------------------------------------
             user_serializer = UserWriteSerializer(data=user_data)
             user_serializer.is_valid(raise_exception=True)
             user = user_serializer.save()
 
-            # ------------------------------------
-            # 2️⃣ Assign UserLocation 
-            # ------------------------------------
+            # 2️⃣ Assign UserLocation (permission enforced here)
             if user_location_public_id:
-                ul_data = {
-                    "user_id": user.public_id,
-                    "room_id": user_location_public_id,
-                }
-
                 ul_serializer = UserLocationWriteSerializer(
-                    data=ul_data, context={"request": request}
+                    data={
+                        "user_id": user.public_id,
+                        "room_id": user_location_public_id,
+                    },
+                    context={"request": request},
                 )
                 ul_serializer.is_valid(raise_exception=True)
 
-                # Permission check using temporary mock object
                 temp_ul = UserLocation(
                     user=user,
                     room=ul_serializer.validated_data["room"]
@@ -243,39 +222,29 @@ class FullUserCreateView(AuditMixin,views.APIView):
 
                 user_location_instance = ul_serializer.save()
 
-            # ------------------------------------
-            # 3️⃣ Assign Role
-            # ------------------------------------
+            # 3️⃣ Assign Role (permission enforced here)
             role_name = role_data.get("role")
 
             def resolve(model, public_id):
                 if not public_id:
                     return None
-                try:
-                    return model.objects.get(public_id=public_id)
-                except model.DoesNotExist:
-                    raise ValidationError(
-                        {model.__name__.lower(): "Invalid public_id"}
-                    )
+                return model.objects.get(public_id=public_id)
 
             department = resolve(Department, role_data.get("department"))
             location = resolve(Location, role_data.get("location"))
             room = resolve(Room, role_data.get("room"))
 
-            # Correct business logic: normalize scope based on role level
+            # Normalize scope based on role level
             if role_name.startswith("ROOM_"):
                 department = None
                 location = None
-
             elif role_name.startswith("LOCATION_"):
                 department = None
                 room = None
-
             elif role_name.startswith("DEPARTMENT_"):
                 location = None
                 room = None
 
-            # Permission using temp RoleAssignment
             temp_role = RoleAssignment(
                 user=user,
                 role=role_name,
@@ -285,33 +254,29 @@ class FullUserCreateView(AuditMixin,views.APIView):
             )
 
             if not RolePermission().has_object_permission(request, self, temp_role):
-                raise PermissionDenied("You do not have permission to assign this role.")
-
-            # Final save payload
-            final_role_payload = {
-                "user": user.public_id,
-                "role": role_name,
-                "department": department.public_id if department else None,
-                "location": location.public_id if location else None,
-                "room": room.public_id if room else None,
-            }
+                raise PermissionDenied(
+                    "You do not have permission to assign this role."
+                )
 
             role_serializer = RoleWriteSerializer(
-                data=final_role_payload, context={"request": request}
+                data={
+                    "user": user.public_id,
+                    "role": role_name,
+                    "department": department.public_id if department else None,
+                    "location": location.public_id if location else None,
+                    "room": room.public_id if room else None,
+                },
+                context={"request": request},
             )
             role_serializer.is_valid(raise_exception=True)
             role_assignment = role_serializer.save()
 
-        # ------------------------------------
-
-        # ------------------------------------
         return Response(
             {
                 "user": UserWriteSerializer(user).data,
                 "user_location": (
                     UserLocationWriteSerializer(user_location_instance).data
-                    if user_location_instance
-                    else None
+                    if user_location_instance else None
                 ),
                 "role_assignment": RoleWriteSerializer(role_assignment).data,
             },

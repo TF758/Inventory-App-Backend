@@ -131,8 +131,8 @@ def check_permission(user: User, required_role: str,
         return False
 
     # prevent view-only roles from performing modify actions
-    if not required_role.endswith("_VIEWER") and not can_modify(role.role, required_role):
-        return False
+    if is_viewer_role(role.role):
+        return required_role.endswith("_VIEWER")
 
     return True
 
@@ -147,8 +147,13 @@ def ensure_permission(user: User, required_role: str,
     Raises:
         PermissionDenied: If the user lacks permission for the resource.
     """
+    if isinstance(required_role, dict):
+        required_role = required_role.get("role")
+
     if not check_permission(user, required_role, room, location, department):
-        raise PermissionDenied(f"Active role lacks {required_role} permission for this resource.")
+        raise PermissionDenied(
+            f"Active role lacks {required_role} permission for this resource."
+        )
 
 def filter_queryset_by_scope(user: User, queryset, model_class):
     """

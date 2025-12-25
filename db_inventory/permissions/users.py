@@ -1,7 +1,7 @@
 # myapp/permissions/users.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
-from .helpers import is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role
+from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role
 from db_inventory.models.site import Room, Location, Department
 from db_inventory.models.roles import RoleAssignment
 from rest_framework.exceptions import PermissionDenied
@@ -265,46 +265,33 @@ class UserLocationPermission(BasePermission):
 
 class FullUserCreatePermission(BasePermission):
     """
-    Permission for the FullUserCreateView.
+    Permission for FullUserCreateView.
 
-    Rules:
-    - SITE_ADMIN can always create users/roles/assign locations anywhere.
-    - DEPARTMENT_ADMIN can create users/roles/assign locations in their department.
-    - LOCATION_ADMIN cannot create new users (can only update existing users in their location).
-    - ROOM_ADMIN cannot create or delete users (can only update users in their room).
+    This permission only controls ACCESS to the endpoint.
+    All authority decisions are enforced downstream by:
+    - UserLocationPermission
+    - RolePermission
+    - RoleWriteSerializer
     """
 
     def has_permission(self, request, view):
-        if not request.user.is_authenticated:
+        if not request.user or not request.user.is_authenticated:
             return False
 
-        active_role = getattr(request.user, "active_role", None)
-        if not active_role:
+        active = getattr(request.user, "active_role", None)
+        if not active:
             return False
 
-        # SITE_ADMIN bypass
-        if active_role.role == "SITE_ADMIN":
-            return True
+        # Viewers are never allowed
+        if is_viewer_role(active.role):
+            return False
 
-        # Only DEPARTMENT_ADMIN can create full users
+        # Any admin role may attempt to use this endpoint
         if request.method == "POST":
-            return has_hierarchy_permission(active_role.role, "DEPARTMENT_ADMIN")
+            return is_admin_role(active.role)
 
-        # Other methods (GET/PUT/PATCH/DELETE) are not allowed here
         return False
 
     def has_object_permission(self, request, view, obj):
-        """
-        Object-level permission for FullUserCreateView.
-        This view mainly uses POST, so object-level checks are rare.
-        """
-        active_role = getattr(request.user, "active_role", None)
-        if not active_role:
-            return False
-
-        # SITE_ADMIN bypass
-        if active_role.role == "SITE_ADMIN":
-            return True
-
-        # Other object-level checks could be implemented here if needed
-        return False
+        # Object-level checks are delegated downstream
+        return True
