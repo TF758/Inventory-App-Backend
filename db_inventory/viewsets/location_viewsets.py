@@ -11,7 +11,7 @@ from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
-from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin
+from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
@@ -340,26 +340,38 @@ class LocationComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelView
             .order_by('-id')[:20]
         )
 
-class LocationRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    """Retrieves a list of users and thier roles in a given location"""
+class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyModelViewSet):
+    """
+    Retrieves a list of users and their roles in a given location
+    """
+    queryset = RoleAssignment.objects.all()
     serializer_class = RoleReadSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
-    permission_classes=[RolePermission]
+    permission_classes = [RolePermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
-    search_fields = ['role']
-
-    # filterset_class = RoleFilter
+    search_fields = ["role"]
 
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        
-        return RoleAssignment.objects.filter(
+        location_id = self.kwargs.get("public_id")
+
+        # Base queryset for this endpoint (location + its rooms)
+        base_qs = RoleAssignment.objects.filter(
             Q(location__public_id=location_id) |
             Q(room__location__public_id=location_id)
-        ).order_by('-id')
+        )
+
+        # Apply ScopeFilterMixin
+        scoped_qs = super().get_queryset().filter(
+            pk__in=base_qs.values("pk")
+        )
+
+        # Apply RoleVisibilityMixin
+        visible_qs = self.filter_visibility(scoped_qs)
+
+        return visible_qs.order_by("-id")
     

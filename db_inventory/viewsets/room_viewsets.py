@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
-from db_inventory.mixins import ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin
+from db_inventory.mixins import ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers import *
@@ -289,22 +289,32 @@ class RoomAccessoriesMiniViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet)
         return super().get_serializer(*args, **kwargs)
 
 
-class RoomRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    """Retrieves a list of users and their roles in a given room"""
+class RoomRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyModelViewSet):
+    """
+    Retrieves a list of users and their roles in a given room
+    """
+
+    queryset = RoleAssignment.objects.all()
     serializer_class = RoleReadSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
     permission_classes = [RoomPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
-    search_fields = ['role']
+    search_fields = ["role"]
 
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        room_id = self.kwargs.get('public_id')
+        room_id = self.kwargs.get("public_id")
 
-        return RoleAssignment.objects.filter(
-            Q(room__public_id=room_id)
-        ).order_by('-id')
+        # Base filter: roles assigned directly to this room
+        qs = super().get_queryset().filter(
+            room__public_id=room_id
+        )
+
+        # Apply role visibility rules (peer hiding, rank visibility)
+        qs = self.filter_visibility(qs)
+
+        return qs.order_by("-id")

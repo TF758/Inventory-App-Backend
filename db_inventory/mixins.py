@@ -45,6 +45,53 @@ class ScopeFilterMixin:
 
         return queryset
 
+class RoleVisibilityMixin:
+    """
+    Filters role assignments based on the viewer's active role.
+
+    This controls *visibility*, not permission.
+    Scope filtering is handled elsewhere.
+    """
+
+    def filter_visibility(self, qs):
+        active = getattr(self.request.user, "active_role", None)
+        if not active:
+            return qs.none()
+
+        # SITE_ADMIN sees everything
+        if active.role == "SITE_ADMIN":
+            return qs
+
+        # DEPARTMENT_ADMIN:
+        # - cannot see peer department admins
+        if active.role == "DEPARTMENT_ADMIN":
+            return qs.exclude(role="DEPARTMENT_ADMIN")
+
+        # LOCATION_ADMIN:
+        # - cannot see peer location admins
+        # - cannot see department roles
+        if active.role == "LOCATION_ADMIN":
+            return qs.exclude(
+                role__in=[
+                    "DEPARTMENT_ADMIN",
+                    "DEPARTMENT_VIEWER",
+                    "LOCATION_ADMIN",
+                ]
+            )
+
+        # ROOM_ADMIN:
+        # - can only see room clerk + viewer
+        if active.role == "ROOM_ADMIN":
+            return qs.filter(
+                role__in=[
+                    "ROOM_CLERK",
+                    "ROOM_VIEWER",
+                ]
+            )
+
+        # Default: hide everything
+        return qs.none()
+    
 class EquipmentBatchMixin:
     """
     Mixin to handle batch validation/import for Equipment.

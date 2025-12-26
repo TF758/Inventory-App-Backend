@@ -46,34 +46,40 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
         active = getattr(user, "active_role", None)
 
+        # 🔑 Always allow user to see their own roles
+        own_roles = qs.filter(user=user)
+
         # SITE_ADMIN sees everything
         if active and active.role == "SITE_ADMIN":
             return qs
 
-        # No active role OR viewer/clerk roles see NOTHING
-        if not active or active.role in ["ROOM_VIEWER", "ROOM_CLERK"]:
-            return qs.none()
+        # No active role → only own roles
+        if not active:
+            return own_roles
 
         active_rank = ROLE_HIERARCHY.get(active.role, -1)
 
+        # VIEWER / CLERK → own roles only
+        if active.role in ["ROOM_VIEWER", "ROOM_CLERK"]:
+            return own_roles
+
         # DEPARTMENT_ADMIN
         if active.role == "DEPARTMENT_ADMIN":
-            return qs.filter(
-                (
-                    Q(department=active.department)
-                    | Q(location__department=active.department)
-                    | Q(room__location__department=active.department)
-                )
+            scoped = qs.filter(
+                Q(department=active.department)
+                | Q(location__department=active.department)
+                | Q(room__location__department=active.department)
             ).exclude(
                 role__in=[
                     r for r, rank in ROLE_HIERARCHY.items()
                     if rank >= active_rank
                 ]
             )
+            return (own_roles | scoped).distinct()
 
         # LOCATION_ADMIN
         if active.role == "LOCATION_ADMIN":
-            return qs.filter(
+            scoped = qs.filter(
                 Q(location=active.location)
                 | Q(room__location=active.location)
             ).exclude(
@@ -82,19 +88,20 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
                     if rank >= active_rank
                 ]
             )
+            return (own_roles | scoped).distinct()
 
         # ROOM_ADMIN
         if active.role == "ROOM_ADMIN":
-            return qs.filter(
-                room=active.room
-            ).exclude(
+            scoped = qs.filter(room=active.room).exclude(
                 role__in=[
                     r for r, rank in ROLE_HIERARCHY.items()
                     if rank >= active_rank
                 ]
             )
+            return (own_roles | scoped).distinct()
 
-        return qs.none()
+        return own_roles
+
 
     # ------------------------------
     # Enforce permission before serializer.save()

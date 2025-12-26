@@ -5,7 +5,7 @@ from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
-from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin
+from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
 from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
 from db_inventory.pagination import  FlexiblePagination
 from django.db.models import Q
@@ -348,29 +348,37 @@ class DepartmentComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVi
         )
     
 
-class DepartmentRolesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    """Retrieves a list of users and thier roles in a given department"""
-    serializer_class = RoleReadSerializer
-    lookup_field = 'public_id'
+class DepartmentRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyModelViewSet):
+    """
+    Retrieves a list of users and their roles in a given department
+    """
 
-    permission_classes=[RolePermission]
+    queryset = RoleAssignment.objects.all()
+    serializer_class = RoleReadSerializer
+    lookup_field = "public_id"
+
+    permission_classes = [RolePermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
-    search_fields = ['role']
-
-    # filterset_class = RoleFilter
+    search_fields = ["role"]
 
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        department_id = self.kwargs.get('public_id')
-        
-        return RoleAssignment.objects.filter(
+        department_id = self.kwargs.get("public_id")
+
+        # Base queryset: department + all children (locations + rooms)
+        qs = super().get_queryset().filter(
             Q(department__public_id=department_id) |
             Q(location__department__public_id=department_id) |
             Q(room__location__department__public_id=department_id)
-        ).order_by('-id')
+        )
+
+        # Apply role visibility rules (peer hiding, rank visibility)
+        qs = self.filter_visibility(qs)
+
+        return qs.order_by("-id")
     
 
 class DepartmentRoomsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
