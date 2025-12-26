@@ -1,7 +1,7 @@
 # myapp/permissions/users.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .constants import ROLE_HIERARCHY
-from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role
+from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role, is_user_in_scope
 from db_inventory.models.site import Room, Location, Department
 from db_inventory.models.roles import RoleAssignment
 from rest_framework.exceptions import PermissionDenied
@@ -288,7 +288,7 @@ class AdminUpdateUserPermission(BasePermission):
         if role.role == "SITE_ADMIN":
             return True
 
-        # Allowed admin tiers
+        # Only admin roles
         if role.role not in [
             "DEPARTMENT_ADMIN",
             "LOCATION_ADMIN",
@@ -296,13 +296,4 @@ class AdminUpdateUserPermission(BasePermission):
         ]:
             return False
 
-        target_role = getattr(obj, "active_role", None)
-        if not target_role:
-            return False
-
-        return is_in_scope(
-            role,
-            room=target_role.room,
-            location=target_role.location,
-            department=target_role.department,
-        )
+        return is_user_in_scope(role, obj)

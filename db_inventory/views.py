@@ -213,3 +213,6 @@ site_rename_view = auth_viewsets.SiteNameChangeAPIView.as_view()
 
 # relocate a site
 site_relocate_view = auth_viewsets.SiteRelocationAPIView.as_view()
+
+# update a user information
+admin_update_user_demographics = auth_viewsets.AdminUpdateUserView.as_view()

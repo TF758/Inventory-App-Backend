@@ -25,7 +25,9 @@ urlpatterns = [
     # rename site
     path('site/rename/', site_rename_view, name='site-rename'),
     # relocate site
-    path('site/relocate/', site_relocate_view, name='site-relocate')
+    path('site/relocate/', site_relocate_view, name='site-relocate'),
+    # update user demographics
+    path('users/<str:public_id>/update-profile/', admin_update_user_demographics, name='admin-update-user-profile')
 
 
 ]

@@ -483,8 +483,8 @@ class SiteRelocationAPIView(APIView):
 class AdminUpdateUserView(APIView):
     permission_classes = [AdminUpdateUserPermission]
 
-    def patch(self, request, user_id):
-        user = get_object_or_404(User, public_id=user_id)
+    def patch(self, request, public_id):
+        user = get_object_or_404(User, public_id=public_id)
 
         self.check_object_permissions(request, user)
 

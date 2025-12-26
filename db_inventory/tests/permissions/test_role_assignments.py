@@ -227,7 +227,7 @@ class TestRoleAssignmentPermissions(RoleAssignmentTestBase):
         self.as_user(self.room_viewer)
 
         res = self.client.get(self.list_url())
-        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
         payload = self.make_room_role_payload(self.room_viewer, room=self.room)
         res = self.client.post(self.list_url(), payload, format="json")

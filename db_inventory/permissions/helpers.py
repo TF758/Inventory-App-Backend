@@ -101,7 +101,39 @@ def is_user_in_scope(
     Infers the target's scope by checking it's User Locations and Role Assignments.
     Todo: Implement this function.
     """
-    pass
+    
+def is_user_in_scope(
+    admin_role: RoleAssignment,
+    target_user: User
+) -> bool:
+    """
+    Check whether the admin_role has scope over the target user.
+    """
+
+    if admin_role.role == "SITE_ADMIN":
+        return True
+
+    # Check role assignments
+    for ra in RoleAssignment.objects.filter(user=target_user):
+        if is_in_scope(
+            admin_role,
+            room=ra.room,
+            location=ra.location,
+            department=ra.department,
+        ):
+            return True
+
+    # Check user locations
+    for ul in UserLocation.objects.filter(user=target_user):
+        if is_in_scope(
+            admin_role,
+            room=ul.room,
+            location=ul.room.location if ul.room else None,
+            department=ul.room.location.department if ul.room else None,
+        ):
+            return True
+
+    return False
 
 def check_permission(user: User, required_role: str,
                      room: Optional[Room] = None,
