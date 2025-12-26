@@ -20,103 +20,29 @@ ROLE_ASSIGNMENT_RULES = {
 
 class UserPermission(BasePermission):
     """
-    Permission class for User objects.
+    Permissions for user self-service and read-only access.
 
     Rules:
     - All authenticated users may view users
     - Users may edit themselves
-    - Admins may edit users within scope
-    - Only SITE_ADMIN and DEPARTMENT_ADMIN may delete users
-    - Deletion is scope-restricted and self-deletion is forbidden
+    - No admin-level writes allowed here
     """
 
-    # ----------------------
-    # REQUEST-LEVEL
-    # ----------------------
-
     def has_permission(self, request, view):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-
-        active_role = getattr(user, "active_role", None)
-
-        # READ is open to all authenticated users
-        if request.method in SAFE_METHODS:
-            return True
-
-        # CREATE user
-        if request.method == "POST":
-            return (
-                active_role
-                and active_role.role in ["SITE_ADMIN", "DEPARTMENT_ADMIN"]
-            )
-
-        # UPDATE / DELETE handled at object level
-        return True
+        return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        active_role = getattr(user, "active_role", None)
 
-        # ------------------
-        # SELF ACCESS
-        # ------------------
-        if user == obj:
-            if request.method == "DELETE":
-                return False
-            return True
-
-        if not active_role:
-            return False
-
-        # SITE ADMIN
-        if active_role.role == "SITE_ADMIN":
-            return True
-
-        # ------------------
-        # 🔒 LOCKING USERS (SPECIAL CASE)
-        # ------------------
-        if request.method in ["PUT", "PATCH"] and "is_locked" in request.data:
-            return active_role.role == "DEPARTMENT_ADMIN"
-
-        # ------------------
-        # READ
-        # ------------------
+        # READ — all authenticated users
         if request.method in SAFE_METHODS:
-            target_role = getattr(obj, "active_role", None)
-            if not target_role:
-                return False
-
-            return is_in_scope(
-                active_role,
-                room=target_role.room,
-                location=target_role.location,
-                department=target_role.department,
-            )
-
-        # ------------------
-        # WRITE / DELETE
-        # ------------------
-        if active_role.role != "DEPARTMENT_ADMIN":
-            return False
-
-        target_role = getattr(obj, "active_role", None)
-        if not target_role:
-            return False
-
-        if not is_in_scope(
-            active_role,
-            room=target_role.room,
-            location=target_role.location,
-            department=target_role.department,
-        ):
-            return False
-
-        if request.method == "DELETE":
             return True
 
-        return True
+        # WRITE — self only
+        if request.method in ["PUT", "PATCH"]:
+            return user == obj
+
+        return False
     
 
 
@@ -150,8 +76,13 @@ class RolePermission(BasePermission):
             return True
 
         # Viewers cannot do anything
-        if not active or is_viewer_role(active.role):
+        # No active role → no access
+        if not active:
             return False
+
+        # Viewers: READ-ONLY access
+        if is_viewer_role(active.role):
+            return request.method in SAFE_METHODS
 
         # READ allowed (scoped later)
         if request.method in SAFE_METHODS:
@@ -165,7 +96,7 @@ class RolePermission(BasePermission):
             if not requested_role:
                 return False
 
-            # ❌ Prevent same-rank or upward role creation
+
             if ROLE_HIERARCHY.get(requested_role, 0) >= ROLE_HIERARCHY.get(active.role, 0):
                 return False
 
@@ -334,3 +265,44 @@ class FullUserCreatePermission(BasePermission):
             "SITE_ADMIN",
             "DEPARTMENT_ADMIN",
         ]
+
+class AdminUpdateUserPermission(BasePermission):
+    """
+    Allows scoped admins to update user demographic info.
+    """
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.method in ["PATCH", "PUT"]
+        )
+
+    def has_object_permission(self, request, view, obj):
+        role = getattr(request.user, "active_role", None)
+
+        if not role:
+            return False
+
+        # SITE_ADMIN can edit anyone
+        if role.role == "SITE_ADMIN":
+            return True
+
+        # Allowed admin tiers
+        if role.role not in [
+            "DEPARTMENT_ADMIN",
+            "LOCATION_ADMIN",
+            "ROOM_ADMIN",
+        ]:
+            return False
+
+        target_role = getattr(obj, "active_role", None)
+        if not target_role:
+            return False
+
+        return is_in_scope(
+            role,
+            room=target_role.room,
+            location=target_role.location,
+            department=target_role.department,
+        )

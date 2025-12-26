@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, User, AuditLog, Department, Location, Room, SiteNameChangeHistory, SiteRelocationHistory
-from db_inventory.serializers.auth import ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer
+from db_inventory.serializers.auth import ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -15,6 +15,8 @@ from db_inventory.mixins import ScopeFilterMixin
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
+from db_inventory.permissions.users import AdminUpdateUserPermission
+from db_inventory.utils.audit import create_audit_log
 
 
 class RevokeUserSessionsViewset(viewsets.GenericViewSet):
@@ -474,4 +476,56 @@ class SiteRelocationAPIView(APIView):
                 "to_parent": target.public_id,
             },
             status=200,
+        )
+
+
+
+class AdminUpdateUserView(APIView):
+    permission_classes = [AdminUpdateUserPermission]
+
+    def patch(self, request, user_id):
+        user = get_object_or_404(User, public_id=user_id)
+
+        self.check_object_permissions(request, user)
+
+        # Snapshot BEFORE
+        before_data = {
+            field: getattr(user, field)
+            for field in AdminUserDemographicsSerializer.Meta.fields
+        }
+
+        serializer = AdminUserDemographicsSerializer(
+            user,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Compute changes
+        changes = {}
+        for field, old_value in before_data.items():
+            new_value = getattr(user, field)
+            if old_value != new_value:
+                changes[field] = {
+                    "from": old_value,
+                    "to": new_value,
+                }
+
+        # Audit log
+        if changes:
+            create_audit_log(
+                request=request,
+                event_type=AuditLog.Events.ADMIN_UPDATED_USER,
+                description="Admin updated user demographic information",
+                target=user,
+                metadata={
+                    "changes": changes,
+                },
+            )
+
+        return Response(
+            AdminUserDemographicsSerializer(user).data,
+            status=status.HTTP_200_OK,
         )

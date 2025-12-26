@@ -233,3 +233,16 @@ class AuditLogLightSerializer(serializers.ModelSerializer):
         ]
 
         read_only_fields = fields
+
+class AdminUserDemographicsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "email",
+            "fname",
+            "lname",
+            "job_title",
+        ]
+
+    def validate_email(self, value):
+        return value.lower()

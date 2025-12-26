@@ -21,64 +21,42 @@ from db_inventory.mixins import AuditMixin
 from db_inventory.permissions.helpers import is_viewer_role, ensure_permission
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+    """
+    User directory + self-service profile updates.
 
-    """ViewSet for managing User objects.
-This viewset provides `list`, `create`, actions for User objects."""
+    - Read users
+    - Users may update themselves
+    - No user creation
+    - No admin actions
+    """
 
-    queryset = User.objects.all().order_by('-id')
+    queryset = User.objects.all().order_by("-id")
     serializer_class = UserReadSerializerFull
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['^email', 'email']
-
+    search_fields = ["^email", "email"]
     filterset_class = UserFilter
-
     pagination_class = FlexiblePagination
 
     permission_classes = [UserPermission]
-
+    http_method_names = ["get", "put", "patch", "head", "options"]
 
     def get_serializer_class(self):
-        if self.action in ["update", "partial_update", "create"]:
+        if self.action in ["update", "partial_update"]:
             return UserWriteSerializer
         return UserReadSerializerFull
-    
 
     def get_queryset(self):
         user = self.request.user
         active_role = getattr(user, "active_role", None)
 
-        # Start with all users (like the "bare minimum" that worked)
         qs = User.objects.all().order_by("-id")
 
-        # Only apply scoping for list requests
         if self.action == "list" and active_role:
             qs = filter_queryset_by_scope(user, qs, User)
 
         return qs
-
-
-            
-
-    def create(self, request, *args, **kwargs):
-        """
-        Custom create method that automatically sets `created_by` to the current user
-        and returns the new user's public_id and summary info after creation.
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Pass created_by automatically
-        user = serializer.save(created_by=request.user)
-
-        user.is_active = True
-        user.save()
-
-        # Return the newly created user (using the read serializer)
-        read_data = UserReadSerializerFull(user, context={'request': request}).data
-        headers = self.get_success_headers(serializer.data)
-        return Response(read_data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 

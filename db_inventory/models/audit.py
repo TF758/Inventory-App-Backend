@@ -161,6 +161,7 @@ class AuditLog(PublicIDModel):
         LOGOUT = "logout"
         USER_CREATED = "user_created"
         USER_UPDATED = "user_updated"
+        ADMIN_UPDATED_USER = "admin_updated_user"
         USER_DELETED = "user_deleted"
 
         PASSWORD_RESET_REQUESTED = "password_reset_requested"
