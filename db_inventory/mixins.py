@@ -222,78 +222,150 @@ class AccessoryBatchMixin:
     
 class AuditMixin:
     """
-    Mixin to automatically track and record user actions on models.
-    Logs create, update, and delete events, including user identity,
-    request metadata, and scope (department, location, room) inferred
-    from the target object. Designed for audit trails and compliance.
+    Mixin to record immutable audit logs for user and system actions.
+
+    Guarantees:
+    - Audit logs are only written AFTER successful DB commits
+    - Works for CRUD (GenericAPIView hooks)
+    - Works for explicit domain actions
+    - No model-layer coupling
     """
 
-    def _log_audit(self, event_type, target=None, description="", metadata=None):
-        user = getattr(self.request, "user", None)
+    # -------------------------------------------------
+    # Scope resolution (department → location → room)
+    # -------------------------------------------------
 
+    def _resolve_scope(self, target):
         room = location = department = None
         room_name = location_name = department_name = None
 
-        if target:
-            # Determine hierarchy from object
-            if hasattr(target, "room") and target.room:
-                room = target.room
-                room_name = room.name
+        if not target:
+            return {
+                "room": None,
+                "room_name": None,
+                "location": None,
+                "location_name": None,
+                "department": None,
+                "department_name": None,
+            }
 
-                if room.location:
-                    location = room.location
-                    location_name = location.name
+        if hasattr(target, "room") and target.room:
+            room = target.room
+            room_name = room.name
 
-                    if location.department:
-                        department = location.department
-                        department_name = department.name
-            
-            elif hasattr(target, "location") and target.location:
-                location = target.location
+            if getattr(room, "location", None):
+                location = room.location
                 location_name = location.name
 
-                if location.department:
+                if getattr(location, "department", None):
                     department = location.department
                     department_name = department.name
 
-            elif hasattr(target, "department") and target.department:
-                department = target.department
+        elif hasattr(target, "location") and target.location:
+            location = target.location
+            location_name = location.name
+
+            if getattr(location, "department", None):
+                department = location.department
                 department_name = department.name
 
-        AuditLog.objects.create(
-            user=self.request.user,
-            user_public_id=user.public_id if user else None,
-            user_email=user.email if user else None,
+        elif hasattr(target, "department") and target.department:
+            department = target.department
+            department_name = department.name
+
+        return {
+            "room": room,
+            "room_name": room_name,
+            "location": location,
+            "location_name": location_name,
+            "department": department,
+            "department_name": department_name,
+        }
+
+    # -------------------------------------------------
+    # Core audit writer (transaction-safe)
+    # -------------------------------------------------
+
+    def _log_audit(self, event_type, *, target=None, description="", metadata=None):
+        """
+        Schedule an immutable audit log entry after transaction commit.
+        """
+
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None) if request else None
+        scope = self._resolve_scope(target)
+
+        def _create_log():
+            AuditLog.objects.create(
+                # Actor
+                user=user,
+                user_public_id=getattr(user, "public_id", None),
+                user_email=getattr(user, "email", None),
+
+                # Event
+                event_type=event_type,
+                description=description,
+                metadata=metadata or {},
+
+                # Target snapshot
+                target_model=target.__class__.__name__ if target else None,
+                target_id=getattr(target, "public_id", None),
+                target_name=str(target) if target else None,
+
+                # Scope
+                department=scope["department"],
+                department_name=scope["department_name"],
+                location=scope["location"],
+                location_name=scope["location_name"],
+                room=scope["room"],
+                room_name=scope["room_name"],
+
+                # Request context
+                ip_address=request.META.get("REMOTE_ADDR") if request else None,
+                user_agent=request.META.get("HTTP_USER_AGENT", "") if request else "",
+            )
+
+        # 🔐 CRITICAL: audit only if DB transaction commits
+        transaction.on_commit(_create_log)
+
+    # -------------------------------------------------
+    # Public helper for domain actions (1-liner)
+    # -------------------------------------------------
+
+    def audit(self, event_type, *, target=None, description="", metadata=None):
+        """
+        Public helper for explicit business/domain audits.
+        """
+        self._log_audit(
             event_type=event_type,
-            target_model=target.__class__.__name__ if target else None,
-            target_id=getattr(target, "public_id", None),
-            target_name=str(target),
-
-            department=department,
-            department_name=department_name,
-
-            location=location,
-            location_name=location_name,
-
-            room=room,
-            room_name=room_name,
-
+            target=target,
             description=description,
-            metadata=metadata or {},
-            ip_address=self.request.META.get("REMOTE_ADDR"),
-            user_agent=self.request.META.get("HTTP_USER_AGENT", ""),
+            metadata=metadata,
         )
-        # --- DRF hooks ---
+
+    # -------------------------------------------------
+    # DRF CRUD hooks (automatic auditing)
+    # -------------------------------------------------
+
     def perform_create(self, serializer):
         obj = serializer.save()
-        self._log_audit(event_type=AuditLog.Events.MODEL_CREATED, target=obj)
+        self._log_audit(
+            event_type=AuditLog.Events.MODEL_CREATED,
+            target=obj,
+        )
 
     def perform_update(self, serializer):
         obj = serializer.save()
-        self._log_audit(event_type=AuditLog.Events.MODEL_UPDATED, target=obj)
+        self._log_audit(
+            event_type=AuditLog.Events.MODEL_UPDATED,
+            target=obj,
+        )
 
     def perform_destroy(self, instance):
-        self._log_audit(event_type=AuditLog.Events.MODEL_DELETED, target=instance)
+        self._log_audit(
+            event_type=AuditLog.Events.MODEL_DELETED,
+            target=instance,
+        )
         instance.delete()
 
 class ExcludeFiltersMixin:
