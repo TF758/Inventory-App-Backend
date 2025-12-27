@@ -2,6 +2,14 @@ from db_inventory.models.base import PublicIDModel
 from django.db import models
 from db_inventory.models.site import Room
 
+class EquipmentStatus(models.TextChoices):
+    AVAILABLE = "available"
+    ASSIGNED = "assigned"
+    LOST = "lost"
+    DAMAGED = "damaged"
+    UNDER_REPAIR = "under_repair"
+    RETIRED = "retired"
+
 class Equipment(PublicIDModel):
     PUBLIC_ID_PREFIX = "EQ"
 
@@ -11,6 +19,7 @@ class Equipment(PublicIDModel):
     serial_number = models.CharField(
         max_length=100, unique=True, blank=True, null=True
     )
+    status = models.CharField(max_length=20,choices=EquipmentStatus.choices,default=EquipmentStatus.AVAILABLE,db_index=True, null=True)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
 
     class Meta:

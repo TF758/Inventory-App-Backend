@@ -178,6 +178,8 @@ class AuditLog(PublicIDModel):
 
         USER_MOVED = "user_moved"
         EXPORT_GENERATED = "export_generated"
+        ASSET_ASSIGNED = "asset_assigned"
+        ASSET_UNASSIGNED = "asset_unassigned"
 
 
 class SiteNameChangeHistory(models.Model):

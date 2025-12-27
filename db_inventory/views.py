@@ -10,7 +10,8 @@ from .viewsets import (
     accessory_viewsets,
     general_viewsets,
     role_viewsets,
-    auth_viewsets
+    auth_viewsets,
+    asset_assignment_viewsets
 )
 
 # --- General ---
@@ -216,3 +217,8 @@ site_relocate_view = auth_viewsets.SiteRelocationAPIView.as_view()
 
 # update a user information
 admin_update_user_demographics = auth_viewsets.AdminUpdateUserView.as_view()
+
+# ASSIGNMENT VIEWS
+
+assign_equipment = asset_assignment_viewsets.AssignEquipmentView.as_view()
+unassign_equipment = asset_assignment_viewsets.UnassignEquipmentView.as_view()

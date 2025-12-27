@@ -75,4 +75,10 @@ urlpatterns = [
     # used to confirm validity of password reset token
     path("reset-password/validate-token/", password_reset_validate, name="password-reset-validate"),
 
+    # assignment
+    path("assets/equipment/assignment/", assign_equipment, name="assign-equipment"),
+    path("assets/equipment/unassign/", unassign_equipment, name="unassign-equipment"),
+
+
+
 ]
