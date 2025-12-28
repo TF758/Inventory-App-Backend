@@ -125,6 +125,10 @@ class EquipmentFilter(django_filters.FilterSet):
     room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
     location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
     department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
+    status = django_filters.BaseInFilter(
+        field_name="status",
+        lookup_expr="in"
+    )
 
 
 
@@ -137,6 +141,7 @@ class EquipmentFilter(django_filters.FilterSet):
         'room',
         'location',
         'department',
+        'status',
        
     ]
         

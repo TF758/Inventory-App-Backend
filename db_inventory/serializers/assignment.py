@@ -10,23 +10,17 @@ class AssignEquipmentSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
-        # Validate user exists
         try:
             user = User.objects.get(public_id=attrs["user_id"])
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {"user_id": "User not found"}
-            )
+            raise serializers.ValidationError({"user_id": "User not found"})
 
-        # Validate equipment exists
         try:
             equipment = Equipment.objects.get(public_id=attrs["equipment_id"])
         except Equipment.DoesNotExist:
-            raise serializers.ValidationError(
-                {"equipment_id": "Equipment not found"}
-            )
+            raise serializers.ValidationError({"equipment_id": "Equipment not found"})
 
-        # Business rules
+        # State-based business rules
         if equipment.status == EquipmentStatus.ASSIGNED:
             raise serializers.ValidationError(
                 "This equipment is already assigned"
@@ -40,10 +34,9 @@ class AssignEquipmentSerializer(serializers.Serializer):
                 "This equipment cannot be assigned in its current state"
             )
 
-        # Attach resolved objects (important)
+        # Attach resolved objects
         attrs["user"] = user
         attrs["equipment"] = equipment
-
         return attrs
 
 class UnassignEquipmentSerializer(serializers.Serializer):
@@ -74,23 +67,44 @@ class UnassignEquipmentSerializer(serializers.Serializer):
                 "This equipment is not currently assigned"
             )
 
-        # Must be assigned to THIS user
-        try:
-            assignment = equipment.active_assignment
-        except EquipmentAssignment.DoesNotExist:
-            raise serializers.ValidationError(
-                "No active assignment found for this equipment"
-            )
-
-        if assignment.user != user:
-            raise serializers.ValidationError(
-                "This equipment is not assigned to the specified user"
-            )
-
         # Attach resolved objects
         attrs["equipment"] = equipment
         attrs["user"] = user
-        attrs["assignment"] = assignment
-
         return attrs
+    
+class ReassignEquipmentSerializer(serializers.Serializer):
+    equipment_id = serializers.CharField(max_length=15)
+    from_user_id = serializers.CharField(max_length=15)
+    to_user_id = serializers.CharField(max_length=15)
+    notes = serializers.CharField(required=False, allow_blank=True)
 
+    def validate(self, attrs):
+        if attrs["from_user_id"] == attrs["to_user_id"]:
+            raise serializers.ValidationError(
+                "from_user_id and to_user_id cannot be the same"
+            )
+
+        try:
+            equipment = Equipment.objects.get(public_id=attrs["equipment_id"])
+        except Equipment.DoesNotExist:
+            raise serializers.ValidationError(
+                {"equipment_id": "Equipment not found"}
+            )
+
+        try:
+            from_user = User.objects.get(public_id=attrs["from_user_id"])
+            to_user = User.objects.get(public_id=attrs["to_user_id"])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid user")
+
+        if equipment.status != EquipmentStatus.ASSIGNED:
+            raise serializers.ValidationError(
+                "This equipment is not currently assigned"
+            )
+
+        attrs.update({
+            "equipment": equipment,
+            "from_user": from_user,
+            "to_user": to_user,
+        })
+        return attrs

@@ -18,6 +18,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             'name',
             'brand',
             'model',
+            'status',
             'serial_number',
             'room_id',
             'room_name',
