@@ -345,3 +345,78 @@ def is_admin_role(role: str) -> bool:
 
     # Any non-viewer role in the hierarchy is considered an admin/write role
     return True
+
+def has_equipment_custody_scope(
+    role: RoleAssignment,
+    equipment: Equipment,
+) -> bool:
+    """
+    Stricter scope check for equipment custody.
+    Prevents upward / sideways authority leakage.
+    """
+
+    if role.role == "SITE_ADMIN":
+        return True
+
+    if not equipment.room:
+        return False
+
+    role_name = role.role
+
+    # ROOM roles → exact room only
+    if role_name.startswith("ROOM_"):
+        return role.room == equipment.room
+
+    # LOCATION roles → same location
+    if role_name.startswith("LOCATION_"):
+        return (
+            role.location
+            and equipment.room.location == role.location
+        )
+
+    # DEPARTMENT roles → same department
+    if role_name.startswith("DEPARTMENT_"):
+        return (
+            role.department
+            and equipment.room.location.department == role.department
+        )
+
+    return False
+
+def can_assign_equipment_to_user(
+    admin_role: RoleAssignment,
+    target_user: User,
+) -> bool:
+    """
+    Determines whether an admin may assign equipment
+    to a target user (custody delegation).
+    """
+
+    if admin_role.role == "SITE_ADMIN":
+        return True
+
+    # ROOM roles → user must be in same room
+    if admin_role.role.startswith("ROOM_"):
+        return UserLocation.objects.filter(
+            user=target_user,
+            room=admin_role.room,
+            is_current=True,
+        ).exists()
+
+    # LOCATION roles → user must be in same location
+    if admin_role.role.startswith("LOCATION_"):
+        return UserLocation.objects.filter(
+            user=target_user,
+            room__location=admin_role.location,
+            is_current=True,
+        ).exists()
+
+    # DEPARTMENT roles → user must be in same department
+    if admin_role.role.startswith("DEPARTMENT_"):
+        return UserLocation.objects.filter(
+            user=target_user,
+            room__location__department=admin_role.department,
+            is_current=True,
+        ).exists()
+
+    return False

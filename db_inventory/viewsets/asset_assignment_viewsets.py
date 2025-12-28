@@ -4,7 +4,7 @@ from db_inventory.models.users import User
 from db_inventory.models.assets import Equipment, EquipmentStatus
 from db_inventory.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from db_inventory.models.audit import AuditLog
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
@@ -12,7 +12,7 @@ from rest_framework import status
 from db_inventory.mixins import AuditMixin
 from db_inventory.serializers.assignment import AssignEquipmentSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
 from db_inventory.permissions.assets import CanManageEquipmentCustody
-from db_inventory.permissions.helpers import get_active_role, is_user_in_scope
+from db_inventory.permissions.helpers import can_assign_equipment_to_user, get_active_role, is_user_in_scope
 
 
 class AssignEquipmentView(AuditMixin, APIView):
@@ -36,9 +36,9 @@ class AssignEquipmentView(AuditMixin, APIView):
 
         # ASSIGNEE JURISDICTION
         active_role = get_active_role(request.user)
-        if not is_user_in_scope(active_role, assignee):
+        if not can_assign_equipment_to_user(active_role, assignee):
             raise ValidationError(
-                "You may only assign equipment to users within your jurisdiction."
+                "You may only assign equipment to users within your room jurisdiction."
             )
 
         with transaction.atomic():
@@ -199,9 +199,9 @@ class ReassignEquipmentView(AuditMixin, APIView):
 
         # 2️⃣ ASSIGNEE JURISDICTION (ONLY FOR to_user)
         active_role = get_active_role(request.user)
-        if not is_user_in_scope(active_role, to_user):
+        if not can_assign_equipment_to_user(active_role, to_user):
             raise ValidationError(
-                "You may only reassign equipment to users within your jurisdiction."
+                "You may only reassign equipment to users within your room jurisdiction."
             )
 
         with transaction.atomic():

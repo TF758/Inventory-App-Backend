@@ -1,7 +1,7 @@
 # myapp/permissions/assets.py
 from rest_framework.permissions import BasePermission
 from .constants import ROLE_HIERARCHY
-from .helpers import get_active_role, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
+from .helpers import get_active_role, has_equipment_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from db_inventory.models.site import Room
 
 class AssetPermission(BasePermission):
@@ -86,8 +86,6 @@ class AssetPermission(BasePermission):
 class CanManageEquipmentCustody(BasePermission):
     """
     Permission to assign / unassign / reassign equipment.
-    Validates that the user's ACTIVE ROLE has admin authority
-    over the equipment's room.
     """
 
     message = "You do not have permission to manage this equipment."
@@ -100,22 +98,8 @@ class CanManageEquipmentCustody(BasePermission):
         if not role:
             return False
 
-        # SITE_ADMIN override
-        if role.role == "SITE_ADMIN":
-            return True
-
-        # Must be an admin role (not viewer)
+        # Must be admin role
         if not is_admin_role(role.role):
             return False
 
-        # Equipment MUST be in scope
-        return is_in_scope(
-            role_assignment=role,
-            room=equipment.room,
-            location=equipment.room.location if equipment.room else None,
-            department=(
-                equipment.room.location.department
-                if equipment.room and equipment.room.location
-                else None
-            ),
-        )
+        return has_equipment_custody_scope(role, equipment)
