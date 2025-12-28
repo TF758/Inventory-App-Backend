@@ -222,3 +222,4 @@ admin_update_user_demographics = auth_viewsets.AdminUpdateUserView.as_view()
 
 assign_equipment = asset_assignment_viewsets.AssignEquipmentView.as_view()
 unassign_equipment = asset_assignment_viewsets.UnassignEquipmentView.as_view()
+reassign_equipment = asset_assignment_viewsets.ReassignEquipmentView.as_view()
