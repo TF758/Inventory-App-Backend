@@ -10,10 +10,42 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.mixins import AuditMixin
-from db_inventory.serializers.assignment import AssignEquipmentSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
-from db_inventory.permissions.assets import CanManageEquipmentCustody
+from db_inventory.serializers.assignment import AssignEquipmentSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer, EquipmentAssignmentSerializer
+from db_inventory.permissions.assets import CanManageEquipmentCustody, CanViewEquipmentAssignments
 from db_inventory.permissions.helpers import can_assign_equipment_to_user, get_active_role, is_user_in_scope
+from rest_framework import mixins, viewsets
+from db_inventory.filters import EquipmentAssignmentFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
+class EquipmentAssignmentViewSet(
+    AuditMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    """
+    Viewset to handle Listing Equipment Assignment
+    both via list and in detail used by Site Admin
+    """
+
+    queryset = EquipmentAssignment.objects.select_related(
+        "equipment", "user", "assigned_by"
+    )
+    serializer_class = EquipmentAssignmentSerializer
+    permission_classes = [CanViewEquipmentAssignments]
+
+    filterset_class = EquipmentAssignmentFilter
+
+    def get_object(self):
+        equipment_public_id = self.kwargs.get("equipment_id")
+
+        obj = get_object_or_404(
+            EquipmentAssignment,
+            equipment__public_id=equipment_public_id,
+        )
+
+        self.check_object_permissions(self.request, obj)
+        return obj
 
 class AssignEquipmentView(AuditMixin, APIView):
     """
@@ -279,3 +311,6 @@ class ReassignEquipmentView(AuditMixin, APIView):
             },
             status=status.HTTP_200_OK,
         )
+    
+class EquipmentAssignmentDetails():
+    """List all Equipment Assignment """

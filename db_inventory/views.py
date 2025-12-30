@@ -85,6 +85,7 @@ equipment_id_detail_view = equipment_viewsets.EquipmentModelViewSet.as_view({
 })
 equipment_list_create_view = equipment_viewsets.EquipmentModelViewSet.as_view({'get': 'list', 'post':'create'})
 
+
 # --- Location ---
 location_accessories_light_view = location_viewsets.LocationAccessoriesMiniViewSet.as_view({'get': 'list'})
 location_accessories_view = location_viewsets.LocationAccessoriesView.as_view({'get': 'list'})
@@ -223,3 +224,11 @@ admin_update_user_demographics = auth_viewsets.AdminUpdateUserView.as_view()
 assign_equipment = asset_assignment_viewsets.AssignEquipmentView.as_view()
 unassign_equipment = asset_assignment_viewsets.UnassignEquipmentView.as_view()
 reassign_equipment = asset_assignment_viewsets.ReassignEquipmentView.as_view()
+
+equipment_assignment_list = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({
+    "get": "list",
+})
+
+equipment_assignment_detail = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({
+    "get": "retrieve",
+})

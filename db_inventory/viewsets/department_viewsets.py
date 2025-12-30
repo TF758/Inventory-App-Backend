@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserLocation, Room
 from db_inventory.serializers.roles import RoleReadSerializer
+from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -16,6 +17,7 @@ from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.serializers.rooms import RoomSerializer
 from django.contrib.contenttypes.models import ContentType
+from rest_framework import mixins
 
 
 
@@ -404,4 +406,28 @@ class DepartmentRoomsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
             .filter(location__department__public_id=department_id)
             .select_related("location", "location__department") 
             .order_by("location__name", "name")
+        )
+
+# ASSIGNMENT
+
+class DepartmentEquipmentAssignmentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    # permission_classes = [IsDepartmentAdmin]
+    serializer_class = EquipmentAssignmentSerializer
+
+    def get_queryset(self):
+        department_id = self.kwargs.get("public_id")
+
+        return EquipmentAssignment.objects.select_related(
+            "equipment",
+            "equipment__room",
+            "equipment__room__location",
+            "equipment__room__location__department",
+            "user",
+            "assigned_by",
+        ).filter(
+            equipment__room__location__department__public_id=department_id
         )
