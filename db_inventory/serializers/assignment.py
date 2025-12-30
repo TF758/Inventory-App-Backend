@@ -4,6 +4,31 @@ from db_inventory.models.users import User
 from db_inventory.models.assets import Equipment, EquipmentStatus
 from db_inventory.models.asset_assignment import EquipmentAssignment
 
+class EquipmentAssignmentSerializer(serializers.ModelSerializer):
+    equipment_id = serializers.CharField(source='equipment.public_id', read_only=True)
+    equipment_name = serializers.CharField(source='equipment.name', read_only=True)
+
+    user_id = serializers.CharField(source='user.public_id', read_only=True)
+    user_name = serializers.CharField(source="user.get_full_name",read_only=True)
+
+    assigned_by = serializers.StringRelatedField()
+
+    class Meta:
+        model = EquipmentAssignment
+        fields = [
+            "id",
+            "equipment_id",
+            "equipment_name",
+            "user_id",
+            "user_name",
+            "assigned_at",
+            "returned_at",
+            "assigned_by",
+            "notes",
+        ]
+
+
+
 class AssignEquipmentSerializer(serializers.Serializer):
     equipment_id = serializers.CharField(max_length=15)
     user_id = serializers.CharField(max_length=15)
