@@ -46,7 +46,7 @@ class AssignEquipmentSerializer(serializers.Serializer):
             raise serializers.ValidationError({"equipment_id": "Equipment not found"})
 
         # State-based business rules
-        if equipment.status == EquipmentStatus.ASSIGNED:
+        if equipment.is_assigned:
             raise serializers.ValidationError(
                 "This equipment is already assigned"
             )
@@ -74,20 +74,16 @@ class UnassignEquipmentSerializer(serializers.Serializer):
         try:
             user = User.objects.get(public_id=attrs["user_id"])
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {"user_id": "User not found"}
-            )
+            raise serializers.ValidationError({"user_id": "User not found"})
 
         # Resolve equipment
         try:
             equipment = Equipment.objects.get(public_id=attrs["equipment_id"])
         except Equipment.DoesNotExist:
-            raise serializers.ValidationError(
-                {"equipment_id": "Equipment not found"}
-            )
+            raise serializers.ValidationError({"equipment_id": "Equipment not found"})
 
         # Must be assigned
-        if equipment.status != EquipmentStatus.ASSIGNED:
+        if not equipment.is_assigned:
             raise serializers.ValidationError(
                 "This equipment is not currently assigned"
             )
@@ -122,10 +118,8 @@ class ReassignEquipmentSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError("Invalid user")
 
-        if equipment.status != EquipmentStatus.ASSIGNED:
-            raise serializers.ValidationError(
-                "This equipment is not currently assigned"
-            )
+        if not equipment.is_assigned:
+            raise serializers.ValidationError("This equipment is not currently assigned")
 
         attrs.update({
             "equipment": equipment,

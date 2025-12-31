@@ -79,7 +79,7 @@ class AssignEquipmentView(AuditMixin, APIView):
             equipment = (Equipment.objects.select_for_update().get(pk=equipment.pk))
 
             # Final guard after lock
-            if equipment.status == EquipmentStatus.ASSIGNED:
+            if equipment.is_assigned:
                 raise ValidationError("This equipment is already assigned")
 
             # OPTION 1: reuse or mutate assignment row
@@ -101,10 +101,6 @@ class AssignEquipmentView(AuditMixin, APIView):
                 assignment.save()
             else:
                 assignment.save()
-
-            # Update equipment status
-            equipment.status = EquipmentStatus.ASSIGNED
-            equipment.save(update_fields=["status"])
 
             # Domain event
             EquipmentEvent.objects.create(
@@ -162,11 +158,13 @@ class UnassignEquipmentView(AuditMixin, APIView):
             equipment = (Equipment.objects.select_for_update().get(pk=equipment.pk))
 
             # Re-resolve assignment AFTER lock
-            try:
-                assignment = equipment.active_assignment
-            except EquipmentAssignment.DoesNotExist:
+            assignment = equipment.active_assignment if equipment.is_assigned else None
+            if not assignment:
                 raise ValidationError("No active assignment found")
-
+            
+            if assignment.user != user:
+                raise ValidationError("Equipment is not assigned to this user")
+            
             # Idempotency guard
             if assignment.returned_at is not None:
                 raise ValidationError("This equipment is already unassigned")
@@ -174,10 +172,6 @@ class UnassignEquipmentView(AuditMixin, APIView):
             # Close assignment
             assignment.returned_at = timezone.now()
             assignment.save(update_fields=["returned_at"])
-
-            # Update equipment status
-            equipment.status = EquipmentStatus.AVAILABLE
-            equipment.save(update_fields=["status"])
 
             # Domain event
             EquipmentEvent.objects.create(
@@ -226,10 +220,10 @@ class ReassignEquipmentView(AuditMixin, APIView):
         to_user = serializer.validated_data["to_user"]
         notes = serializer.validated_data.get("notes", "")
 
-        # 1️⃣ ASSET AUTHORITY
+     
         self.check_object_permissions(request, equipment)
 
-        # 2️⃣ ASSIGNEE JURISDICTION (ONLY FOR to_user)
+      
         active_role = get_active_role(request.user)
         if not can_assign_equipment_to_user(active_role, to_user):
             raise ValidationError(
@@ -238,17 +232,16 @@ class ReassignEquipmentView(AuditMixin, APIView):
 
         with transaction.atomic():
 
-            # 🔒 Lock equipment row
+       
             equipment = (
                 Equipment.objects
                 .select_for_update()
                 .get(pk=equipment.pk)
             )
 
-            # Re-resolve assignment AFTER lock
-            try:
-                assignment = equipment.active_assignment
-            except EquipmentAssignment.DoesNotExist:
+         
+            assignment = equipment.active_assignment if equipment.is_assigned else None
+            if not assignment:
                 raise ValidationError("No active assignment found")
 
             # Safety check
@@ -256,6 +249,8 @@ class ReassignEquipmentView(AuditMixin, APIView):
                 raise ValidationError(
                     "Equipment is not assigned to from_user"
                 )
+            if from_user == to_user:
+                raise ValidationError("Equipment is already assigned to this user")
 
             # Domain event: returned from old user
             EquipmentEvent.objects.create(
@@ -266,7 +261,7 @@ class ReassignEquipmentView(AuditMixin, APIView):
                 notes=notes or "Equipment reassigned",
             )
 
-            # Mutate existing assignment (Option 1)
+            # Mutate existing assignment 
             assignment.user = to_user
             assignment.assigned_by = request.user
             assignment.assigned_at = timezone.now()
@@ -282,10 +277,6 @@ class ReassignEquipmentView(AuditMixin, APIView):
                 reported_by=request.user,
                 notes=notes or "Equipment reassigned",
             )
-
-            # Status remains ASSIGNED
-            equipment.status = EquipmentStatus.ASSIGNED
-            equipment.save(update_fields=["status"])
 
             # Audit log 
             self.audit(
