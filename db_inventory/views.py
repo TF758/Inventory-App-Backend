@@ -232,3 +232,5 @@ equipment_assignment_list = asset_assignment_viewsets.EquipmentAssignmentViewSet
 equipment_assignment_detail = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({
     "get": "retrieve",
 })
+
+equipment_event_history = asset_assignment_viewsets.EquipmentEventHistoryViewset.as_view({"get": "list"})

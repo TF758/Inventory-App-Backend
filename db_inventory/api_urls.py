@@ -77,6 +77,7 @@ urlpatterns = [
     path("reset-password/validate-token/", password_reset_validate, name="password-reset-validate"),
 
     # assignment
+    path("assets/equipment/<str:public_id>/event-history/", equipment_event_history, name="equipment-event-history"),
     path("assets/equipment/assign/", assign_equipment, name="assign-equipment"),
     path("assets/equipment/unassign/", unassign_equipment, name="unassign-equipment"),
      path("assets/equipment/reassign/", reassign_equipment, name="reassign-equipment"),

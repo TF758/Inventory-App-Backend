@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from db_inventory.models.users import User
 from db_inventory.models.assets import Equipment, EquipmentStatus
-from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 
 class EquipmentAssignmentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id', read_only=True)
@@ -127,3 +127,23 @@ class ReassignEquipmentSerializer(serializers.Serializer):
             "to_user": to_user,
         })
         return attrs
+
+
+class EquipmentEventSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    reported_by_email = serializers.EmailField(
+        source="reported_by.email", read_only=True
+    )
+
+    class Meta:
+        model = EquipmentEvent
+        fields = [
+            "id",
+            "event_type",
+            "occurred_at",
+            "user",
+            "user_email",
+            "reported_by",
+            "reported_by_email",
+            "notes",
+        ]

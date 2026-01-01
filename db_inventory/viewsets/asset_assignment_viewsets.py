@@ -10,12 +10,14 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.mixins import AuditMixin
-from db_inventory.serializers.assignment import AssignEquipmentSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer, EquipmentAssignmentSerializer
+from db_inventory.serializers.assignment import AssignEquipmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer, EquipmentAssignmentSerializer
 from db_inventory.permissions.assets import CanManageEquipmentCustody, CanViewEquipmentAssignments
 from db_inventory.permissions.helpers import can_assign_equipment_to_user, get_active_role, is_user_in_scope
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, viewsets, filters
 from db_inventory.filters import EquipmentAssignmentFilter
 from django_filters.rest_framework import DjangoFilterBackend
+
+from db_inventory.pagination import FlexiblePagination
 
 class EquipmentAssignmentViewSet(
     AuditMixin,
@@ -33,6 +35,7 @@ class EquipmentAssignmentViewSet(
     )
     serializer_class = EquipmentAssignmentSerializer
     permission_classes = [CanViewEquipmentAssignments]
+    pagination_class = FlexiblePagination
 
     filterset_class = EquipmentAssignmentFilter
 
@@ -303,5 +306,24 @@ class ReassignEquipmentView(AuditMixin, APIView):
             status=status.HTTP_200_OK,
         )
     
-class EquipmentAssignmentDetails():
-    """List all Equipment Assignment """
+class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
+    """
+    Full chronological event timeline for a piece of equipment.
+    """
+    serializer_class = EquipmentEventSerializer
+    pagination_class = FlexiblePagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ["occurred_at"]
+    # most recent first
+    ordering = ["-occurred_at"] 
+
+    def get_queryset(self):
+        equipment_id = self.kwargs.get("public_id")
+
+        return (
+            EquipmentEvent.objects.filter(
+                equipment__public_id=equipment_id
+            )
+            .select_related("user", "reported_by")
+        )
+        
