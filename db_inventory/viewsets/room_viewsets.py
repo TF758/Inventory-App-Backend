@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from db_inventory.serializers.rooms import  *
+from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.models import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -10,6 +11,7 @@ from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers import *
 from django.db.models import Q
+from rest_framework import mixins
 
 
 class RoomModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
@@ -84,14 +86,16 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
 
 
     def get_queryset(self):
-        room_id = self.kwargs.get('public_id')
+        room_id = self.kwargs.get("public_id")
+
         return (
             UserLocation.objects.filter(
-                room__public_id=room_id
+                is_current=True,
+                room__public_id=room_id,
             )
             .select_related(
-                'user',
-                'room',
+                "user",
+                "room",
             )
         )
     
@@ -318,3 +322,24 @@ class RoomRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyMod
         qs = self.filter_visibility(qs)
 
         return qs.order_by("-id")
+
+class RoomEquipmentAssignmentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = EquipmentAssignmentSerializer
+
+    def get_queryset(self):
+        room_id = self.kwargs.get("public_id")
+
+        return EquipmentAssignment.objects.select_related(
+            "equipment",
+            "equipment__room",
+            "equipment__room__location",
+            "equipment__room__location__department",
+            "user",
+            "assigned_by",
+        ).filter(
+            equipment__room__public_id=room_id
+        )

@@ -1,6 +1,14 @@
 from db_inventory.models.base import PublicIDModel
 from django.db import models
 from db_inventory.models.site import Room
+from django.apps import apps
+
+class EquipmentStatus(models.TextChoices):
+    OK = "ok", "OK"
+    DAMAGED = "damaged", "Damaged"
+    UNDER_REPAIR = "under_repair", "Under repair"
+    LOST = "lost", "Lost"
+    RETIRED = "retired", "Retired"
 
 class Equipment(PublicIDModel):
     PUBLIC_ID_PREFIX = "EQ"
@@ -11,6 +19,7 @@ class Equipment(PublicIDModel):
     serial_number = models.CharField(
         max_length=100, unique=True, blank=True, null=True
     )
+    status = models.CharField(max_length=20,choices=EquipmentStatus.choices,default=EquipmentStatus.OK,db_index=True, null=True)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
 
     class Meta:
@@ -19,6 +28,16 @@ class Equipment(PublicIDModel):
             models.Index(fields=["name"]),
             models.Index(fields=["serial_number"]),
         ]
+ 
+    @property
+    def is_assigned(self) -> bool:
+        EquipmentAssignment = apps.get_model(
+            "db_inventory", "EquipmentAssignment"
+        )
+        try:
+            return self.active_assignment.returned_at is None
+        except EquipmentAssignment.DoesNotExist:
+            return False
 
     def __str__(self):
         return f"{self.name} - {self.public_id}"

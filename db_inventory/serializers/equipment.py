@@ -4,12 +4,16 @@ from  db_inventory.models.assets import Equipment
 from db_inventory.models.site import  Room
 
 class EquipmentSerializer(serializers.ModelSerializer):
+    is_assigned = serializers.SerializerMethodField()
     room_id = serializers.CharField(source='room.public_id', default=None, read_only=True)
     room_name = serializers.CharField(source='room.name', default=None, read_only=True)
     location_id = serializers.CharField(source='room.location.public_id', default=None, read_only=True)
     location_name = serializers.CharField(source='room.location.name', default=None, read_only=True)
     department_id = serializers.CharField(source='room.location.department.public_id', default=None, read_only=True)
     department_name = serializers.CharField(source='room.location.department.name', default=None, read_only=True)
+
+    def get_is_assigned(self, obj):
+        return obj.is_assigned
 
     class Meta:
         model = Equipment
@@ -18,6 +22,8 @@ class EquipmentSerializer(serializers.ModelSerializer):
             'name',
             'brand',
             'model',
+            'status',
+            'is_assigned',   
             'serial_number',
             'room_id',
             'room_name',
@@ -33,7 +39,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
         exclude_location = kwargs.pop('exclude_location', False)
         exclude_department = kwargs.pop('exclude_department', False)
         super().__init__(*args, **kwargs)
-
+    
 
         if exclude_room:
             self.fields.pop('room_id', None)

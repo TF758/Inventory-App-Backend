@@ -46,14 +46,12 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
         active = getattr(user, "active_role", None)
 
-        # 🔑 Always allow user to see their own roles
         own_roles = qs.filter(user=user)
 
         # SITE_ADMIN sees everything
         if active and active.role == "SITE_ADMIN":
             return qs
 
-        # No active role → only own roles
         if not active:
             return own_roles
 

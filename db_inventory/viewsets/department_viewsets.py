@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserLocation, Room
 from db_inventory.serializers.roles import RoleReadSerializer
+from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -16,6 +17,7 @@ from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.serializers.rooms import RoomSerializer
 from django.contrib.contenttypes.models import ContentType
+from rest_framework import mixins
 
 
 
@@ -79,10 +81,14 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
     def get_queryset(self):
         department_id = self.kwargs.get("public_id")
 
-        queryset = (
-            UserLocation.objects.filter(
+        return (
+            UserLocation.objects.filter(is_current=True)
+            .filter(
                 Q(room__location__department__public_id=department_id)
-                | Q(user__created_by__user_locations__room__location__department__public_id=department_id)
+                | Q(
+                    user__created_by__user_locations__is_current=True,
+                    user__created_by__user_locations__room__location__department__public_id=department_id
+                )
                 | Q(user__role_assignments__department__public_id=department_id)
             )
             .select_related(
@@ -94,8 +100,6 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
             .distinct()
             .order_by("-id")
         )
-
-        return queryset
 
     
     def get_serializer(self, *args, **kwargs):
@@ -116,18 +120,26 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     permission_classes=[UserPermission]
 
     def get_queryset(self):
-        department_id = self.kwargs.get('public_id')
+        department_id = self.kwargs.get("public_id")
+
         return (
-            UserLocation.objects.filter(
-                room__location__department__public_id=department_id
+            UserLocation.objects.filter(is_current=True)
+            .filter(
+                Q(room__location__department__public_id=department_id)
+                | Q(
+                    user__created_by__user_locations__is_current=True,
+                    user__created_by__user_locations__room__location__department__public_id=department_id
+                )
+                | Q(user__role_assignments__department__public_id=department_id)
             )
             .select_related(
-                'user',
-                'room',
-                'room__location',
-                'room__location__department'
+                "user",
+                "room",
+                "room__location",
+                "room__location__department",
             )
-            .order_by('-id')[:20]  # last 20 entries, most recent first
+            .distinct()
+            .order_by("-id")
         )
 
 class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
@@ -404,4 +416,28 @@ class DepartmentRoomsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
             .filter(location__department__public_id=department_id)
             .select_related("location", "location__department") 
             .order_by("location__name", "name")
+        )
+
+# ASSIGNMENT
+
+class DepartmentEquipmentAssignmentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    # permission_classes = [IsDepartmentAdmin]
+    serializer_class = EquipmentAssignmentSerializer
+
+    def get_queryset(self):
+        department_id = self.kwargs.get("public_id")
+
+        return EquipmentAssignment.objects.select_related(
+            "equipment",
+            "equipment__room",
+            "equipment__room__location",
+            "equipment__room__location__department",
+            "user",
+            "assigned_by",
+        ).filter(
+            equipment__room__location__department__public_id=department_id
         )

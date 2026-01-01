@@ -3,6 +3,7 @@ from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.serializers.roles import RoleReadSerializer
 from db_inventory.serializers.locations import LocationWriteSerializer, LocationRoomSerializer, LocationReadSerializer, LocationListSerializer, LocationComponentSerializer
 from db_inventory.serializers.users import UserAreaSerializer
+from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.models.assets import Equipment, Consumable, Accessory, Component
@@ -17,6 +18,9 @@ from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from django.db.models import Q
 from db_inventory.mixins import AuditMixin
+from rest_framework import mixins
+
+from db_inventory.permissions.assets import HasAssignmentScopePermission
 
 class LocationModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -125,14 +129,16 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
     
 
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
+        location_id = self.kwargs.get("public_id")
+
         return (
             UserLocation.objects.filter(
-                room__location__public_id=location_id
+                is_current=True,
+                room__location__public_id=location_id,
             )
             .select_related(
-                'user',
-                'room',
+                "user",
+                "room",
             )
         )
     
@@ -149,11 +155,17 @@ class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes =[UserPermission]
 
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
+        location_id = self.kwargs.get("public_id")
+
         return (
-            UserLocation.objects.filter(room__location__public_id=location_id)
-            .select_related('user', 'room')
-            .order_by('-id')[:20]
+            UserLocation.objects.filter(
+                is_current=True,
+                room__location__public_id=location_id,
+            )
+            .select_related(
+                "user",
+                "room",
+            )
         )
 
 class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
@@ -374,4 +386,26 @@ class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnl
         visible_qs = self.filter_visibility(scoped_qs)
 
         return visible_qs.order_by("-id")
-    
+
+class LocationEquipmentAssignmentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = EquipmentAssignmentSerializer
+
+    permission_classes = [HasAssignmentScopePermission]
+
+    def get_queryset(self):
+        location_id = self.kwargs.get("public_id")
+
+        return EquipmentAssignment.objects.select_related(
+            "equipment",
+            "equipment__room",
+            "equipment__room__location",
+            "equipment__room__location__department",
+            "user",
+            "assigned_by",
+        ).filter(
+            equipment__room__location__public_id=location_id
+        )

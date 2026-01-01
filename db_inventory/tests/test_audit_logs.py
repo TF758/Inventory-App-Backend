@@ -8,8 +8,10 @@ from db_inventory.factories import (
     DepartmentFactory, LocationFactory, RoomFactory,
     EquipmentFactory
 )
+from django.test import TransactionTestCase
 
-class AuditLogTests(TestCase):
+class AuditLogTests(TransactionTestCase):
+    reset_sequences = True
     def setUp(self):
         # API client
         self.client = APIClient()

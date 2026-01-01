@@ -1,8 +1,9 @@
-# myapp/permissions/assets.py
 from rest_framework.permissions import BasePermission
+from db_inventory.models.asset_assignment import EquipmentAssignment
 from .constants import ROLE_HIERARCHY
-from .helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
-from db_inventory.models.site import Room
+from .helpers import get_active_role, has_equipment_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
+from db_inventory.models.site import Department, Location, Room
+from rest_framework.exceptions import PermissionDenied
 
 class AssetPermission(BasePermission):
     """
@@ -81,4 +82,128 @@ class AssetPermission(BasePermission):
         return (
             has_hierarchy_permission(active_role.role, required_role)
             and is_in_scope(active_role, room=room_for_scope)
+        )
+
+class CanManageEquipmentCustody(BasePermission):
+    """
+    Permission to assign / unassign / reassign equipment.
+    """
+
+    message = "You do not have permission to manage this equipment."
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, equipment):
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # Must be admin role
+        if not is_admin_role(role.role):
+            return False
+
+        return has_equipment_custody_scope(role, equipment)
+
+class HasAssignmentScopePermission(BasePermission):
+    """
+    Permission for viewing equipment assignments.
+
+    Rules:
+    - Requires active role
+    - SITE_ADMIN bypasses all checks
+    - Viewer roles are denied
+    - Active role must cover the requested scope object
+      (department / location / room)
+    """
+
+    message = "You do not have permission to view equipment assignments for this scope."
+
+    def has_permission(self, request, view):
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # SITE_ADMIN bypass
+        if role.role == "SITE_ADMIN":
+            return True
+
+        # Viewer roles are blocked
+        if is_viewer_role(role.role):
+            return False
+
+        # Resolve scope object from URL
+        public_id = view.kwargs.get("public_id")
+        if not public_id:
+            return False
+
+        department = location = room = None
+
+        # Try resolving in order of hierarchy
+        department = Department.objects.filter(public_id=public_id).first()
+        if not department:
+            location = Location.objects.filter(public_id=public_id).first()
+        if not location and not department:
+            room = Room.objects.filter(public_id=public_id).first()
+
+        if not any([department, location, room]):
+            raise PermissionDenied("Invalid scope identifier.")
+
+        # Pure scope coverage check
+        return is_in_scope(
+            role,
+            room=room,
+            location=location,
+            department=department,
+        )
+
+class CanViewEquipmentAssignments(BasePermission):
+    """
+    Permissions for EquipmentAssignmentViewSet.
+
+    - list: SITE_ADMIN only
+    - retrieve: admins whose active role covers the equipment's room
+    """
+
+    message = "You do not have permission to view this equipment assignment."
+
+    def has_permission(self, request, view):
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # LIST endpoint → SITE_ADMIN only
+        if view.action == "list":
+            return role.role == "SITE_ADMIN"
+
+        # For retrieve, defer to object-level permission
+        return True
+
+    def has_object_permission(self, request, view, obj: EquipmentAssignment):
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # SITE_ADMIN bypass
+        if role.role == "SITE_ADMIN":
+            return True
+
+        # Viewer roles blocked
+        if is_viewer_role(role.role):
+            return False
+
+        equipment = obj.equipment
+        if not equipment or not equipment.room:
+            return False
+
+        # Pure scope coverage via equipment room
+        return is_in_scope(
+            role,
+            room=equipment.room,
+            location=equipment.room.location if equipment.room else None,
+            department=(
+                equipment.room.location.department
+                if equipment.room and equipment.room.location
+                else None
+            ),
         )

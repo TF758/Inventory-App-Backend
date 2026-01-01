@@ -34,6 +34,7 @@ urlpatterns = [
     path('equipments/<str:public_id>/', equipment_id_detail_view, name='equipment-detail'),
     path('equipments-import/', equipment_batch_import_view, name='equipment-batch-import'),
      path('equipments-validate-import/', equipment_batch_validate_view, name='equipment-batch-validate'),
+    
 
     path('components/', component_list_create_view, name='components'), 
     path('components/<str:public_id>/', component_id_detail_view, name='component-detail'),
@@ -74,5 +75,16 @@ urlpatterns = [
 
     # used to confirm validity of password reset token
     path("reset-password/validate-token/", password_reset_validate, name="password-reset-validate"),
+
+    # assignment
+    path("assets/equipment/<str:public_id>/event-history/", equipment_event_history, name="equipment-event-history"),
+    path("assets/equipment/assign/", assign_equipment, name="assign-equipment"),
+    path("assets/equipment/unassign/", unassign_equipment, name="unassign-equipment"),
+     path("assets/equipment/reassign/", reassign_equipment, name="reassign-equipment"),
+
+    path("assets/equipment-assignments/",equipment_assignment_list,name="equipment-assignment-list",),
+    path("assets/equipment-assignments/<str:equipment_id>/",equipment_assignment_detail, name="equipment-assignment-detail",),
+
+
 
 ]

@@ -5,10 +5,15 @@ from db_inventory.models.users import *
 from db_inventory.models.security import *
 from db_inventory.models.roles import *
 from db_inventory.models.audit import *
+from db_inventory.models.asset_assignment import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
 # Simple models
+
+admin.site.register(EquipmentAssignment)
+
+admin.site.register(EquipmentEvent)
 
 admin.site.register(SiteNameChangeHistory)
 
@@ -89,7 +94,7 @@ class RoomAdmin(admin.ModelAdmin):
 class EquipmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'serial_number', 'public_id')  
     readonly_fields = ('public_id',) 
-    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room')
+    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room', 'status')
 
 
 @admin.register(Component)
