@@ -55,40 +55,19 @@ class UserFilter(django_filters.FilterSet):
 
     def filter_q(self, queryset, name, value):
         """
-        Used to query user model when doing live search
+        used primarily for live search by email
         """
 
-        value = value.strip()
+        value = value.strip().lower()
         if len(value) < 2:
             return queryset.none()
 
-        # Tokenize: "john doe" → ["john", "doe"]
-        terms = [t for t in value.lower().split() if len(t) >= 2]
-        if not terms:
-            return queryset.none()
+        return (
+            queryset
+            .filter(email__istartswith=value)
+            .order_by("email")[:20]
+        )
 
-        q_filter = Q()
-        for term in terms:
-            q_filter |= (
-                Q(email__icontains=term)
-                | Q(fname__icontains=term)
-                | Q(lname__icontains=term)
-            )
-
-        queryset = queryset.filter(q_filter)
-
-        # Rank prefix matches higher
-        queryset = queryset.annotate(
-            relevance=Case(
-                When(email__istartswith=value, then=Value(1)),
-                When(fname__istartswith=value, then=Value(2)),
-                When(lname__istartswith=value, then=Value(3)),
-                default=Value(4),
-                output_field=IntegerField(),
-            )
-        ).order_by("relevance", "email")
-
-        return queryset[:20]
 
 class DepartmentFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
@@ -158,41 +137,18 @@ class AreaUserFilter(django_filters.FilterSet):
 
     def filter_q(self, queryset, name, value):
         """
-       Used for live searches
+         used primarily for live search by email
         """
 
-        value = value.strip()
-        if not value:
+        value = value.strip().lower()
+        if len(value) < 2:
             return queryset.none()
 
-        # Split into tokens (e.g. "john doe" → ["john", "doe"])
-        terms = [t for t in value.lower().split() if len(t) >= 2]
-
-        if not terms:
-            return queryset.none()
-
-        # Match ANY term across email / fname / lname
-        q_filter = Q()
-        for term in terms:
-            q_filter |= (
-                Q(user__email__icontains=term)
-                | Q(user__fname__icontains=term)
-                | Q(user__lname__icontains=term)
-            )
-
-        queryset = queryset.filter(q_filter)
-
-        queryset = queryset.annotate(
-            relevance=Case(
-                When(user__email__istartswith=value, then=Value(1)),
-                When(user__fname__istartswith=value, then=Value(2)),
-                When(user__lname__istartswith=value, then=Value(3)),
-                default=Value(4),
-                output_field=IntegerField(),
-            )
-        ).order_by("relevance", "user__email")
-
-        return queryset[:20]
+        return (
+            queryset
+            .filter(user__email__istartswith=value)
+            .order_by("user__email")[:20]
+    )
 
 class EquipmentFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
@@ -201,10 +157,8 @@ class EquipmentFilter(django_filters.FilterSet):
     room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
     location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
     department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
-    status = django_filters.BaseInFilter(
-        field_name="status",
-        lookup_expr="in"
-    )
+    status = django_filters.BaseInFilter(field_name="status",lookup_expr="in")
+    is_assigned = django_filters.BooleanFilter(method="filter_is_assigned")
 
 
     class Meta:
@@ -217,8 +171,26 @@ class EquipmentFilter(django_filters.FilterSet):
         'location',
         'department',
         'status',
+         'is_assigned',
        
     ]
+    # filter using equipment asignemnt related_name
+    def filter_is_assigned(self, queryset, name, value):
+        if value is True:
+            # Assigned equipment ONLY
+            return queryset.filter(
+                active_assignment__isnull=False,
+                active_assignment__returned_at__isnull=True,
+            )
+
+        if value is False:
+            # Unassigned equipment ONLY
+            return queryset.exclude(
+                active_assignment__isnull=False,
+                active_assignment__returned_at__isnull=True,
+            )
+
+        return queryset
         
 class LocationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains', field_name="name")
