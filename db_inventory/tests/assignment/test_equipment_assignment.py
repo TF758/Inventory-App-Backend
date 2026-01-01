@@ -8,21 +8,14 @@ from db_inventory.models.assets import EquipmentStatus
 from db_inventory.models.roles import RoleAssignment
 
 class EquipmentAssignmentAPITestCase(TestCase):
-
     def setUp(self):
         self.client = APIClient()
-        self.assign_url = reverse('assign-equipment')
-        self.unassign_url =  reverse('unassign-equipment')
-        self.reassign_url = reverse('reassign-equipment')
-
-class TestAssignEquipment(EquipmentAssignmentAPITestCase):
-
-   
-    def setUp(self):
-        super().setUp()
         self.assign_url = reverse("assign-equipment")
         self.unassign_url = reverse("unassign-equipment")
         self.reassign_url = reverse("reassign-equipment")
+
+
+class TestAssignEquipment(EquipmentAssignmentAPITestCase):
 
     def test_room_admin_can_assign_equipment_to_user_in_same_room(self):
         dept = DepartmentFactory()
@@ -30,11 +23,7 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
         room = RoomFactory(location=loc)
 
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN",room=room)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -46,7 +35,7 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
         self.client.force_authenticate(admin)
 
         response = self.client.post(
-             self.assign_url,
+            self.assign_url,
             {
                 "equipment_id": equipment.public_id,
                 "user_id": assignee.public_id,
@@ -57,12 +46,12 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
 
         self.assertEqual(response.status_code, 201)
 
+        equipment.refresh_from_db()
+        self.assertTrue(equipment.is_assigned)
+
         assignment = EquipmentAssignment.objects.get(equipment=equipment)
         self.assertEqual(assignment.user, assignee)
 
-        equipment.refresh_from_db()
-        self.assertEqual(equipment.status, EquipmentStatus.ASSIGNED)
-    
     def test_room_admin_cannot_assign_to_user_outside_room(self):
         dept = DepartmentFactory()
         loc = LocationFactory(department=dept)
@@ -71,11 +60,7 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
         room_b = RoomFactory(location=loc)
 
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room_a,
-        )
+        RoleAssignment.objects.create(user=admin, role="ROOM_ADMIN", room=room_a)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -98,6 +83,9 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("jurisdiction", str(response.data).lower())
 
+        equipment.refresh_from_db()
+        self.assertFalse(equipment.is_assigned)
+
     def test_location_admin_cannot_assign_equipment_outside_location(self):
         dept = DepartmentFactory()
 
@@ -108,11 +96,7 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
         room_b = RoomFactory(location=loc_b)
 
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="LOCATION_ADMIN",
-            location=loc_b,
-        )
+        RoleAssignment.objects.create(user=admin,role="LOCATION_ADMIN",location=loc_b,)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -122,7 +106,6 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
         equipment = EquipmentFactory(room=room_a)
 
         self.client.force_authenticate(admin)
-
 
         response = self.client.post(
             self.assign_url,
@@ -135,14 +118,10 @@ class TestAssignEquipment(EquipmentAssignmentAPITestCase):
 
         self.assertEqual(response.status_code, 403)
 
-class TestReassignEquipment(EquipmentAssignmentAPITestCase):
+        equipment.refresh_from_db()
+        self.assertFalse(equipment.is_assigned)
 
-    
-    def setUp(self):
-        super().setUp()
-        self.assign_url = reverse("assign-equipment")
-        self.unassign_url = reverse("unassign-equipment")
-        self.reassign_url = reverse("reassign-equipment")
+class TestReassignEquipment(EquipmentAssignmentAPITestCase):
 
     def test_reassign_equipment_within_scope(self):
         dept = DepartmentFactory()
@@ -150,11 +129,7 @@ class TestReassignEquipment(EquipmentAssignmentAPITestCase):
         room = RoomFactory(location=loc)
 
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN", room=room)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -165,13 +140,7 @@ class TestReassignEquipment(EquipmentAssignmentAPITestCase):
 
         equipment = EquipmentFactory(room=room)
 
-        EquipmentAssignment.objects.create(
-            equipment=equipment,
-            user=user_a,
-            assigned_by=admin,
-        )
-        equipment.status = EquipmentStatus.ASSIGNED
-        equipment.save()
+        EquipmentAssignment.objects.create(equipment=equipment,user=user_a,assigned_by=admin)
 
         self.client.force_authenticate(admin)
 
@@ -187,6 +156,9 @@ class TestReassignEquipment(EquipmentAssignmentAPITestCase):
 
         self.assertEqual(response.status_code, 200)
 
+        equipment.refresh_from_db()
+        self.assertTrue(equipment.is_assigned)
+
         assignment = EquipmentAssignment.objects.get(equipment=equipment)
         self.assertEqual(assignment.user, user_b)
 
@@ -198,11 +170,7 @@ class TestReassignEquipment(EquipmentAssignmentAPITestCase):
         room_b = RoomFactory(location=loc)
 
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room_a,
-        )
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN",room=room_a,)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -213,13 +181,7 @@ class TestReassignEquipment(EquipmentAssignmentAPITestCase):
 
         equipment = EquipmentFactory(room=room_a)
 
-        EquipmentAssignment.objects.create(
-            equipment=equipment,
-            user=user_a,
-            assigned_by=admin,
-        )
-        equipment.status = EquipmentStatus.ASSIGNED
-        equipment.save()
+        EquipmentAssignment.objects.create(equipment=equipment,user=user_a,assigned_by=admin)
 
         self.client.force_authenticate(admin)
 
@@ -235,6 +197,10 @@ class TestReassignEquipment(EquipmentAssignmentAPITestCase):
 
         self.assertEqual(response.status_code, 400)
 
+        equipment.refresh_from_db()
+        assignment = EquipmentAssignment.objects.get(equipment=equipment)
+        self.assertEqual(assignment.user, user_a)
+
 class TestUnassignEquipment(EquipmentAssignmentAPITestCase):
 
     def test_unassign_equipment(self):
@@ -243,11 +209,7 @@ class TestUnassignEquipment(EquipmentAssignmentAPITestCase):
         room = RoomFactory(location=loc)
 
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN",room=room)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -256,13 +218,7 @@ class TestUnassignEquipment(EquipmentAssignmentAPITestCase):
 
         equipment = EquipmentFactory(room=room)
 
-        EquipmentAssignment.objects.create(
-            equipment=equipment,
-            user=user,
-            assigned_by=admin,
-        )
-        equipment.status = EquipmentStatus.ASSIGNED
-        equipment.save()
+        EquipmentAssignment.objects.create(equipment=equipment,user=user,assigned_by=admin,)
 
         self.client.force_authenticate(admin)
 
@@ -278,7 +234,7 @@ class TestUnassignEquipment(EquipmentAssignmentAPITestCase):
         self.assertEqual(response.status_code, 200)
 
         equipment.refresh_from_db()
-        self.assertEqual(equipment.status, EquipmentStatus.AVAILABLE)
+        self.assertFalse(equipment.is_assigned)
 
 class TestAssignEquipmentEdgeCases(EquipmentAssignmentAPITestCase):
 
@@ -287,7 +243,6 @@ class TestAssignEquipmentEdgeCases(EquipmentAssignmentAPITestCase):
         If equipment changes jurisdiction before assignment is committed,
         the assignment should fail.
         """
-
         # Department / location setup
         dept_a = DepartmentFactory()
         dept_b = DepartmentFactory()
@@ -300,11 +255,7 @@ class TestAssignEquipmentEdgeCases(EquipmentAssignmentAPITestCase):
 
         # Admin with authority over Location A
         admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="LOCATION_ADMIN",
-            location=loc_a,
-        )
+        RoleAssignment.objects.create(user=admin,role="LOCATION_ADMIN",location=loc_a,)
         admin.active_role = admin.role_assignments.first()
         admin.save()
 
@@ -330,6 +281,115 @@ class TestAssignEquipmentEdgeCases(EquipmentAssignmentAPITestCase):
             format="json",
         )
 
-        # EXPECTED SAFE BEHAVIOR
         self.assertEqual(response.status_code, 403)
-        self.assertIn("detail", response.data)
+
+        equipment.refresh_from_db()
+        self.assertFalse(equipment.is_assigned)
+
+class TestEquipmentAssignmentGuards(EquipmentAssignmentAPITestCase):
+
+    def test_assign_fails_if_equipment_already_assigned(self):
+        dept = DepartmentFactory()
+        loc = LocationFactory(department=dept)
+        room = RoomFactory(location=loc)
+
+        admin = UserFactory()
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN",room=room)
+        admin.active_role = admin.role_assignments.first()
+        admin.save()
+
+        user_a = UserFactory()
+        user_b = UserFactory()
+        UserLocationFactory(user=user_a, room=room)
+        UserLocationFactory(user=user_b, room=room)
+
+        equipment = EquipmentFactory(room=room)
+
+        EquipmentAssignment.objects.create(equipment=equipment,user=user_a,assigned_by=admin)
+
+        self.client.force_authenticate(admin)
+
+        response = self.client.post(
+            self.assign_url,
+            {
+                "equipment_id": equipment.public_id,
+                "user_id": user_b.public_id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        equipment.refresh_from_db()
+        assignment = EquipmentAssignment.objects.get(equipment=equipment)
+        self.assertEqual(assignment.user, user_a)
+
+    def test_unassign_fails_if_wrong_user(self):
+        dept = DepartmentFactory()
+        loc = LocationFactory(department=dept)
+        room = RoomFactory(location=loc)
+
+        admin = UserFactory()
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN",room=room,)
+        admin.active_role = admin.role_assignments.first()
+        admin.save()
+
+        assigned_user = UserFactory()
+        other_user = UserFactory()
+        UserLocationFactory(user=assigned_user, room=room)
+        UserLocationFactory(user=other_user, room=room)
+
+        equipment = EquipmentFactory(room=room)
+
+        EquipmentAssignment.objects.create(equipment=equipment,user=assigned_user,assigned_by=admin,)
+
+        self.client.force_authenticate(admin)
+
+        response = self.client.post(
+            self.unassign_url,
+            {
+                "equipment_id": equipment.public_id,
+                "user_id": other_user.public_id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        equipment.refresh_from_db()
+        self.assertTrue(equipment.is_assigned)
+
+    def test_reassign_to_same_user_fails(self):
+        dept = DepartmentFactory()
+        loc = LocationFactory(department=dept)
+        room = RoomFactory(location=loc)
+
+        admin = UserFactory()
+        RoleAssignment.objects.create(user=admin,role="ROOM_ADMIN",room=room,)
+        admin.active_role = admin.role_assignments.first()
+        admin.save()
+
+        user = UserFactory()
+        UserLocationFactory(user=user, room=room)
+
+        equipment = EquipmentFactory(room=room)
+
+        EquipmentAssignment.objects.create(equipment=equipment,user=user,assigned_by=admin,)
+
+        self.client.force_authenticate(admin)
+
+        response = self.client.post(
+            self.reassign_url,
+            {
+                "equipment_id": equipment.public_id,
+                "from_user_id": user.public_id,
+                "to_user_id": user.public_id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        equipment.refresh_from_db()
+        assignment = EquipmentAssignment.objects.get(equipment=equipment)
+        self.assertEqual(assignment.user, user)
