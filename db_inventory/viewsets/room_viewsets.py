@@ -86,14 +86,16 @@ class RoomUsersViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelView
 
 
     def get_queryset(self):
-        room_id = self.kwargs.get('public_id')
+        room_id = self.kwargs.get("public_id")
+
         return (
             UserLocation.objects.filter(
-                room__public_id=room_id
+                is_current=True,
+                room__public_id=room_id,
             )
             .select_related(
-                'user',
-                'room',
+                "user",
+                "room",
             )
         )
     

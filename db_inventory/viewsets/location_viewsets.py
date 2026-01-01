@@ -129,14 +129,16 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
     
 
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
+        location_id = self.kwargs.get("public_id")
+
         return (
             UserLocation.objects.filter(
-                room__location__public_id=location_id
+                is_current=True,
+                room__location__public_id=location_id,
             )
             .select_related(
-                'user',
-                'room',
+                "user",
+                "room",
             )
         )
     
@@ -153,11 +155,17 @@ class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes =[UserPermission]
 
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
+        location_id = self.kwargs.get("public_id")
+
         return (
-            UserLocation.objects.filter(room__location__public_id=location_id)
-            .select_related('user', 'room')
-            .order_by('-id')[:20]
+            UserLocation.objects.filter(
+                is_current=True,
+                room__location__public_id=location_id,
+            )
+            .select_related(
+                "user",
+                "room",
+            )
         )
 
 class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):

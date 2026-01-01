@@ -81,10 +81,14 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
     def get_queryset(self):
         department_id = self.kwargs.get("public_id")
 
-        queryset = (
-            UserLocation.objects.filter(
+        return (
+            UserLocation.objects.filter(is_current=True)
+            .filter(
                 Q(room__location__department__public_id=department_id)
-                | Q(user__created_by__user_locations__room__location__department__public_id=department_id)
+                | Q(
+                    user__created_by__user_locations__is_current=True,
+                    user__created_by__user_locations__room__location__department__public_id=department_id
+                )
                 | Q(user__role_assignments__department__public_id=department_id)
             )
             .select_related(
@@ -96,8 +100,6 @@ class DepartmentUsersViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, Ex
             .distinct()
             .order_by("-id")
         )
-
-        return queryset
 
     
     def get_serializer(self, *args, **kwargs):
@@ -118,18 +120,26 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     permission_classes=[UserPermission]
 
     def get_queryset(self):
-        department_id = self.kwargs.get('public_id')
+        department_id = self.kwargs.get("public_id")
+
         return (
-            UserLocation.objects.filter(
-                room__location__department__public_id=department_id
+            UserLocation.objects.filter(is_current=True)
+            .filter(
+                Q(room__location__department__public_id=department_id)
+                | Q(
+                    user__created_by__user_locations__is_current=True,
+                    user__created_by__user_locations__room__location__department__public_id=department_id
+                )
+                | Q(user__role_assignments__department__public_id=department_id)
             )
             .select_related(
-                'user',
-                'room',
-                'room__location',
-                'room__location__department'
+                "user",
+                "room",
+                "room__location",
+                "room__location__department",
             )
-            .order_by('-id')[:20]  # last 20 entries, most recent first
+            .distinct()
+            .order_by("-id")
         )
 
 class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
