@@ -43,7 +43,7 @@ class AssetPermission(BasePermission):
         if not has_hierarchy_permission(active_role.role, required_role):
             return False
 
-        # Scope check for POST (new objects)
+    
         if request.method == "POST":
             room_id = request.data.get("room")
             if not room_id:

@@ -40,6 +40,7 @@ class EquipmentEvent(models.Model):
         DAMAGED="damaged", "Damaged"
         REPAIRED="repaired", "Repaired"
         RETIRED = "retired", "Retired"
+        UNDER_REPAIR = "under_repair", "Under repair"
     
 
     equipment = models.ForeignKey(

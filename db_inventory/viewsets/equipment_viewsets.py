@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from db_inventory.serializers.equipment import (
+EquipmentStatusChangeSerializer,
 EquipmentWriteSerializer
 ,EquipmentSerializer
 )
@@ -15,11 +16,14 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import AssetPermission, is_in_scope
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+from db_inventory.utils.asset_helpers import equipment_event_from_status
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
     """ViewSet for managing Equipment objects.
-    This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Equipment objects."""
+    """
 
     queryset = Equipment.objects.all().order_by('-id')
     lookup_field = 'public_id'
@@ -127,4 +131,64 @@ class EquipmentBatchImportView(EquipmentBatchMixin, APIView):
                 },
             },
             status=status.HTTP_207_MULTI_STATUS,
+        )
+
+class EquipmentStatusChangeView(APIView):
+
+    """Dedicated view to update equipment sttaus"""
+    permission_classes = [AssetPermission]
+
+    def patch(self, request, public_id):
+        serializer = EquipmentStatusChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        new_status = serializer.validated_data["status"]
+        notes = serializer.validated_data.get("notes", "")
+
+        equipment = get_object_or_404(Equipment, public_id=public_id)
+
+        self.check_object_permissions(request, equipment)
+
+        old_status = equipment.status
+
+        if old_status == new_status:
+            return Response(
+                {"detail": "Status is already set to this value."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            equipment.status = new_status
+            equipment.save(update_fields=["status"])
+
+             # Derive domain event
+            event_type = equipment_event_from_status(new_status)
+
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=request.user,
+                reported_by=request.user,
+                event_type=event_type,
+                notes=notes or f"{old_status} → {new_status}",
+            )
+
+            AuditLog.objects.create(
+                user=request.user,
+                user_public_id=getattr(request.user, "public_id", None),
+                user_email=request.user.email,
+                event_type="equipment_status_changed",
+                description=f"Equipment status changed from {old_status} to {new_status}",
+                metadata={
+                    "old_status": old_status,
+                    "new_status": new_status,
+                },
+                target_model="Equipment",
+                target_id=equipment.public_id,
+                target_name=str(equipment),
+                room=equipment.room,
+            )
+
+        return Response(
+            {"public_id": equipment.public_id,"status": equipment.status,},
+            status=status.HTTP_200_OK,
         )

@@ -32,6 +32,7 @@ urlpatterns = [
 
     path('equipments/', equipment_list_create_view, name='equipments'),
     path('equipments/<str:public_id>/', equipment_id_detail_view, name='equipment-detail'),
+    path('equipments/<str:public_id>/status/', update_equipment_status, name='update-equipment-status'),
     path('equipments-import/', equipment_batch_import_view, name='equipment-batch-import'),
      path('equipments-validate-import/', equipment_batch_validate_view, name='equipment-batch-validate'),
     

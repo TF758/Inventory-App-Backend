@@ -84,6 +84,8 @@ equipment_id_detail_view = equipment_viewsets.EquipmentModelViewSet.as_view({
     'delete': 'destroy'
 })
 equipment_list_create_view = equipment_viewsets.EquipmentModelViewSet.as_view({'get': 'list', 'post':'create'})
+# update equipment status
+update_equipment_status = equipment_viewsets.EquipmentStatusChangeView.as_view()
 
 
 # --- Location ---

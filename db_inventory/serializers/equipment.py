@@ -1,6 +1,6 @@
 
 from rest_framework import serializers
-from  db_inventory.models.assets import Equipment
+from  db_inventory.models.assets import Equipment, EquipmentStatus
 from db_inventory.models.site import  Room
 
 class EquipmentSerializer(serializers.ModelSerializer):
@@ -150,8 +150,13 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
         model = Equipment
         fields = ["name", "public_id"]
 
+class EquipmentStatusChangeSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=EquipmentStatus.choices)
+    notes = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+
 __all__ = [
     "EquipmentSerializer",
     "EquipmentWriteSerializer",
     "EquipmentDropdownSerializer",
+    "EquipmentStatusChangeSerializer"
 ]
