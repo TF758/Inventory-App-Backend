@@ -196,16 +196,34 @@ class LocationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains', field_name="name")
     department = django_filters.CharFilter(lookup_expr='exact', field_name="department__public_id")
     location = django_filters.CharFilter(field_name='public_id', lookup_expr='exact')  
+    q = django_filters.CharFilter(method="filter_q")
+
 
     class Meta:
         model = Location
         fields = [
             'name',
             'department',
-            'location'
+            'location',
+            "q"
         ]
 
+    def filter_q(self, queryset, name, value):
+        """
+        Live search for locations 
+        """
+        value = value.strip().lower()
+        if len(value) < 2:
+            return queryset.none()
+
+        return (
+            queryset.filter(
+                Q(name__istartswith=value) |
+                Q(public_id__istartswith=value)
+            ).order_by("name")[:20])
+
 class RoomFilter(django_filters.FilterSet):
+    q = django_filters.CharFilter(method="filter_q")
     name = django_filters.CharFilter(lookup_expr='icontains')
     location = django_filters.CharFilter(field_name='location__public_id', lookup_expr='exact')
     department = django_filters.CharFilter(field_name='location__department__public_id', lookup_expr='exact')
@@ -220,6 +238,20 @@ class RoomFilter(django_filters.FilterSet):
             'department',
             'room',
         ]
+
+    def filter_q(self, queryset, name, value):
+        """
+        Live search for rooms 
+        """
+        value = value.strip().lower()
+        if len(value) < 2:
+            return queryset.none()
+
+        return (
+            queryset.filter(
+                Q(name__istartswith=value) |
+                Q(public_id__istartswith=value)
+            ).order_by("name")[:20] )
 
 class ComponentFilter(django_filters.FilterSet):
     name= django_filters.CharFilter(lookup_expr='icontains')

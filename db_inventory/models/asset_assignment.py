@@ -68,6 +68,13 @@ class EquipmentEvent(models.Model):
 
     notes = models.TextField(blank=True)
 
+    def __str__(self):
+        return (
+            f"{self.get_event_type_display()} · "
+            f"{self.equipment.public_id} · "
+            f"{self.occurred_at:%Y-%m-%d %H:%M}"
+        )
+
 class AccessoryEvent(models.Model):
     EVENT_TYPE_CHOICES = (
         ("assigned", "Assigned"),

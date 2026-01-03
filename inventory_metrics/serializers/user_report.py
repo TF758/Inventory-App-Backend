@@ -26,7 +26,7 @@ class UserLoginStatsSerializer(serializers.Serializer):
         return ret
 
 class UserRoleSummaryItemSerializer(serializers.Serializer):
-    role = serializers.CharField()
+    role_name  = serializers.CharField()
     scope = serializers.CharField()
     assigned_date = serializers.DateTimeField()
 
