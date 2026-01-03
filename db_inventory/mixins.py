@@ -1,16 +1,11 @@
-from rest_framework import viewsets
 from .permissions import filter_queryset_by_scope
-from rest_framework.exceptions import PermissionDenied
 from db_inventory.models import AuditLog, Equipment, Accessory
-from rest_framework.response import Response
-from rest_framework import status
 from django.db import transaction
 from .serializers.equipment import EquipmentBatchtWriteSerializer,EquipmentSerializer
 from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWriteSerializer
 from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
-from django.utils import timezone
-
+from django.utils.text import capfirst
 
 class ScopeFilterMixin:
     """
@@ -282,8 +277,30 @@ class AuditMixin:
             "department_name": department_name,
         }
 
+    def _get_target_label(self, target):
+        """
+        Return a human-friendly, audit-safe snapshot label.
+        """
+        if not target:
+            return None
+
+        if hasattr(target, "audit_label") and callable(target.audit_label):
+            return target.audit_label()
+
+        # Fallback (last resort)
+        return str(target)
+
+    def _get_target_model(self, target):
+        """
+        Return a human-friendly target model name.
+        """
+        if not target:
+            return None
+
+        return capfirst(target.__class__.__name__)
+
     # -------------------------------------------------
-    # Core audit writer (transaction-safe)
+    # Core audit logger
     # -------------------------------------------------
 
     def _log_audit(self, event_type, *, target=None, description="", metadata=None):
@@ -308,11 +325,11 @@ class AuditMixin:
                 metadata=metadata or {},
 
                 # Target snapshot
-                target_model=target.__class__.__name__ if target else None,
+                target_model=self._get_target_model(target),
                 target_id=getattr(target, "public_id", None),
-                target_name=str(target) if target else None,
+                target_name=self._get_target_label(target),
 
-                # Scope
+                # Scope snapshot
                 department=scope["department"],
                 department_name=scope["department_name"],
                 location=scope["location"],
@@ -325,11 +342,10 @@ class AuditMixin:
                 user_agent=request.META.get("HTTP_USER_AGENT", "") if request else "",
             )
 
-        # 🔐 CRITICAL: audit only if DB transaction commits
         transaction.on_commit(_create_log)
 
     # -------------------------------------------------
-    # Public helper for domain actions (1-liner)
+    # Public helper for domain actions
     # -------------------------------------------------
 
     def audit(self, event_type, *, target=None, description="", metadata=None):

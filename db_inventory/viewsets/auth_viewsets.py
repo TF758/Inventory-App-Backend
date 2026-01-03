@@ -314,33 +314,37 @@ class SiteNameChangeAPIView(APIView):
         # --------------------
 
         AuditLog.objects.create(
-            user=request.user,
-            user_public_id=request.user.public_id,
-            user_email=request.user.email,
-            event_type=AuditLog.Events.MODEL_UPDATED,
-            target_model=obj.__class__.__name__,
-            target_id=obj.public_id,
-            target_name=str(obj),
+        user=request.user,
+        user_public_id=request.user.public_id,
+        user_email=request.user.email,
 
-            department=department,
-            department_name=department.name if department else None,
+        event_type=AuditLog.Events.MODEL_UPDATED,
 
-            location=location,
-            location_name=location.name if location else None,
+        target_model=obj._meta.verbose_name.title(),
+        target_id=obj.public_id,
 
-            room=room,
-            room_name=room.name if room else None,
+        target_name=old_name,
 
-            description="Site name changed",
-            metadata={
-                "change_type": "site_rename",
-                "old_name": old_name,
-                "new_name": new_name,
-                "reason": reason,
-            },
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
-        )
+        department=department,
+        department_name=department.name if department else None,
+
+        location=location,
+        location_name=location.name if location else None,
+
+        room=room,
+        room_name=room.name if room else None,
+
+        description="Site name changed",
+        metadata={
+            "change_type": "site_rename",
+            "old_name": old_name,
+            "new_name": new_name,
+            "reason": reason,
+        },
+
+        ip_address=request.META.get("REMOTE_ADDR"),
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+    )
 
         return Response(
             {
@@ -456,24 +460,33 @@ class SiteRelocationAPIView(APIView):
         # --------------------
 
         AuditLog.objects.create(
-            user=request.user,
-            user_public_id=request.user.public_id,
-            user_email=request.user.email,
-            event_type=AuditLog.Events.MODEL_RELOCATED,
-            target_model=obj.__class__.__name__,
-            target_id=obj.public_id,
-            target_name=str(obj),
-            description="Site relocated",
-            metadata={
-                "site_type": site_type,
-                "from_parent": from_parent.name if from_parent else None,
-                "to_parent": target.name,
-                "reason": reason,
-                "change_type": "site_relocation",
-            },
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
-        )
+        user=request.user,
+        user_public_id=request.user.public_id,
+        user_email=request.user.email,
+        event_type=AuditLog.Events.MODEL_RELOCATED,
+        target_model=obj._meta.verbose_name.title(),
+        target_id=obj.public_id,
+
+        target_name=obj.name,
+
+        description="Site relocated",
+
+        metadata={
+            "change_type": "site_relocation",
+            "site_type": site_type,
+
+            "from_parent_name": from_parent.name if from_parent else None,
+            "from_parent_public_id": from_parent.public_id if from_parent else None,
+
+            "to_parent_name": target.name,
+            "to_parent_public_id": target.public_id,
+
+            "reason": reason,
+        },
+
+        ip_address=request.META.get("REMOTE_ADDR"),
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+    )
 
         return Response(
             {
@@ -530,6 +543,7 @@ class AdminUpdateUserView(APIView):
                 target=user,
                 metadata={
                     "changes": changes,
+                    "user_public_id": user.public_id,
                 },
             )
 

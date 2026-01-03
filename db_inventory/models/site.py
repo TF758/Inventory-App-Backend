@@ -23,6 +23,8 @@ class Department(PublicIDModel):
     def __str__(self):
         return self.name
 
+    def audit_label(self) -> str:
+        return self.name
 
 
 class Location(PublicIDModel):
@@ -43,6 +45,11 @@ class Location(PublicIDModel):
         if self.department:
             return f"{self.name} @ {self.department.name}"
         return self.name
+    
+    def audit_label(self) -> str:
+        if self.department:
+            return f"{self.name} (Department: {self.department.name})"
+        return self.name
 
 class Room(PublicIDModel):
     PUBLIC_ID_PREFIX = "RM"
@@ -61,7 +68,13 @@ class Room(PublicIDModel):
             return f"{self.name} @ {self.location.name}"
         return self.name
     
-
+    def audit_label(self) -> str:
+        parts = [self.name]
+        if self.location:
+            parts.append(f"Location: {self.location.name}")
+        if self.location and self.location.department:
+            parts.append(f"Department: {self.location.department.name}")
+        return f"{self.name} ({', '.join(parts[1:])})" if len(parts) > 1 else self.name
 
 class UserLocation(PublicIDModel):
     """

@@ -16,9 +16,7 @@ class Equipment(PublicIDModel):
     name = models.CharField(max_length=100)
     brand = models.CharField(max_length=100, blank=True, default="")
     model = models.CharField(max_length=100, blank=True, default="")
-    serial_number = models.CharField(
-        max_length=100, unique=True, blank=True, null=True
-    )
+    serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     status = models.CharField(max_length=20,choices=EquipmentStatus.choices,default=EquipmentStatus.OK,db_index=True, null=True)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
 
@@ -38,6 +36,17 @@ class Equipment(PublicIDModel):
             return self.active_assignment.returned_at is None
         except EquipmentAssignment.DoesNotExist:
             return False
+        
+    def audit_label(self) -> str:
+        parts = [self.name]
+
+        if self.brand:
+            parts.append(self.brand)
+        if self.model:
+            parts.append(self.model)
+        if self.serial_number:
+            parts.append(f"(S/N: {self.serial_number})")
+        return " ".join(parts)
 
     def __str__(self):
         return f"{self.name} - {self.public_id}"
@@ -63,6 +72,18 @@ class Component(PublicIDModel):
         if self.equipment:
             return f"{self.name} @ {self.equipment.name}"
         return self.name
+    
+    def audit_label(self) -> str:
+        parts = [self.name]
+        if self.brand:
+            parts.append(self.brand)
+        if self.model:
+            parts.append(self.model)
+        if self.serial_number:
+            parts.append(f"(S/N: {self.serial_number})")
+        if self.equipment:
+            parts.append(f"[Attached to: {self.equipment.name}]")
+        return " ".join(parts)
 
 class Consumable(PublicIDModel):
     PUBLIC_ID_PREFIX = "CON"
@@ -80,6 +101,9 @@ class Consumable(PublicIDModel):
 
     def __str__(self):
         return self.name
+    
+    def audit_label(self) -> str:
+        return self.name
 
 class Accessory(PublicIDModel):
     PUBLIC_ID_PREFIX = "AC"
@@ -96,4 +120,9 @@ class Accessory(PublicIDModel):
         ]
 
     def __str__(self):
+        return self.name
+
+    def audit_label(self) -> str:
+        if self.serial_number:
+            return f"{self.name} (S/N: {self.serial_number})"
         return self.name

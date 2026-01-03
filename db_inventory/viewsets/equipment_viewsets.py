@@ -19,6 +19,7 @@ from db_inventory.permissions import AssetPermission, is_in_scope
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from db_inventory.utils.asset_helpers import equipment_event_from_status
+from db_inventory.utils.audit import create_audit_log
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -172,20 +173,17 @@ class EquipmentStatusChangeView(APIView):
                 notes=notes or f"{old_status} → {new_status}",
             )
 
-            AuditLog.objects.create(
-                user=request.user,
-                user_public_id=getattr(request.user, "public_id", None),
-                user_email=request.user.email,
-                event_type="equipment_status_changed",
-                description=f"Equipment status changed from {old_status} to {new_status}",
+            create_audit_log(
+                request=request,
+                event_type=AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
+                target=equipment,
+                description=f"Status changed from {old_status} to {new_status}",
                 metadata={
+                    "change_type": "equipment_status_change",
                     "old_status": old_status,
                     "new_status": new_status,
+                    "notes": notes,
                 },
-                target_model="Equipment",
-                target_id=equipment.public_id,
-                target_name=str(equipment),
-                room=equipment.room,
             )
 
         return Response(

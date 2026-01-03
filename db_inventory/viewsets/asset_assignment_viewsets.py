@@ -118,9 +118,10 @@ class AssignEquipmentView(AuditMixin, APIView):
             self.audit(
                 event_type=AuditLog.Events.ASSET_ASSIGNED,
                 target=equipment,
-                description=f"Equipment assigned to {assignee.email}",
+                description=f"Assigned to user {assignee.email}",
                 metadata={
-                    "assigned_to": assignee.public_id,
+                    "assigned_to_public_id": assignee.public_id,
+                    "assigned_to_email": assignee.email,
                     "notes": notes,
                 },
             )
@@ -187,14 +188,15 @@ class UnassignEquipmentView(AuditMixin, APIView):
 
             # Audit log
             self.audit(
-                event_type=AuditLog.Events.ASSET_UNASSIGNED,
-                target=equipment,
-                description=f"Equipment unassigned from {user.email}",
-                metadata={
-                    "returned_by": user.public_id,
-                    "notes": notes,
-                },
-            )
+            event_type=AuditLog.Events.ASSET_UNASSIGNED,
+            target=equipment,
+            description=f"Unassigned from user {user.email}",
+            metadata={
+                "unassigned_from_public_id": user.public_id,
+                "unassigned_from_email": user.email,
+                "notes": notes,
+            },
+        )
 
         return Response(
             {
@@ -286,12 +288,14 @@ class ReassignEquipmentView(AuditMixin, APIView):
                 event_type=AuditLog.Events.ASSET_REASSIGNED,
                 target=equipment,
                 description=(
-                    f"Equipment reassigned from {from_user.email} "
-                    f"to {to_user.email}"
+                    f"Reassigned from user {from_user.email} "
+                    f"to user {to_user.email}"
                 ),
                 metadata={
-                    "from_user": from_user.public_id,
-                    "to_user": to_user.public_id,
+                    "reassigned_from_public_id": from_user.public_id,
+                    "reassigned_from_email": from_user.email,
+                    "reassigned_to_public_id": to_user.public_id,
+                    "reassigned_to_email": to_user.email,
                     "notes": notes,
                 },
             )
