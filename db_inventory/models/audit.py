@@ -13,119 +13,42 @@ from django.contrib.contenttypes.models import ContentType
 class AuditLog(PublicIDModel):
     """ 
     audit log for security, and traceability.
-
     """
 
     PUBLIC_ID_PREFIX = "LOG"
 
-    # --------------------
-    # Actor (who did it)
-    # --------------------
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="audit_logs",
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="audit_logs",)
 
     # Snapshots (in case user is deleted or renamed)
     user_public_id = models.CharField(max_length=15, null=True, blank=True)
     user_email = models.EmailField(null=True, blank=True)
 
-    # --------------------
-    # Event
-    # --------------------
 
-    event_type = models.CharField(
-        max_length=100,
-        help_text="Machine-readable event identifier",
-    )
+    event_type = models.CharField(max_length=100,help_text="Machine-readable event identifier",)
+    description = models.TextField(blank=True,default="",help_text="Human-readable description of the event")
+    metadata = models.JSONField(null=True,blank=True,help_text="Additional structured event data",)
 
-    description = models.TextField(
-        blank=True,
-        default="",
-        help_text="Human-readable description of the event",
-    )
 
-    metadata = models.JSONField(
-        null=True,
-        blank=True,
-        help_text="Additional structured event data",
-    )
+    target_model = models.CharField(max_length=100,null=True,blank=True,help_text="Model name of the affected object",)
 
-    # --------------------
-    # Target (what was affected)
-    # --------------------
+    target_id = models.CharField(max_length=100,null=True,blank=True,help_text="Public ID of the affected object")
+    target_name = models.CharField(max_length=255,null=True,blank=True,help_text="Snapshot of object name at time of event",)
 
-    target_model = models.CharField(
-        max_length=100,
-        null=True,
-        blank=True,
-        help_text="Model name of the affected object",
-    )
-
-    target_id = models.CharField(
-        max_length=100,
-        null=True,
-        blank=True,
-        help_text="Public ID of the affected object",
-    )
-
-    target_name = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="Snapshot of object name at time of event",
-    )
-
-    # --------------------
-    # Scope (site context)
-    # --------------------
-
-    department = models.ForeignKey(
-        Department,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="audit_logs",
-    )
+    department = models.ForeignKey(Department,on_delete=models.SET_NULL,null=True,blank=True,related_name="audit_logs",)
     department_name = models.CharField(max_length=100, null=True, blank=True)
 
-    location = models.ForeignKey(
-        Location,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="audit_logs",
-    )
+    location = models.ForeignKey(Location,on_delete=models.SET_NULL,null=True,blank=True,related_name="audit_logs",)
     location_name = models.CharField(max_length=255, null=True, blank=True)
 
-    room = models.ForeignKey(
-        Room,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="audit_logs",
-    )
+    room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="audit_logs",)
     room_name = models.CharField(max_length=255, null=True, blank=True)
 
-    # --------------------
-    # Request context
-    # --------------------
+
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=255, null=True, blank=True)
 
-    # --------------------
-    # Timestamp
-    # --------------------
-
-    created_at = models.DateTimeField(
-        default=timezone.now,
-        db_index=True,
-    )
+    created_at = models.DateTimeField(default=timezone.now,db_index=True,)
 
     class Meta:
         ordering = ["-created_at"]
@@ -135,10 +58,6 @@ class AuditLog(PublicIDModel):
             models.Index(fields=["user"]),
             models.Index(fields=["target_model", "target_id"]),
         ]
-
-    # --------------------
-    # Immutability enforcement
-    # --------------------
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -204,13 +123,7 @@ class SiteNameChangeHistory(models.Model):
 
     changed_at = models.DateTimeField(auto_now_add=True)
 
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="site_name_change_histories",
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="site_name_change_histories",)
     user_email = models.EmailField(null=True, blank=True)
 
     reason = models.TextField(blank=True)
@@ -241,11 +154,11 @@ class SiteRelocationHistory(models.Model):
 
     site_type = models.CharField(max_length=20,choices=SiteType.choices,db_index=True,)
 
-    # Moved object (public identity)
+
     object_public_id = models.CharField(max_length=15,db_index=True,help_text="Public ID of the relocated site entity",)
     object_name = models.CharField(max_length=255,help_text="Name of the site at time of relocation", null=True)
 
-    # From → To (public identity + snapshot names)
+
     from_parent_public_id = models.CharField(max_length=15,help_text="Previous parent site public ID",)
     from_parent_name = models.CharField(max_length=255,help_text="Previous parent site name at time of relocation", null=True)
 
@@ -254,13 +167,7 @@ class SiteRelocationHistory(models.Model):
 
     changed_at = models.DateTimeField(auto_now_add=True)
 
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="site_relocations",
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="site_relocations",)
     user_email = models.EmailField(null=True, blank=True)
 
     reason = models.TextField(blank=True)

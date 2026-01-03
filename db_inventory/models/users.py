@@ -31,21 +31,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     lname = models.CharField(max_length=30, blank=True, default='')
     job_title = models.CharField(max_length=50, blank=True, default='')
     role = models.CharField(max_length=20, blank=True, default='user')
+
     public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
-    active_role = models.ForeignKey(
-        "RoleAssignment",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="active_for_users", 
-    )
-    created_by = models.ForeignKey(
-        "User",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_users"
-    )
+    active_role = models.ForeignKey("RoleAssignment",on_delete=models.SET_NULL,null=True,blank=True,related_name="active_for_users", )
+    
+    created_by = models.ForeignKey("User",on_delete=models.SET_NULL,null=True,blank=True,related_name="created_users")
     is_locked = models.BooleanField(default=False)
     is_system_user = models.BooleanField(default=False)  # for test/demo/system accounts
     force_password_change = models.BooleanField(default=False)

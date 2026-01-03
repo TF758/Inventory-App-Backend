@@ -194,7 +194,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "description",
             "metadata",
 
-            # Scope (FK + snapshot values)
+    
             "department",
             "department_name",
             "location",

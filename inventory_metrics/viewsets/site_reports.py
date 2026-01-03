@@ -148,20 +148,13 @@ class SiteAuditLogReportAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # -----------------------------
-        # 2. Ensure site exists
-        # -----------------------------
+
         site_model = self.site_model_map[site_type]
         site = get_object_or_404(site_model, public_id=site_id)
 
-        # -----------------------------
-        # 3. Build time filter
-        # -----------------------------
         start_date = timezone.now() - timedelta(days=audit_period_days)
 
-        # -----------------------------
-        # 4. Build queryset dynamically
-        # -----------------------------
+
         site_filter_field = self.site_filter_field_map[site_type]
 
         audit_logs = (
@@ -176,9 +169,7 @@ class SiteAuditLogReportAPIView(APIView):
             .order_by('-created_at')
         )
 
-        # -----------------------------
-        # 5. Serialize response (simple)
-        # -----------------------------
+
         rows = [self._to_report_row(log) for log in audit_logs]
 
         return Response(

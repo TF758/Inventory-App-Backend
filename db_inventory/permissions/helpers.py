@@ -91,16 +91,6 @@ def is_in_scope(role_assignment: RoleAssignment,
 
     return False
 
-def is_user_in_scope(
-                    user: User,
-                    room: Optional[Room] = None,
-                    location: Optional[Location] = None,
-                    department: Optional[Department] = None) -> bool:
-    """
-    Check if the user's active role has scope over a user.
-    Infers the target's scope by checking it's User Locations and Role Assignments.
-    Todo: Implement this function.
-    """
     
 def is_user_in_scope(
     admin_role: RoleAssignment,

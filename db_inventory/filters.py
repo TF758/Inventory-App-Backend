@@ -72,6 +72,7 @@ class UserFilter(django_filters.FilterSet):
 class DepartmentFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
+    q = django_filters.CharFilter(method="filter_q")
 
     class Meta:
         model = Department
@@ -79,6 +80,20 @@ class DepartmentFilter(django_filters.FilterSet):
             'name',
             'description',
         ]
+    def filter_q(self, queryset, name, value):
+        """
+        used primarily for live search by name
+        """
+
+        value = value.strip().lower()
+        if len(value) < 2:
+            return queryset.none()
+
+        return (
+            queryset
+            .filter(name__istartswith=value)
+            .order_by("name")[:20]
+        )
 
 class AreaUserFilter(django_filters.FilterSet):
     """
