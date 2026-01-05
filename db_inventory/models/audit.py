@@ -100,6 +100,7 @@ class AuditLog(PublicIDModel):
         ASSET_ASSIGNED = "asset_assigned"
         ASSET_UNASSIGNED = "asset_unassigned"
         ASSET_REASSIGNED = "asset_reassigned"
+        EQUIPMENT_STATUS_CHANGED = "equipment_status_changed"
 
 
 class SiteNameChangeHistory(models.Model):

@@ -227,12 +227,13 @@ assign_equipment = asset_assignment_viewsets.AssignEquipmentView.as_view()
 unassign_equipment = asset_assignment_viewsets.UnassignEquipmentView.as_view()
 reassign_equipment = asset_assignment_viewsets.ReassignEquipmentView.as_view()
 
-equipment_assignment_list = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({
-    "get": "list",
-})
+equipment_assignment_list = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({"get": "list",})
 
-equipment_assignment_detail = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({
-    "get": "retrieve",
-})
+equipment_assignment_detail = asset_assignment_viewsets.EquipmentAssignmentViewSet.as_view({"get": "retrieve",})
 
 equipment_event_history = asset_assignment_viewsets.EquipmentEventHistoryViewset.as_view({"get": "list"})
+
+# AUDIT Logs
+audit_log_list = auth_viewsets.AuditLogViewSet.as_view({"get": "list",})
+
+audit_log_detail = auth_viewsets.AuditLogViewSet.as_view({"get": "retrieve",})

@@ -20,7 +20,6 @@ class TempPasswordChangeSerializer(serializers.Serializer):
         if attrs["new_password"] != attrs["confirm_password"]:
             raise serializers.ValidationError("New password and confirmation do not match.")
 
-        # Verify temp password
         try:
             event = PasswordResetEvent.objects.filter(
                 user__email=self.context.get("email"),
@@ -44,7 +43,6 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate_current_password(self, value):
         user = self.context['request'].user
-        # check that the user sending it is the current logged in user
         if not user or not user.is_authenticated:
             raise serializers.ValidationError("User not authenticated.")
         if not user.check_password(value):
@@ -88,7 +86,7 @@ class AdminPasswordResetSerializer(serializers.Serializer):
         token_service = PasswordResetToken()
         event = token_service.generate_token(
             user_public_id=self.user.public_id,
-            admin_public_id=admin.public_id   # <-- YES, we pass it here
+            admin_public_id=admin.public_id  
         )
 
         reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"

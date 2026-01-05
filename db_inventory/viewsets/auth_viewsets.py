@@ -164,6 +164,10 @@ class AuditLogViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.all().select_related(
         "department", "location", "room"
     )
+    
+    lookup_field = "public_id"
+    lookup_url_kwarg = "public_id"
+
     serializer_class = AuditLogLightSerializer
     pagination_class = FlexiblePagination
 

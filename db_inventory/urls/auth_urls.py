@@ -7,6 +7,10 @@ from rest_framework_simplejwt.views import (
 
 
 urlpatterns = [
+    # audfit logs
+    path("audit-logs/", audit_log_list, name="audit-log-list"),
+    path("audit-logs/<str:public_id>/", audit_log_detail, name="audit-log-detail"),
+
     # User Sessions ---
     path('sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
 
