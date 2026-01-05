@@ -139,8 +139,7 @@ class DepartmentUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
                 "room__location__department",
             )
             .distinct()
-            .order_by("-id")
-        )
+            .order_by("-id")[:20] )
 
 class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ExcludeFiltersMixin):
     serializer_class = DepartmentLocationsLightSerializer
@@ -164,7 +163,6 @@ class DepartmentLocationsViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
             Location.objects
             .filter(department__public_id=department_id)
             .annotate(room_count=Count('rooms'))  
-            
         )
 
 class DepartmentLocationsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
@@ -178,7 +176,7 @@ class DepartmentLocationsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelVie
         return (
             Location.objects.filter(department__public_id=department_id)
             .annotate(room_count=Count('rooms'))
-            .order_by('-id')[:20]  # last 20 locations
+            .order_by('-id')[:20]  
         )
 
 
