@@ -78,6 +78,7 @@ class AuditLog(PublicIDModel):
         LOGOUT = "logout"
         USER_CREATED = "user_created"
         USER_UPDATED = "user_updated"
+        ADMIN_RESET_PASSWORD = "admin_reset_password"
         ADMIN_UPDATED_USER = "admin_updated_user"
         USER_DELETED = "user_deleted"
 
@@ -91,7 +92,6 @@ class AuditLog(PublicIDModel):
         MODEL_UPDATED = "model_updated"
         MODEL_DELETED = "model_deleted"
 
-        MODEL_RELOCATED = "model_relocated"
 
         USER_MOVED = "user_moved"
         EXPORT_GENERATED = "export_generated"
@@ -99,6 +99,8 @@ class AuditLog(PublicIDModel):
         ASSET_UNASSIGNED = "asset_unassigned"
         ASSET_REASSIGNED = "asset_reassigned"
         EQUIPMENT_STATUS_CHANGED = "equipment_status_changed"
+        SITE_RELOCATED = "site_relocated"
+        SITE_RENAMED = "site_renamed"
 
 
 class SiteNameChangeHistory(models.Model):
