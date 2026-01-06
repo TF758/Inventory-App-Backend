@@ -1,14 +1,14 @@
+from django.conf import settings
 from django.urls import reverse
 from django.test import TestCase
 from django.utils import timezone
-from django.contrib.auth.hashers import make_password
-
+from django.test import override_settings
 from rest_framework.test import APITestCase
 from unittest.mock import patch
-
-from db_inventory.models import User, PasswordResetEvent
+from db_inventory.models import User
 from db_inventory.factories import UserFactory
 from db_inventory.utils.tokens import PasswordResetToken
+
 
 
 # ----------------------------------------------------------------------
@@ -22,9 +22,10 @@ class FailingEmailBackend:
         raise Exception("Simulated email backend failure")
 
 
-# ----------------------------------------------------------------------
-# PASSWORD RESET REQUEST TESTS
-# ----------------------------------------------------------------------
+@patch(
+    "db_inventory.viewsets.general_viewsets.PasswordResetRequestView.throttle_classes",
+    new=[]
+)
 class PasswordResetRequestTests(TestCase):
 
     def setUp(self):
@@ -37,19 +38,15 @@ class PasswordResetRequestTests(TestCase):
         response = self.client.post(url, {"email": self.active_user.email}, format="json")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["detail"], "Password reset email sent.")
+        self.assertEqual(response.json()["detail"],"If an account exists, a password reset email has been sent.")
 
     def test_password_reset_request_user_not_found(self):
         url = reverse("password-reset-request")
 
         response = self.client.post(url, {"email": "missing@example.com"}, format="json")
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("email", response.json())
-        self.assertEqual(
-            response.json()["email"][0],
-            "User with this email does not exist.",
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["detail"],"If an account exists, a password reset email has been sent.")
 
     def test_password_reset_request_inactive_user(self):
         url = reverse("password-reset-request")
@@ -58,7 +55,7 @@ class PasswordResetRequestTests(TestCase):
 
         # View intentionally returns 200 even for inactive users
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["detail"], "Password reset email sent.")
+        self.assertEqual(response.json()["detail"],"If an account exists, a password reset email has been sent.")
 
     def test_only_last_token_active(self):
         user = UserFactory(email="multi@example.com", is_active=True)
@@ -103,7 +100,7 @@ class PasswordResetRequestTests(TestCase):
         response = self.client.post(url, {"email": "usercase@example.com"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["detail"], "Password reset email sent.")
+        self.assertEqual(response.json()["detail"],"If an account exists, a password reset email has been sent.")
 
 
 # ----------------------------------------------------------------------

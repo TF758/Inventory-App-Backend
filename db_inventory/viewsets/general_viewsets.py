@@ -19,6 +19,10 @@ from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.serializers.auth import PasswordResetConfirmSerializer
+from db_inventory.throttling import LoginThrottle, PasswordResetThrottle, RefreshTokenThrottle
+from rest_framework.exceptions import Throttled
+from db_inventory.mixins import AuditMixin
+from db_inventory.models.audit import AuditLog
 
 
 logger = logging.getLogger(__name__) 
@@ -26,6 +30,8 @@ logger = logging.getLogger(__name__)
 class SessionTokenLoginView(TokenObtainPairView):
     serializer_class = SessionTokenLoginViewSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
+
 
     def post(self, request, *args, **kwargs):
         # Authenticate user via serializer
@@ -90,10 +96,12 @@ class SessionTokenLoginView(TokenObtainPairView):
         )
 
         return response
+    
 
 class RefreshAPIView(APIView):
     permission_classes = [AllowAny]          
-    authentication_classes = []              
+    authentication_classes = []
+    throttle_classes = [RefreshTokenThrottle]              
 
     def post(self, request):
 
@@ -279,7 +287,9 @@ class SerializerFieldsView(APIView):
 
         return Response(get_serializer_field_info(serializer_class))
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(AuditMixin, APIView):
+
+    throttle_classes = [PasswordResetThrottle]
 
     """Initiate password reset by sending email with reset link."""
 
@@ -289,19 +299,39 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "Password reset email sent."}, status=200)
 
-class PasswordResetConfirmView(APIView):
+        user = getattr(serializer, "user", None)
+
+        if user:
+            self.audit(
+                event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
+                target=user,
+                description="Password reset requested",
+                metadata={
+                    "initiated_by_admin": False,
+                },
+        )
+        return Response({"detail": "If an account exists, a password reset email has been sent."}, status=200)
+
+class PasswordResetConfirmView(AuditMixin, APIView):
     """
     Confirm password reset (user or admin triggered) and set new password.
     """
 
-    permission_classes = [AllowAny]  # If you want admins to also use it, adjust permissions
+    permission_classes = [AllowAny] 
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        user = serializer.save()
+
+        self.audit(
+            event_type=AuditLog.Events.PASSWORD_RESET_COMPLETED,
+            target=user,
+            description="Password reset completed successfully",
+        )
 
         return Response(
             {"detail": "Password has been reset successfully."},
