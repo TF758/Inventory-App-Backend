@@ -90,15 +90,33 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'db_inventory.authentication.SessionJWTAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication', 
-        'rest_framework.authentication.SessionAuthentication',      
-        'rest_framework.authentication.BasicAuthentication',         
+        'rest_framework.authentication.SessionAuthentication',         
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated', 
     ],
+     "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
 }
 
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "anon": env("THROTTLE_ANON", default="100/hour"),
+    "user": env("THROTTLE_USER", default="1000/hour"),
+
+    # Auth
+    "login": env("THROTTLE_LOGIN", default="5/min"),
+    "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
+    "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
+
+    # General
+    "user_read": env("THROTTLE_USER_READ", default="1000/hour"),
+
+    # Business
+    "equipment_action": env("THROTTLE_EQUIPMENT", default="30/hour"),
+    "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
+}
 
 ROOT_URLCONF = 'inventory.urls'
 
