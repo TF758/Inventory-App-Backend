@@ -3,6 +3,8 @@ import random
 import django
 from faker import Faker
 
+from db_inventory.models.site import Department, Location, Room
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")
 django.setup()
 
@@ -53,6 +55,13 @@ MINISTRY_TO_LOCATIONS = {
     "Ministry of Housing and Local Government": HOUSING_LOCATIONS,
 }
 
+def normalize_location_name(name: str) -> str:
+    return (
+        name.strip()
+        .replace("Saint-Lucia", "Saint Lucia")
+        .replace("  ", " ")
+    )
+
 class Command(BaseCommand):
     help = 'Generate sample data for inventory database safely'
 
@@ -68,27 +77,57 @@ class Command(BaseCommand):
         all_locations = []
 
         for ministry_name in LIST_OF_MINISTIRES:
-            department = DepartmentFactory(name=ministry_name)
+            department, _ = Department.objects.get_or_create(
+                name=ministry_name
+            )
             departments.append(department)
 
+            seen_locations = set()
             locations_list = MINISTRY_TO_LOCATIONS.get(ministry_name, [])
-            for loc_name in locations_list:
-                loc = LocationFactory(name=loc_name, department=department)
-                all_locations.append(loc)
+
+            for raw_name in locations_list:
+                name = normalize_location_name(raw_name)
+                key = (department.id, name)
+
+                if key in seen_locations:
+                    continue
+
+                location, _ = Location.objects.get_or_create(
+                    department=department,
+                    name=name,
+                )
+
+                seen_locations.add(key)
+                all_locations.append(location)
+
 
         # -------------------------------
         # Rooms
         # -------------------------------
         rooms = []
+
         for loc in all_locations:
             count = random.randint(6, 12)
-            for _ in range(count):
-                room = RoomFactory(name=f"{faker.word().capitalize()} Room", location=loc)
-                rooms.append(room)
+            used_names = set()
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Created {len(departments)} departments, {len(all_locations)} locations, {len(rooms)} rooms.'
-        ))
+            attempts = 0
+            while len(used_names) < count:
+                attempts += 1
+                if attempts > count * 5:
+                    break  # safety guard
+
+                name = f"{faker.word().capitalize()} Room"
+
+                if name in used_names:
+                    continue
+
+                room, _ = Room.objects.get_or_create(
+                    location=loc,
+                    name=name,
+                )
+
+                used_names.add(name)
+                rooms.append(room)
 
         # -------------------------------
         # Users

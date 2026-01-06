@@ -19,10 +19,10 @@ class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
 
-    email = factory.Sequence(lambda n: f"{fake.first_name().lower()}.{fake.last_name().lower()}.{n}@example.com")
+    email = factory.Sequence(lambda n: f"user{n}@example.com")
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
-    job_title = factory.Faker('job')
+    job_title = factory.LazyFunction(lambda: fake.job()[:50])
     is_active = factory.LazyFunction(lambda: random.choices([True, False], weights=[0.85, 0.15])[0])  # 85% active, 15% inactive
     public_id = factory.Sequence(lambda n: f"UID{n:08d}")
     is_staff = False
@@ -37,7 +37,7 @@ class AdminUserFactory(factory.django.DjangoModelFactory):
     password = factory.PostGenerationMethodCall('set_password', 'admin')
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
-    job_title = factory.Faker('job')
+    job_title = factory.LazyFunction(lambda: fake.job()[:50])
     is_staff = True
     is_superuser = True
 
@@ -55,7 +55,7 @@ class LocationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Location
 
-    name = factory.LazyFunction(fake.company)
+    name = factory.Sequence(lambda n: f"{fake.color_name()} Location {n}")
     department = factory.LazyFunction(lambda: random.choice(Department.objects.all()))
 
 
@@ -63,7 +63,7 @@ class RoomFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Room
 
-    name = factory.LazyFunction(fake.color_name)
+    name = factory.Sequence(lambda n: f"{fake.color_name()} Room {n}")
     location = factory.LazyFunction(lambda: random.choice(Location.objects.all()))
     
 
