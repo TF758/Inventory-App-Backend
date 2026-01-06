@@ -21,11 +21,11 @@ class AuditLog(PublicIDModel):
 
     # Snapshots (in case user is deleted or renamed)
     user_public_id = models.CharField(max_length=15, null=True, blank=True)
-    user_email = models.EmailField(null=True, blank=True)
+    user_email = models.EmailField(null=True, blank=True, max_length=50)
 
 
     event_type = models.CharField(max_length=100,help_text="Machine-readable event identifier",)
-    description = models.TextField(blank=True,default="",help_text="Human-readable description of the event")
+    description = models.CharField(blank=True,default="",help_text="Human-readable description of the event",  max_length=255)
     metadata = models.JSONField(null=True,blank=True,help_text="Additional structured event data",)
 
 
@@ -42,8 +42,6 @@ class AuditLog(PublicIDModel):
 
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="audit_logs",)
     room_name = models.CharField(max_length=255, null=True, blank=True)
-
-
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=255, null=True, blank=True)
@@ -125,9 +123,9 @@ class SiteNameChangeHistory(models.Model):
     changed_at = models.DateTimeField(auto_now_add=True)
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="site_name_change_histories",)
-    user_email = models.EmailField(null=True, blank=True)
+    user_email = models.EmailField(null=True, blank=True, max_length=50)
 
-    reason = models.TextField(blank=True)
+    reason = models.CharField(blank=True, max_length=255)
 
     class Meta:
         indexes = [
@@ -159,7 +157,6 @@ class SiteRelocationHistory(models.Model):
     object_public_id = models.CharField(max_length=15,db_index=True,help_text="Public ID of the relocated site entity",)
     object_name = models.CharField(max_length=255,help_text="Name of the site at time of relocation", null=True)
 
-
     from_parent_public_id = models.CharField(max_length=15,help_text="Previous parent site public ID",)
     from_parent_name = models.CharField(max_length=255,help_text="Previous parent site name at time of relocation", null=True)
 
@@ -169,9 +166,9 @@ class SiteRelocationHistory(models.Model):
     changed_at = models.DateTimeField(auto_now_add=True)
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="site_relocations",)
-    user_email = models.EmailField(null=True, blank=True)
+    user_email = models.EmailField(null=True, blank=True, max_length=50)
 
-    reason = models.TextField(blank=True)
+    reason = models.CharField(blank=True, max_length=255)
 
     class Meta:
         indexes = [

@@ -2,6 +2,12 @@ from db_inventory.models.base import PublicIDModel
 from django.db import models
 from db_inventory.models.site import Room
 from django.apps import apps
+from django.core.validators import MinValueValidator, RegexValidator
+
+serial_validator = RegexValidator(
+    regex=r"^[A-Z0-9\-]+$",
+    message="Serial number may contain only letters, numbers, and dashes."
+)
 
 class EquipmentStatus(models.TextChoices):
     OK = "ok", "OK"
@@ -14,9 +20,9 @@ class Equipment(PublicIDModel):
     PUBLIC_ID_PREFIX = "EQ"
 
     name = models.CharField(max_length=100)
-    brand = models.CharField(max_length=100, blank=True, default="")
-    model = models.CharField(max_length=100, blank=True, default="")
-    serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    brand = models.CharField(max_length=100, blank=True)
+    model = models.CharField(max_length=100, blank=True)
+    serial_number = models.CharField(max_length=50, unique=True, blank=True, null=True,  validators=[serial_validator])
     status = models.CharField(max_length=20,choices=EquipmentStatus.choices,default=EquipmentStatus.OK,db_index=True, null=True)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
 
@@ -55,10 +61,10 @@ class Component(PublicIDModel):
     PUBLIC_ID_PREFIX = "COM"
 
     name = models.CharField(max_length=100)
-    brand = models.CharField(max_length=100, blank=True, default="")
-    model = models.CharField(max_length=100, blank=True, default="")
-    serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    quantity = models.IntegerField(default=0)
+    brand = models.CharField(max_length=100, blank=True)
+    model = models.CharField(max_length=100, blank=True)
+    serial_number = models.CharField(max_length=50, unique=True, blank=True, null=True, validators=[serial_validator])
+    quantity = models.PositiveIntegerField(default=0)
     equipment = models.ForeignKey(Equipment,on_delete=models.SET_NULL,null=True,blank=True,related_name="components")
 
     class Meta:
@@ -67,6 +73,12 @@ class Component(PublicIDModel):
             models.Index(fields=["name"]),
             models.Index(fields=["serial_number"]),
         ]
+
+        models.CheckConstraint(
+        condition=models.Q(quantity__gte=0),
+        name="quantity_non_negative"
+        )
+            
 
     def __str__(self):
         if self.equipment:
@@ -89,8 +101,8 @@ class Consumable(PublicIDModel):
     PUBLIC_ID_PREFIX = "CON"
 
     name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, default="")
-    quantity = models.IntegerField(default=0)
+    description = models.TextField(blank=True, max_length=255)
+    quantity = models.PositiveIntegerField(default=0)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="consumables")
 
     class Meta:
@@ -110,7 +122,7 @@ class Accessory(PublicIDModel):
 
     name = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    quantity = models.IntegerField(default=0)
+    quantity = models.PositiveIntegerField(default=0)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="accessories")
 
     class Meta:
