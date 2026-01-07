@@ -270,37 +270,59 @@ class RefreshAPIView(APIView):
             )
 
 class LogoutAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = []  # AllowAny
     authentication_classes = []
 
     def post(self, request):
         raw_refresh = request.COOKIES.get("refresh")
+        if not raw_refresh:
+            return Response(
+                {"detail": "No refresh token found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if raw_refresh:
-            try:
-                hashed_refresh = UserSession.hash_token(raw_refresh)
+        try:
+            hashed_refresh = UserSession.hash_token(raw_refresh)
+        except Exception:
+            logger.exception("Logout refresh token hashing failed")
+            return Response(
+                {"detail": "Internal server error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-                # Try to revoke session if it exists (supports rotated tokens)
-                session = UserSession.objects.filter(
-                    Q(refresh_token_hash=hashed_refresh) |
-                    Q(previous_refresh_token_hash=hashed_refresh),
-                    status=UserSession.Status.ACTIVE,
-                ).first()
+        try:
+            session = UserSession.objects.get(refresh_token_hash=hashed_refresh)
+        except UserSession.DoesNotExist:
+            return Response(
+                {"detail": "Invalid or expired session."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-                if session:
-                    session.status = UserSession.Status.REVOKED
-                    session.save(update_fields=["status"])
+        if session.status != UserSession.Status.ACTIVE:
+            return Response(
+                {"detail": "Invalid or expired session."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            except Exception:
-                # We do NOT surface logout errors to the client
-                logger.exception("Logout failed during session revocation")
+        try:
+            session.status = UserSession.Status.REVOKED
+            session.save(update_fields=["status"])
+        except Exception:
+            logger.exception("Logout session revoke failed", extra={"session_id": str(session.id)})
+            return Response(
+                {"detail": "Internal server error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        # Always succeed and always delete cookie
         response = Response(
             {"detail": "Successfully logged out."},
             status=status.HTTP_200_OK,
         )
-        response.delete_cookie("refresh", path="/")
+        response.delete_cookie(
+            "refresh",
+            path="/",
+            samesite=settings.COOKIE_SAMESITE,
+        )
         return response
 
 
