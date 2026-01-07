@@ -1,4 +1,5 @@
 from datetime import timedelta
+from django.conf import settings
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -11,8 +12,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework_simplejwt.tokens import AccessToken
 from django.db import IntegrityError
+from django.test import override_settings
 
 
+@mock.patch(
+    "db_inventory.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
+    new=[]
+)
 class SessionTokenLoginViewTests(TestCase):
     """
     Tests for the SessionTokenLoginView (JWT + DB-backed refresh sessions)
@@ -252,7 +258,14 @@ class SessionTokenLoginViewTests(TestCase):
         self.assertIn(response.status_code, [500, 503])
         self.assertEqual(UserSession.objects.count(), 0)
 
-
+@mock.patch(
+    "db_inventory.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
+    new=[]
+)
+@mock.patch(
+    "db_inventory.viewsets.general_viewsets.RefreshAPIView.throttle_classes",
+    new=[]
+)
 class RefreshTokenViewTests(TestCase):
     """Tests for RefreshAPIView behavior and token rotation."""
 

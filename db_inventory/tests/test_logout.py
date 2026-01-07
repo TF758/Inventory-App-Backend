@@ -10,6 +10,10 @@ from datetime import timedelta
 from django.db import IntegrityError
 
 
+@mock.patch(
+    "db_inventory.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
+    new=[]
+)
 class LogoutAPIViewTests(TestCase):
     """Tests for LogoutAPIView (revokes session and deletes refresh cookie)"""
 

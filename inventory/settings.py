@@ -83,39 +83,38 @@ MIDDLEWARE = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'db_inventory.pagination.OptionalPagination',
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
+    "DEFAULT_PAGINATION_CLASS": "db_inventory.pagination.OptionalPagination",
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'db_inventory.authentication.SessionJWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',         
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "db_inventory.authentication.SessionJWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated', 
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-     "DEFAULT_THROTTLE_CLASSES": [
+    "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-}
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON", default="100/hour"),
+        "user": env("THROTTLE_USER", default="1000/hour"),
 
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
-    "anon": env("THROTTLE_ANON", default="100/hour"),
-    "user": env("THROTTLE_USER", default="1000/hour"),
+      
+        "login": env("THROTTLE_LOGIN", default="5/min"),
+        "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
+        "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
 
-    # Auth
-    "login": env("THROTTLE_LOGIN", default="5/min"),
-    "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
-    "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
+        "user_read": env("THROTTLE_USER_READ", default="1000/hour"),
 
-    # General
-    "user_read": env("THROTTLE_USER_READ", default="1000/hour"),
-
-    # Business
-    "equipment_action": env("THROTTLE_EQUIPMENT", default="30/hour"),
-    "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
+        "equipment_action": env("THROTTLE_EQUIPMENT", default="30/hour"),
+        "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
+    },
 }
 
 ROOT_URLCONF = 'inventory.urls'

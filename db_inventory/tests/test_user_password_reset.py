@@ -106,6 +106,10 @@ class PasswordResetRequestTests(TestCase):
 # ----------------------------------------------------------------------
 # PASSWORD RESET CONFIRM TESTS
 # ----------------------------------------------------------------------
+@patch(
+    "db_inventory.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
+    new=[]
+)
 class PasswordResetConfirmTests(APITestCase):
 
     def setUp(self):
@@ -146,6 +150,10 @@ class PasswordResetConfirmTests(APITestCase):
         self.assertEqual(response.json()["code"], "TOKEN_INVALID")
 
 
+@patch(
+    "db_inventory.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
+    new=[]
+)
 class PasswordResetTokenExpirationTests(TestCase):
 
     def test_token_expired(self):
