@@ -3,6 +3,7 @@ from db_inventory.models.site import Location, Room
 from db_inventory.models.assets import Accessory
 from db_inventory.serializers.locations import LocationFullSerializer
 from db_inventory.serializers.rooms import RoomNameSerializer
+from rest_framework.validators import UniqueValidator
 
 
 # Write Serializer
@@ -10,18 +11,54 @@ class AccessoryWriteSerializer(serializers.ModelSerializer):
     room = serializers.SlugRelatedField(
         slug_field="public_id",
         queryset=Room.objects.all(),
-        allow_null=False,
         required=True,
     )
+
+    serial_number = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[
+            UniqueValidator(
+                queryset=Accessory.objects.all(),
+                message="Accessory with this serial number already exists."
+            )
+        ],
+    )
+
     class Meta:
         model = Accessory
-        fields = [
-            'name',
-            'serial_number',
-            'quantity',
-            'room',
-        ]
+        fields = ("name", "serial_number", "quantity", "room")
 
+    # ---------- Field-level validation ----------
+
+    def validate_name(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Accessory name cannot be empty.")
+        return value
+
+    def validate_serial_number(self, value):
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    def validate_quantity(self, value: int) -> int:
+        if value < 0:
+            raise serializers.ValidationError("Quantity cannot be negative.")
+        if value > 100_000:
+            raise serializers.ValidationError("Quantity value is unreasonably large.")
+        return value
+
+    # ---------- Object-level validation ----------
+
+    def validate(self, attrs):
+        # Require room only on create
+        if not self.instance and not attrs.get("room"):
+            raise serializers.ValidationError({"room": "Room is required."})
+        return attrs
+    
 class AccessoryFullSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source='room.public_id', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
