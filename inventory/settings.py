@@ -260,4 +260,6 @@ if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
 # COOKIE_SECURE = not DEBUG   # True in production, False in dev
 COOKIE_SECURE = not DEBUG   # True in production, False in dev
 COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'  # Lax works in dev for localhost
+IDLE_TIMEOUT = timedelta(minutes=30)
+ABSOLUTE_LIFETIME = timedelta(days=7)
 
