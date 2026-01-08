@@ -11,7 +11,7 @@ from .viewsets import (
     general_viewsets,
     role_viewsets,
     auth_viewsets,
-    asset_assignment_viewsets
+    asset_assignment_viewsets, audit_viewsets
 )
 
 # --- General ---
@@ -210,8 +210,6 @@ user_unlock_view = auth_viewsets.UserLockViewSet.as_view({
 # Admin reset user password
 admin_reset_user_password_view = auth_viewsets.AdminResetUserPasswordView.as_view()
 
-admin_logs = auth_viewsets.AuditLogViewSet.as_view({'get': 'list'})
-
 # rename a site
 site_rename_view = auth_viewsets.SiteNameChangeAPIView.as_view()
 
@@ -234,6 +232,7 @@ equipment_assignment_detail = asset_assignment_viewsets.EquipmentAssignmentViewS
 equipment_event_history = asset_assignment_viewsets.EquipmentEventHistoryViewset.as_view({"get": "list"})
 
 # AUDIT Logs
-audit_log_list = auth_viewsets.AuditLogViewSet.as_view({"get": "list",})
+audit_log_list = audit_viewsets.AuditLogViewSet.as_view({"get": "list",})
 
-audit_log_detail = auth_viewsets.AuditLogViewSet.as_view({"get": "retrieve",})
+audit_log_detail = audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve",})
+

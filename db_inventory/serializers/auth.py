@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from db_inventory.models.users import User, PasswordResetEvent
 from db_inventory.models.security import UserSession
-from db_inventory.models.audit import AuditLog
+from db_inventory.models.audit import AuditLog, SiteNameChangeHistory
 from django.contrib.auth import password_validation
 from django.conf import settings
 from db_inventory.utils.tokens import PasswordResetToken
@@ -223,6 +223,8 @@ class AuditLogLightSerializer(serializers.ModelSerializer):
             "department_name",
             "location_name",
             "room_name",
+
+            "metadata",
         ]
 
         read_only_fields = fields
@@ -239,3 +241,19 @@ class AdminUserDemographicsSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         return value.lower()
+
+class SiteNameChangeHistorySerializer(serializers.ModelSerializer):
+    date = serializers.DateTimeField(source="changed_at", read_only=True)
+
+    class Meta:
+        model = SiteNameChangeHistory
+        fields = [
+            "id",
+            "site_type",
+            "object_public_id",
+            "old_name",
+            "new_name",
+            "reason",
+            "user_email",
+            "date",
+        ]

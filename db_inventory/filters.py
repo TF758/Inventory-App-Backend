@@ -427,3 +427,25 @@ class EquipmentAssignmentFilter(django_filters.FilterSet):
             "location",
             "department",
         ]
+
+
+
+class SiteNameChangeHistoryFilter(django_filters.FilterSet):
+    site_type = django_filters.CharFilter(field_name="site_type")
+    object_public_id = django_filters.CharFilter(field_name="object_public_id")
+    user_email = django_filters.CharFilter(field_name="user_email", lookup_expr="iexact")
+
+    start_date = django_filters.DateTimeFilter(
+        field_name="changed_at", lookup_expr="gte"
+    )
+    end_date = django_filters.DateTimeFilter(
+        field_name="changed_at", lookup_expr="lte"
+    )
+
+    class Meta:
+        model = SiteNameChangeHistory
+        fields = [
+            "site_type",
+            "object_public_id",
+            "user_email",
+        ]

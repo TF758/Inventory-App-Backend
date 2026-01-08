@@ -408,3 +408,19 @@ class ExcludeFiltersMixin:
                 }
 
         return DynamicFilterset
+
+
+class ListDetailSerializerMixin:
+    """
+    Allows a ViewSet to use different serializers for list vs detail views.
+    """
+
+    list_serializer_class = None
+    detail_serializer_class = None
+
+    def get_serializer_class(self):
+        if self.action == "retrieve" and self.detail_serializer_class:
+            return self.detail_serializer_class
+        if self.action == "list" and self.list_serializer_class:
+            return self.list_serializer_class
+        return super().get_serializer_class()
