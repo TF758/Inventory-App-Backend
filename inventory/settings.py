@@ -47,24 +47,6 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
-
-
-
-# if "test" in sys.argv:
-#     LOGGING = {
-#         "version": 1,
-#         "disable_existing_loggers": False,
-#         "handlers": {
-#             "null": {"class": "logging.NullHandler"},
-#         },
-#         "loggers": {
-#             "django.request": {
-#                 "handlers": ["null"],
-#                 "level": "ERROR",  # silence 403/404 spam
-#                 "propagate": False,
-#             },
-#         },
-#     }
 if "test" in sys.argv:
     LOGGING = {
         "version": 1,
@@ -97,6 +79,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    "django_extensions",
     
 ]
 
@@ -288,9 +271,40 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
     raise ValueError("EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in environment variables")
-# COOKIE_SECURE = not DEBUG   # True in production, False in dev
-COOKIE_SECURE = not DEBUG   # True in production, False in dev
-COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'  # Lax works in dev for localhost
+
+# ----------------------------------------
+# Cookie / Security Settings
+# ----------------------------------------
+
+# Detect test mode
+IS_TESTING = "test" in sys.argv
+
+
+if DEBUG or IS_TESTING:
+    # Local dev + tests (HTTPS dev server)
+    COOKIE_SECURE = True
+    COOKIE_SAMESITE = "None"
+
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+
+    # Do NOT force redirect in dev
+    SECURE_SSL_REDIRECT = False
+else:
+    # Production
+    COOKIE_SECURE = True
+    COOKIE_SAMESITE = "None"
+
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+
+    SECURE_SSL_REDIRECT = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+]
+
 IDLE_TIMEOUT = timedelta(minutes=30)
 ABSOLUTE_LIFETIME = timedelta(days=7)
 
