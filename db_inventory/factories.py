@@ -3,6 +3,9 @@ from db_inventory.models import User, Department, Location, Equipment, Component
 from faker import Faker
 import random
 from django.utils import timezone
+from datetime import timedelta
+from db_inventory.models.security import UserSession
+import secrets
 
 fake = Faker()
 
@@ -19,10 +22,10 @@ class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
 
-    email = factory.Sequence(lambda n: f"{fake.first_name().lower()}.{fake.last_name().lower()}.{n}@example.com")
+    email = factory.Sequence(lambda n: f"user{n}@example.com")
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
-    job_title = factory.Faker('job')
+    job_title = factory.LazyFunction(lambda: fake.job()[:50])
     is_active = factory.LazyFunction(lambda: random.choices([True, False], weights=[0.85, 0.15])[0])  # 85% active, 15% inactive
     public_id = factory.Sequence(lambda n: f"UID{n:08d}")
     is_staff = False
@@ -37,7 +40,7 @@ class AdminUserFactory(factory.django.DjangoModelFactory):
     password = factory.PostGenerationMethodCall('set_password', 'admin')
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
-    job_title = factory.Faker('job')
+    job_title = factory.LazyFunction(lambda: fake.job()[:50])
     is_staff = True
     is_superuser = True
 
@@ -55,7 +58,7 @@ class LocationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Location
 
-    name = factory.LazyFunction(fake.company)
+    name = factory.Sequence(lambda n: f"{fake.color_name()} Location {n}")
     department = factory.LazyFunction(lambda: random.choice(Department.objects.all()))
 
 
@@ -63,7 +66,7 @@ class RoomFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Room
 
-    name = factory.LazyFunction(fake.color_name)
+    name = factory.Sequence(lambda n: f"{fake.color_name()} Room {n}")
     location = factory.LazyFunction(lambda: random.choice(Location.objects.all()))
     
 
@@ -130,3 +133,35 @@ class ConsumableFactory(factory.django.DjangoModelFactory):
     description = factory.LazyFunction(lambda: fake.text(max_nb_chars=50))
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
     room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+
+class UserSessionFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UserSession
+
+    user = factory.SubFactory(UserFactory)
+    status = UserSession.Status.ACTIVE
+
+    expires_at = factory.LazyFunction(
+        lambda: timezone.now() + timedelta(days=7)
+    )
+
+    absolute_expires_at = factory.LazyFunction(
+        lambda: timezone.now() + timedelta(days=30)
+    )
+
+    ip_address = factory.Faker("ipv4")
+    user_agent = factory.Faker("user_agent")
+
+    user_agent_hash = factory.LazyAttribute(
+        lambda o: UserSession.hash_user_agent(o.user_agent)
+    )
+    refresh_token_hash = factory.LazyFunction(
+        lambda: UserSession.hash_token(secrets.token_urlsafe(64))
+    )
+    previous_refresh_token_hash = None
+
+    @factory.post_generation
+    def attach_raw_refresh(obj, create, extracted, **kwargs):
+        if not create:
+            return
+        obj.raw_refresh = extracted or secrets.token_urlsafe(64)

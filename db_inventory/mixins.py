@@ -310,6 +310,10 @@ class AuditMixin:
 
         request = getattr(self, "request", None)
         user = getattr(request, "user", None) if request else None
+
+        if user and user.is_anonymous:
+            user = None
+            
         scope = self._resolve_scope(target)
 
         def _create_log():

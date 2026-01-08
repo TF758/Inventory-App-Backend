@@ -53,24 +53,7 @@ class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
         return qs
     
-    def perform_create(self, serializer):
-        room_id = self.request.data.get("room")
-        if not room_id:
-            raise PermissionDenied("You must specify a room to create equipment.")
-        
-        room = Room.objects.filter(public_id=room_id).first()
-        if not room:
-            raise PermissionDenied("Invalid room ID.")
 
-        active_role = getattr(self.request.user, "active_role", None)
-        if not active_role:
-            raise PermissionDenied("No active role assigned.")
-
-        # Permission check for POST creation scope
-        if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
-            raise PermissionDenied("You do not have permission to create equipment in this room.")
-
-        serializer.save(room=room)
     
 
 class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):

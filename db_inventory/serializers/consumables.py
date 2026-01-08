@@ -10,18 +10,48 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
     room = serializers.SlugRelatedField(
         slug_field="public_id",
         queryset=Room.objects.all(),
-        allow_null=False,
         required=True,
+        allow_null=False,
     )
-    
+
     class Meta:
         model = Consumable
-        fields = [
-            'name',
-            'quantity',
-            'description',
-            'room',
-        ]
+        fields = ("name", "quantity", "description", "room")
+
+    # ---------- Field-level validation ----------
+
+    def validate_name(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Consumable name cannot be empty.")
+        return value
+
+    def validate_description(self, value: str) -> str:
+        if value is None:
+            return ""
+        value = value.strip()
+        if len(value) > 255:
+            raise serializers.ValidationError("Description is too long.")
+        return value
+
+    def validate_quantity(self, value: int) -> int:
+        if value < 0:
+            raise serializers.ValidationError("Quantity cannot be negative.")
+
+        if value > 100_000:
+            raise serializers.ValidationError("Quantity value is unreasonably large.")
+
+        return value
+
+    # ---------- Object-level validation ----------
+
+    def validate(self, attrs):
+        # Require room on create
+        if not self.instance and not attrs.get("room"):
+            raise serializers.ValidationError({
+                "room": "Room is required."
+            })
+        return attrs
 
 class ConsumableAreaReaSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source='room.public_id', read_only=True)

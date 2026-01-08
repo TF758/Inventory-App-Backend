@@ -1,3 +1,4 @@
+
 """
 Django settings for inventory project.
 
@@ -15,6 +16,7 @@ from pathlib import Path
 from datetime import timedelta
 import environ 
 import os
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,7 +47,20 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
-
+if "test" in sys.argv:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "handlers": {
+            "null": {
+                "class": "logging.NullHandler",
+            },
+        },
+        "root": {
+            "handlers": ["null"],
+            "level": "CRITICAL",
+        },
+    }
 # Application definition
 
 INSTALLED_APPS = [
@@ -64,6 +79,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    "django_extensions",
     
 ]
 
@@ -81,22 +97,39 @@ MIDDLEWARE = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'db_inventory.pagination.OptionalPagination',
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
+    "DEFAULT_PAGINATION_CLASS": "db_inventory.pagination.OptionalPagination",
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'db_inventory.authentication.SessionJWTAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication', 
-        'rest_framework.authentication.SessionAuthentication',      
-        'rest_framework.authentication.BasicAuthentication',         
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "db_inventory.authentication.SessionJWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated', 
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-}
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON", default="100/hour"),
+        "user": env("THROTTLE_USER", default="1000/hour"),
 
+      
+        "login": env("THROTTLE_LOGIN", default="5/min"),
+        "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
+        "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
+
+        "user_read": env("THROTTLE_USER_READ", default="1000/hour"),
+
+        "equipment_action": env("THROTTLE_EQUIPMENT", default="30/hour"),
+        "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
+    },
+}
 
 ROOT_URLCONF = 'inventory.urls'
 
@@ -118,16 +151,17 @@ TEMPLATES = [
 WSGI_APPLICATION = 'inventory.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "HOST": env("DB_HOST", default="localhost"),
+        "PORT": env("DB_PORT", default="5432"),
     }
 }
-
 AUTH_USER_MODEL = 'db_inventory.User'
 
 
@@ -192,11 +226,22 @@ CORS_ALLOW_HEADERS = [
 ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=50),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    # Lifetimes
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=env.int("JWT_ACCESS_MINUTES", default=15)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=env.int("JWT_REFRESH_DAYS", default=1)
+    ),
+
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+
     "USER_ID_FIELD": "public_id",
     "USER_ID_CLAIM": "public_id",
 
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 # hide validators during dev to speed up tests
@@ -226,7 +271,40 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
     raise ValueError("EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in environment variables")
-# COOKIE_SECURE = not DEBUG   # True in production, False in dev
-COOKIE_SECURE = not DEBUG   # True in production, False in dev
-COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'  # Lax works in dev for localhost
+
+# ----------------------------------------
+# Cookie / Security Settings
+# ----------------------------------------
+
+# Detect test mode
+IS_TESTING = "test" in sys.argv
+
+
+if DEBUG or IS_TESTING:
+    # Local dev + tests (HTTPS dev server)
+    COOKIE_SECURE = True
+    COOKIE_SAMESITE = "None"
+
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+
+    # Do NOT force redirect in dev
+    SECURE_SSL_REDIRECT = False
+else:
+    # Production
+    COOKIE_SECURE = True
+    COOKIE_SAMESITE = "None"
+
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+
+    SECURE_SSL_REDIRECT = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+]
+
+IDLE_TIMEOUT = timedelta(minutes=30)
+ABSOLUTE_LIFETIME = timedelta(days=7)
 

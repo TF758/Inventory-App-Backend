@@ -19,13 +19,23 @@ from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.serializers.auth import PasswordResetConfirmSerializer
+from db_inventory.throttling import LoginThrottle, PasswordResetThrottle, RefreshTokenThrottle
+from rest_framework.exceptions import Throttled
+from db_inventory.mixins import AuditMixin
+from db_inventory.models.audit import AuditLog
+from django.db.models import Q
+from django.conf import settings
 
+IDLE_TIMEOUT = timedelta(minutes=30)
+ABSOLUTE_LIFETIME = timedelta(days=7)
 
 logger = logging.getLogger(__name__) 
 
 class SessionTokenLoginView(TokenObtainPairView):
     serializer_class = SessionTokenLoginViewSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
+
 
     def post(self, request, *args, **kwargs):
         # Authenticate user via serializer
@@ -38,38 +48,39 @@ class SessionTokenLoginView(TokenObtainPairView):
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
-            logger.exception("Failed to hash refresh token for user %s", getattr(user, "pk", None))
-            raise APIException("Failed to generate refresh token.")
+            logger.exception("Refresh token hashing failed", extra={"user_id": user.pk})
+            raise APIException("Authentication failed.")
+        
+        now = timezone.now()
 
         # Create session and ensure atomicity — if anything after creation fails, we will remove the session
         try:
             with transaction.atomic():
-                session = UserSession.objects.create(
-                    user=user,
-                    refresh_token_hash=hashed_refresh,
-                    expires_at=timezone.localtime(timezone.now()) + timedelta(days=1),
-                    ip_address=request.META.get("REMOTE_ADDR"),
-                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                ua_hash = UserSession.hash_user_agent(
+                    request.META.get("HTTP_USER_AGENT", "")
                 )
-        except IntegrityError:
-            logger.exception("IntegrityError creating UserSession for user %s", getattr(user, "pk", None))
-            raise APIException("Failed to persist session.")
+                session = UserSession.objects.create(
+                user=user,
+                refresh_token_hash=hashed_refresh,
+                expires_at=now + timedelta(days=1),
+                absolute_expires_at=now + ABSOLUTE_LIFETIME,
+                user_agent_hash=ua_hash,   # 🔥 new
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
         except Exception:
-            logger.exception("Unexpected error creating UserSession for user %s", getattr(user, "pk", None))
-            raise APIException("Failed to create user session.")
+            logger.exception("Session creation failed", extra={"user_id": user.pk})
+            raise APIException("Authentication failed.")
 
         # Generate access token bound to the created session.
         try:
             access_token_obj = AccessToken.for_user(user)
             access_token_obj["session_id"] = str(session.id)
+            access_token_obj["abs_exp"] = int(session.absolute_expires_at.timestamp())
             access_token = str(access_token_obj)
         except Exception:
-            try:
                 session.delete()
-            except Exception:
-                logger.exception("Failed to delete session %s after token generation failure", getattr(session, "id", None))
-            logger.exception("Failed to generate access token for user %s", getattr(user, "pk", None))
-            raise APIException("Failed to generate access token.")
+                logger.exception("Access token generation failed", extra={"user_id": user.pk})
+                raise APIException("Authentication failed.")
 
         # Build response including metadata
         response_data = {
@@ -84,102 +95,185 @@ class SessionTokenLoginView(TokenObtainPairView):
             key="refresh",
             value=raw_refresh,
             httponly=True,
-            secure=True,
-            samesite="None",
+            secure=settings.COOKIE_SECURE,
+            samesite=settings.COOKIE_SAMESITE,
             path="/",
+            max_age=int(ABSOLUTE_LIFETIME.total_seconds()),
         )
 
         return response
-
+    
 class RefreshAPIView(APIView):
-    permission_classes = [AllowAny]          
-    authentication_classes = []              
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [RefreshTokenThrottle]
 
     def post(self, request):
-
-        
         try:
+            # --- Get refresh token from cookie ---
             raw_refresh = request.COOKIES.get("refresh")
             if not raw_refresh:
-                return Response({"detail": "No refresh token found."}, status=400)
+                return Response(
+                    {"detail": "Invalid or expired session."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
 
             hashed_refresh = UserSession.hash_token(raw_refresh)
 
+            # --- Lookup session (supports reuse detection) ---
             try:
                 session = UserSession.objects.get(
-                    refresh_token_hash=hashed_refresh,
+                    Q(refresh_token_hash=hashed_refresh)
+                    | Q(previous_refresh_token_hash=hashed_refresh),
                     status=UserSession.Status.ACTIVE,
                 )
             except UserSession.DoesNotExist:
-                return Response({"detail": "Invalid or expired session."}, status=401)
-            
-            # Check for expiration
-            if session.expires_at <= timezone.now():
+                return Response(
+                    {"detail": "Invalid or expired session."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            # --- Refresh token reuse detection ---
+            if session.previous_refresh_token_hash == hashed_refresh:
+                session.status = UserSession.Status.REVOKED
+                session.save(update_fields=["status"])
+
+                resp = Response(
+                    {"detail": "Invalid or expired session."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+                resp.delete_cookie("refresh", path="/")
+                return resp
+
+            now = timezone.now()
+
+            # --- Absolute + idle expiration ---
+            if session.absolute_expires_at <= now or session.expires_at <= now:
                 session.status = UserSession.Status.EXPIRED
                 session.save(update_fields=["status"])
-                return Response({"detail": "Session has expired."}, status=401)
+
+                resp = Response(
+                    {"detail": "Invalid or expired session."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+                resp.delete_cookie("refresh", path="/")
+                return resp
+
+            # --- User-agent binding ---
+            req_ua_hash = UserSession.hash_user_agent(
+                request.META.get("HTTP_USER_AGENT", "")
+            )
+            if session.user_agent_hash and session.user_agent_hash != req_ua_hash:
+                session.status = UserSession.Status.REVOKED
+                session.save(update_fields=["status"])
+
+                resp = Response(
+                    {"detail": "Invalid or expired session."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+                resp.delete_cookie("refresh", path="/")
+                return resp
 
             user = session.user
 
+            # --- Locked account handling ---
             if user.is_locked:
-                # Revoke all active sessions for the user
-                UserSession.objects.filter(user=user, status=UserSession.Status.ACTIVE).update(
-                    status=UserSession.Status.REVOKED
-                )
+                UserSession.objects.filter(
+                    user=user,
+                    status=UserSession.Status.ACTIVE,
+                ).update(status=UserSession.Status.REVOKED)
 
-                # Optionally delete the current refresh cookie
-                response = Response(
-                    {"detail": "Your account has been locked. Please contact your administrator."},
-                    status=403
+                resp = Response(
+                    {
+                        "detail": "Your account has been locked. Please contact your administrator."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-                response.delete_cookie("refresh", path="/")
-                return response
+                resp.delete_cookie("refresh", path="/")
+                return resp
+
+            # --- Generate access token ---
             try:
                 access_token = AccessToken.for_user(user)
-            except Exception as e:
-                return Response({"detail": f"Failed to generate access token: {str(e)}"}, status=500)
+            except Exception:
+                logger.exception(
+                    "Access token generation failed",
+                    extra={"session_id": str(session.id)},
+                )
+                return Response(
+                    {"detail": "Internal server error."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             access_token["public_id"] = str(user.public_id)
             access_token["session_id"] = str(session.id)
-            access_token["role_id"] = user.active_role.public_id if user.active_role else None
+            access_token["abs_exp"] = int(session.absolute_expires_at.timestamp())
+            access_token["role_id"] = (
+                user.active_role.public_id if user.active_role else None
+            )
 
-            # Rotate refresh token
-            import secrets
+            # --- Rotate refresh token 
             new_raw_refresh = secrets.token_urlsafe(64)
-            try:
-                session.refresh_token_hash = UserSession.hash_token(new_raw_refresh)
-                session.expires_at = timezone.now() + timedelta(days=7)
-                session.save(update_fields=["refresh_token_hash", "expires_at"])
-            except Exception as e:
-                return Response({"detail": f"Failed to save session: {str(e)}"}, status=500)
+            new_hash = UserSession.hash_token(new_raw_refresh)
 
+            try:
+                with transaction.atomic():
+                    session.previous_refresh_token_hash = session.refresh_token_hash
+                    session.refresh_token_hash = new_hash
+                    session.expires_at = now + IDLE_TIMEOUT
+                    session.save(
+                        update_fields=[
+                            "previous_refresh_token_hash",
+                            "refresh_token_hash",
+                            "expires_at",
+                        ]
+                    )
+            except Exception:
+                logger.exception(
+                    "Refresh token rotation failed",
+                    extra={"session_id": str(session.id)},
+                )
+                return Response(
+                    {"detail": "Internal server error."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # --- Success response ---
             response = Response(
                 {
                     "access": str(access_token),
                     "public_id": str(user.public_id),
-                    "role_id": user.active_role.public_id if user.active_role else None,
+                    "role_id": (
+                        user.active_role.public_id if user.active_role else None
+                    ),
                 },
-                status=200
+                status=status.HTTP_200_OK,
             )
+
             response.set_cookie(
-            key="refresh",
-            value=new_raw_refresh,
-            httponly=True,
-            secure=True,
-            samesite='None',
-            path="/",
-        )
+                key="refresh",
+                value=new_raw_refresh,
+                httponly=True,
+                secure=settings.COOKIE_SECURE,
+                samesite=settings.COOKIE_SAMESITE,
+                path="/",
+                max_age=int(ABSOLUTE_LIFETIME.total_seconds()),
+            )
+
             return response
 
-        except Exception as e:
-            return Response({"detail": f"Internal server error: {str(e)}"}, status=500)
+        except Exception:
+            logger.exception("Refresh flow failed")
+            return Response(
+                {"detail": "Internal server error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 class LogoutAPIView(APIView):
-    permission_classes = []  # AllowAny
+    permission_classes = []
     authentication_classes = []
 
     def post(self, request):
-        # Get refresh token from HttpOnly cookie
         raw_refresh = request.COOKIES.get("refresh")
         if not raw_refresh:
             return Response(
@@ -187,45 +281,46 @@ class LogoutAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Hash the token safely
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
+            logger.exception("Logout refresh token hashing failed")
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Attempt to find session
         try:
-            session = UserSession.objects.get(refresh_token_hash=hashed_refresh)
+            session = UserSession.objects.get(
+                Q(refresh_token_hash=hashed_refresh) |
+                Q(previous_refresh_token_hash=hashed_refresh)
+            )
         except UserSession.DoesNotExist:
             return Response(
                 {"detail": "Invalid or expired session."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if session is already revoked
+        # 🔑 Idempotency check
         if session.status != UserSession.Status.ACTIVE:
             return Response(
                 {"detail": "Invalid or expired session."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Revoke the session
         try:
             session.status = UserSession.Status.REVOKED
             session.save(update_fields=["status"])
         except Exception:
+            logger.exception("Logout session revoke failed")
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Produce response and delete cookie
         response = Response(
             {"detail": "Successfully logged out."},
-            status=status.HTTP_200_OK
+            status=status.HTTP_200_OK,
         )
         response.delete_cookie("refresh", path="/")
         return response
@@ -279,7 +374,9 @@ class SerializerFieldsView(APIView):
 
         return Response(get_serializer_field_info(serializer_class))
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(AuditMixin, APIView):
+
+    throttle_classes = [PasswordResetThrottle]
 
     """Initiate password reset by sending email with reset link."""
 
@@ -289,19 +386,39 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "Password reset email sent."}, status=200)
 
-class PasswordResetConfirmView(APIView):
+        user = getattr(serializer, "user", None)
+
+        if user:
+            self.audit(
+                event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
+                target=user,
+                description="Password reset requested",
+                metadata={
+                    "initiated_by_admin": False,
+                },
+        )
+        return Response({"detail": "If an account exists, a password reset email has been sent."}, status=200)
+
+class PasswordResetConfirmView(AuditMixin, APIView):
     """
     Confirm password reset (user or admin triggered) and set new password.
     """
 
-    permission_classes = [AllowAny]  # If you want admins to also use it, adjust permissions
+    permission_classes = [AllowAny] 
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        user = serializer.save()
+
+        self.audit(
+            event_type=AuditLog.Events.PASSWORD_RESET_COMPLETED,
+            target=user,
+            description="Password reset completed successfully",
+        )
 
         return Response(
             {"detail": "Password has been reset successfully."},

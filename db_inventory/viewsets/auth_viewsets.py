@@ -11,7 +11,7 @@ from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import AuditLogFilter
-from db_inventory.mixins import ScopeFilterMixin
+from db_inventory.mixins import AuditMixin, ScopeFilterMixin
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
@@ -101,7 +101,7 @@ class UserLockViewSet(viewsets.GenericViewSet):
                         status=status.HTTP_200_OK)
 
 
-class AdminResetUserPasswordView(APIView):
+class AdminResetUserPasswordView(AuditMixin, APIView):
     """
     Admin triggers a password reset for a user using public_id.
     Sends an email with a token-based reset link.
@@ -112,12 +112,19 @@ class AdminResetUserPasswordView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         
-        reset_link = serializer.save(admin=request.user)
+        self.audit(
+            event_type=AuditLog.Events.ADMIN_RESET_PASSWORD,
+            target=serializer.user,
+            description="Admin initiated password reset",
+            metadata={
+                "initiated_by_admin": True,
+                "admin_public_id": request.user.public_id,
+            },
+        )
 
         return Response(
             {
                 "detail": "Password reset link sent to user.",
-                "reset_link": reset_link  # Optional: admin may see it
             },
             status=status.HTTP_200_OK
         )
@@ -228,7 +235,7 @@ class AuditLogViewSet(ScopeFilterMixin,viewsets.ReadOnlyModelViewSet):
         return AuditLogLightSerializer
 
 
-class SiteNameChangeAPIView(APIView):
+class SiteNameChangeAPIView(AuditMixin, APIView):
     """
     POST-only endpoint to rename a Department, Location, or Room.
 
@@ -295,60 +302,18 @@ class SiteNameChangeAPIView(APIView):
             reason=reason,
         )
 
-        # --------------------
-        # Derive hierarchy for audit log
-        # --------------------
-
-        department = location = room = None
-
-        if isinstance(obj, Department):
-            department = obj
-
-        elif isinstance(obj, Location):
-            location = obj
-            department = obj.department
-
-        elif isinstance(obj, Room):
-            room = obj
-            location = obj.location
-            department = obj.location.department if obj.location else None
-
-        # --------------------
-        # Create audit log entry
-        # --------------------
-
-        AuditLog.objects.create(
-        user=request.user,
-        user_public_id=request.user.public_id,
-        user_email=request.user.email,
-
-        event_type=AuditLog.Events.MODEL_UPDATED,
-
-        target_model=obj._meta.verbose_name.title(),
-        target_id=obj.public_id,
-
-        target_name=old_name,
-
-        department=department,
-        department_name=department.name if department else None,
-
-        location=location,
-        location_name=location.name if location else None,
-
-        room=room,
-        room_name=room.name if room else None,
-
-        description="Site name changed",
-        metadata={
-            "change_type": "site_rename",
-            "old_name": old_name,
-            "new_name": new_name,
-            "reason": reason,
-        },
-
-        ip_address=request.META.get("REMOTE_ADDR"),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-    )
+        self.audit(
+                event_type=AuditLog.Events.SITE_RENAMED,
+                target=obj,
+                description="Site name changed",
+                metadata={
+                    "change_type": "site_rename",
+                    "old_name": old_name,
+                    "new_name": new_name,
+                    "reason": reason,
+                    "site_type": site_type,
+                },
+            )
 
         return Response(
             {
@@ -362,7 +327,7 @@ class SiteNameChangeAPIView(APIView):
         )
 
 
-class SiteRelocationAPIView(APIView):
+class SiteRelocationAPIView(AuditMixin, APIView):
     """
     POST-only endpoint to relocate:
     - Location → Department
@@ -391,10 +356,6 @@ class SiteRelocationAPIView(APIView):
 
         if site_type == "room" and target_site != "location":
             raise ValidationError("Rooms can only be moved under a location.")
-
-        # --------------------
-        # Load objects
-        # --------------------
 
         if site_type == "location":
             try:
@@ -463,34 +424,23 @@ class SiteRelocationAPIView(APIView):
         # Audit log
         # --------------------
 
-        AuditLog.objects.create(
-        user=request.user,
-        user_public_id=request.user.public_id,
-        user_email=request.user.email,
-        event_type=AuditLog.Events.MODEL_RELOCATED,
-        target_model=obj._meta.verbose_name.title(),
-        target_id=obj.public_id,
+        self.audit(
+                event_type=AuditLog.Events.SITE_RELOCATED,
+                target=obj,
+                description="Site relocated",
+                metadata={
+                    "change_type": "site_relocation",
+                    "site_type": site_type,
 
-        target_name=obj.name,
+                    "from_parent_public_id": from_parent.public_id if from_parent else None,
+                    "from_parent_name": from_parent.name if from_parent else None,
 
-        description="Site relocated",
+                    "to_parent_public_id": target.public_id,
+                    "to_parent_name": target.name,
 
-        metadata={
-            "change_type": "site_relocation",
-            "site_type": site_type,
-
-            "from_parent_name": from_parent.name if from_parent else None,
-            "from_parent_public_id": from_parent.public_id if from_parent else None,
-
-            "to_parent_name": target.name,
-            "to_parent_public_id": target.public_id,
-
-            "reason": reason,
-        },
-
-        ip_address=request.META.get("REMOTE_ADDR"),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-    )
+                    "reason": reason,
+                },
+            )
 
         return Response(
             {

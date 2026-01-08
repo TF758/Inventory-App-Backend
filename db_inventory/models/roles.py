@@ -5,7 +5,7 @@ from django.utils import timezone
 from db_inventory.models.base import PublicIDModel
 from db_inventory.models.site import Department, Location, Room
 from django.conf import settings
-
+from django.db.models import Q
 
 class RoleAssignment(PublicIDModel):
     """
@@ -42,43 +42,89 @@ class RoleAssignment(PublicIDModel):
     role = models.CharField(max_length=40, choices=ROLE_CHOICES)
 
     # Scope (only ONE may be set, depending on role)
-    department = models.ForeignKey(
-        Department,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="role_assignments",
-    )
-    location = models.ForeignKey(
-        Location,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="role_assignments",
-    )
-    room = models.ForeignKey(
-        Room,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="role_assignments",
-    )
+    department = models.ForeignKey(Department,on_delete=models.CASCADE,null=True,blank=True,related_name="role_assignments",)
+    location = models.ForeignKey(Location,on_delete=models.CASCADE,null=True,blank=True,related_name="role_assignments",)
+    room = models.ForeignKey(Room,on_delete=models.CASCADE,null=True,blank=True,related_name="role_assignments",)
 
-    assigned_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="assigned_roles",
-    )
+    assigned_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="assigned_roles",)
     assigned_date = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ("user", "role", "department", "location", "room")
         indexes = [
             models.Index(fields=["public_id"]),
             models.Index(fields=["role"]),
+            models.Index(fields=["user", "role"]),
         ]
+
+        constraints = [
+            # --------------------------------------------------
+            # Scope validity (exactly one scope, except SITE_ADMIN)
+            # --------------------------------------------------
+            models.CheckConstraint(
+                condition=(
+                    # SITE_ADMIN → no scope
+                    Q(role="SITE_ADMIN") &
+                    Q(department__isnull=True) &
+                    Q(location__isnull=True) &
+                    Q(room__isnull=True)
+                ) |
+                (
+                    # Department roles → department only
+                    Q(role__startswith="DEPARTMENT") &
+                    Q(department__isnull=False) &
+                    Q(location__isnull=True) &
+                    Q(room__isnull=True)
+                ) |
+                (
+                    # Location roles → location only
+                    Q(role__startswith="LOCATION") &
+                    Q(department__isnull=True) &
+                    Q(location__isnull=False) &
+                    Q(room__isnull=True)
+                ) |
+                (
+                    # Room roles → room only
+                    Q(role__startswith="ROOM") &
+                    Q(department__isnull=True) &
+                    Q(location__isnull=True) &
+                    Q(room__isnull=False)
+                ),
+                name="role_assignment_valid_scope",
+            ),
+
+            # --------------------------------------------------
+            # Uniqueness constraints (NULL-safe, scope-aware)
+            # --------------------------------------------------
+
+            # Only one SITE_ADMIN per user
+            models.UniqueConstraint(
+                fields=["user", "role"],
+                condition=Q(role="SITE_ADMIN"),
+                name="unique_site_admin_per_user",
+            ),
+
+            # One department role per user per department
+            models.UniqueConstraint(
+                fields=["user", "role", "department"],
+                condition=Q(department__isnull=False),
+                name="unique_department_role_per_user",
+            ),
+
+            # One location role per user per location
+            models.UniqueConstraint(
+                fields=["user", "role", "location"],
+                condition=Q(location__isnull=False),
+                name="unique_location_role_per_user",
+            ),
+
+            # One room role per user per room
+            models.UniqueConstraint(
+                fields=["user", "role", "room"],
+                condition=Q(room__isnull=False),
+                name="unique_room_role_per_user",
+            ),
+        ]
+        
 
     # --------------------
     # Validation
@@ -90,6 +136,8 @@ class RoleAssignment(PublicIDModel):
         """
         # SITE_ADMIN: no scope required
         if self.role == "SITE_ADMIN":
+            if self.department or self.location or self.room:
+                raise ValidationError("SITE_ADMIN role must not have any scope.")
             return
 
         # Department-level roles

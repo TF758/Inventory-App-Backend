@@ -73,37 +73,32 @@ class AdminPasswordResetSerializer(serializers.Serializer):
             self.user = User.objects.get(public_id=value)
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found.")
-        
+
         if self.user.is_locked:
             raise serializers.ValidationError("User account is locked.")
+
         return value
 
     def save(self, admin):
-        """
-        admin is passed from serializer.save(admin=request.user)
-        """
-
         token_service = PasswordResetToken()
         event = token_service.generate_token(
             user_public_id=self.user.public_id,
-            admin_public_id=admin.public_id  
+            admin_public_id=admin.public_id,
         )
 
         reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
 
-        # Send email to the user
         send_mail(
-            subject="Your Password Reset Request",
-            message=f"""
-            An administrator has initiated a password reset for your account.
-
-            Use this link (expires in 10 minutes):
-            {reset_link}
-
-            If you did not expect this, contact your administrator immediately.
-            """,
+            subject="Administrator-Initiated Password Reset",
+            message=(
+                "An administrator has initiated a password reset for your account.\n\n"
+                "This link expires in 10 minutes:\n\n"
+                f"{reset_link}\n\n"
+                "If you did not expect this, contact support immediately."
+            ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[self.user.email],
+            fail_silently=False,
         )
 
         return reset_link

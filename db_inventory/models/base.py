@@ -6,7 +6,7 @@ class PublicIDModel(models.Model):
     """Abstract base model that provides a unique public_id field."""
 
     public_id = models.CharField(
-        max_length=12,
+        max_length=32,
         unique=True,
         editable=False,
         null=True,

@@ -6,12 +6,13 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.db.models import Q
 
 class Department(PublicIDModel):
     PUBLIC_ID_PREFIX = "DPT"
 
-    name = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True, default='')
+    name = models.CharField(max_length=255, unique=True)
+    description = models.CharField(blank=True, max_length=500)
     img_link = models.URLField(blank=True, default='')
 
     class Meta:
@@ -19,7 +20,7 @@ class Department(PublicIDModel):
             models.Index(fields=["public_id"]),
             models.Index(fields=["name"]),
         ]
-
+        
     def __str__(self):
         return self.name
 
@@ -40,6 +41,14 @@ class Location(PublicIDModel):
             models.Index(fields=["public_id"]),
             models.Index(fields=["name"]),
         ]
+        constraints = [
+        models.UniqueConstraint(
+            fields=["department", "name"],
+            name="unique_location_name_per_department"
+        )
+    ]
+
+    
 
     def __str__(self):
         if self.department:
@@ -62,6 +71,12 @@ class Room(PublicIDModel):
             models.Index(fields=["public_id"]),
             models.Index(fields=["name"]),
         ]
+        constraints = [
+        models.UniqueConstraint(
+            fields=["location", "name"],
+            name="unique_room_name_per_location"
+        )
+    ]
 
     def __str__(self):
         if self.location:
@@ -103,7 +118,14 @@ class UserLocation(PublicIDModel):
                 fields=["user"],
                 condition=models.Q(is_current=True),
                 name="unique_current_location_per_user",
-            )
+            ),
+            models.CheckConstraint(
+            condition=(
+                Q(is_current=False) |
+                Q(room__isnull=False)
+            ),
+            name="current_user_location_requires_room"
+        )
         ]
 
     # --------------------
