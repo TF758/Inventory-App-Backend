@@ -207,3 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 *.pyc 
+
+# Local HTTPS dev certs
+*.pem
+*.crt
+*.key
