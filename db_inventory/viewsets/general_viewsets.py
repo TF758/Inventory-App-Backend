@@ -270,7 +270,7 @@ class RefreshAPIView(APIView):
             )
 
 class LogoutAPIView(APIView):
-    permission_classes = []  # AllowAny
+    permission_classes = []
     authentication_classes = []
 
     def post(self, request):
@@ -291,13 +291,17 @@ class LogoutAPIView(APIView):
             )
 
         try:
-            session = UserSession.objects.get(refresh_token_hash=hashed_refresh)
+            session = UserSession.objects.get(
+                Q(refresh_token_hash=hashed_refresh) |
+                Q(previous_refresh_token_hash=hashed_refresh)
+            )
         except UserSession.DoesNotExist:
             return Response(
                 {"detail": "Invalid or expired session."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # 🔑 Idempotency check
         if session.status != UserSession.Status.ACTIVE:
             return Response(
                 {"detail": "Invalid or expired session."},
@@ -308,7 +312,7 @@ class LogoutAPIView(APIView):
             session.status = UserSession.Status.REVOKED
             session.save(update_fields=["status"])
         except Exception:
-            logger.exception("Logout session revoke failed", extra={"session_id": str(session.id)})
+            logger.exception("Logout session revoke failed")
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -318,11 +322,7 @@ class LogoutAPIView(APIView):
             {"detail": "Successfully logged out."},
             status=status.HTTP_200_OK,
         )
-        response.delete_cookie(
-            "refresh",
-            path="/",
-            samesite=settings.COOKIE_SAMESITE,
-        )
+        response.delete_cookie("refresh", path="/")
         return response
 
 

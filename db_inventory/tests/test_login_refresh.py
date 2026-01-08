@@ -248,3 +248,65 @@ class RefreshTokenViewTests(TestCase):
         self.assertEqual(cookie["samesite"], settings.COOKIE_SAMESITE)
         self.assertTrue(cookie["httponly"])
         self.assertEqual(cookie["path"], "/")
+
+    def test_refresh_fails_after_absolute_expiry(self):
+        self._login()
+
+        session = UserSession.objects.get(user=self.user)
+        session.absolute_expires_at = timezone.now() - timedelta(seconds=1)
+        session.save(update_fields=["absolute_expires_at"])
+
+        response = self.client.post(
+            self.refresh_url,
+            format="json",
+            HTTP_USER_AGENT=TEST_UA,
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, UserSession.Status.EXPIRED)
+
+    def test_refresh_fails_when_session_revoked(self):
+        self._login()
+
+        session = UserSession.objects.get(user=self.user)
+        session.status = UserSession.Status.REVOKED
+        session.save(update_fields=["status"])
+
+        response = self.client.post(
+            self.refresh_url,
+            format="json",
+            HTTP_USER_AGENT=TEST_UA,
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_access_token_rejected_when_session_expired(self):
+        login_response = self._login()
+        token = login_response.json()["access"]
+
+        session = UserSession.objects.get(user=self.user)
+        session.expires_at = timezone.now() - timedelta(seconds=1)
+        session.save(update_fields=["expires_at"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        protected_url = reverse("departments")
+        response = self.client.get(protected_url)
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_refresh_fails_for_locked_user(self):
+        self._login()
+        self.user.is_locked = True
+        self.user.save(update_fields=["is_locked"])
+
+        response = self.client.post(
+            self.refresh_url,
+            format="json",
+            HTTP_USER_AGENT=TEST_UA,
+        )
+
+        self.assertEqual(response.status_code, 403)
+

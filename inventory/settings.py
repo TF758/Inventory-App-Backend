@@ -16,7 +16,7 @@ from pathlib import Path
 from datetime import timedelta
 import environ 
 import os
-
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,6 +48,37 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 
+
+
+# if "test" in sys.argv:
+#     LOGGING = {
+#         "version": 1,
+#         "disable_existing_loggers": False,
+#         "handlers": {
+#             "null": {"class": "logging.NullHandler"},
+#         },
+#         "loggers": {
+#             "django.request": {
+#                 "handlers": ["null"],
+#                 "level": "ERROR",  # silence 403/404 spam
+#                 "propagate": False,
+#             },
+#         },
+#     }
+if "test" in sys.argv:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "handlers": {
+            "null": {
+                "class": "logging.NullHandler",
+            },
+        },
+        "root": {
+            "handlers": ["null"],
+            "level": "CRITICAL",
+        },
+    }
 # Application definition
 
 INSTALLED_APPS = [

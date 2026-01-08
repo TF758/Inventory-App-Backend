@@ -3,6 +3,9 @@ from db_inventory.models import User, Department, Location, Equipment, Component
 from faker import Faker
 import random
 from django.utils import timezone
+from datetime import timedelta
+from db_inventory.models.security import UserSession
+import secrets
 
 fake = Faker()
 
@@ -130,3 +133,35 @@ class ConsumableFactory(factory.django.DjangoModelFactory):
     description = factory.LazyFunction(lambda: fake.text(max_nb_chars=50))
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
     room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+
+class UserSessionFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UserSession
+
+    user = factory.SubFactory(UserFactory)
+    status = UserSession.Status.ACTIVE
+
+    expires_at = factory.LazyFunction(
+        lambda: timezone.now() + timedelta(days=7)
+    )
+
+    absolute_expires_at = factory.LazyFunction(
+        lambda: timezone.now() + timedelta(days=30)
+    )
+
+    ip_address = factory.Faker("ipv4")
+    user_agent = factory.Faker("user_agent")
+
+    user_agent_hash = factory.LazyAttribute(
+        lambda o: UserSession.hash_user_agent(o.user_agent)
+    )
+    refresh_token_hash = factory.LazyFunction(
+        lambda: UserSession.hash_token(secrets.token_urlsafe(64))
+    )
+    previous_refresh_token_hash = None
+
+    @factory.post_generation
+    def attach_raw_refresh(obj, create, extracted, **kwargs):
+        if not create:
+            return
+        obj.raw_refresh = extracted or secrets.token_urlsafe(64)
