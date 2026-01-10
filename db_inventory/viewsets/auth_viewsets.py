@@ -6,18 +6,18 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, User, AuditLog, Department, Location, Room, SiteNameChangeHistory, SiteRelocationHistory
-from db_inventory.serializers.auth import AuditLogSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistorySerializer
+from db_inventory.serializers.auth import AuditLogSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import AuditLogFilter, SiteNameChangeHistoryFilter
-from db_inventory.mixins import AuditMixin, ScopeFilterMixin
+from db_inventory.mixins import AuditMixin, ListDetailSerializerMixin, ScopeFilterMixin
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
 from db_inventory.permissions.users import AdminUpdateUserPermission
 from db_inventory.utils.audit import create_audit_log
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 
 class RevokeUserSessionsViewset(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
@@ -164,12 +164,21 @@ class ChangePasswordView(APIView):
     
 
 class SiteNameChangeListAPIView(ListAPIView):
-    queryset = SiteNameChangeHistory.objects.all()
-    serializer_class = SiteNameChangeHistorySerializer
+    queryset = SiteNameChangeHistory.objects.all().order_by("-changed_at")
     permission_classes = [IsAuthenticated]
+    serializer_class = SiteNameChangeHistoryListSerializer
 
     filter_backends = [DjangoFilterBackend]
     filterset_class = SiteNameChangeHistoryFilter
+    pagination_class = FlexiblePagination
+
+    ordering_fields = ["changed_at"]
+    ordering = ["-changed_at"]
+
+class SiteNameChangeDetailAPIView(RetrieveAPIView):
+    queryset = SiteNameChangeHistory.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = SiteNameChangeHistorySerializer   
 
 class SiteNameChangeAPIView(AuditMixin, APIView):
     """

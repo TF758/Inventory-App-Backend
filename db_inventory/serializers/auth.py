@@ -257,3 +257,17 @@ class SiteNameChangeHistorySerializer(serializers.ModelSerializer):
             "user_email",
             "date",
         ]
+
+class SiteNameChangeHistoryListSerializer(serializers.ModelSerializer):
+    date = serializers.DateTimeField(source="changed_at", read_only=True)
+
+    class Meta:
+        model = SiteNameChangeHistory
+        fields = [
+            "id",
+            "site_type",
+            "old_name",
+            "new_name",
+            "user_email",
+            "date",
+        ]

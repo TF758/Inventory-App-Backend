@@ -48,7 +48,7 @@ admin.site.register(Accessory)
 
 @admin.register(UserSession)
 class UserSessionAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "status", "created_at", "last_used_at", "ip_address")
+    list_display = ("id", "user", "status", "absolute_expires_at", "created_at", "last_used_at", "ip_address")
     list_filter = ("status", "created_at")
     search_fields = ("user__username", "ip_address")
 

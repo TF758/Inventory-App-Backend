@@ -26,6 +26,9 @@ urlpatterns = [
     ),
     # rename site
     path('site/rename/', site_rename_view, name='site-rename'),
+
+    path("site-name-changes/", site_name_chnage_list),
+    path("site-name-changes/<int:pk>/", site_name_chnage_detail),
     # relocate site
     path('site/relocate/', site_relocate_view, name='site-relocate'),
     # update user demographics

@@ -236,3 +236,8 @@ audit_log_list = audit_viewsets.AuditLogViewSet.as_view({"get": "list",})
 
 audit_log_detail = audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve",})
 
+# site name chnange
+
+site_name_chnage_list = auth_viewsets.SiteNameChangeListAPIView.as_view()
+site_name_chnage_detail = auth_viewsets.SiteNameChangeDetailAPIView.as_view()
+
