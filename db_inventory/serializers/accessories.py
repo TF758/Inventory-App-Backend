@@ -60,6 +60,8 @@ class AccessoryWriteSerializer(serializers.ModelSerializer):
         return attrs
     
 class AccessoryFullSerializer(serializers.ModelSerializer):
+    available_quantity = serializers.SerializerMethodField()
+
     room_id = serializers.CharField(source='room.public_id', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
 
@@ -76,6 +78,7 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'name',
             'serial_number',
             'quantity',
+            'available_quantity',
             'room_id',
             'room_name',
             'location_id',
@@ -83,6 +86,9 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'department_id',
             'department_name'
         ]
+
+    def get_available_quantity(self, obj):
+        return obj.available_quantity
 
     def __init__(self, *args, **kwargs):
         exclude_room = kwargs.pop('exclude_room', False)

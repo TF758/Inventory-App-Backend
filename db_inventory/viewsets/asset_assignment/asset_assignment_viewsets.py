@@ -1,8 +1,7 @@
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from db_inventory.models.users import User
-from db_inventory.models.assets import Equipment, EquipmentStatus
-from db_inventory.models.asset_assignment import EquipmentAssignment, EquipmentEvent
+from db_inventory.models.assets import  Equipment
+from db_inventory.models.asset_assignment import AccessoryEvent, EquipmentAssignment, EquipmentEvent
 from db_inventory.models.audit import AuditLog
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
@@ -11,11 +10,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.mixins import AuditMixin
 from db_inventory.serializers.assignment import AssignEquipmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer, EquipmentAssignmentSerializer
-from db_inventory.permissions.assets import CanManageEquipmentCustody, CanViewEquipmentAssignments
-from db_inventory.permissions.helpers import can_assign_equipment_to_user, get_active_role, is_user_in_scope
+from db_inventory.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
+from db_inventory.permissions.helpers import can_assign_equipment_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
 from db_inventory.filters import EquipmentAssignmentFilter
-from django_filters.rest_framework import DjangoFilterBackend
 
 from db_inventory.pagination import FlexiblePagination
 
@@ -56,7 +54,7 @@ class AssignEquipmentView(AuditMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageEquipmentCustody]
+    permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
         serializer = AssignEquipmentSerializer(data=request.data)
@@ -143,7 +141,7 @@ class UnassignEquipmentView(AuditMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageEquipmentCustody]
+    permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
         serializer = UnassignEquipmentSerializer(data=request.data)
@@ -214,7 +212,7 @@ class ReassignEquipmentView(AuditMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageEquipmentCustody]
+    permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
         serializer = ReassignEquipmentSerializer(data=request.data)
@@ -330,4 +328,4 @@ class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
             )
             .select_related("user", "reported_by")
         )
-        
+

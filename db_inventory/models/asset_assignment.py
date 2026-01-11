@@ -24,18 +24,6 @@ class AccessoryAssignment(models.Model):
 
     assigned_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True)
 
-    @property
-    def assigned_quantity(self):
-        return (
-            self.assignments
-            .filter(returned_at__isnull=True)
-            .aggregate(total=models.Sum("quantity"))["total"]
-            or 0
-        )
-
-    @property
-    def available_quantity(self):
-        return self.quantity - self.assigned_quantity
 
 class ConsumableIssue(models.Model):
     consumable = models.ForeignKey(Consumable,on_delete=models.PROTECT,related_name="issues")
