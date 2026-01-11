@@ -24,6 +24,19 @@ class AccessoryAssignment(models.Model):
 
     assigned_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True)
 
+    @property
+    def assigned_quantity(self):
+        return (
+            self.assignments
+            .filter(returned_at__isnull=True)
+            .aggregate(total=models.Sum("quantity"))["total"]
+            or 0
+        )
+
+    @property
+    def available_quantity(self):
+        return self.quantity - self.assigned_quantity
+
 class ConsumableIssue(models.Model):
     consumable = models.ForeignKey(Consumable,on_delete=models.PROTECT,related_name="issues")
     user = models.ForeignKey(User,on_delete=models.PROTECT,related_name="consumables_received")
@@ -41,6 +54,7 @@ class EquipmentEvent(models.Model):
         REPAIRED="repaired", "Repaired"
         RETIRED = "retired", "Retired"
         UNDER_REPAIR = "under_repair", "Under repair"
+        CONDEMNED = "condemned", "Condemned"
     
 
     equipment = models.ForeignKey(
@@ -76,37 +90,27 @@ class EquipmentEvent(models.Model):
         )
 
 class AccessoryEvent(models.Model):
-    EVENT_TYPE_CHOICES = (
-        ("assigned", "Assigned"),
-        ("returned", "Returned"),
-        ("lost", "Lost"),
-        ("damaged", "Damaged"),
-    )
+    class EventType(models.TextChoices):
+        ASSIGNED = "assigned", "Assigned"
+        RETURNED = "returned", "Returned"
+        DAMAGED = "damaged", "Damaged"
 
-    accessory = models.ForeignKey(
-        Accessory,
-        on_delete=models.PROTECT,
-        related_name="events"
-    )
+        LOST = "lost", "Lost"
+        CONDEMNED = "condemned", "Condemned"
 
-    user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
+        RESTOCKED = "restocked", "Restocked"
+        ADJUSTED = "adjusted", "Adjusted"
 
-    quantity = models.PositiveIntegerField()
+    accessory = models.ForeignKey(Accessory,on_delete=models.PROTECT,related_name="events")
 
-    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES)
+    user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True)
+
+    quantity_change  = models.IntegerField()
+
+    event_type = models.CharField(max_length=20,  choices=EventType.choices,)
     occurred_at = models.DateTimeField(auto_now_add=True)
 
-    reported_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="reported_accessory_events"
-    )
+    reported_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,related_name="reported_accessory_events")
 
     notes = models.TextField(blank=True)
 
