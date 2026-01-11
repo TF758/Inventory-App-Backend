@@ -207,3 +207,22 @@ class CanViewEquipmentAssignments(BasePermission):
                 else None
             ),
         )
+
+class CanSelfReturnAsset(BasePermission):
+    """
+    Allows a user to self-return assets they personally hold.
+    Explicitly disallows admin roles to prevent bypassing admin flows.
+    """
+
+    message = "Admins must use the admin return endpoint."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # Explicitly block admin roles
+        return not is_admin_role(role.role)

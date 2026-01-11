@@ -10,6 +10,7 @@ from .viewsets import (
 )
 from .viewsets.sites import *
 from .viewsets.assets import *
+from .viewsets.asset_assignment import *
 
 # --- General ---
 api_login_view = general_viewsets.SessionTokenLoginView.as_view()
@@ -26,6 +27,8 @@ accessory_id_detail_view = accessory_viewsets.AccessoryModelViewSet.as_view({
     'delete': 'destroy'
 })
 accessory_list_create_view = accessory_viewsets.AccessoryModelViewSet.as_view({'get': 'list', 'post':'create'})
+
+accessory_event_history = accessory_assignnment.AccessoryEventHistoryViewSet.as_view({"get": "list"})
 
 # --- Component ---
 component_id_detail_view = component_viewsets.ComponentModelViewSet.as_view({

@@ -87,5 +87,8 @@ urlpatterns = [
     path("assets/equipment-assignments/<str:equipment_id>/",equipment_assignment_detail, name="equipment-assignment-detail",),
 
 
+    path("assets/accessories/<str:public_id>/event-history/", accessory_event_history, name="accessory-event-history"),
+
+
 
 ]
