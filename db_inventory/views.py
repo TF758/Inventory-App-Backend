@@ -1,18 +1,15 @@
+from .viewsets.asset_assignment import asset_assignment_viewsets
+from .viewsets.assets import accessory_viewsets
 from inventory_metrics.viewsets import admin_metrics_viewset
 from .viewsets import (
     user_viewsets,
-    department_viewsets,
-    location_viewsets,
-    room_viewsets,
-    equipment_viewsets,
-    component_viewsets,
-    consumable_viewsets,
-    accessory_viewsets,
     general_viewsets,
     role_viewsets,
     auth_viewsets,
-    asset_assignment_viewsets, audit_viewsets
+    audit_viewsets
 )
+from .viewsets.sites import *
+from .viewsets.assets import *
 
 # --- General ---
 api_login_view = general_viewsets.SessionTokenLoginView.as_view()

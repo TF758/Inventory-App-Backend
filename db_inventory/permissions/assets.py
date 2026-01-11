@@ -1,7 +1,7 @@
 from rest_framework.permissions import BasePermission
 from db_inventory.models.asset_assignment import EquipmentAssignment
 from .constants import ROLE_HIERARCHY
-from .helpers import get_active_role, has_equipment_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
+from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from db_inventory.models.site import Department, Location, Room
 from rest_framework.exceptions import PermissionDenied
 
@@ -84,7 +84,7 @@ class AssetPermission(BasePermission):
             and is_in_scope(active_role, room=room_for_scope)
         )
 
-class CanManageEquipmentCustody(BasePermission):
+class CanManageAssetCustody(BasePermission):
     """
     Permission to assign / unassign / reassign equipment.
     """
@@ -103,7 +103,7 @@ class CanManageEquipmentCustody(BasePermission):
         if not is_admin_role(role.role):
             return False
 
-        return has_equipment_custody_scope(role, equipment)
+        return has_asset_custody_scope(role, equipment)
 
 class HasAssignmentScopePermission(BasePermission):
     """

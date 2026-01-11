@@ -2,13 +2,15 @@ from rest_framework import viewsets
 from db_inventory.serializers.components import (
    ComponentWriteSerializer, ComponentSerializer
 )
-from ..models import Component
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import ComponentFilter
 from db_inventory.mixins import ScopeFilterMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
-from ..pagination import FlexiblePagination
+from db_inventory.models.assets import Component
+from db_inventory.pagination import FlexiblePagination
+
 
 
 class ComponentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
