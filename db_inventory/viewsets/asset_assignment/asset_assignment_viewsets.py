@@ -11,7 +11,7 @@ from rest_framework import status
 from db_inventory.mixins import AuditMixin
 from db_inventory.serializers.assignment import AssignEquipmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer, EquipmentAssignmentSerializer
 from db_inventory.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
-from db_inventory.permissions.helpers import can_assign_equipment_to_user, get_active_role
+from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
 from db_inventory.filters import EquipmentAssignmentFilter
 
@@ -69,7 +69,7 @@ class AssignEquipmentView(AuditMixin, APIView):
 
         # ASSIGNEE JURISDICTION
         active_role = get_active_role(request.user)
-        if not can_assign_equipment_to_user(active_role, assignee):
+        if not can_assign_asset_to_user(active_role, assignee):
             raise ValidationError(
                 "You may only assign equipment to users within your room jurisdiction."
             )
@@ -228,7 +228,7 @@ class ReassignEquipmentView(AuditMixin, APIView):
 
       
         active_role = get_active_role(request.user)
-        if not can_assign_equipment_to_user(active_role, to_user):
+        if not can_assign_asset_to_user(active_role, to_user):
             raise ValidationError(
                 "You may only reassign equipment to users within your room jurisdiction."
             )

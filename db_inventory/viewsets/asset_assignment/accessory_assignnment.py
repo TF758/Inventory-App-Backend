@@ -15,6 +15,7 @@ from rest_framework import mixins, viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from db_inventory.pagination import FlexiblePagination
+from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -52,6 +53,12 @@ class AssignAccessoryView(AuditMixin, APIView):
 
         # Asset authority check
         self.check_object_permissions(request, accessory)
+        role = get_active_role(request.user)
+        if not can_assign_asset_to_user(role, user):
+            raise ValidationError(
+                "You do not have permission to assign assets to this user."
+            )
+
 
         with transaction.atomic():
 
@@ -178,7 +185,6 @@ class AdminReturnAccessoryView(AuditMixin, APIView):
                     "affected_user_public_id": assignment.user.public_id,
                     "affected_user_email": assignment.user.email,
                     "accessory_public_id": accessory.public_id,
-                    "assignment_public_id": assignment.public_id,
                     "notes": notes,
                 },
             )
@@ -195,6 +201,8 @@ class CondemnAccessoryView(AuditMixin, APIView):
         accessory = serializer.validated_data["accessory"]
         quantity = serializer.validated_data["quantity"]
         notes = serializer.validated_data.get("notes", "")
+
+        self.check_object_permissions(request, accessory)
 
         with transaction.atomic():
 

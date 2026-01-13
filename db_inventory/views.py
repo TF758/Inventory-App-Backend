@@ -245,3 +245,5 @@ site_name_chnage_detail = auth_viewsets.SiteNameChangeDetailAPIView.as_view()
 
 assign_accessory = accessory_assignnment.AssignAccessoryView.as_view()
 condem_accessory = accessory_assignnment.CondemnAccessoryView.as_view()
+
+admin_return_accessory = accessory_assignnment.AdminReturnAccessoryView.as_view()

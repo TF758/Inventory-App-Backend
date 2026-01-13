@@ -85,6 +85,7 @@ urlpatterns = [
 
     path("assets/accessories/assign/", assign_accessory, name="assign-accessory"),
       path("assets/accessories/condemn/", condem_accessory, name="condemn-accessory"),
+    path("assets/accessories/admin-return/", admin_return_accessory, name="admin-return-accessory"),
 
     path("assets/equipment-assignments/",equipment_assignment_list,name="equipment-assignment-list",),
     path("assets/equipment-assignments/<str:equipment_id>/",equipment_assignment_detail, name="equipment-assignment-detail",),
