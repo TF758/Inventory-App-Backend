@@ -102,7 +102,7 @@ class AssignAccessoryView(AuditMixin, APIView):
                     "user_email": user.email,
                     "quantity": quantity,
                     "accessory_public_id": accessory.public_id,
-                    "assignment_public_id": assignment.public_id,
+                 
                 },
             )
 
@@ -204,8 +204,8 @@ class CondemnAccessoryView(AuditMixin, APIView):
                 .get(pk=accessory.pk)
             )
 
-            if quantity > accessory.quantity:
-                raise ValidationError("Cannot condemn more than total quantity")
+            if quantity > accessory.available_quantity:
+                raise ValidationError("Cannot condemn accessories that are currently assigned")
 
             accessory.quantity -= quantity
             accessory.save()

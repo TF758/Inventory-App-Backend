@@ -241,3 +241,7 @@ audit_log_detail = audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve",})
 site_name_chnage_list = auth_viewsets.SiteNameChangeListAPIView.as_view()
 site_name_chnage_detail = auth_viewsets.SiteNameChangeDetailAPIView.as_view()
 
+# accessories assignment
+
+assign_accessory = accessory_assignnment.AssignAccessoryView.as_view()
+condem_accessory = accessory_assignnment.CondemnAccessoryView.as_view()
