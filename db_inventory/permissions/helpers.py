@@ -373,13 +373,13 @@ def has_asset_custody_scope(
 
     return False
 
-def can_assign_equipment_to_user(
+def can_assign_asset_to_user(
     admin_role: RoleAssignment,
     target_user: User,
 ) -> bool:
     """
     Determines whether an admin may assign equipment
-    to a target user (custody delegation).
+    to a target user.
     """
 
     if admin_role.role == "SITE_ADMIN":

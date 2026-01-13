@@ -92,7 +92,19 @@ class CanManageAssetCustody(BasePermission):
     message = "You do not have permission to manage this equipment."
 
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
+        active_role = get_active_role(request.user)
+
+        if not active_role:
+            return False
+
+        if active_role.role == "SITE_ADMIN":
+            return True
+        
+        # return true for admins
+        if is_admin_role(active_role.role):
+            return True
+        
+        return False
 
     def has_object_permission(self, request, view, equipment):
         role = get_active_role(request.user)
