@@ -13,9 +13,10 @@ from db_inventory.serializers.assignment import AccessoryEventSerializer, AdminR
 from db_inventory.permissions.assets import CanManageAssetCustody, CanSelfReturnAsset
 from rest_framework import mixins, viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework.generics import GenericAPIView
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
+from db_inventory.serializers.accessories import AccessoryDistributionSerializer
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -94,6 +95,7 @@ class AssignAccessoryView(AuditMixin, APIView):
                 accessory=accessory,
                 user=user,
                 event_type="assigned",
+                quantity=quantity,  
                 quantity_change=0,
                 reported_by=request.user,
                 notes=notes or f"Assigned {quantity} units",
@@ -168,13 +170,14 @@ class AdminReturnAccessoryView(AuditMixin, APIView):
                 accessory=accessory,
                 user=assignment.user,
                 event_type="returned",
+                quantity=quantity,
                 quantity_change=0,
                 reported_by=request.user,
                 notes=notes or f"Returned {quantity} units",
             )
 
             self.audit(
-                event_type=AuditLog.Events.ASSET_RETURNED,
+                event_type=AuditLog.Events.ADMIN_RETURNED_ASSET,
                 target=accessory,
                 description=(
                     f"Admin returned {quantity} accessory units "
@@ -221,6 +224,7 @@ class CondemnAccessoryView(AuditMixin, APIView):
             AccessoryEvent.objects.create(
                 accessory=accessory,
                 event_type="condemned",
+                quantity=quantity,
                 quantity_change=-quantity,
                 reported_by=request.user,
                 notes=notes,
@@ -284,6 +288,7 @@ class SelfReturnAccessoryView(AuditMixin, APIView):
                 accessory=accessory,
                 user=request.user,
                 event_type="returned",
+                quantity=quantity,
                 quantity_change=0,
                 reported_by=request.user,
                 notes=notes or "User self-return",
@@ -299,3 +304,35 @@ class SelfReturnAccessoryView(AuditMixin, APIView):
         )
 
         return Response(status=status.HTTP_200_OK)
+
+
+class AccessoryDistributionView(GenericAPIView):
+    permission_classes = [CanManageAssetCustody]
+    pagination_class = FlexiblePagination
+    serializer_class = AccessoryDistributionSerializer
+
+    def get(self, request, public_id):
+        accessory = get_object_or_404(
+            Accessory.objects.select_related("room"),
+            public_id=public_id,
+        )
+
+        self.check_object_permissions(request, accessory)
+
+        queryset = (
+            AccessoryAssignment.objects
+            .filter(
+                accessory=accessory,
+                returned_at__isnull=True,
+            )
+            .select_related("user")
+            .order_by("-assigned_at")
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

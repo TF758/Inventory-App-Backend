@@ -188,15 +188,20 @@ class AccessoryEventSerializer(serializers.ModelSerializer):
     reported_by_email = serializers.EmailField(
         source="reported_by.email", read_only=True
     )
+
     quantity_display = serializers.SerializerMethodField()
+    quantity = serializers.SerializerMethodField()
+    action_label = serializers.SerializerMethodField()
 
     class Meta:
         model = AccessoryEvent
         fields = [
             "id",
             "event_type",
+            "action_label",
             "occurred_at",
             "quantity_change",
+            "quantity",
             "quantity_display",
             "user",
             "user_email",
@@ -205,8 +210,34 @@ class AccessoryEventSerializer(serializers.ModelSerializer):
             "notes",
         ]
 
+    def get_quantity(self, obj):
+        """
+        Human-meaningful quantity involved in the action
+        (assigned / returned / condemned / restocked).
+        """
+        if hasattr(obj, "quantity") and obj.quantity is not None:
+            return obj.quantity
+
+        # Safety fallback for legacy rows (optional)
+        if obj.quantity_change:
+            return abs(obj.quantity_change)
+
+        return None
+
     def get_quantity_display(self, obj):
+        """
+        Stock impact display (+ / -), kept for inventory context.
+        """
         if obj.quantity_change == 0:
             return None
         sign = "+" if obj.quantity_change > 0 else ""
         return f"{sign}{obj.quantity_change}"
+
+    def get_action_label(self, obj):
+        return {
+            "assigned": "Assigned",
+            "returned": "Returned",
+            "condemned": "Condemned",
+            "restocked": "Restocked",
+            "adjusted": "Adjusted",
+        }.get(obj.event_type, obj.event_type.replace("_", " ").title())

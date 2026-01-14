@@ -5,6 +5,8 @@ from db_inventory.serializers.locations import LocationFullSerializer
 from db_inventory.serializers.rooms import RoomNameSerializer
 from rest_framework.validators import UniqueValidator
 
+from db_inventory.models.asset_assignment import AccessoryAssignment
+
 
 # Write Serializer
 class AccessoryWriteSerializer(serializers.ModelSerializer):
@@ -165,10 +167,27 @@ class AccessoryBatchWriteSerializer(serializers.ModelSerializer):
             instance.save(update_fields=["room"])
         return instance
 
+class AccessoryDistributionSerializer(serializers.ModelSerializer):
+    user_public_id = serializers.CharField(source="user.public_id")
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccessoryAssignment
+        fields = [
+            "id", 
+            "user_public_id",
+            "user_name",
+            "quantity",
+            "assigned_at",
+        ]
+
+    def get_user_name(self, obj):
+        return f"{obj.user.fname} {obj.user.lname}".strip()
 
 
 __all__ = [
     'AccessoryWriteSerializer',
     'AccessoryFullSerializer',
-    'AccessoryBatchWriteSerializer'
+    'AccessoryBatchWriteSerializer',
+    'AccessoryDistributionSerializer',
 ]

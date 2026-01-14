@@ -93,6 +93,7 @@ class AccessoryEvent(models.Model):
 
     user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True)
 
+    quantity = models.PositiveIntegerField(null=True, blank=True)
     quantity_change  = models.IntegerField()
 
     event_type = models.CharField(max_length=20,  choices=EventType.choices,)
