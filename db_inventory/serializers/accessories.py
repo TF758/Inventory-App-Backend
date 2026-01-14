@@ -184,10 +184,15 @@ class AccessoryDistributionSerializer(serializers.ModelSerializer):
     def get_user_name(self, obj):
         return f"{obj.user.fname} {obj.user.lname}".strip()
 
+class RestockAccessorySerializer(serializers.Serializer):
+    accessory = serializers.SlugRelatedField(slug_field="public_id",queryset=Accessory.objects.all(),)
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
 
 __all__ = [
     'AccessoryWriteSerializer',
     'AccessoryFullSerializer',
     'AccessoryBatchWriteSerializer',
     'AccessoryDistributionSerializer',
+    'RestockAccessorySerializer',
 ]

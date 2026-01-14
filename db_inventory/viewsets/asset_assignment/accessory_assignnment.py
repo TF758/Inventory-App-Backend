@@ -16,7 +16,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.generics import GenericAPIView
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.serializers.accessories import AccessoryDistributionSerializer
+from db_inventory.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -336,3 +336,48 @@ class AccessoryDistributionView(GenericAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+class RestockAccessoryView(AuditMixin, APIView):
+    permission_classes = [CanManageAssetCustody]
+
+    def post(self, request):
+        serializer = RestockAccessorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        accessory = serializer.validated_data["accessory"]
+        quantity = serializer.validated_data["quantity"]
+        notes = serializer.validated_data.get("notes", "")
+
+        self.check_object_permissions(request, accessory)
+
+        with transaction.atomic():
+            accessory = (
+                Accessory.objects
+                .select_for_update()
+                .get(pk=accessory.pk)
+            )
+
+            accessory.quantity += quantity
+            accessory.save(update_fields=["quantity"])
+
+            AccessoryEvent.objects.create(
+                accessory=accessory,
+                event_type=AccessoryEvent.EventType.RESTOCKED,
+                quantity=quantity,
+                quantity_change=quantity,
+                reported_by=request.user,
+                notes=notes or f"Restocked {quantity} units",
+            )
+
+            self.audit(
+                event_type=AuditLog.Events.ASSET_RESTOCKED,
+                target=accessory,
+                description=f"Restocked {quantity} accessory units",
+                metadata={
+                    "quantity": quantity,
+                    "accessory_public_id": accessory.public_id,
+                    "notes": notes,
+                },
+            )
+
+        return Response(status=status.HTTP_200_OK)

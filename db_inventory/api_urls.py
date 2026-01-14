@@ -94,6 +94,7 @@ urlpatterns = [
 
     path("assets/accessories/<str:public_id>/event-history/", accessory_event_history, name="accessory-event-history"),
      path("assets/accessories/return/", AdminReturnAccessoryView.as_view(), name="accessory-return"),
+    path("assets/accessories/restock/", RestockAccessoryView.as_view(), name="accessory-restock"),
 
 
 

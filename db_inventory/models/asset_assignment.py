@@ -1,6 +1,7 @@
 from db_inventory.models.assets import Equipment, Accessory, Consumable
 from db_inventory.models.users import User
 from django.db import models
+from django.core.exceptions import ValidationError
 
 
 class EquipmentAssignment(models.Model):
@@ -102,6 +103,15 @@ class AccessoryEvent(models.Model):
     reported_by = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,related_name="reported_accessory_events")
 
     notes = models.TextField(blank=True)
+
+    def clean(self):
+        if self.event_type in {
+            self.EventType.ASSIGNED,
+            self.EventType.RETURNED,
+            self.EventType.RESTOCKED,
+            self.EventType.CONDEMNED,
+        } and self.quantity is None:
+            raise ValidationError("quantity is required for this event type")
 
 class ConsumableEvent(models.Model):
     EVENT_TYPE_CHOICES = (
