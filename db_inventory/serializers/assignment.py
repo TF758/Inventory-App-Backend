@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 from db_inventory.models.users import User
-from db_inventory.models.assets import Equipment, EquipmentStatus
-from db_inventory.models.asset_assignment import EquipmentAssignment, EquipmentEvent
+from db_inventory.models.assets import Accessory, Equipment, EquipmentStatus
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, EquipmentAssignment, EquipmentEvent
 
 class EquipmentAssignmentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id', read_only=True)
@@ -147,3 +147,97 @@ class EquipmentEventSerializer(serializers.ModelSerializer):
             "reported_by_email",
             "notes",
         ]
+
+class AssignAccessorySerializer(serializers.Serializer):
+    accessory = serializers.SlugRelatedField(slug_field="public_id",queryset=Accessory.objects.all())
+    user = serializers.SlugRelatedField(slug_field="public_id",queryset=User.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class AdminReturnAccessorySerializer(serializers.Serializer):
+    assignment = serializers.PrimaryKeyRelatedField(queryset=AccessoryAssignment.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    def validate(self, attrs):
+        assignment = attrs["assignment"]
+
+        if assignment.returned_at is not None:
+            raise serializers.ValidationError(
+                "This assignment is already closed"
+            )
+
+        return attrs
+
+class SelfReturnAccessorySerializer(serializers.Serializer):
+    accessory = serializers.SlugRelatedField(slug_field="public_id",queryset=Accessory.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class CondemnAccessorySerializer(serializers.Serializer):
+    accessory = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=Accessory.objects.all()
+    )
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AccessoryEventSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    reported_by_email = serializers.EmailField(
+        source="reported_by.email", read_only=True
+    )
+
+    quantity_display = serializers.SerializerMethodField()
+    quantity = serializers.SerializerMethodField()
+    action_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccessoryEvent
+        fields = [
+            "id",
+            "event_type",
+            "action_label",
+            "occurred_at",
+            "quantity_change",
+            "quantity",
+            "quantity_display",
+            "user",
+            "user_email",
+            "reported_by",
+            "reported_by_email",
+            "notes",
+        ]
+
+    def get_quantity(self, obj):
+        """
+        Human-meaningful quantity involved in the action
+        (assigned / returned / condemned / restocked).
+        """
+        if hasattr(obj, "quantity") and obj.quantity is not None:
+            return obj.quantity
+
+        # Safety fallback for legacy rows (optional)
+        if obj.quantity_change:
+            return abs(obj.quantity_change)
+
+        return None
+
+    def get_quantity_display(self, obj):
+        """
+        Stock impact display (+ / -), kept for inventory context.
+        """
+        if obj.quantity_change == 0:
+            return None
+        sign = "+" if obj.quantity_change > 0 else ""
+        return f"{sign}{obj.quantity_change}"
+
+    def get_action_label(self, obj):
+        return {
+            "assigned": "Assigned",
+            "returned": "Returned",
+            "condemned": "Condemned",
+            "restocked": "Restocked",
+            "adjusted": "Adjusted",
+        }.get(obj.event_type, obj.event_type.replace("_", " ").title())

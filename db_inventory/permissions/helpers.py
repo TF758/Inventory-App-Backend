@@ -336,50 +336,50 @@ def is_admin_role(role: str) -> bool:
     # Any non-viewer role in the hierarchy is considered an admin/write role
     return True
 
-def has_equipment_custody_scope(
+def has_asset_custody_scope(
     role: RoleAssignment,
-    equipment: Equipment,
+    asset,
 ) -> bool:
     """
-    Stricter scope check for equipment custody.
+    Scope check for physical asset custody.
     Prevents upward / sideways authority leakage.
     """
 
     if role.role == "SITE_ADMIN":
         return True
 
-    if not equipment.room:
+    if not asset.room:
         return False
 
     role_name = role.role
 
     # ROOM roles → exact room only
     if role_name.startswith("ROOM_"):
-        return role.room == equipment.room
+        return role.room == asset.room
 
     # LOCATION roles → same location
     if role_name.startswith("LOCATION_"):
         return (
             role.location
-            and equipment.room.location == role.location
+            and asset.room.location == role.location
         )
 
     # DEPARTMENT roles → same department
     if role_name.startswith("DEPARTMENT_"):
         return (
             role.department
-            and equipment.room.location.department == role.department
+            and asset.room.location.department == role.department
         )
 
     return False
 
-def can_assign_equipment_to_user(
+def can_assign_asset_to_user(
     admin_role: RoleAssignment,
     target_user: User,
 ) -> bool:
     """
     Determines whether an admin may assign equipment
-    to a target user (custody delegation).
+    to a target user.
     """
 
     if admin_role.role == "SITE_ADMIN":

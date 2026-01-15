@@ -5,6 +5,8 @@ from db_inventory.serializers.locations import LocationFullSerializer
 from db_inventory.serializers.rooms import RoomNameSerializer
 from rest_framework.validators import UniqueValidator
 
+from db_inventory.models.asset_assignment import AccessoryAssignment
+
 
 # Write Serializer
 class AccessoryWriteSerializer(serializers.ModelSerializer):
@@ -60,6 +62,8 @@ class AccessoryWriteSerializer(serializers.ModelSerializer):
         return attrs
     
 class AccessoryFullSerializer(serializers.ModelSerializer):
+    available_quantity = serializers.SerializerMethodField()
+
     room_id = serializers.CharField(source='room.public_id', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
 
@@ -76,6 +80,7 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'name',
             'serial_number',
             'quantity',
+            'available_quantity',
             'room_id',
             'room_name',
             'location_id',
@@ -83,6 +88,9 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'department_id',
             'department_name'
         ]
+
+    def get_available_quantity(self, obj):
+        return obj.available_quantity
 
     def __init__(self, *args, **kwargs):
         exclude_room = kwargs.pop('exclude_room', False)
@@ -159,10 +167,32 @@ class AccessoryBatchWriteSerializer(serializers.ModelSerializer):
             instance.save(update_fields=["room"])
         return instance
 
+class AccessoryDistributionSerializer(serializers.ModelSerializer):
+    user_public_id = serializers.CharField(source="user.public_id")
+    user_name = serializers.SerializerMethodField()
 
+    class Meta:
+        model = AccessoryAssignment
+        fields = [
+            "id", 
+            "user_public_id",
+            "user_name",
+            "quantity",
+            "assigned_at",
+        ]
+
+    def get_user_name(self, obj):
+        return f"{obj.user.fname} {obj.user.lname}".strip()
+
+class RestockAccessorySerializer(serializers.Serializer):
+    accessory = serializers.SlugRelatedField(slug_field="public_id",queryset=Accessory.objects.all(),)
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
 
 __all__ = [
     'AccessoryWriteSerializer',
     'AccessoryFullSerializer',
-    'AccessoryBatchWriteSerializer'
+    'AccessoryBatchWriteSerializer',
+    'AccessoryDistributionSerializer',
+    'RestockAccessorySerializer',
 ]

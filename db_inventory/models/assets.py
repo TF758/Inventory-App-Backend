@@ -3,6 +3,7 @@ from django.db import models
 from db_inventory.models.site import Room
 from django.apps import apps
 from django.core.validators import MinValueValidator, RegexValidator
+from django.db.models import Sum
 
 serial_validator = RegexValidator(
     regex=r"^[A-Z0-9\-]+$",
@@ -130,6 +131,19 @@ class Accessory(PublicIDModel):
             models.Index(fields=["public_id"]),
             models.Index(fields=["name"]),
         ]
+
+    @property
+    def assigned_quantity(self) -> int:
+        return (
+            self.assignments
+            .filter(returned_at__isnull=True)
+            .aggregate(total=Sum("quantity"))["total"]
+            or 0
+        )
+
+    @property
+    def available_quantity(self) -> int:
+        return self.quantity - self.assigned_quantity
 
     def __str__(self):
         return self.name

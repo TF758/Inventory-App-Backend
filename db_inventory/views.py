@@ -1,18 +1,16 @@
+from .viewsets.asset_assignment import asset_assignment_viewsets
+from .viewsets.assets import accessory_viewsets
 from inventory_metrics.viewsets import admin_metrics_viewset
 from .viewsets import (
     user_viewsets,
-    department_viewsets,
-    location_viewsets,
-    room_viewsets,
-    equipment_viewsets,
-    component_viewsets,
-    consumable_viewsets,
-    accessory_viewsets,
     general_viewsets,
     role_viewsets,
     auth_viewsets,
-    asset_assignment_viewsets, audit_viewsets
+    audit_viewsets
 )
+from .viewsets.sites import *
+from .viewsets.assets import *
+from .viewsets.asset_assignment import *
 
 # --- General ---
 api_login_view = general_viewsets.SessionTokenLoginView.as_view()
@@ -29,6 +27,8 @@ accessory_id_detail_view = accessory_viewsets.AccessoryModelViewSet.as_view({
     'delete': 'destroy'
 })
 accessory_list_create_view = accessory_viewsets.AccessoryModelViewSet.as_view({'get': 'list', 'post':'create'})
+
+accessory_event_history = accessory_assignnment.AccessoryEventHistoryViewSet.as_view({"get": "list"})
 
 # --- Component ---
 component_id_detail_view = component_viewsets.ComponentModelViewSet.as_view({
@@ -241,3 +241,9 @@ audit_log_detail = audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve",})
 site_name_chnage_list = auth_viewsets.SiteNameChangeListAPIView.as_view()
 site_name_chnage_detail = auth_viewsets.SiteNameChangeDetailAPIView.as_view()
 
+# accessories assignment
+
+assign_accessory = accessory_assignnment.AssignAccessoryView.as_view()
+condem_accessory = accessory_assignnment.CondemnAccessoryView.as_view()
+
+admin_return_accessory = accessory_assignnment.AdminReturnAccessoryView.as_view()

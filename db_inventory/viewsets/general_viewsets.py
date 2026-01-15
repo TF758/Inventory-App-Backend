@@ -64,7 +64,7 @@ class SessionTokenLoginView(TokenObtainPairView):
                 refresh_token_hash=hashed_refresh,
                 expires_at=now + timedelta(days=1),
                 absolute_expires_at=now + ABSOLUTE_LIFETIME,
-                user_agent_hash=ua_hash,   # 🔥 new
+                user_agent_hash=ua_hash,  
                 ip_address=request.META.get("REMOTE_ADDR"),
             )
         except Exception:

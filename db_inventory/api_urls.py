@@ -83,8 +83,18 @@ urlpatterns = [
     path("assets/equipment/unassign/", unassign_equipment, name="unassign-equipment"),
      path("assets/equipment/reassign/", reassign_equipment, name="reassign-equipment"),
 
+    path("assets/accessories/assign/", assign_accessory, name="assign-accessory"),
+      path("assets/accessories/condemn/", condem_accessory, name="condemn-accessory"),
+    path("assets/accessories/admin-return/", admin_return_accessory, name="admin-return-accessory"),
+    path("assets/accessories/<str:public_id>/distribution/", AccessoryDistributionView.as_view(),name="accessory-distribution",),
+
     path("assets/equipment-assignments/",equipment_assignment_list,name="equipment-assignment-list",),
     path("assets/equipment-assignments/<str:equipment_id>/",equipment_assignment_detail, name="equipment-assignment-detail",),
+
+
+    path("assets/accessories/<str:public_id>/event-history/", accessory_event_history, name="accessory-event-history"),
+     path("assets/accessories/return/", AdminReturnAccessoryView.as_view(), name="accessory-return"),
+    path("assets/accessories/restock/", RestockAccessoryView.as_view(), name="accessory-restock"),
 
 
 

@@ -1,7 +1,7 @@
 from rest_framework.permissions import BasePermission
 from db_inventory.models.asset_assignment import EquipmentAssignment
 from .constants import ROLE_HIERARCHY
-from .helpers import get_active_role, has_equipment_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
+from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from db_inventory.models.site import Department, Location, Room
 from rest_framework.exceptions import PermissionDenied
 
@@ -84,7 +84,7 @@ class AssetPermission(BasePermission):
             and is_in_scope(active_role, room=room_for_scope)
         )
 
-class CanManageEquipmentCustody(BasePermission):
+class CanManageAssetCustody(BasePermission):
     """
     Permission to assign / unassign / reassign equipment.
     """
@@ -92,7 +92,19 @@ class CanManageEquipmentCustody(BasePermission):
     message = "You do not have permission to manage this equipment."
 
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
+        active_role = get_active_role(request.user)
+
+        if not active_role:
+            return False
+
+        if active_role.role == "SITE_ADMIN":
+            return True
+        
+        # return true for admins
+        if is_admin_role(active_role.role):
+            return True
+        
+        return False
 
     def has_object_permission(self, request, view, equipment):
         role = get_active_role(request.user)
@@ -103,7 +115,7 @@ class CanManageEquipmentCustody(BasePermission):
         if not is_admin_role(role.role):
             return False
 
-        return has_equipment_custody_scope(role, equipment)
+        return has_asset_custody_scope(role, equipment)
 
 class HasAssignmentScopePermission(BasePermission):
     """
@@ -207,3 +219,22 @@ class CanViewEquipmentAssignments(BasePermission):
                 else None
             ),
         )
+
+class CanSelfReturnAsset(BasePermission):
+    """
+    Allows a user to self-return assets they personally hold.
+    Explicitly disallows admin roles to prevent bypassing admin flows.
+    """
+
+    message = "Admins must use the admin return endpoint."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # Explicitly block admin roles
+        return not is_admin_role(role.role)
