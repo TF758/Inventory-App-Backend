@@ -91,6 +91,9 @@ class AuditLog(PublicIDModel):
         MODEL_CREATED = "model_created"
         MODEL_UPDATED = "model_updated"
         MODEL_DELETED = "model_deleted"
+        CONSUMABLE_ISSUED = "consumable_issued"
+        CONSUMABLE_RETURNED = "consumable_returned"
+        CONSUMABLE_USED = "consumable_used"
 
 
         USER_MOVED = "user_moved"
@@ -105,6 +108,7 @@ class AuditLog(PublicIDModel):
         EQUIPMENT_STATUS_CHANGED = "equipment_status_changed"
         SITE_RELOCATED = "site_relocated"
         SITE_RENAMED = "site_renamed"
+        STOCK_USED = "stock_used"
 
 
 class SiteNameChangeHistory(models.Model):
