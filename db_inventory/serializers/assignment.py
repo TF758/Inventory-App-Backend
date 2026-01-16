@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 from db_inventory.models.users import User
-from db_inventory.models.assets import Accessory, Equipment, EquipmentStatus
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, EquipmentAssignment, EquipmentEvent
+from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent
 
 class EquipmentAssignmentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id', read_only=True)
@@ -241,3 +241,34 @@ class AccessoryEventSerializer(serializers.ModelSerializer):
             "restocked": "Restocked",
             "adjusted": "Adjusted",
         }.get(obj.event_type, obj.event_type.replace("_", " ").title())
+    
+
+class IssueConsumableSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField(slug_field="public_id",queryset=Consumable.objects.all())
+    user = serializers.SlugRelatedField(slug_field="public_id",queryset=User.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    purpose = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class UseConsumableSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField(slug_field="public_id",queryset=Consumable.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class ReturnConsumableSerializer(serializers.Serializer):
+    issue = serializers.PrimaryKeyRelatedField(queryset=ConsumableIssue.objects.select_related("consumable", "user"))
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class ReportConsumableLossSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField(slug_field="public_id",queryset=Consumable.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    event_type = serializers.ChoiceField(
+        choices=[
+            ConsumableEvent.EventType.LOST,
+            ConsumableEvent.EventType.DAMAGED,
+            ConsumableEvent.EventType.EXPIRED,
+            ConsumableEvent.EventType.CONDEMNED,
+        ]
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
