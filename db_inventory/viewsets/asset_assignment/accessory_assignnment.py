@@ -10,13 +10,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.mixins import AuditMixin
 from db_inventory.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer,SelfReturnAccessorySerializer
-from db_inventory.permissions.assets import CanManageAssetCustody, CanSelfReturnAsset
+from db_inventory.permissions.assets import CanManageAssetCustody, CanSelfReturnAsset, CanUseAsset
 from rest_framework import mixins, viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.generics import GenericAPIView
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer
+from db_inventory.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -381,3 +381,52 @@ class RestockAccessoryView(AuditMixin, APIView):
             )
 
         return Response(status=status.HTTP_200_OK)
+
+class UseAccessoryView(AuditMixin, APIView):
+    permission_classes = [CanUseAsset]
+
+    def post(self, request):
+        serializer = UseAccessorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        accessory = serializer.validated_data["accessory"]
+        quantity = serializer.validated_data["quantity"]
+        notes = serializer.validated_data.get("notes", "")
+
+        # Enforce ownership
+        assignment = get_object_or_404(
+            AccessoryAssignment,
+            accessory=accessory,
+            user=request.user,
+            returned_at__isnull=True,
+        )
+
+        if quantity > assignment.quantity:
+            raise ValidationError(
+                "Usage quantity exceeds your assigned quantity."
+            )
+
+        with transaction.atomic():
+            # Record usage event (inventory-neutral)
+            AccessoryEvent.objects.create(
+                accessory=accessory,
+                user=request.user,
+                event_type=AccessoryEvent.EventType.USED,
+                quantity=quantity,
+                quantity_change=0,
+                reported_by=request.user,
+                notes=notes or f"Used {quantity} units",
+            )
+
+            self.audit(
+                event_type=AuditLog.Events.STOCK_USED,
+                target=accessory,
+                description=f"{request.user.email} recorded usage of {quantity} units",
+                metadata={
+                    "quantity": quantity,
+                    "accessory_public_id": accessory.public_id,
+                    "user_public_id": request.user.public_id,
+                },
+            )
+
+        return Response(status=status.HTTP_201_CREATED)

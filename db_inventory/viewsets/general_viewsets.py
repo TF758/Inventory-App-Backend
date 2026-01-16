@@ -1,3 +1,4 @@
+import token
 from rest_framework_simplejwt.views import TokenObtainPairView
 from db_inventory.serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer
 from db_inventory.serializers.equipment import EquipmentBatchtWriteSerializer
@@ -26,8 +27,8 @@ from db_inventory.models.audit import AuditLog
 from django.db.models import Q
 from django.conf import settings
 
-IDLE_TIMEOUT = timedelta(minutes=30)
-ABSOLUTE_LIFETIME = timedelta(days=7)
+IDLE_TIMEOUT = timedelta(seconds=60)
+ABSOLUTE_LIFETIME = timedelta(seconds=120)
 
 logger = logging.getLogger(__name__) 
 
@@ -62,7 +63,7 @@ class SessionTokenLoginView(TokenObtainPairView):
                 session = UserSession.objects.create(
                 user=user,
                 refresh_token_hash=hashed_refresh,
-                expires_at=now + timedelta(days=1),
+                expires_at= now + IDLE_TIMEOUT,
                 absolute_expires_at=now + ABSOLUTE_LIFETIME,
                 user_agent_hash=ua_hash,  
                 ip_address=request.META.get("REMOTE_ADDR"),
@@ -76,6 +77,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             access_token_obj = AccessToken.for_user(user)
             access_token_obj["session_id"] = str(session.id)
             access_token_obj["abs_exp"] = int(session.absolute_expires_at.timestamp())
+            access_token_obj["idle_exp"] = int(session.expires_at.timestamp())
             access_token = str(access_token_obj)
         except Exception:
                 session.delete()
@@ -207,6 +209,7 @@ class RefreshAPIView(APIView):
 
             access_token["public_id"] = str(user.public_id)
             access_token["session_id"] = str(session.id)
+            access_token["idle_exp"] = int(session.expires_at.timestamp())
             access_token["abs_exp"] = int(session.absolute_expires_at.timestamp())
             access_token["role_id"] = (
                 user.active_role.public_id if user.active_role else None
