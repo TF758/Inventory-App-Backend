@@ -83,7 +83,7 @@ class AccessoryEvent(models.Model):
         ASSIGNED = "assigned", "Assigned"
         RETURNED = "returned", "Returned"
         DAMAGED = "damaged", "Damaged"
-
+        USED = "used", "Used" 
         LOST = "lost", "Lost"
         CONDEMNED = "condemned", "Condemned"
 

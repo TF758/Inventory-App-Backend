@@ -238,3 +238,7 @@ class CanSelfReturnAsset(BasePermission):
 
         # Explicitly block admin roles
         return not is_admin_role(role.role)
+
+class CanUseAsset(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
