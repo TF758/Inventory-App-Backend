@@ -43,29 +43,35 @@ class ConsumableIssue(models.Model):
             models.Index(fields=["consumable", "user"]),
             models.Index(fields=["user", "returned_at"]),
         ]
-
         constraints = [
+            # Only ONE open issue per (consumable, user)
+            models.UniqueConstraint(
+                fields=["consumable", "user"],
+                condition=Q(returned_at__isnull=True),
+                name="unique_open_issue_per_user_consumable",
+            ),
+
             # quantity must never go negative
             models.CheckConstraint(
-                check=Q(quantity__gte=0),
+                condition=Q(quantity__gte=0),
                 name="consumable_issue_quantity_non_negative",
             ),
 
             # issued_quantity must be positive
             models.CheckConstraint(
-                check=Q(issued_quantity__gt=0),
+                condition=Q(issued_quantity__gt=0),
                 name="consumable_issue_issued_quantity_positive",
             ),
 
             # remaining quantity cannot exceed originally issued
             models.CheckConstraint(
-                check=Q(quantity__lte=F("issued_quantity")),
+                condition=Q(quantity__lte=F("issued_quantity")),
                 name="consumable_issue_quantity_lte_issued",
             ),
 
             # if returned_at is set, quantity must be zero
             models.CheckConstraint(
-                check=Q(returned_at__isnull=True) | Q(quantity=0),
+                condition=Q(returned_at__isnull=True) | Q(quantity=0),
                 name="consumable_issue_closed_has_zero_quantity",
             ),
         ]
