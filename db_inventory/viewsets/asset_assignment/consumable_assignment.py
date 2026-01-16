@@ -1,4 +1,4 @@
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -233,7 +233,7 @@ class ReturnConsumableView(AuditMixin, APIView):
 
         return Response(status=status.HTTP_200_OK,)
     
-class ReportConsumableIncidentView(AuditMixin, APIView):
+class ReportConsumableLossView(AuditMixin, APIView):
     permission_classes = [CanUseAsset]
 
     ALLOWED_EVENT_TYPES = {
@@ -293,7 +293,7 @@ class ReportConsumableIncidentView(AuditMixin, APIView):
 
             # Audit log
             self.audit(
-                event_type=AuditLog.Events.CONSUMABLE_REPORTED_INCIDENT,
+                event_type=AuditLog.Events.CONSUMABLE_LOSS_REPORTED,
                 target=consumable,
                 description=(
                     f"{request.user.email} reported "

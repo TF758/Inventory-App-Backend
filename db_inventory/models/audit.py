@@ -94,6 +94,7 @@ class AuditLog(PublicIDModel):
         CONSUMABLE_ISSUED = "consumable_issued"
         CONSUMABLE_RETURNED = "consumable_returned"
         CONSUMABLE_USED = "consumable_used"
+        CONSUMABLE_LOSS_REPORTED = "consumable_loss_reported"
 
 
         USER_MOVED = "user_moved"
