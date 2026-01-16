@@ -194,6 +194,32 @@ class RefreshAPIView(APIView):
                 resp.delete_cookie("refresh", path="/")
                 return resp
 
+            # --- Rotate refresh token ---
+            new_raw_refresh = secrets.token_urlsafe(64)
+            new_hash = UserSession.hash_token(new_raw_refresh)
+
+            try:
+                with transaction.atomic():
+                    session.previous_refresh_token_hash = session.refresh_token_hash
+                    session.refresh_token_hash = new_hash
+                    session.expires_at = now + settings.IDLE_TIMEOUT
+                    session.save(
+                        update_fields=[
+                            "previous_refresh_token_hash",
+                            "refresh_token_hash",
+                            "expires_at",
+                        ]
+                    )
+            except Exception:
+                logger.exception(
+                    "Refresh token rotation failed",
+                    extra={"session_id": str(session.id)},
+                )
+                return Response(
+                    {"detail": "Internal server error."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
             # --- Generate access token ---
             try:
                 access_token = AccessToken.for_user(user)
@@ -214,32 +240,6 @@ class RefreshAPIView(APIView):
             access_token["role_id"] = (
                 user.active_role.public_id if user.active_role else None
             )
-
-            # --- Rotate refresh token 
-            new_raw_refresh = secrets.token_urlsafe(64)
-            new_hash = UserSession.hash_token(new_raw_refresh)
-
-            try:
-                with transaction.atomic():
-                    session.previous_refresh_token_hash = session.refresh_token_hash
-                    session.refresh_token_hash = new_hash
-                    session.expires_at = now + IDLE_TIMEOUT
-                    session.save(
-                        update_fields=[
-                            "previous_refresh_token_hash",
-                            "refresh_token_hash",
-                            "expires_at",
-                        ]
-                    )
-            except Exception:
-                logger.exception(
-                    "Refresh token rotation failed",
-                    extra={"session_id": str(session.id)},
-                )
-                return Response(
-                    {"detail": "Internal server error."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
 
             # --- Success response ---
             response = Response(
