@@ -30,14 +30,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Initialize environment variables
-env = environ.Env(
-    DEBUG=(bool, False)  # default value for DEBUG if not in .env
-)
+env = environ.Env(DEBUG=(bool, False))  # default value for DEBUG if not in .env )
 
 
 # Read the .env file
-environ.Env.read_env(env_file=BASE_DIR / ".env")
+ENV = os.environ.get("DJANGO_ENV", "dev")  # default to dev
 
+env_file = BASE_DIR / f".env.{ENV}"
+
+if env_file.exists():
+    environ.Env.read_env(env_file=env_file)
+else:
+    raise RuntimeError(f"Missing env file: {env_file}")
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-secret")
 
 
@@ -312,4 +316,3 @@ except KeyError as e:
 
 SESSION_IDLE_TIMEOUT = timedelta(minutes=SESSION_IDLE_MINUTES)
 SESSION_ABSOLUTE_LIFETIME = timedelta(days=SESSION_ABSOLUTE_DAYS)
-
