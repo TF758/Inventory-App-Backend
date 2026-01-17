@@ -68,15 +68,33 @@ class IssueConsumableView(AuditMixin, APIView):
                     "Not enough consumable stock available"
                 )
 
-            # Create issue (custody batch)
-            issue = ConsumableIssue.objects.create(
-                consumable=consumable,
-                user=user,
-                quantity=quantity,
-                issued_quantity=quantity,
-                assigned_by=request.user,
-                purpose=purpose,
+            #Try to find existing open issue
+            issue = (
+                ConsumableIssue.objects
+                .select_for_update()
+                .filter(
+                    consumable=consumable,
+                    user=user,
+                    returned_at__isnull=True,
+                )
+                .first()
             )
+
+            if issue:
+                # Merge into existing issue
+                issue.quantity += quantity
+                issue.issued_quantity += quantity
+                issue.save(update_fields=["quantity", "issued_quantity"])
+            else:
+                # Create new issue
+                issue = ConsumableIssue.objects.create(
+                    consumable=consumable,
+                    user=user,
+                    quantity=quantity,
+                    issued_quantity=quantity,
+                    assigned_by=request.user,
+                    purpose=purpose,
+                )
 
             # Reduce global stock
             consumable.quantity -= quantity
