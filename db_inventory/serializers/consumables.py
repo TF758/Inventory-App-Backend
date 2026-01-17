@@ -7,16 +7,17 @@ from db_inventory.models.site import Location, Room
  
  # Write Serializer
 class ConsumableWriteSerializer(serializers.ModelSerializer):
-    room = serializers.SlugRelatedField(
-        slug_field="public_id",
-        queryset=Room.objects.all(),
-        required=True,
-        allow_null=False,
-    )
+    room = serializers.SlugRelatedField( slug_field="public_id", queryset=Room.objects.all(), required=True, allow_null=False, )
 
     class Meta:
         model = Consumable
-        fields = ("name", "quantity", "description", "room")
+        fields = (
+            "name",
+            "quantity",
+            "low_stock_threshold",
+            "description",
+            "room",
+        )
 
     # ---------- Field-level validation ----------
 
@@ -43,17 +44,37 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate_low_stock_threshold(self, value: int) -> int:
+        if value < 0:
+            raise serializers.ValidationError( "Low stock threshold cannot be negative." )
+        if value > 100_000:
+            raise serializers.ValidationError( "Low stock threshold is unreasonably large." )
+        return value
+
     # ---------- Object-level validation ----------
 
     def validate(self, attrs):
         # Require room on create
         if not self.instance and not attrs.get("room"):
+            raise serializers.ValidationError({ "room": "Room is required." })
+
+        quantity = attrs.get( "quantity", self.instance.quantity if self.instance else None )
+        threshold = attrs.get( "low_stock_threshold", self.instance.low_stock_threshold if self.instance else None )
+
+        if (
+            quantity is not None
+            and threshold is not None
+            and threshold > quantity
+        ):
             raise serializers.ValidationError({
-                "room": "Room is required."
-            })
+                "low_stock_threshold": (
+                    "Low stock threshold cannot exceed current quantity." ) })
+
         return attrs
 
 class ConsumableAreaReaSerializer(serializers.ModelSerializer):
+    is_low_stock = serializers.BooleanField(read_only=True)
+
     room_id = serializers.CharField(source='room.public_id', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
 
@@ -69,6 +90,8 @@ class ConsumableAreaReaSerializer(serializers.ModelSerializer):
             'public_id',
             'name',
             'quantity',
+            "low_stock_threshold",
+            "is_low_stock",
             'description',
             'room_id',
             'room_name',
