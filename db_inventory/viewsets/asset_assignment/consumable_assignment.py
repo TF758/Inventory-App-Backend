@@ -8,9 +8,35 @@ from db_inventory.models.asset_assignment import ConsumableEvent, ConsumableIssu
 from db_inventory.models.assets import Consumable
 from db_inventory.models.audit import AuditLog
 from db_inventory.permissions.assets import CanManageAssetCustody, CanUseAsset
-from db_inventory.serializers.assignment import IssueConsumableSerializer, ReportConsumableLossSerializer, ReturnConsumableSerializer, UseConsumableSerializer
+from db_inventory.serializers.assignment import ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, ReturnConsumableSerializer, UseConsumableSerializer
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from rest_framework import mixins, viewsets, filters
+from db_inventory.pagination import FlexiblePagination
+
+
+class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Full chronological event timeline for a consumable.
+    """
+    serializer_class = ConsumableEventSerializer
+    pagination_class = FlexiblePagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ["occurred_at"]
+    ordering = ["-occurred_at"]
+
+    def get_queryset(self):
+        consumable_id = self.kwargs.get("public_id")
+
+        return (
+            ConsumableEvent.objects
+            .filter(consumable__public_id=consumable_id)
+            .select_related(
+                "user",
+                "reported_by",
+                "issue",
+            )
+        )
 
 class IssueConsumableView(AuditMixin, APIView):
     permission_classes = [CanManageAssetCustody]

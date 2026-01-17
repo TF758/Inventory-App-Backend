@@ -4,6 +4,28 @@ from db_inventory.models.users import User
 from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
 from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent
 
+
+
+class ConsumableEventSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField( source="user.email", read_only=True, allow_null=True, )
+    reported_by = serializers.EmailField( source="reported_by.email", read_only=True, allow_null=True, )
+    issue_id = serializers.IntegerField(source="issue.id", read_only=True)
+
+    class Meta:
+        model = ConsumableEvent
+        fields = [
+            "id",
+            "event_type",
+            "quantity",
+            "quantity_change",
+            "issue_id",
+            "user_email",
+            "reported_by",
+            "notes",
+            "occurred_at",
+        ]
+        read_only_fields = fields
+
 class EquipmentAssignmentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id', read_only=True)
     equipment_name = serializers.CharField(source='equipment.name', read_only=True)
@@ -185,9 +207,7 @@ class CondemnAccessorySerializer(serializers.Serializer):
 
 class AccessoryEventSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source="user.email", read_only=True)
-    reported_by_email = serializers.EmailField(
-        source="reported_by.email", read_only=True
-    )
+    reported_by_email = serializers.EmailField( source="reported_by.email", read_only=True )
 
     quantity_display = serializers.SerializerMethodField()
     quantity = serializers.SerializerMethodField()
