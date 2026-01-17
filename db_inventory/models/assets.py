@@ -104,6 +104,7 @@ class Consumable(PublicIDModel):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, max_length=255)
     quantity = models.PositiveIntegerField(default=0)
+    low_stock_threshold = models.PositiveIntegerField( default=0, help_text="Alert when available quantity is at or below this value" )
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="consumables")
 
     class Meta:
@@ -114,6 +115,10 @@ class Consumable(PublicIDModel):
 
     def __str__(self):
         return self.name
+    
+    @property
+    def is_low_stock(self) -> bool:
+        return (self.low_stock_threshold > 0 and self.quantity <= self.low_stock_threshold)
     
     def audit_label(self) -> str:
         return self.name

@@ -292,3 +292,25 @@ class ReportConsumableLossSerializer(serializers.Serializer):
         ]
     )
     notes = serializers.CharField(required=False, allow_blank=True)
+
+class ConsumableDistributionSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    consumable_public_id = serializers.CharField(
+        source="consumable.public_id",
+        read_only=True
+    )
+
+    class Meta:
+        model = ConsumableIssue
+        fields = [
+            "id",
+            "consumable_public_id",
+            "user",
+            "user_email",
+            "quantity",           # remaining
+            "issued_quantity",    # original
+            "assigned_at",
+            "returned_at",
+            "purpose",
+        ]
+        read_only_fields = fields

@@ -106,6 +106,7 @@ urlpatterns = [
     path("assets/consumables/use/", UseConsumableView.as_view(), name="use-consumable"),
     path("assets/consumables/return/", ReturnConsumableView.as_view(), name="return-consumable"),
     path("assets/consumables/report-loss/", ReportConsumableLossView.as_view(), name="report-consumable-loss"),
+    path("assets/consumables/<str:public_id>/distribution/", ConsumableDistributionViewSet.as_view({"get": "list"}), name="consumable-distribution"),
 
 
 

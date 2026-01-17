@@ -8,7 +8,7 @@ from db_inventory.models.asset_assignment import ConsumableEvent, ConsumableIssu
 from db_inventory.models.assets import Consumable
 from db_inventory.models.audit import AuditLog
 from db_inventory.permissions.assets import CanManageAssetCustody, CanUseAsset
-from db_inventory.serializers.assignment import ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, ReturnConsumableSerializer, UseConsumableSerializer
+from db_inventory.serializers.assignment import ConsumableDistributionSerializer, ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, ReturnConsumableSerializer, UseConsumableSerializer
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets, filters
@@ -336,3 +336,26 @@ class ReportConsumableLossView(AuditMixin, APIView):
             )
 
         return Response(status=status.HTTP_200_OK)
+
+class ConsumableDistributionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Current distribution of a consumable:
+    who holds it and how much remains.
+    """
+    serializer_class = ConsumableDistributionSerializer
+    pagination_class = FlexiblePagination
+    permission_classes = [CanManageAssetCustody]
+
+    def get_queryset(self):
+        consumable_id = self.kwargs.get("public_id")
+
+        return (
+            ConsumableIssue.objects
+            .filter(
+                consumable__public_id=consumable_id,
+                returned_at__isnull=True,
+                quantity__gt=0,
+            )
+            .select_related("user", "consumable")
+            .order_by("-assigned_at")
+        )
