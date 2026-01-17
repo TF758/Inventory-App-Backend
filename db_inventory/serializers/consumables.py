@@ -58,18 +58,6 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
         if not self.instance and not attrs.get("room"):
             raise serializers.ValidationError({ "room": "Room is required." })
 
-        quantity = attrs.get( "quantity", self.instance.quantity if self.instance else None )
-        threshold = attrs.get( "low_stock_threshold", self.instance.low_stock_threshold if self.instance else None )
-
-        if (
-            quantity is not None
-            and threshold is not None
-            and threshold > quantity
-        ):
-            raise serializers.ValidationError({
-                "low_stock_threshold": (
-                    "Low stock threshold cannot exceed current quantity." ) })
-
         return attrs
 
 class ConsumableAreaReaSerializer(serializers.ModelSerializer):
