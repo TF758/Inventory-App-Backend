@@ -88,10 +88,7 @@ class PasswordResetRequestTests(TestCase):
             response = self.client.post(url, {"email": self.active_user.email})
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            response.json()["detail"],
-            "Could not send password reset email, please try again later.",
-        )
+        self.assertEqual( response.json()["detail"], "Could not send password reset email, please try again later.", )
 
     def test_case_insensitive_email_lookup(self):
         user = UserFactory(email="UserCase@example.com", is_active=True)
@@ -113,11 +110,7 @@ class PasswordResetRequestTests(TestCase):
 class PasswordResetConfirmTests(APITestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@example.com",
-            password="OldPass123!",
-            is_active=True,
-        )
+        self.user = User.objects.create_user( email="test@example.com", password="OldPass123!", is_active=True, )
         self.url = reverse("password-reset-confirm")
 
     @patch("db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=None)

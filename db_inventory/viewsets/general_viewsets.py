@@ -27,8 +27,6 @@ from db_inventory.models.audit import AuditLog
 from django.db.models import Q
 from django.conf import settings
 
-IDLE_TIMEOUT = timedelta(seconds=60)
-ABSOLUTE_LIFETIME = timedelta(seconds=120)
 
 logger = logging.getLogger(__name__) 
 
@@ -63,8 +61,8 @@ class SessionTokenLoginView(TokenObtainPairView):
                 session = UserSession.objects.create(
                 user=user,
                 refresh_token_hash=hashed_refresh,
-                expires_at= now + IDLE_TIMEOUT,
-                absolute_expires_at=now + ABSOLUTE_LIFETIME,
+                expires_at= now + settings.SESSION_IDLE_TIMEOUT,
+                absolute_expires_at=now + settings.SESSION_ABSOLUTE_LIFETIME,
                 user_agent_hash=ua_hash,  
                 ip_address=request.META.get("REMOTE_ADDR"),
             )
@@ -100,7 +98,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE,
             path="/",
-            max_age=int(ABSOLUTE_LIFETIME.total_seconds()),
+            max_age=int(settings.SESSION_ABSOLUTE_LIFETIME.total_seconds()),
         )
 
         return response
@@ -202,7 +200,7 @@ class RefreshAPIView(APIView):
                 with transaction.atomic():
                     session.previous_refresh_token_hash = session.refresh_token_hash
                     session.refresh_token_hash = new_hash
-                    session.expires_at = now + settings.IDLE_TIMEOUT
+                    session.expires_at = now + settings.SESSION_IDLE_TIMEOUT
                     session.save(
                         update_fields=[
                             "previous_refresh_token_hash",
@@ -260,7 +258,7 @@ class RefreshAPIView(APIView):
                 secure=settings.COOKIE_SECURE,
                 samesite=settings.COOKIE_SAMESITE,
                 path="/",
-                max_age=int(ABSOLUTE_LIFETIME.total_seconds()),
+                max_age=int(settings.SESSION_ABSOLUTE_LIFETIME.total_seconds()),
             )
 
             return response
