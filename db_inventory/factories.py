@@ -58,17 +58,16 @@ class LocationFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Location
 
-    name = factory.Sequence(lambda n: f"{fake.color_name()} Location {n}")
-    department = factory.LazyFunction(lambda: random.choice(Department.objects.all()))
+    name = factory.Sequence(lambda n: f"Location {n}")
+    department = factory.SubFactory(DepartmentFactory)
 
 
 class RoomFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Room
 
-    name = factory.Sequence(lambda n: f"{fake.color_name()} Room {n}")
-    location = factory.LazyFunction(lambda: random.choice(Location.objects.all()))
-    
+    name = factory.Sequence(lambda n: f"Room {n}")
+    location = factory.SubFactory(LocationFactory)
 
 class UserLocationFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -100,7 +99,7 @@ class EquipmentFactory(factory.django.DjangoModelFactory):
     brand = factory.LazyFunction(fake.company)
     model = factory.LazyFunction(fake.word)
     serial_number = factory.Sequence(lambda n: f'SN{n}')
-    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+    room = factory.SubFactory(RoomFactory)
 
 
 class ComponentFactory(factory.django.DjangoModelFactory):
@@ -108,11 +107,11 @@ class ComponentFactory(factory.django.DjangoModelFactory):
         model = Component
 
     name = factory.Sequence(lambda n: f'Component {n}')
-    brand = factory.LazyFunction(fake.company)
-    model = factory.LazyFunction(fake.word)
+    brand = factory.Faker("company")
+    model = factory.Faker("word")
     serial_number = factory.Sequence(lambda n: f'SN{n}')
-    quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=40))
-    equipment = factory.LazyFunction(lambda: random.choice(Equipment.objects.all()))
+    quantity = factory.Faker("random_int", min=1, max=40)
+    equipment = factory.SubFactory(EquipmentFactory)
 
 
 class AccessoryFactory(factory.django.DjangoModelFactory):
@@ -122,7 +121,7 @@ class AccessoryFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f'Accessory {n}')
     serial_number = factory.Sequence(lambda n: f'SN{n}')
     quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
-    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+    room = factory.SubFactory(RoomFactory)
 
 
 class ConsumableFactory(factory.django.DjangoModelFactory):
@@ -130,9 +129,9 @@ class ConsumableFactory(factory.django.DjangoModelFactory):
         model = Consumable
 
     name = factory.Sequence(lambda n: f'Consumable {n}')
-    description = factory.LazyFunction(lambda: fake.text(max_nb_chars=50))
-    quantity = factory.LazyFunction(lambda: fake.random_int(min=1, max=100))
-    room = factory.LazyFunction(lambda: random.choice(Room.objects.all()))
+    description = factory.Faker("text", max_nb_chars=50)
+    quantity = factory.Faker("random_int", min=1, max=100)
+    room = factory.SubFactory(RoomFactory)
 
 class UserSessionFactory(factory.django.DjangoModelFactory):
     class Meta:

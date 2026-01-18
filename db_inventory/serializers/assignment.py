@@ -1,8 +1,30 @@
 from rest_framework import serializers
 
 from db_inventory.models.users import User
-from db_inventory.models.assets import Accessory, Equipment, EquipmentStatus
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, EquipmentAssignment, EquipmentEvent
+from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent
+from rest_framework.serializers import ValidationError
+
+
+class ConsumableEventSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField( source="user.email", read_only=True, allow_null=True, )
+    reported_by = serializers.EmailField( source="reported_by.email", read_only=True, allow_null=True, )
+    issue_id = serializers.IntegerField(source="issue.id", read_only=True)
+
+    class Meta:
+        model = ConsumableEvent
+        fields = [
+            "id",
+            "event_type",
+            "quantity",
+            "quantity_change",
+            "issue_id",
+            "user_email",
+            "reported_by",
+            "notes",
+            "occurred_at",
+        ]
+        read_only_fields = fields
 
 class EquipmentAssignmentSerializer(serializers.ModelSerializer):
     equipment_id = serializers.CharField(source='equipment.public_id', read_only=True)
@@ -185,9 +207,7 @@ class CondemnAccessorySerializer(serializers.Serializer):
 
 class AccessoryEventSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source="user.email", read_only=True)
-    reported_by_email = serializers.EmailField(
-        source="reported_by.email", read_only=True
-    )
+    reported_by_email = serializers.EmailField( source="reported_by.email", read_only=True )
 
     quantity_display = serializers.SerializerMethodField()
     quantity = serializers.SerializerMethodField()
@@ -241,3 +261,69 @@ class AccessoryEventSerializer(serializers.ModelSerializer):
             "restocked": "Restocked",
             "adjusted": "Adjusted",
         }.get(obj.event_type, obj.event_type.replace("_", " ").title())
+    
+
+class IssueConsumableSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField(slug_field="public_id",queryset=Consumable.objects.all())
+    user = serializers.SlugRelatedField(slug_field="public_id",queryset=User.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    purpose = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class UseConsumableSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField(slug_field="public_id",queryset=Consumable.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class ReturnConsumableSerializer(serializers.Serializer):
+    issue = serializers.PrimaryKeyRelatedField(queryset=ConsumableIssue.objects.select_related("consumable", "user"))
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class ReportConsumableLossSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField( slug_field="public_id", queryset=Consumable.objects.all(), required=False, )
+    issue = serializers.PrimaryKeyRelatedField( queryset=ConsumableIssue.objects.select_related("consumable", "user"), required=False, )
+    quantity = serializers.IntegerField(min_value=1)
+    event_type = serializers.ChoiceField(
+        choices=[
+            ConsumableEvent.EventType.LOST,
+            ConsumableEvent.EventType.DAMAGED,
+            ConsumableEvent.EventType.EXPIRED,
+            ConsumableEvent.EventType.CONDEMNED,
+        ]
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get("issue") and not attrs.get("consumable"):
+            raise ValidationError(
+                "Either issue or consumable must be provided."
+            )
+        return attrs
+    
+class ConsumableDistributionSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    consumable_public_id = serializers.CharField(
+        source="consumable.public_id",
+        read_only=True
+    )
+
+    class Meta:
+        model = ConsumableIssue
+        fields = [
+            "id",
+            "consumable_public_id",
+            "user",
+            "user_email",
+            "quantity",          
+            "issued_quantity", 
+            "assigned_at",
+            "returned_at",
+            "purpose",
+        ]
+        read_only_fields = fields
+
+class RestockConsumableSerializer(serializers.Serializer):
+    consumable = serializers.SlugRelatedField( slug_field="public_id", queryset=Consumable.objects.all(), )
+    quantity = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)

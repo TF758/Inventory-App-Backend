@@ -27,8 +27,6 @@ from db_inventory.models.audit import AuditLog
 from django.db.models import Q
 from django.conf import settings
 
-IDLE_TIMEOUT = timedelta(seconds=60)
-ABSOLUTE_LIFETIME = timedelta(seconds=120)
 
 logger = logging.getLogger(__name__) 
 
@@ -63,8 +61,8 @@ class SessionTokenLoginView(TokenObtainPairView):
                 session = UserSession.objects.create(
                 user=user,
                 refresh_token_hash=hashed_refresh,
-                expires_at= now + IDLE_TIMEOUT,
-                absolute_expires_at=now + ABSOLUTE_LIFETIME,
+                expires_at= now + settings.SESSION_IDLE_TIMEOUT,
+                absolute_expires_at=now + settings.SESSION_ABSOLUTE_LIFETIME,
                 user_agent_hash=ua_hash,  
                 ip_address=request.META.get("REMOTE_ADDR"),
             )
@@ -100,7 +98,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE,
             path="/",
-            max_age=int(ABSOLUTE_LIFETIME.total_seconds()),
+            max_age=int(settings.SESSION_ABSOLUTE_LIFETIME.total_seconds()),
         )
 
         return response
@@ -194,6 +192,32 @@ class RefreshAPIView(APIView):
                 resp.delete_cookie("refresh", path="/")
                 return resp
 
+            # --- Rotate refresh token ---
+            new_raw_refresh = secrets.token_urlsafe(64)
+            new_hash = UserSession.hash_token(new_raw_refresh)
+
+            try:
+                with transaction.atomic():
+                    session.previous_refresh_token_hash = session.refresh_token_hash
+                    session.refresh_token_hash = new_hash
+                    session.expires_at = now + settings.SESSION_IDLE_TIMEOUT
+                    session.save(
+                        update_fields=[
+                            "previous_refresh_token_hash",
+                            "refresh_token_hash",
+                            "expires_at",
+                        ]
+                    )
+            except Exception:
+                logger.exception(
+                    "Refresh token rotation failed",
+                    extra={"session_id": str(session.id)},
+                )
+                return Response(
+                    {"detail": "Internal server error."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
             # --- Generate access token ---
             try:
                 access_token = AccessToken.for_user(user)
@@ -215,32 +239,6 @@ class RefreshAPIView(APIView):
                 user.active_role.public_id if user.active_role else None
             )
 
-            # --- Rotate refresh token 
-            new_raw_refresh = secrets.token_urlsafe(64)
-            new_hash = UserSession.hash_token(new_raw_refresh)
-
-            try:
-                with transaction.atomic():
-                    session.previous_refresh_token_hash = session.refresh_token_hash
-                    session.refresh_token_hash = new_hash
-                    session.expires_at = now + IDLE_TIMEOUT
-                    session.save(
-                        update_fields=[
-                            "previous_refresh_token_hash",
-                            "refresh_token_hash",
-                            "expires_at",
-                        ]
-                    )
-            except Exception:
-                logger.exception(
-                    "Refresh token rotation failed",
-                    extra={"session_id": str(session.id)},
-                )
-                return Response(
-                    {"detail": "Internal server error."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
             # --- Success response ---
             response = Response(
                 {
@@ -260,7 +258,7 @@ class RefreshAPIView(APIView):
                 secure=settings.COOKIE_SECURE,
                 samesite=settings.COOKIE_SAMESITE,
                 path="/",
-                max_age=int(ABSOLUTE_LIFETIME.total_seconds()),
+                max_age=int(settings.SESSION_ABSOLUTE_LIFETIME.total_seconds()),
             )
 
             return response

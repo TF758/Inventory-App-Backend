@@ -1,4 +1,7 @@
 from django.urls import path, include
+
+from .viewsets import *
+
 from .views import *
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -96,6 +99,17 @@ urlpatterns = [
     path("assets/accessories/return/", AdminReturnAccessoryView.as_view(), name="accessory-return"),
     path("assets/accessories/restock/", RestockAccessoryView.as_view(), name="accessory-restock"),
     path("assets/accessories/use/", UseAccessoryView.as_view(), name="use-accessory"),
+
+
+    path("assets/consumables/<str:public_id>/event-history/", ConsumableEventHistoryViewSet.as_view({"get": "list"}), name="consumable-event-history"),
+    path("assets/consumables/restock/", RestockConsumableView.as_view(), name="consumable-restock"),
+    path("assets/consumables/issue/", IssueConsumableView.as_view(), name="issue-consumable"),
+    path("assets/consumables/use/", UseConsumableView.as_view(), name="use-consumable"),
+    path("assets/consumables/return/", ReturnConsumableView.as_view(), name="return-consumable"),
+    path("assets/consumables/report-loss/", ReportConsumableLossView.as_view(), name="report-consumable-loss"),
+    path("assets/consumables/<str:public_id>/distribution/", ConsumableDistributionViewSet.as_view({"get": "list"}), name="consumable-distribution"),
+
+
 
 
 

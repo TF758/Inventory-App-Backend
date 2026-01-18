@@ -30,14 +30,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Initialize environment variables
-env = environ.Env(
-    DEBUG=(bool, False)  # default value for DEBUG if not in .env
-)
+env = environ.Env(DEBUG=(bool, False))  # default value for DEBUG if not in .env )
 
 
 # Read the .env file
-environ.Env.read_env(env_file=BASE_DIR / ".env")
+ENV = os.environ.get("DJANGO_ENV", "dev")  # default to dev
 
+env_file = BASE_DIR / f".env.{ENV}"
+
+if env_file.exists():
+    environ.Env.read_env(env_file=env_file)
+else:
+    raise RuntimeError(f"Missing env file: {env_file}")
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-secret")
 
 
@@ -256,15 +260,13 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
         'OPTIONS': {'min_length': 3}
     },
-    # {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    # {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in ("true", "1")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
@@ -305,6 +307,12 @@ CSRF_TRUSTED_ORIGINS = [
     "https://127.0.0.1:5173",
 ]
 
-IDLE_TIMEOUT = timedelta(minutes=30)
-ABSOLUTE_LIFETIME = timedelta(days=7)
 
+try:
+    SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
+    SESSION_ABSOLUTE_DAYS = int(os.environ["SESSION_ABSOLUTE_DAYS"])
+except KeyError as e:
+    raise RuntimeError(f"Missing required env var: {e}")
+
+SESSION_IDLE_TIMEOUT = timedelta(minutes=SESSION_IDLE_MINUTES)
+SESSION_ABSOLUTE_LIFETIME = timedelta(days=SESSION_ABSOLUTE_DAYS)

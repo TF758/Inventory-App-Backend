@@ -142,7 +142,7 @@ class RefreshTokenViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         session.refresh_from_db()
-        expected = timezone.now() + settings.IDLE_TIMEOUT
+        expected = timezone.now() + settings.SESSION_IDLE_TIMEOUT
         self.assertAlmostEqual(
             session.expires_at.timestamp(),
             expected.timestamp(),

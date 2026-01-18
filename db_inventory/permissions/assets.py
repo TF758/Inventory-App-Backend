@@ -1,5 +1,5 @@
 from rest_framework.permissions import BasePermission
-from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from db_inventory.models.site import Department, Location, Room
@@ -240,5 +240,25 @@ class CanSelfReturnAsset(BasePermission):
         return not is_admin_role(role.role)
 
 class CanUseAsset(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if isinstance(obj, ConsumableIssue):
+            return obj.user_id == request.user.id
+
+        if isinstance(obj, AccessoryAssignment):
+            return obj.user_id == request.user.id
+
+        return False
+
+class CanReportConsumableLoss(BasePermission):
+    """
+    Allows:
+    - users to report loss on their own open issues
+    - admins to report loss on any issue in scope
+    
+    """
+
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated
