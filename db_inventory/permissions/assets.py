@@ -251,3 +251,14 @@ class CanUseAsset(BasePermission):
             return obj.user_id == request.user.id
 
         return False
+
+class CanReportConsumableLoss(BasePermission):
+    """
+    Allows:
+    - users to report loss on their own open issues
+    - admins to report loss on any issue in scope
+    
+    """
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated

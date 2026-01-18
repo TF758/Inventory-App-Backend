@@ -102,6 +102,7 @@ urlpatterns = [
 
 
     path("assets/consumables/<str:public_id>/event-history/", ConsumableEventHistoryViewSet.as_view({"get": "list"}), name="consumable-event-history"),
+    path("assets/consumables/restock/", RestockConsumableView.as_view(), name="consumable-restock"),
     path("assets/consumables/issue/", IssueConsumableView.as_view(), name="issue-consumable"),
     path("assets/consumables/use/", UseConsumableView.as_view(), name="use-consumable"),
     path("assets/consumables/return/", ReturnConsumableView.as_view(), name="return-consumable"),
