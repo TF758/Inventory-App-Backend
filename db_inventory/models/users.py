@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.utils import timezone
 from db_inventory.utils.ids import generate_base62_identifier
+from db_inventory.models.base import PublicIDModel
 
 
 
@@ -25,14 +26,16 @@ class CustomUserManager(UserManager):
         extra_fields.setdefault('is_superuser', True)
         return self._create_user(email, password, **extra_fields)
 
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin, PublicIDModel):
+    PUBLIC_ID_PREFIX = "USR"
+
     email = models.EmailField(blank=True, default='', unique=True, db_index=True)
     fname = models.CharField(max_length=30, blank=True, default='')
     lname = models.CharField(max_length=30, blank=True, default='')
     job_title = models.CharField(max_length=50, blank=True, default='')
     role = models.CharField(max_length=20, blank=True, default='user')
 
-    public_id = models.CharField(max_length=15, unique=True, editable=False, null=True, db_index=True)
+    
     active_role = models.ForeignKey("RoleAssignment",on_delete=models.SET_NULL,null=True,blank=True,related_name="active_for_users", )
     
     created_by = models.ForeignKey("User",on_delete=models.SET_NULL,null=True,blank=True,related_name="created_users")
@@ -73,7 +76,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.fname if self.fname else self.email.split('@')[0]
-
+    
+    def get_active_role_public_id(self):
+        return self.active_role.public_id if self.active_role else None
+    
     def save(self, *args, **kwargs):
         if not self.public_id:
             while True:

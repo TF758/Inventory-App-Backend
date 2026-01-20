@@ -100,10 +100,13 @@ def is_user_in_scope(
     Check whether the admin_role has scope over the target user.
     """
 
+    if not admin_role:
+        return False
+
     if admin_role.role == "SITE_ADMIN":
         return True
 
-    # Check role assignments
+
     for ra in RoleAssignment.objects.filter(user=target_user):
         if is_in_scope(
             admin_role,
@@ -113,13 +116,21 @@ def is_user_in_scope(
         ):
             return True
 
-    # Check user locations
-    for ul in UserLocation.objects.filter(user=target_user):
+    current_ul = (
+        UserLocation.objects
+        .select_related("room__location__department")
+        .filter(user=target_user, is_current=True)
+    )
+
+    for ul in current_ul:
+        if not ul.room:
+            continue  
+
         if is_in_scope(
             admin_role,
             room=ul.room,
-            location=ul.room.location if ul.room else None,
-            department=ul.room.location.department if ul.room else None,
+            location=ul.room.location,
+            department=ul.room.location.department,
         ):
             return True
 
