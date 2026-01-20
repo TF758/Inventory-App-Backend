@@ -7,6 +7,8 @@ from datetime import timedelta
 from db_inventory.models.security import UserSession
 import secrets
 
+from db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
+
 fake = Faker()
 
 DEPARTMENT_IMAGE_URLS = [
@@ -25,7 +27,9 @@ class UserFactory(factory.django.DjangoModelFactory):
     email = factory.Sequence(lambda n: f"user{n}@example.com")
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')
+    password = factory.PostGenerationMethodCall("set_password", "password")
     job_title = factory.LazyFunction(lambda: fake.job()[:50])
+    force_password_change = False
     is_active = factory.LazyFunction(lambda: random.choices([True, False], weights=[0.85, 0.15])[0])  # 85% active, 15% inactive
     public_id = factory.Sequence(lambda n: f"UID{n:08d}")
     is_staff = False
@@ -139,24 +143,13 @@ class UserSessionFactory(factory.django.DjangoModelFactory):
 
     user = factory.SubFactory(UserFactory)
     status = UserSession.Status.ACTIVE
-
-    expires_at = factory.LazyFunction(
-        lambda: timezone.now() + timedelta(days=7)
-    )
-
-    absolute_expires_at = factory.LazyFunction(
-        lambda: timezone.now() + timedelta(days=30)
-    )
-
+    expires_at = factory.LazyFunction( lambda: timezone.now() + timedelta(days=7) )
+    absolute_expires_at = factory.LazyFunction( lambda: timezone.now() + timedelta(days=30) )
     ip_address = factory.Faker("ipv4")
     user_agent = factory.Faker("user_agent")
 
-    user_agent_hash = factory.LazyAttribute(
-        lambda o: UserSession.hash_user_agent(o.user_agent)
-    )
-    refresh_token_hash = factory.LazyFunction(
-        lambda: UserSession.hash_token(secrets.token_urlsafe(64))
-    )
+    user_agent_hash = factory.LazyAttribute( lambda o: UserSession.hash_user_agent(o.user_agent) )
+    refresh_token_hash = factory.LazyFunction( lambda: UserSession.hash_token(secrets.token_urlsafe(64)) )
     previous_refresh_token_hash = None
 
     @factory.post_generation
@@ -164,3 +157,76 @@ class UserSessionFactory(factory.django.DjangoModelFactory):
         if not create:
             return
         obj.raw_refresh = extracted or secrets.token_urlsafe(64)
+
+class AuditLogFactory(factory.Factory):
+    """
+    Build-only factory for AuditLog.
+    Safe for bulk_create (no save(), no side effects).
+    """
+
+    class Meta:
+        model = AuditLog
+
+    # Actor
+    user = None
+    user_public_id = None
+    user_email = factory.Faker("email")
+
+    # Event
+    event_type = AuditLog.Events.LOGIN
+    description = "User logged in"
+    metadata = factory.LazyFunction(dict)
+
+    # Target snapshots
+    target_model = None
+    target_id = None
+    target_name = None
+
+    # Org snapshots
+    department = None
+    department_name = None
+    location = None
+    location_name = None
+    room = None
+    room_name = None
+
+    # Request context
+    ip_address = factory.Faker("ipv4")
+    user_agent = factory.Faker("user_agent")
+
+    created_at = factory.LazyFunction(timezone.now)
+
+
+
+
+class SiteNameChangeHistoryFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = SiteNameChangeHistory
+
+    site_type = SiteNameChangeHistory.SiteType.DEPARTMENT
+    object_public_id = factory.Sequence(lambda n: f"SITE-{n:05d}")
+    old_name = factory.Faker("company")
+    new_name = factory.Faker("company")
+    user = factory.SubFactory("db_inventory.factories.user.UserFactory")
+    user_email = factory.LazyAttribute(lambda o: o.user.email if o.user else None)
+    reason = factory.Faker("sentence", nb_words=6)
+
+class SiteRelocationHistoryFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = SiteRelocationHistory
+
+    site_type = SiteRelocationHistory.SiteType.LOCATION
+
+    object_public_id = factory.Sequence(lambda n: f"SITE-{n:05d}")
+    object_name = factory.Faker("company")
+
+    from_parent_public_id = factory.Sequence(lambda n: f"PAR-{n:05d}")
+    from_parent_name = factory.Faker("company")
+
+    to_parent_public_id = factory.Sequence(lambda n: f"PAR-{n:05d}")
+    to_parent_name = factory.Faker("company")
+
+    user = factory.SubFactory("db_inventory.factories.user.UserFactory")
+    user_email = factory.LazyAttribute(lambda o: o.user.email if o.user else None)
+
+    reason = factory.Faker("sentence", nb_words=8)

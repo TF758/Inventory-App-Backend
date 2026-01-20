@@ -1,38 +1,54 @@
 import os
 import random
 import django
-from faker import Faker
 from datetime import timedelta
-import random
 from django.utils import timezone
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent
-from db_inventory.models.assets import Accessory
-from db_inventory.models.users import User
+from django.db import transaction
+from tqdm import tqdm # progress bar
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")
 django.setup()
 
-
-from django.core.management import call_command
 from django.core.management.base import BaseCommand
+from db_inventory.models.asset_assignment import ( AccessoryAssignment, AccessoryEvent, )
+from db_inventory.models.assets import Accessory
+from db_inventory.models.users import User
+
+
+FAKE_EVENTS_PER_ACCESSORY = 50
 
 SCENARIOS = {
-    "assigned_active": 0.30,        # assigned, not returned
-    "assigned_returned": 0.25,      # assigned then returned
-    "partial_return": 0.15,         # assigned, partially returned
-    "condemned": 0.15,              # stock condemned
-    "restocked": 0.10,              # new stock added
-    "adjusted": 0.05,               # inventory correction
+    "assigned_active": 0.30,
+    "assigned_returned": 0.25,
+    "partial_return": 0.15,
+    "condemned": 0.15,
+    "restocked": 0.10,
+    "adjusted": 0.05,
 }
+
+SEGMENTS_PER_ACCESSORY = (2, 4)
 
 
 def next_time(current):
     return current + timedelta(days=random.randint(5, 120))
 
+
 def pick_scenario():
-    scenarios = list(SCENARIOS.keys())
-    weights = list(SCENARIOS.values())
-    return random.choices(scenarios, weights=weights)[0]
+    return random.choices(
+        list(SCENARIOS.keys()),
+        weights=list(SCENARIOS.values()),
+    )[0]
+
+
+def get_last_event_time(accessory):
+    last_event = (
+        AccessoryEvent.objects
+        .filter(accessory=accessory)
+        .order_by("-occurred_at")
+        .first()
+    )
+    return last_event.occurred_at if last_event else None
+
 
 def create_event(accessory, event_type, quantity_change, user, when, notes=""):
     AccessoryEvent.objects.create(
@@ -45,20 +61,17 @@ def create_event(accessory, event_type, quantity_change, user, when, notes=""):
         notes=notes,
     )
 
-    # Apply ownership change
     if quantity_change != 0:
-        accessory.quantity += quantity_change
-        if accessory.quantity < 0:
-            accessory.quantity = 0
+        accessory.quantity = max(0, accessory.quantity + quantity_change)
         accessory.save(update_fields=["quantity"])
 
 def assign_accessory(accessory, user, when):
     if accessory.quantity <= 0:
-        return
+        return None
 
     qty = random.randint(1, min(3, accessory.quantity))
 
-    AccessoryAssignment.objects.create(
+    assignment = AccessoryAssignment.objects.create(
         accessory=accessory,
         user=user,
         quantity=qty,
@@ -75,12 +88,11 @@ def assign_accessory(accessory, user, when):
         notes=f"Assigned {qty} units",
     )
 
-    return qty
+    return assignment
 
 
 def return_accessory(assignment, qty, when):
-    if qty > assignment.quantity:
-        qty = assignment.quantity
+    qty = min(qty, assignment.quantity)
 
     assignment.quantity -= qty
     if assignment.quantity == 0:
@@ -97,21 +109,21 @@ def return_accessory(assignment, qty, when):
     )
 
 
-def generate_accessory_timeline(accessory, users):
-    now = timezone.now() - timedelta(days=random.randint(180, 1200))
-    scenario = random.choices(
-        list(SCENARIOS.keys()),
-        weights=list(SCENARIOS.values()),
-    )[0]
 
+def generate_accessory_timeline(accessory, users, start_time=None):
+    if start_time:
+        now = start_time + timedelta(days=random.randint(7, 60))
+    else:
+        now = timezone.now() - timedelta(days=random.randint(300, 1500))
+
+    scenario = pick_scenario()
     user = random.choice(users)
 
-    # Ensure starting stock
     if accessory.quantity == 0:
         create_event(
             accessory,
             "restocked",
-            random.randint(5, 20),
+            random.randint(5, 25),
             user,
             now,
             notes="Initial stock",
@@ -122,26 +134,18 @@ def generate_accessory_timeline(accessory, users):
         assign_accessory(accessory, user, now)
 
     elif scenario == "assigned_returned":
-        qty = assign_accessory(accessory, user, now)
-        if qty:
-            now = next_time(now)
-            assignment = AccessoryAssignment.objects.filter(
-                accessory=accessory,
-                user=user,
-                returned_at__isnull=True,
-            ).last()
-            return_accessory(assignment, qty, now)
+        assignment = assign_accessory(accessory, user, now)
+        if assignment:
+            return_accessory(assignment, assignment.quantity, next_time(now))
 
     elif scenario == "partial_return":
-        qty = assign_accessory(accessory, user, now)
-        if qty and qty > 1:
-            now = next_time(now)
-            assignment = AccessoryAssignment.objects.filter(
-                accessory=accessory,
-                user=user,
-                returned_at__isnull=True,
-            ).last()
-            return_accessory(assignment, random.randint(1, qty - 1), now)
+        assignment = assign_accessory(accessory, user, now)
+        if assignment and assignment.quantity > 1:
+            return_accessory(
+                assignment,
+                random.randint(1, assignment.quantity - 1),
+                next_time(now),
+            )
 
     elif scenario == "condemned":
         condemned = random.randint(1, min(3, accessory.quantity))
@@ -158,7 +162,7 @@ def generate_accessory_timeline(accessory, users):
         create_event(
             accessory,
             "restocked",
-            random.randint(5, 15),
+            random.randint(5, 20),
             user,
             now,
             notes="Supplier delivery",
@@ -175,23 +179,74 @@ def generate_accessory_timeline(accessory, users):
             notes="Inventory recount adjustment",
         )
 
+
+def generate_multiple_timelines(accessory, users, segments):
+    current_time = None
+
+    for _ in range(segments):
+        generate_accessory_timeline(accessory, users, current_time)
+        current_time = get_last_event_time(accessory)
+        if current_time:
+            current_time += timedelta(days=random.randint(20, 120))
+
+
+def bulk_fake_events(accessory, users, start_time, count):
+    events = []
+    current_time = start_time
+
+    for _ in range(count):
+        current_time += timedelta(minutes=random.randint(5, 240))
+        events.append(
+            AccessoryEvent(
+                accessory=accessory,
+                user=random.choice(users),
+                reported_by=random.choice(users),
+                event_type=random.choice(
+                    ["assigned", "returned", "adjusted"]
+                ),
+                quantity_change=0,
+                occurred_at=current_time,
+                notes="Synthetic historical event",
+            )
+        )
+
+    AccessoryEvent.objects.bulk_create(events)
+
+
+# -------------------------------
+# Management command
+# -------------------------------
 class Command(BaseCommand):
-    help = "Generate historical accessory assignments and events"
+    help = "Purge and regenerate accessory assignment & event history"
 
     def handle(self, *args, **kwargs):
-        accessories = Accessory.objects.all()
         users = list(User.objects.filter(is_active=True))
+        accessories = list(Accessory.objects.all())
+
+        self.stdout.write(self.style.WARNING("Purging accessory history…"))
+
+        with transaction.atomic():
+            AccessoryAssignment.objects.all().delete()
+            AccessoryEvent.objects.all().delete()
+
+        self.stdout.write(self.style.WARNING("Existing accessory history purged."))
 
         self.stdout.write(
-            f"Generating history for {accessories.count()} accessories"
+            self.style.MIGRATE_HEADING(
+                f"Generating history for {len(accessories):,} accessories"
+            )
         )
 
-        for accessory in accessories:
-            if AccessoryEvent.objects.filter(accessory=accessory).exists():
-                continue
+        for accessory in tqdm(
+            accessories,
+            desc="Processing accessories",
+            unit="accessory",
+        ):
+            segments = random.randint(*SEGMENTS_PER_ACCESSORY)
 
-            generate_accessory_timeline(accessory, users)
+            generate_multiple_timelines(accessory, users, segments)
 
-        self.stdout.write(
-            self.style.SUCCESS("Accessory history generation complete")
-        )
+            last_time = get_last_event_time(accessory) or timezone.now()
+            bulk_fake_events(accessory, users, last_time, FAKE_EVENTS_PER_ACCESSORY)
+
+        self.stdout.write( self.style.SUCCESS("Accessory history generation complete!") )
