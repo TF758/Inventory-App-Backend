@@ -3,6 +3,7 @@ import hashlib
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
+from db_inventory.models.base import PublicIDModel
 
 
 
@@ -51,3 +52,49 @@ class UserSession(models.Model):
     @staticmethod
     def hash_user_agent(ua: str) -> str:
         return hashlib.sha256((ua or "").encode()).hexdigest()
+    
+class Notification(PublicIDModel):
+   
+    PUBLIC_ID_PREFIX = "NTF"
+
+    class Level(models.TextChoices):
+        INFO = "info", "Info"
+        WARNING = "warning", "Warning"
+        CRITICAL = "critical", "Critical"
+
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications", )
+    type = models.CharField(max_length=100, help_text="Machine-readable notification type (e.g. asset_assigned)", )
+    level = models.CharField(max_length=20, choices=Level.choices, default=Level.INFO, db_index=True, help_text="Severity level of the notification", )
+    title = models.CharField( max_length=150, help_text="Short notification title", )
+    message = models.CharField( max_length=255, help_text="Human-readable message shown to the user", )
+    entity_type = models.CharField( max_length=100, null=True, blank=True, help_text="Model or domain type (e.g. asset)", )
+    entity_id = models.CharField( max_length=100, null=True, blank=True, help_text="Public ID of the related object", )
+    # State
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField( default=timezone.now, db_index=True, )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "is_read"]),
+            models.Index(fields=["recipient", "level"]),
+            models.Index(fields=["type"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def mark_as_read(self):
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=["is_read", "read_at"])
+
+    def __str__(self):
+        return (
+            f"{self.type} [{self.level}] → "
+            f"{self.recipient} ({'read' if self.is_read else 'unread'})"
+        )
