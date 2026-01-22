@@ -1,3 +1,4 @@
+from db_inventory.models.security import Notification
 from .permissions import filter_queryset_by_scope
 from db_inventory.models import AuditLog, Equipment, Accessory
 from django.db import transaction
@@ -424,3 +425,40 @@ class ListDetailSerializerMixin:
         if self.action == "list" and self.list_serializer_class:
             return self.list_serializer_class
         return super().get_serializer_class()
+
+class NotificationMixin:
+    """
+    Mixin to create user-facing notifications after successful DB commits.
+
+    """
+
+    def notify(
+        self,
+        *,
+        recipient,
+        notif_type,
+        title,
+        message,
+        level=Notification.Level.INFO,
+        entity=None,
+        actor=None,
+    ):
+        """
+        Schedule a notification after transaction commit.
+        """
+
+        if not recipient or recipient.is_anonymous:
+            return
+
+        def _create_notification():
+            Notification.objects.create(
+                recipient=recipient,
+                type=notif_type,
+                level=level,
+                title=title,
+                message=message,
+                entity_type=entity.__class__.__name__.lower() if entity else None,
+                entity_id=getattr(entity, "public_id", None),
+            )
+
+        transaction.on_commit(_create_notification)

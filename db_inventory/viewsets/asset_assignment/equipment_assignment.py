@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
-from db_inventory.mixins import AuditMixin
+from db_inventory.mixins import AuditMixin, NotificationMixin
 from db_inventory.serializers.assignment import AssignEquipmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer, EquipmentAssignmentSerializer
 from db_inventory.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
@@ -16,6 +16,7 @@ from rest_framework import mixins, viewsets, filters
 from db_inventory.filters import EquipmentAssignmentFilter
 
 from db_inventory.pagination import FlexiblePagination
+from db_inventory.models.security import Notification
 
 class EquipmentAssignmentViewSet(
     AuditMixin,
@@ -48,7 +49,7 @@ class EquipmentAssignmentViewSet(
         self.check_object_permissions(self.request, obj)
         return obj
 
-class AssignEquipmentView(AuditMixin, APIView):
+class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
     Assign an equipment to a user.
     Uses a single mutable EquipmentAssignment per equipment.
@@ -124,6 +125,19 @@ class AssignEquipmentView(AuditMixin, APIView):
                 },
             )
 
+            self.notify(
+                recipient=assignee,
+                notif_type=AuditLog.Events.ASSET_ASSIGNED,
+                level=Notification.Level.INFO,
+                title="Equipment assigned to you",
+                message=(
+                    f"{equipment.name} has been assigned to you "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
+
         return Response(
             {
                 "equipment": equipment.public_id,
@@ -135,10 +149,9 @@ class AssignEquipmentView(AuditMixin, APIView):
 
 
 
-class UnassignEquipmentView(AuditMixin, APIView):
+class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
     Unassign (return) an equipment from a user.
-    Uses a single mutable EquipmentAssignment per equipment.
     """
 
     permission_classes = [CanManageAssetCustody]
@@ -195,6 +208,18 @@ class UnassignEquipmentView(AuditMixin, APIView):
                 "notes": notes,
             },
         )
+            self.notify(
+                recipient=user,
+                notif_type=AuditLog.Events.ASSET_UNASSIGNED,
+                level=Notification.Level.WARNING,
+                title="Equipment returned",
+                message=(
+                    f"{equipment.name} has been unassigned from you "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
 
         return Response(
             {
@@ -296,6 +321,19 @@ class ReassignEquipmentView(AuditMixin, APIView):
                     "reassigned_to_email": to_user.email,
                     "notes": notes,
                 },
+            )
+
+            self.notify(
+                recipient=from_user,
+                notif_type=AuditLog.Events.ASSET_REASSIGNED,
+                level=Notification.Level.WARNING,
+                title="Equipment reassigned",
+                message=(
+                    f"{equipment.name} has been reassigned from you "
+                    f"to {to_user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
             )
 
         return Response(

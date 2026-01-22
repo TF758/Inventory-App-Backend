@@ -1,0 +1,7 @@
+
+ADMIN_ROLES = {
+    "ROOM_ADMIN",
+    "LOCATION_ADMIN",
+    "DEPARTMENT_ADMIN",
+    "SITE_ADMIN",
+}
