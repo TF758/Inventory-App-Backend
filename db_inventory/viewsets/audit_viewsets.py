@@ -48,15 +48,6 @@ class AuditLogViewSet(
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    User-facing notification inbox.
-
-    Guarantees:
-    - Users only see their own notifications
-    - INFO notifications may be auto-marked as read
-    - WARNING / CRITICAL require explicit acknowledgment
-    - Deletion is soft and level-aware
-    """
 
     serializer_class = NotificationSerializer
     pagination_class = FlexiblePagination
