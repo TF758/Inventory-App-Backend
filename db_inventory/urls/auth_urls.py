@@ -1,38 +1,30 @@
 from django.urls import path, include
-from db_inventory.views import *
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
 
+from db_inventory.viewsets import audit_viewsets
+from db_inventory.viewsets import auth_viewsets
 
 urlpatterns = [
-    # audfit logs
-    path("audit-logs/", audit_log_list, name="audit-log-list"),
-    path("audit-logs/<str:public_id>/", audit_log_detail, name="audit-log-detail"),
+    # --- Audit Logs ---
+    path( "audit-logs/", audit_viewsets.AuditLogViewSet.as_view({"get": "list"}), name="audit-log-list", ),
+    path( "audit-logs/<str:public_id>/", audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve"}), name="audit-log-detail", ),
+    # --- User Sessions ---
+    path( "sessions/revoke-all/", auth_viewsets.RevokeUserSessionsViewset.as_view({"post": "revoke_all"}), name="user-session-revoke-all", ),
 
-    # User Sessions ---
-    path('sessions/revoke-all/', user_session_revoke_all_view, name='user-session-revoke-all'),
+    # --- Lock / Unlock User Accounts ---
+    path( "users/<str:public_id>/lock/", auth_viewsets.UserLockViewSet.as_view({"post": "lock"}), name="user-lock", ),
+    path( "users/<str:public_id>/unlock/", auth_viewsets.UserLockViewSet.as_view({"post": "unlock"}), name="user-unlock", ),
 
-    # Lock/Unlock User Accounts
-    path('users/<str:public_id>/lock/', user_lock_view, name='user-lock'),
-    path('users/<str:public_id>/unlock/', user_unlock_view, name='user-unlock'),
+    # --- Admin Password Reset ---
+    path( "users/<str:user_public_id>/reset-password/", auth_viewsets.AdminResetUserPasswordView.as_view(), name="admin-reset-user-password", ),
 
-    # Admin triggers a password reset (temp password + optional email)
-    path(
-        'users/<str:user_public_id>/reset-password/',
-        admin_reset_user_password_view,
-        name='admin-reset-user-password'
-    ),
-    # rename site
-    path('site/rename/', site_rename_view, name='site-rename'),
+    # --- Site Admin ---
+    path( "site/rename/", auth_viewsets.SiteNameChangeAPIView.as_view(), name="site-rename", ),
+    path( "site/relocate/", auth_viewsets.SiteRelocationAPIView.as_view(), name="site-relocate", ),
 
-    path("site-name-changes/", site_name_chnage_list),
-    path("site-name-changes/<int:pk>/", site_name_chnage_detail),
-    # relocate site
-    path('site/relocate/', site_relocate_view, name='site-relocate'),
-    # update user demographics
-    path('users/<str:public_id>/update-profile/', admin_update_user_demographics, name='admin-update-user-profile')
+    # --- Site Name Change History ---
+    path( "site-name-changes/", auth_viewsets.SiteNameChangeListAPIView.as_view(), name="site-name-change-list", ),
+    path( "site-name-changes/<int:pk>/", auth_viewsets.SiteNameChangeDetailAPIView.as_view(), name="site-name-change-detail", ),
 
-
+    # --- Admin User Updates ---
+    path( "users/<str:public_id>/update-profile/", auth_viewsets.AdminUpdateUserView.as_view(), name="admin-update-user-profile", ),
 ]

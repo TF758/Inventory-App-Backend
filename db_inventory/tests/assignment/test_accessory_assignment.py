@@ -283,7 +283,7 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
 class TestAdminReturnAccessory(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.return_url = reverse("admin-return-accessory")
+        self.return_url = reverse("return-accessory")
 
     def test_admin_can_partially_return_accessory(self):
         dept = DepartmentFactory()
