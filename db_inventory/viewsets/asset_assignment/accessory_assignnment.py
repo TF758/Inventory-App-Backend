@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
-from db_inventory.mixins import AuditMixin
+from db_inventory.mixins import AuditMixin, NotificationMixin
 from db_inventory.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer,SelfReturnAccessorySerializer
 from db_inventory.permissions.assets import CanManageAssetCustody, CanSelfReturnAsset, CanUseAsset
 from rest_framework import mixins, viewsets, filters
@@ -17,6 +17,7 @@ from rest_framework.generics import GenericAPIView
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
 from db_inventory.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
+from db_inventory.models.security import Notification
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -40,7 +41,7 @@ class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
-class AssignAccessoryView(AuditMixin, APIView):
+class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
     permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
@@ -115,6 +116,18 @@ class AssignAccessoryView(AuditMixin, APIView):
                 },
             )
 
+            self.notify(
+            recipient=user,
+            notif_type=AuditLog.Events.ASSET_ASSIGNED,
+            level=Notification.Level.INFO,
+            title="Accessory assigned to you",
+            message=(
+                f"{quantity} unit(s) of {accessory.name} "
+                f"were assigned to you by {request.user.get_full_name()}"
+            ),
+            entity=accessory,
+        )
+
         return Response(
             {
                 "accessory": accessory.public_id,
@@ -125,7 +138,7 @@ class AssignAccessoryView(AuditMixin, APIView):
             status=status.HTTP_201_CREATED,
         )
 
-class AdminReturnAccessoryView(AuditMixin, APIView):
+class AdminReturnAccessoryView(AuditMixin,NotificationMixin, APIView):
     permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
@@ -191,6 +204,19 @@ class AdminReturnAccessoryView(AuditMixin, APIView):
                     "notes": notes,
                 },
             )
+
+            self.notify(
+                    recipient=assignment.user,
+                    notif_type=AuditLog.Events.ADMIN_RETURNED_ASSET,
+                    level=Notification.Level.WARNING,
+                    title="Accessory returned by admin",
+                    message=(
+                        f"{quantity} unit(s) of {accessory.name} "
+                        f"were returned by an administrator."
+                    ),
+                    entity=accessory,
+                    actor=request.user,
+                )
 
         return Response(status=status.HTTP_200_OK)
 

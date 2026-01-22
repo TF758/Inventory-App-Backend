@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from db_inventory.models.users import User, PasswordResetEvent
-from db_inventory.models.security import UserSession
+from db_inventory.models.security import Notification, UserSession
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory
 from django.contrib.auth import password_validation
 from django.conf import settings
@@ -271,3 +271,27 @@ class SiteNameChangeHistoryListSerializer(serializers.ModelSerializer):
             "user_email",
             "date",
         ]
+
+class NotificationSerializer(serializers.ModelSerializer):
+    entity = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            "public_id",
+            "type",
+            "level",
+            "title",
+            "message",
+            "entity",
+            "is_read",
+            "created_at",
+        ]
+
+    def get_entity(self, obj):
+        if not obj.entity_type or not obj.entity_id:
+            return None
+        return {
+            "type": obj.entity_type,
+            "id": obj.entity_id,
+        }

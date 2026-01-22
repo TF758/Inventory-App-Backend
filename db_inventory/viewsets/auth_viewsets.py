@@ -6,18 +6,18 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, User, AuditLog, Department, Location, Room, SiteNameChangeHistory, SiteRelocationHistory
-from db_inventory.serializers.auth import AuditLogSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
+from db_inventory.serializers.auth import ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter
 from db_inventory.filters import AuditLogFilter, SiteNameChangeHistoryFilter
-from db_inventory.mixins import AuditMixin, ListDetailSerializerMixin, ScopeFilterMixin
-from django.contrib.contenttypes.models import ContentType
+from db_inventory.mixins import AuditMixin, ListDetailSerializerMixin, NotificationMixin, ScopeFilterMixin
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
 from db_inventory.permissions.users import AdminUpdateUserPermission
 from db_inventory.utils.audit import create_audit_log
 from rest_framework.generics import ListAPIView, RetrieveAPIView
+from db_inventory.models.security import Notification
+from db_inventory.utils.viewset_helpers import get_users_affected_by_site
 
 class RevokeUserSessionsViewset(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
@@ -180,7 +180,7 @@ class SiteNameChangeDetailAPIView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = SiteNameChangeHistorySerializer   
 
-class SiteNameChangeAPIView(AuditMixin, APIView):
+class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
     """
     POST-only endpoint to rename a Department, Location, or Room.
 
@@ -256,6 +256,22 @@ class SiteNameChangeAPIView(AuditMixin, APIView):
                     "site_type": site_type,
                 },
             )
+        
+        affected_users = get_users_affected_by_site(obj)
+
+        for user in affected_users:
+            self.notify(
+                recipient=user,
+                notif_type=AuditLog.Events.SITE_RENAMED,
+                level=Notification.Level.INFO,
+                title="Site renamed",
+                message=(
+                    f"{site_type.capitalize()} '{old_name}' "
+                    f"has been renamed to '{new_name}'."
+                ),
+                entity=obj,
+                actor=request.user,
+            )
 
         return Response(
             {
@@ -269,7 +285,7 @@ class SiteNameChangeAPIView(AuditMixin, APIView):
         )
 
 
-class SiteRelocationAPIView(AuditMixin, APIView):
+class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
     """
     POST-only endpoint to relocate:
     - Location → Department
@@ -382,6 +398,24 @@ class SiteRelocationAPIView(AuditMixin, APIView):
 
                     "reason": reason,
                 },
+            )
+        
+        
+        affected_users = get_users_affected_by_site(obj)
+
+        for user in affected_users:
+            self.notify(
+                recipient=user,
+                notif_type=AuditLog.Events.SITE_RELOCATED,
+                level=Notification.Level.CRITICAL,
+                title="Site relocated",
+                message=(
+                    f"{site_type.capitalize()} '{obj.name}' was moved "
+                    f"from '{from_parent.name if from_parent else 'N/A'}' "
+                    f"to '{target.name}'."
+                ),
+                entity=obj,
+                actor=request.user,
             )
 
         return Response(

@@ -3,7 +3,7 @@ from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from db_inventory.mixins import AuditMixin
+from db_inventory.mixins import AuditMixin, NotificationMixin
 from db_inventory.models.asset_assignment import ConsumableEvent, ConsumableIssue
 from db_inventory.models.assets import Consumable
 from db_inventory.models.audit import AuditLog
@@ -13,6 +13,8 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets, filters
 from db_inventory.pagination import FlexiblePagination
+from db_inventory.models.security import Notification
+from db_inventory.utils.viewset_helpers import get_admins_responsible_for_room, get_current_room_for_user, get_site_admins
 
 
 class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -38,7 +40,7 @@ class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             )
         )
 
-class IssueConsumableView(AuditMixin, APIView):
+class IssueConsumableView(AuditMixin, NotificationMixin, APIView):
     permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
@@ -128,6 +130,19 @@ class IssueConsumableView(AuditMixin, APIView):
                 },
             )
 
+            self.notify(
+                recipient=user,
+                notif_type=AuditLog.Events.CONSUMABLE_ISSUED,
+                level=Notification.Level.INFO,
+                title="Consumable issued to you",
+                message=(
+                    f"{quantity} unit(s) of {consumable.name} "
+                    f"were issued to you by {request.user.get_full_name()}."
+                ),
+                entity=consumable,
+                actor=request.user,
+            )
+
         return Response(
             status=status.HTTP_200_OK,
         )
@@ -196,7 +211,7 @@ class UseConsumableView(AuditMixin, APIView):
             status=status.HTTP_200_OK,
         )
 
-class ReturnConsumableView(AuditMixin, APIView):
+class AdminReturnConsumableView(AuditMixin,NotificationMixin, APIView):
     permission_classes = [CanManageAssetCustody]
 
     def post(self, request):
@@ -273,6 +288,19 @@ class ReturnConsumableView(AuditMixin, APIView):
                     "issue_id": issue.id,
                     "notes": notes,
                 },
+            )
+
+            self.notify(
+                recipient=issue.user,
+                notif_type=AuditLog.Events.CONSUMABLE_RETURNED,
+                level=Notification.Level.WARNING,
+                title="Consumable returned by admin",
+                message=(
+                    f"{quantity} unit(s) of {consumable.name} "
+                    f"were returned by an administrator."
+                ),
+                entity=consumable,
+                actor=request.user,
             )
 
         return Response(status=status.HTTP_200_OK,)
@@ -366,6 +394,36 @@ class ReportConsumableLossView(AuditMixin, APIView):
                     "notes": notes,
                 }
             )
+
+            is_self_report = issue and request.user == issue.user
+
+            if is_self_report:
+                user_location = get_current_room_for_user(issue.user)
+
+                admins = (
+                    get_admins_responsible_for_room(user_location.room)
+                    if user_location and user_location.room
+                    else get_site_admins()
+                )
+
+                for admin in admins:
+                    self.notify(
+                        recipient=admin,
+                        notif_type=AuditLog.Events.CONSUMABLE_LOSS_REPORTED,
+                        level=Notification.Level.CRITICAL,
+                        title="Consumable loss reported",
+                        message=(
+                            f"{issue.user.email} reported {event_type.upper()} "
+                            f"of {quantity} unit(s) of {consumable.name}"
+                            + (
+                                f" in room {user_location.room.name}."
+                                if user_location and user_location.room
+                                else "."
+                            )
+                        ),
+                        entity=consumable,
+                        actor=request.user,
+                    )
 
         return Response(status=status.HTTP_200_OK)
 
