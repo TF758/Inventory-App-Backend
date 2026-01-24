@@ -41,7 +41,8 @@ env_file = BASE_DIR / f".env.{ENV}"
 if env_file.exists():
     environ.Env.read_env(env_file=env_file)
 else:
-    raise RuntimeError(f"Missing env file: {env_file}")
+    print(f"Warning: env file not found: {env_file}")
+
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-secret")
 
 
@@ -267,12 +268,17 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-    raise ValueError("EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in environment variables")
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER or "no-reply@localhost"
+
+if not DEBUG:
+    if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+        raise ValueError(
+            "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in production"
+        )
 
 # ----------------------------------------
 # Cookie / Security Settings
@@ -281,19 +287,18 @@ if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
 # Detect test mode
 IS_TESTING = "test" in sys.argv
 
-
 if DEBUG or IS_TESTING:
-    # Local dev + tests (HTTPS dev server)
-    COOKIE_SECURE = True
-    COOKIE_SAMESITE = "None"
+    # Local dev + tests (HTTP, Docker-friendly)
+    COOKIE_SECURE = False
+    COOKIE_SAMESITE = "Lax"
 
-    CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
 
-    # Do NOT force redirect in dev
+    # Do NOT force HTTPS redirect in dev
     SECURE_SSL_REDIRECT = False
 else:
-    # Production
+    # Production (HTTPS only)
     COOKIE_SECURE = True
     COOKIE_SAMESITE = "None"
 
@@ -302,10 +307,13 @@ else:
 
     SECURE_SSL_REDIRECT = True
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://localhost:5173",
-    "https://127.0.0.1:5173",
-]
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ],
+)
 
 
 try:
@@ -316,3 +324,6 @@ except KeyError as e:
 
 SESSION_IDLE_TIMEOUT = timedelta(minutes=SESSION_IDLE_MINUTES)
 SESSION_ABSOLUTE_LIFETIME = timedelta(days=SESSION_ABSOLUTE_DAYS)
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
