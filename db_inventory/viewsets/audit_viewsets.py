@@ -94,7 +94,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({"marked_read": updated})
 
     # -------------------------------------------------
-    # Explicit read / acknowledge (single notification)
+    #  acknowledge (single notification)
     # -------------------------------------------------
 
     @action(detail=True, methods=["post"], url_path="read")
@@ -134,7 +134,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         ):
             return Response(
                 {"detail": "Notification must be acknowledged before deletion."},
-                status=status.HTTP_403_FORBIDDEN,
+                status=status.HTTP_409_CONFLICT,
             )
 
         notification.is_deleted = True
