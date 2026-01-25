@@ -305,7 +305,7 @@ class AdminReturnConsumableView(AuditMixin,NotificationMixin, APIView):
 
         return Response(status=status.HTTP_200_OK,)
     
-class ReportConsumableLossView(AuditMixin, APIView):
+class ReportConsumableLossView(AuditMixin, NotificationMixin, APIView):
     permission_classes = [CanReportConsumableLoss]
 
     ALLOWED_EVENT_TYPES = {

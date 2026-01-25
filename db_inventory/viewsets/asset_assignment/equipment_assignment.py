@@ -231,7 +231,7 @@ class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
         )
 
 
-class ReassignEquipmentView(AuditMixin, APIView):
+class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
     Reassign equipment from one user to another.
     Uses a single mutable EquipmentAssignment per equipment.
@@ -323,6 +323,7 @@ class ReassignEquipmentView(AuditMixin, APIView):
                 },
             )
 
+            # notify users
             self.notify(
                 recipient=from_user,
                 notif_type=AuditLog.Events.ASSET_REASSIGNED,
@@ -330,7 +331,22 @@ class ReassignEquipmentView(AuditMixin, APIView):
                 title="Equipment reassigned",
                 message=(
                     f"{equipment.name} has been reassigned from you "
-                    f"to {to_user.get_full_name()}."
+                    f"to {to_user.get_full_name()} "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
+
+
+            self.notify(
+                recipient=to_user,
+                notif_type=AuditLog.Events.ASSET_ASSIGNED,
+                level=Notification.Level.INFO,
+                title="Equipment assigned to you",
+                message=(
+                    f"{equipment.name} has been assigned to you "
+                    f"by {request.user.get_full_name()}."
                 ),
                 entity=equipment,
                 actor=request.user,
