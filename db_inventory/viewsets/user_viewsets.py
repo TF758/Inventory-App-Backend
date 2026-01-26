@@ -8,7 +8,7 @@ from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.site import UserLocation, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import UserFilter, UserLocationFilter
+from db_inventory.filters import  UserFilter, UserLocationFilter
 from db_inventory.mixins import ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
@@ -16,15 +16,17 @@ from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 from db_inventory.mixins import AuditMixin
-from db_inventory.permissions.helpers import is_viewer_role, ensure_permission
+from db_inventory.permissions.helpers import ensure_permission
 from django.db.models import Count, Q
-from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 
+
 from db_inventory.permissions.users import CanViewUserProfile
+from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
