@@ -1,5 +1,7 @@
 from django.urls import path, include
 
+
+
 from .viewsets import *
 
 from .views import *
@@ -17,7 +19,8 @@ urlpatterns = [
     path('login/',api_login_view, name='login'),
     path('logout/',api_logout, name='logout'),
     path('refresh/', api_token_refresh, name='session_refresh'),
-
+    path( "profiles/me/", SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile", ),
+    path( "profiles/me/equipment/", SelfAssignedEquipmentViewSet.as_view({"get": "list"}), name="self-user-equipment", ),
     path('users/create-full/', create_full_user_view, name='create-full-user'),
     path('users/', user_list_create_view, name='users'),
     path('users/<str:public_id>/',user_id_detail_view, name='user-detail'),

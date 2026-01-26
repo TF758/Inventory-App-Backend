@@ -6,3 +6,4 @@ from .assets import *
 from .user_viewsets import *
 from .role_viewsets import *
 from .general_viewsets import *
+from .self_viewsets import *
