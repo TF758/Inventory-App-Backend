@@ -2,6 +2,8 @@
 from db_inventory.models.users import User
 from rest_framework import serializers
 
+from db_inventory.models.asset_assignment import AccessoryAssignment
+
 
 class SelfUserProfileSerializer(serializers.ModelSerializer):
     equipment_count = serializers.IntegerField(read_only=True)
@@ -109,3 +111,20 @@ class SelfAssignedEquipmentSerializer(serializers.Serializer):
             "public_id": room.public_id,
             "name": room.name,
         }
+
+class SelfAccessoryAssignmentSerializer(serializers.ModelSerializer):
+    accessory_public_id = serializers.CharField( source="accessory.public_id", read_only=True, )
+    accessory_name = serializers.CharField( source="accessory.name", read_only=True, )
+    room_name = serializers.CharField( source="accessory.room.name", read_only=True, )
+    room_public_id = serializers.CharField( source="accessory.room.public_id", read_only=True, )
+
+    class Meta:
+        model = AccessoryAssignment
+        fields = (
+            "accessory_public_id",
+            "accessory_name",
+            "quantity",
+            "assigned_at",
+            "room_name",
+            "room_public_id",
+        )

@@ -1,4 +1,4 @@
-from db_inventory.serializers.self import  SelfUserProfileSerializer
+from db_inventory.serializers.self import  SelfAccessoryAssignmentSerializer, SelfUserProfileSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import EquipmentAssignmentFilter
 from db_inventory.pagination import FlexiblePagination
@@ -7,7 +7,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import ListModelMixin
-from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryAssignment, EquipmentAssignment
 from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 from db_inventory.models.users import User
 
@@ -84,3 +84,31 @@ class SelfAssignedEquipmentViewSet(ListModelMixin, GenericViewSet):
         )
         .order_by("-assigned_at")
     )
+
+
+class SelfAccessoryViewSet(ListModelMixin, GenericViewSet):
+    """
+    List accessories currently assigned to the logged-in user.
+    Self-scope only.
+    """
+
+    serializer_class = SelfAccessoryAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = FlexiblePagination
+    # filterset_class = EquipmentAssignmentFilter 
+
+    def get_queryset(self):
+        return (
+            AccessoryAssignment.objects
+            .filter(
+                user=self.request.user,
+                returned_at__isnull=True,
+                quantity__gt=0,
+            )
+            .select_related(
+                "accessory",
+                "accessory__room",
+                "accessory__room__location",
+            )
+            .order_by("-assigned_at")
+        )
