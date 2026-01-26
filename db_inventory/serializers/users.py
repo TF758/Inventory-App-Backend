@@ -187,10 +187,42 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
         validated_data.pop('user_id', None)
         validated_data.pop('room_id', None)
         return super().update(instance, validated_data)
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    equipment_count = serializers.IntegerField(read_only=True)
+    accessory_count = serializers.IntegerField(read_only=True)
+    consumable_count = serializers.IntegerField(read_only=True)
+    current_role = serializers.SerializerMethodField()
+
+
+    class Meta:
+        model = User
+        fields = (
+            "public_id",
+            "email",
+            "fname",
+            "lname",
+            "job_title",
+            "current_role",
+            'last_login',
+            'is_active',
+            "equipment_count",
+            "accessory_count",
+            "consumable_count",
+        )
+    def get_current_role(self, obj):
+        return obj.get_active_role_public_id()
+
 
 __all__ = [
     "UserWriteSerializer",
     "UserReadSerializerFull",
     "UserAreaSerializer",
-    "UserLocationWriteSerializer"
+    "UserLocationWriteSerializer",
+    'UserProfileSerializer',
 ]

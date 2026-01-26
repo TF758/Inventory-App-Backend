@@ -297,3 +297,30 @@ class AdminUpdateUserPermission(BasePermission):
             return False
 
         return is_user_in_scope(role, obj)
+
+class CanViewUserProfile(BasePermission):
+    """
+    Permission to view a user profile.
+    """
+
+    def has_permission(self, request, view):
+        """
+        """
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+
+        requester = request.user
+        target_user = obj
+
+        if requester == target_user:
+            return True
+
+        active_role = getattr(requester, "active_role", None)
+        if not active_role:
+            return False
+
+        if active_role.role == "SITE_ADMIN":
+            return True
+
+        return is_user_in_scope(admin_role=active_role, target_user=target_user, )
