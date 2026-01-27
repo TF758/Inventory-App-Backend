@@ -3,7 +3,8 @@ from typing import Optional
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
 from db_inventory.models import *
-from .constants import ROLE_HIERARCHY
+from db_inventory.models.assets import EquipmentStatus
+from .constants import OWNER_ALLOWED_STATUSES, ROLE_HIERARCHY
 
 
 def can_modify(user_role: str, target_role: str) -> bool:
@@ -421,3 +422,27 @@ def can_assign_asset_to_user(
         ).exists()
 
     return False
+
+def can_change_equipment_status(user, equipment, new_status):
+    active_role = getattr(user, "active_role", None)
+    if not active_role:
+        return False
+
+    # SITE_ADMIN
+    if active_role.role == "SITE_ADMIN":
+        return True
+
+    # Owner rule
+    if equipment.current_holder == user:
+        return new_status in {
+            EquipmentStatus.OK,
+            EquipmentStatus.DAMAGED,
+            EquipmentStatus.UNDER_REPAIR,
+        }
+    print("In scope")
+
+    # Admin / clerk rule
+    return (
+        has_hierarchy_permission(active_role.role, "ROOM_CLERK")
+        and is_in_scope(active_role, room=equipment.room)
+    )
