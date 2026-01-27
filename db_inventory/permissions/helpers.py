@@ -236,13 +236,63 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         elif active_role.department:
             q |= Q(department=active_role.department)
 
-    elif model_class in (Equipment, Accessory, Consumable):
+    # elif model_class in (Equipment, Accessory, Consumable):
+    #     if active_role.room:
+    #         q |= Q(room=active_role.room)
+    #     elif active_role.location:
+    #         q |= Q(room__location=active_role.location)
+    #     elif active_role.department:
+    #         q |= Q(room__location__department=active_role.department)
+
+    elif model_class == Equipment:
+        scope_q = Q()
+        assignment_q = Q(
+            active_assignment__user=user,
+            active_assignment__returned_at__isnull=True,
+        )
+
         if active_role.room:
-            q |= Q(room=active_role.room)
+            scope_q |= Q(room=active_role.room)
         elif active_role.location:
-            q |= Q(room__location=active_role.location)
+            scope_q |= Q(room__location=active_role.location)
         elif active_role.department:
-            q |= Q(room__location__department=active_role.department)
+            scope_q |= Q(room__location__department=active_role.department)
+
+        q |= scope_q | assignment_q
+
+    elif model_class == Accessory:
+        scope_q = Q()
+        assignment_q = Q(
+            assignments__user=user,
+            assignments__returned_at__isnull=True,
+            assignments__quantity__gt=0,
+        )
+
+        if active_role.room:
+            scope_q |= Q(room=active_role.room)
+        elif active_role.location:
+            scope_q |= Q(room__location=active_role.location)
+        elif active_role.department:
+            scope_q |= Q(room__location__department=active_role.department)
+
+        q |= scope_q | assignment_q
+
+    elif model_class == Consumable:
+        scope_q = Q()
+        assignment_q = Q(
+            issues__user=user,
+            issues__returned_at__isnull=True,
+            issues__quantity__gt=0,
+        )
+
+        if active_role.room:
+            scope_q |= Q(room=active_role.room)
+        elif active_role.location:
+            scope_q |= Q(room__location=active_role.location)
+        elif active_role.department:
+            scope_q |= Q(room__location__department=active_role.department)
+
+        q |= scope_q | assignment_q
 
     elif model_class == Component:
         if active_role.room:

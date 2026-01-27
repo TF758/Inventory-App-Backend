@@ -2,7 +2,7 @@
 from db_inventory.models.users import User
 from rest_framework import serializers
 
-from db_inventory.models.asset_assignment import AccessoryAssignment
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 
 class SelfUserProfileSerializer(serializers.ModelSerializer):
@@ -127,4 +127,21 @@ class SelfAccessoryAssignmentSerializer(serializers.ModelSerializer):
             "assigned_at",
             "room_name",
             "room_public_id",
+        )
+
+class SelfConsumableIssueSerializer(serializers.ModelSerializer):
+    public_id = serializers.CharField( source="consumable.public_id", read_only=True, )
+    name = serializers.CharField( source="consumable.name", read_only=True, )
+    room_name = serializers.CharField( source="consumable.room.name", read_only=True, )
+    room_public_id = serializers.CharField( source="consumable.room.public_id", read_only=True, )
+    class Meta:
+        model = ConsumableIssue
+        fields = (
+            "public_id",
+            "name",
+            "quantity",        # ← remaining quantity (important)
+            "assigned_at",
+            "room_name",
+            "room_public_id",
+            "purpose",         # optional but useful context
         )

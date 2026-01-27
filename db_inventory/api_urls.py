@@ -44,7 +44,8 @@ urlpatterns = [
     path('unallocated-users/', user_viewsets.UnallocatedUserViewSet.as_view({'get': 'list'}), name='unallocated-user-list'),
     path( "profiles/me/", SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile", ),
     path( "profiles/me/equipment/", SelfAssignedEquipmentViewSet.as_view({"get": "list"}), name="self-user-equipment", ),
-     path( "profiles/me/accessories/", SelfAccessoryViewSet.as_view({"get": "list"}), name="self-user-accessories", ),
+    path( "profiles/me/accessories/", SelfAccessoryViewSet.as_view({"get": "list"}), name="self-user-accessories", ),
+    path( "profiles/me/consumables/", SelfConsumableViewSet.as_view({"get": "list"}), name="self-user-consumables", ),
     path('users/profile/<str:public_id>/',UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
 
 
