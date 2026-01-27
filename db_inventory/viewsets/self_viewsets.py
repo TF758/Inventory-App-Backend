@@ -1,4 +1,4 @@
-from db_inventory.serializers.self import  SelfAccessoryAssignmentSerializer, SelfUserProfileSerializer
+from db_inventory.serializers.self import  SelfAccessoryAssignmentSerializer, SelfConsumableIssueSerializer, SelfUserProfileSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import EquipmentAssignmentFilter
 from db_inventory.pagination import FlexiblePagination
@@ -7,7 +7,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import ListModelMixin
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryAssignment, EquipmentAssignment
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 from db_inventory.models.users import User
 
@@ -109,6 +109,31 @@ class SelfAccessoryViewSet(ListModelMixin, GenericViewSet):
                 "accessory",
                 "accessory__room",
                 "accessory__room__location",
+            )
+            .order_by("-assigned_at")
+        )
+
+class SelfConsumableViewSet(ListModelMixin, GenericViewSet):
+    """
+    List consumables currently issued to the logged-in user.
+    """
+
+    serializer_class = SelfConsumableIssueSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        return (
+            ConsumableIssue.objects
+            .filter(
+                user=self.request.user,
+                returned_at__isnull=True,
+                quantity__gt=0,
+            )
+            .select_related(
+                "consumable",
+                "consumable__room",
+                "consumable__room__location",
             )
             .order_by("-assigned_at")
         )
