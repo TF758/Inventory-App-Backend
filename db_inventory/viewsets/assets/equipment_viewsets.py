@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from db_inventory.utils.asset_helpers import equipment_event_from_status
 from db_inventory.utils.audit import create_audit_log
+from db_inventory.permissions.helpers import can_change_equipment_status
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -156,6 +157,12 @@ class EquipmentStatusChangeView(APIView):
             return Response(
                 {"detail": "Status is already set to this value."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if not can_change_equipment_status(request.user, equipment, new_status):
+            return Response(
+                {"detail": "You are not allowed to set this status."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         with transaction.atomic():

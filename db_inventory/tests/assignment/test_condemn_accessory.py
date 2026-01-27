@@ -4,8 +4,6 @@ from rest_framework.test import APIClient
 from django.urls import reverse
 
 from db_inventory.factories import (
-    DepartmentFactory,
-    LocationFactory,
     RoomFactory,
     UserFactory,
     UserLocationFactory,
@@ -13,33 +11,20 @@ from db_inventory.factories import (
 )
 from db_inventory.models import AccessoryAssignment
 from db_inventory.models.roles import RoleAssignment
+from db_inventory.tests.utils.assignments_test_bases import CondemnAccessoryTestBase
 
 
-class TestCondemnAccessory(TestCase):
+class TestCondemnAccessory(CondemnAccessoryTestBase):
+
     def setUp(self):
-        self.client = APIClient()
-        self.condemn_url = reverse("condemn-accessory")
+        super().setUp()
+        self.authenticate_admin()
 
     def test_admin_can_condemn_available_accessories(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         accessory = AccessoryFactory(
-            room=room,
+            room=self.room,
             quantity=10,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.condemn_url,
@@ -56,38 +41,18 @@ class TestCondemnAccessory(TestCase):
         accessory.refresh_from_db()
         self.assertEqual(accessory.quantity, 6)
 
-
     def test_cannot_condemn_more_than_available_quantity(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
-        accessory = AccessoryFactory(
-            room=room,
-            quantity=5,
-        )
-
-        # Assign all stock
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
         AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=5,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.condemn_url,
@@ -104,39 +69,18 @@ class TestCondemnAccessory(TestCase):
         accessory.refresh_from_db()
         self.assertEqual(accessory.quantity, 5)
 
-    
     def test_cannot_condemn_beyond_available_when_partially_assigned(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
-        accessory = AccessoryFactory(
-            room=room,
-            quantity=10,
-        )
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
         AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=7,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        # available_quantity = 3
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.condemn_url,
@@ -152,19 +96,13 @@ class TestCondemnAccessory(TestCase):
         accessory.refresh_from_db()
         self.assertEqual(accessory.quantity, 10)
 
-    
     def test_non_admin_cannot_condemn_accessory(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
+        self.client.force_authenticate(user=None)
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(
-            room=room,
-            quantity=5,
-        )
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
         self.client.force_authenticate(user)
 
@@ -183,18 +121,7 @@ class TestCondemnAccessory(TestCase):
         self.assertEqual(accessory.quantity, 5)
 
     def test_cannot_condemn_zero_quantity(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(user=admin, role="ROOM_ADMIN", room=room)
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
-        accessory = AccessoryFactory(room=room, quantity=5)
-
-        self.client.force_authenticate(admin)
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
         response = self.client.post(
             self.condemn_url,
@@ -206,24 +133,13 @@ class TestCondemnAccessory(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
         accessory.refresh_from_db()
         self.assertEqual(accessory.quantity, 5)
 
     def test_admin_cannot_condemn_accessory_outside_scope(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-
-        room_a = RoomFactory(location=loc)
-        room_b = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(user=admin, role="ROOM_ADMIN", room=room_a)
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
-        accessory = AccessoryFactory(room=room_b, quantity=5)
-
-        self.client.force_authenticate(admin)
+        other_room = RoomFactory(location=self.location)
+        accessory = AccessoryFactory(room=other_room, quantity=5)
 
         response = self.client.post(
             self.condemn_url,

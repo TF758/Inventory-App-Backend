@@ -13,36 +13,19 @@ from db_inventory.factories import (
 )
 from db_inventory.models import AccessoryAssignment
 from db_inventory.models.roles import RoleAssignment
+from db_inventory.tests.utils.assignments_test_bases import AccessoryAssignmentTestBase
 
 
-class AccessoryAssignmentAPITestCase(TestCase):
+class TestAssignAccessory(AccessoryAssignmentTestBase):
+
     def setUp(self):
-        self.client = APIClient()
-        self.assign_url = reverse("assign-accessory")
-
-
-class TestAssignAccessory(AccessoryAssignmentAPITestCase):
+        self.authenticate_admin()
 
     def test_room_admin_can_assign_accessory_to_user_in_same_room(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=room)
+        UserLocationFactory(user=assignee, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=10)
-
-        self.client.force_authenticate(admin)
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         response = self.client.post(
             self.assign_url,
@@ -66,34 +49,20 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
             returned_at__isnull=True,
         )
         self.assertEqual(assignment.quantity, 3)
+
     def test_assigning_again_to_same_user_aggregates_quantity(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=10)
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         # First assignment
         AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=3,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.assign_url,
@@ -119,27 +88,12 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
         self.assertEqual(accessory.available_quantity, 5)
 
     def test_room_admin_cannot_assign_to_user_outside_room(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-
-        room_a = RoomFactory(location=loc)
-        room_b = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room_a,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
+        other_room = RoomFactory(location=self.location)
 
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=room_b)
+        UserLocationFactory(user=assignee, room=other_room)
 
-        accessory = AccessoryFactory(room=room_a, quantity=5)
-
-        self.client.force_authenticate(admin)
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
         response = self.client.post(
             self.assign_url,
@@ -152,34 +106,27 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-
         self.assertFalse(
-            AccessoryAssignment.objects.filter(accessory=accessory).exists())
-        
-    def test_location_admin_cannot_assign_accessory_outside_location(self):
-        dept = DepartmentFactory()
-
-        loc_a = LocationFactory(department=dept)
-        loc_b = LocationFactory(department=dept)
-
-        room_a = RoomFactory(location=loc_a)
-        room_b = RoomFactory(location=loc_b)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="LOCATION_ADMIN",
-            location=loc_b,
+            AccessoryAssignment.objects.filter(accessory=accessory).exists()
         )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
+
+    def test_location_admin_cannot_assign_accessory_outside_location(self):
+        other_location = LocationFactory(department=self.department)
+        other_room = RoomFactory(location=other_location)
+
+        # Switch admin role to LOCATION_ADMIN
+        role = RoleAssignment.objects.create(
+            user=self.admin,
+            role="LOCATION_ADMIN",
+            location=other_location,
+        )
+        self.admin.active_role = role
+        self.admin.save()
 
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=room_b)
+        UserLocationFactory(user=assignee, room=other_room)
 
-        accessory = AccessoryFactory(room=room_a, quantity=5)
-
-        self.client.force_authenticate(admin)
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
         response = self.client.post(
             self.assign_url,
@@ -192,35 +139,20 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
         )
 
         self.assertEqual(response.status_code, 403)
-    
+
     def test_assign_fails_if_quantity_exceeds_available(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=5)
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
         # Existing assignment consumes 4
         AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=4,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.assign_url,
@@ -236,36 +168,29 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
 
         accessory.refresh_from_db()
         self.assertEqual(accessory.available_quantity, 1)
-    
+
     def test_assignment_fails_if_accessory_moved_out_of_scope(self):
-        dept_a = DepartmentFactory()
-        dept_b = DepartmentFactory()
+        other_department = DepartmentFactory()
+        other_location = LocationFactory(department=other_department)
+        other_room = RoomFactory(location=other_location)
 
-        loc_a = LocationFactory(department=dept_a)
-        loc_b = LocationFactory(department=dept_b)
-
-        room_a = RoomFactory(location=loc_a)
-        room_b = RoomFactory(location=loc_b)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
+        # Switch admin role to LOCATION_ADMIN of original location
+        role = RoleAssignment.objects.create(
+            user=self.admin,
             role="LOCATION_ADMIN",
-            location=loc_a,
+            location=self.location,
         )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
+        self.admin.active_role = role
+        self.admin.save()
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=room_a)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room_a, quantity=5)
+        accessory = AccessoryFactory(room=self.room, quantity=5)
 
         # Simulate relocation before assignment
-        accessory.room = room_b
-        accessory.save()
-
-        self.client.force_authenticate(admin)
+        accessory.room = other_room
+        accessory.save(update_fields=["room"])
 
         response = self.client.post(
             self.assign_url,
@@ -279,39 +204,23 @@ class TestAssignAccessory(AccessoryAssignmentAPITestCase):
 
         self.assertEqual(response.status_code, 403)
 
+class TestAdminReturnAccessory(AccessoryAssignmentTestBase):
 
-class TestAdminReturnAccessory(TestCase):
     def setUp(self):
-        self.client = APIClient()
-        self.return_url = reverse("return-accessory")
+        self.authenticate_admin()
 
     def test_admin_can_partially_return_accessory(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=10)
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         assignment = AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=5,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.return_url,
@@ -333,32 +242,17 @@ class TestAdminReturnAccessory(TestCase):
         self.assertEqual(accessory.available_quantity, 7)
 
     def test_admin_can_fully_return_accessory(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=10)
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         assignment = AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=4,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.return_url,
@@ -379,32 +273,17 @@ class TestAdminReturnAccessory(TestCase):
         self.assertEqual(accessory.available_quantity, 10)
 
     def test_admin_cannot_return_more_than_assigned(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=10)
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         assignment = AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=3,
-            assigned_by=admin,
+            assigned_by=self.admin,
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.return_url,
@@ -419,35 +298,20 @@ class TestAdminReturnAccessory(TestCase):
 
         assignment.refresh_from_db()
         self.assertEqual(assignment.quantity, 3)
-    
+
     def test_admin_cannot_return_closed_assignment(self):
-        dept = DepartmentFactory()
-        loc = LocationFactory(department=dept)
-        room = RoomFactory(location=loc)
-
-        admin = UserFactory()
-        RoleAssignment.objects.create(
-            user=admin,
-            role="ROOM_ADMIN",
-            room=room,
-        )
-        admin.active_role = admin.role_assignments.first()
-        admin.save()
-
         user = UserFactory()
-        UserLocationFactory(user=user, room=room)
+        UserLocationFactory(user=user, room=self.room)
 
-        accessory = AccessoryFactory(room=room, quantity=10)
+        accessory = AccessoryFactory(room=self.room, quantity=10)
 
         assignment = AccessoryAssignment.objects.create(
             accessory=accessory,
             user=user,
             quantity=0,
-            assigned_by=admin,
+            assigned_by=self.admin,
             returned_at=timezone.now(),
         )
-
-        self.client.force_authenticate(admin)
 
         response = self.client.post(
             self.return_url,

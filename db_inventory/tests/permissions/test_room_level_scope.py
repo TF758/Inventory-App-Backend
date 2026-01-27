@@ -5,7 +5,6 @@ from db_inventory.models import User, Room, Location, Department, RoleAssignment
 from db_inventory.permissions.helpers import is_in_scope, check_permission, ensure_permission
 from django.test import TestCase
 from rest_framework.exceptions import PermissionDenied
-
 class RoomAdminScopeTests(TestCase):
     """
     Test Room-level role permissions:
@@ -14,34 +13,39 @@ class RoomAdminScopeTests(TestCase):
       - SITE_ADMIN bypass
     """
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         # Departments
-        self.dept1 = DepartmentFactory(name="Chemistry")
-        self.dept2 = DepartmentFactory(name="Biology")
+        cls.dept1 = DepartmentFactory(name="Chemistry")
+        cls.dept2 = DepartmentFactory(name="Biology")
 
         # Locations
-        self.loc1 = LocationFactory(name="Building A", department=self.dept1)
-        self.loc2 = LocationFactory(name="Building B", department=self.dept2)
+        cls.loc1 = LocationFactory(name="Building A", department=cls.dept1)
+        cls.loc2 = LocationFactory(name="Building B", department=cls.dept2)
 
         # Rooms
-        self.room1 = RoomFactory(name="Lab 101", location=self.loc1)
-        self.room2 = RoomFactory(name="Lab 202", location=self.loc2)
+        cls.room1 = RoomFactory(name="Lab 101", location=cls.loc1)
+        cls.room2 = RoomFactory(name="Lab 202", location=cls.loc2)
 
         # Users
-        self.user = UserFactory()
-        self.admin_user = AdminUserFactory()
+        cls.user = UserFactory()
+        cls.admin_user = AdminUserFactory()
 
         # Site admin role
-        self.site_admin_role = RoleAssignment.objects.create(
-            user=self.admin_user, role="SITE_ADMIN"
+        cls.site_admin_role = RoleAssignment.objects.create(
+            user=cls.admin_user,
+            role="SITE_ADMIN",
         )
-        self.admin_user.active_role = self.site_admin_role
-        self.site_admin_role.save()
+        cls.admin_user.active_role = cls.site_admin_role
+        cls.admin_user.save()
 
     # --- ROOM_ADMIN tests ---
     def test_room_admin_access_own_room(self):
-        """ROOM_ADMIN can access their assigned room"""
-        role = RoleAssignment.objects.create(user=self.user, role="ROOM_ADMIN", room=self.room1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="ROOM_ADMIN",
+            room=self.room1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -49,8 +53,11 @@ class RoomAdminScopeTests(TestCase):
         self.assertTrue(is_in_scope(role, room=self.room1))
 
     def test_room_admin_cannot_access_other_room(self):
-        """ROOM_ADMIN cannot access rooms outside their location"""
-        role = RoleAssignment.objects.create(user=self.user, role="ROOM_ADMIN",  room=self.room1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="ROOM_ADMIN",
+            room=self.room1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -58,30 +65,33 @@ class RoomAdminScopeTests(TestCase):
         self.assertFalse(is_in_scope(role, room=self.room2))
 
     def test_site_admin_bypass_room_scope(self):
-        """SITE_ADMIN can access any room"""
         self.assertTrue(check_permission(self.admin_user, "ROOM_ADMIN", room=self.room1))
         self.assertTrue(check_permission(self.admin_user, "ROOM_ADMIN", room=self.room2))
         self.assertTrue(is_in_scope(self.site_admin_role, room=self.room1))
         self.assertTrue(is_in_scope(self.site_admin_role, room=self.room2))
 
     def test_missing_active_role_denied_room(self):
-        """User without active role cannot access rooms"""
         self.assertFalse(check_permission(self.user, "ROOM_ADMIN", room=self.room1))
 
     def test_ensure_permission_raises_for_out_of_scope_room(self):
-        """ensure_permission should raise PermissionDenied if room out of scope"""
-        role = RoleAssignment.objects.create(user=self.user, role="ROOM_ADMIN",  room=self.room1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="ROOM_ADMIN",
+            room=self.room1,
+        )
         self.user.active_role = role
         self.user.save()
 
         with self.assertRaises(PermissionDenied):
             ensure_permission(self.user, "ROOM_ADMIN", room=self.room2)
 
-
     # --- ROOM_VIEWER tests ---
     def test_room_viewer_can_view_own_room(self):
-        """ROOM_VIEWER can view rooms within their location"""
-        role = RoleAssignment.objects.create(user=self.user, role="ROOM_VIEWER",  room=self.room1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="ROOM_VIEWER",
+            room=self.room1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -89,8 +99,11 @@ class RoomAdminScopeTests(TestCase):
         self.assertTrue(is_in_scope(role, room=self.room1))
 
     def test_room_viewer_cannot_modify_room(self):
-        """ROOM_VIEWER cannot POST/PUT/PATCH/DELETE rooms"""
-        role = RoleAssignment.objects.create(user=self.user, role="ROOM_VIEWER", room=self.room1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="ROOM_VIEWER",
+            room=self.room1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -99,59 +112,64 @@ class RoomAdminScopeTests(TestCase):
 
 class RoomPermissionAPITests(APITestCase):
     """
-    API-level enforcement tests for RoomPermission:
-    Enforces field-level business rules:
-      - Name changes vs location reassignment
-      - Scope enforcement
-      - Role hierarchy
+    API-level enforcement tests for RoomPermission.
     """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Departments & Locations
+        cls.dept = DepartmentFactory(name="Physics")
+        cls.other_dept = DepartmentFactory(name="Other Dept")
+
+        cls.loc = LocationFactory(name="Building A", department=cls.dept)
+        cls.other_loc = LocationFactory(name="Other Building", department=cls.other_dept)
+
+        # Rooms
+        cls.room = RoomFactory(name="Lab 101", location=cls.loc)
+        cls.other_room = RoomFactory(name="Lab 202", location=cls.other_loc)
+
+        # Users
+        cls.viewer = UserFactory()
+        cls.room_admin = UserFactory()
+        cls.loc_admin = UserFactory()
+        cls.dep_admin = UserFactory()
+        cls.site_admin = AdminUserFactory()
+
+        # Roles
+        cls.viewer.active_role = RoleAssignment.objects.create(
+            user=cls.viewer,
+            role="ROOM_VIEWER",
+            room=cls.room,
+        )
+        cls.room_admin.active_role = RoleAssignment.objects.create(
+            user=cls.room_admin,
+            role="ROOM_ADMIN",
+            room=cls.room,
+        )
+        cls.loc_admin.active_role = RoleAssignment.objects.create(
+            user=cls.loc_admin,
+            role="LOCATION_ADMIN",
+            location=cls.loc,
+        )
+        cls.dep_admin.active_role = RoleAssignment.objects.create(
+            user=cls.dep_admin,
+            role="DEPARTMENT_ADMIN",
+            department=cls.dept,
+        )
+        cls.site_admin.active_role = RoleAssignment.objects.create(
+            user=cls.site_admin,
+            role="SITE_ADMIN",
+        )
+
+        for u in (cls.viewer, cls.room_admin, cls.loc_admin, cls.dep_admin, cls.site_admin):
+            u.save()
+
+        cls.detail_url = reverse("room-detail", args=[cls.room.public_id])
+        cls.other_detail_url = reverse("room-detail", args=[cls.other_room.public_id])
+        cls.list_url = reverse("rooms")
 
     def setUp(self):
         self.client = APIClient()
-
-        # Departments & Locations
-        self.dept = DepartmentFactory(name="Physics")
-        self.other_dept = DepartmentFactory(name="Other Dept")
-
-        self.loc = LocationFactory(name="Building A", department=self.dept)
-        self.other_loc = LocationFactory(name="Other Building", department=self.other_dept)
-
-        # Rooms
-        self.room = RoomFactory(name="Lab 101", location=self.loc)
-        self.other_room = RoomFactory(name="Lab 202", location=self.other_loc)
-
-        # Users
-        self.viewer = UserFactory()
-        self.room_admin = UserFactory()
-        self.loc_admin = UserFactory()
-        self.dep_admin = UserFactory()
-        self.site_admin = AdminUserFactory()
-
-        # Roles
-        self.viewer.active_role = RoleAssignment.objects.create(
-            user=self.viewer, role="ROOM_VIEWER", room=self.room
-        )
-        self.room_admin.active_role = RoleAssignment.objects.create(
-            user=self.room_admin, role="ROOM_ADMIN", room=self.room
-        )
-        self.loc_admin.active_role = RoleAssignment.objects.create(
-            user=self.loc_admin, role="LOCATION_ADMIN", location=self.loc
-        )
-        self.dep_admin.active_role = RoleAssignment.objects.create(
-            user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept
-        )
-        self.site_admin.active_role = RoleAssignment.objects.create(
-            user=self.site_admin, role="SITE_ADMIN"
-        )
-
-        for u in [self.viewer, self.room_admin, self.loc_admin, self.dep_admin, self.site_admin]:
-            u.save()
-
-        # URLs
-        self.detail_url = reverse("room-detail", args=[self.room.public_id])
-        self.other_detail_url = reverse("room-detail", args=[self.other_room.public_id])
-        self.list_url = reverse("rooms")
-
     # ---------------- VIEWER ----------------
 
     def test_room_viewer_can_get(self):
