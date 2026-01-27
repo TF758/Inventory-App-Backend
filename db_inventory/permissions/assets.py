@@ -29,15 +29,12 @@ class AssetPermission(BasePermission):
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
-        
-
-        print(request.user, getattr(request.user, "active_role", None))
 
         # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":
             return True
 
-
+        # READ-only: allow, object permission will enforce scope
         if request.method in SAFE_METHODS:
             return True
 
@@ -67,7 +64,7 @@ class AssetPermission(BasePermission):
 
             # READ: must be in scope
             if request.method in SAFE_METHODS:
-                return True
+                return is_in_scope(active_role, room=room_for_scope)
 
             # WRITE: viewers blocked (defensive)
             if is_viewer_role(active_role.role):
@@ -260,41 +257,3 @@ class CanReportConsumableLoss(BasePermission):
 
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated
-    
-
-class CanUpdateEquipmentStatus(BasePermission):
-    """
-    Permission to allow updating equipment status.
-
-    Rules:
-    - SITE_ADMIN: always allowed
-    - Admin role + in-scope equipment: allowed
-    - Non-admin but current assignee: allowed
-    """
-
-    def has_object_permission(self, request, view, equipment):
-        # Only applies to write methods
-        if request.method not in ("PATCH", "PUT"):
-            return True
-
-        active_role = getattr(request.user, "active_role", None)
-        if not active_role:
-            return False
-
-        # 1. SITE_ADMIN bypass
-        if active_role.role == "SITE_ADMIN":
-            return True
-
-        # 2. Admin role + scope
-        if (
-            is_admin_role(active_role.role)
-            and is_in_scope(active_role, room=getattr(equipment, "room", None))
-        ):
-            return True
-
-        # 3. Assigned user (non-admin allowed)
-        assignment = getattr(equipment, "active_assignment", None)
-        if assignment and assignment.returned_at is None:
-            return assignment.user_id == request.user.id
-
-        return False
