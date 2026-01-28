@@ -46,6 +46,8 @@ urlpatterns = [
     path( "profiles/me/equipment/", SelfAssignedEquipmentViewSet.as_view({"get": "list"}), name="self-user-equipment", ),
     path( "profiles/me/accessories/", SelfAccessoryViewSet.as_view({"get": "list"}), name="self-user-accessories", ),
     path( "profiles/me/consumables/", SelfConsumableViewSet.as_view({"get": "list"}), name="self-user-consumables", ),
+    path( "profiles/me/consumables/use/", UseConsumableView.as_view(), name="use-consumable", ),
+    path( "profiles/me/consumables/<str:public_id>/", SelfConsumableAssignmentDetailView.as_view(), name="assign-consumable-detail", ),
     path('users/profile/<str:public_id>/',UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
 
 

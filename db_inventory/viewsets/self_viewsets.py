@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from db_inventory.serializers.self import  SelfAccessoryAssignmentSerializer, SelfConsumableIssueSerializer, SelfUserProfileSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import EquipmentAssignmentFilter
@@ -10,6 +11,7 @@ from rest_framework.mixins import ListModelMixin
 from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 from db_inventory.models.users import User
+from rest_framework.generics import RetrieveAPIView
 
 
 class SelfUserProfileViewSet(RetrieveModelMixin, GenericViewSet):
@@ -136,4 +138,16 @@ class SelfConsumableViewSet(ListModelMixin, GenericViewSet):
                 "consumable__room__location",
             )
             .order_by("-assigned_at")
+        )
+
+class SelfConsumableAssignmentDetailView(RetrieveAPIView):
+    serializer_class = SelfConsumableIssueSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return get_object_or_404(
+            ConsumableIssue,
+            consumable__public_id=self.kwargs["public_id"],
+            user=self.request.user,
+            returned_at__isnull=True,
         )

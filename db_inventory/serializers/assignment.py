@@ -271,9 +271,42 @@ class IssueConsumableSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
 class UseConsumableSerializer(serializers.Serializer):
-    consumable = serializers.SlugRelatedField(slug_field="public_id",queryset=Consumable.objects.all())
+    consumable = serializers.SlugRelatedField( slug_field="public_id", queryset=Consumable.objects.all(), )
     quantity = serializers.IntegerField(min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            raise serializers.ValidationError("Authentication required.")
+
+        consumable = attrs["consumable"]
+        quantity = attrs["quantity"]
+
+        try:
+            issue = ConsumableIssue.objects.get(
+                consumable=consumable,
+                user=request.user,
+                returned_at__isnull=True,
+            )
+        except ConsumableIssue.DoesNotExist:
+            raise serializers.ValidationError(
+                "You do not have this consumable assigned."
+            )
+
+        if quantity > issue.quantity:
+            raise serializers.ValidationError(
+                {
+                    "quantity": (
+                        f"Usage quantity exceeds your remaining "
+                        f"assigned amount ({issue.quantity})."
+                    )
+                }
+            )
+
+        # stash issue for the view to reuse (optional but nice)
+        attrs["issue"] = issue
+        return attrs
 
 class ReturnConsumableSerializer(serializers.Serializer):
     issue = serializers.PrimaryKeyRelatedField(queryset=ConsumableIssue.objects.select_related("consumable", "user"))
