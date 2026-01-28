@@ -12,6 +12,23 @@ services:
     depends_on:
       - db
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: .
+    command: celery -A inventory worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env.dev
+    environment:
+      DJANGO_SETTINGS_MODULE: inventory.settings
+    depends_on:
+      - redis
+      - web
   db:
     image: postgres:15
     container_name: inventory_db

@@ -85,6 +85,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     "django_extensions",
+
+     "django_celery_results",
+      "django_celery_beat",
     
 ]
 
@@ -327,3 +330,11 @@ SESSION_ABSOLUTE_LIFETIME = timedelta(days=SESSION_ABSOLUTE_DAYS)
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
+
+
+CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_BACKEND = "django-db"
+
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
