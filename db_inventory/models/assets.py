@@ -16,6 +16,8 @@ class EquipmentStatus(models.TextChoices):
     UNDER_REPAIR = "under_repair", "Under repair"
     LOST = "lost", "Lost"
     RETIRED = "retired", "Retired"
+    CONDEMNED = "condemned", "Condemned"
+
 
 class Equipment(PublicIDModel):
     PUBLIC_ID_PREFIX = "EQ"
@@ -43,6 +45,13 @@ class Equipment(PublicIDModel):
             return self.active_assignment.returned_at is None
         except EquipmentAssignment.DoesNotExist:
             return False
+    
+    @property
+    def current_holder(self):
+        assignment = getattr(self, "active_assignment", None)
+        if assignment and assignment.returned_at is None:
+            return assignment.user
+        return None
         
     def audit_label(self) -> str:
         parts = [self.name]

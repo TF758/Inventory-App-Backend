@@ -1,5 +1,8 @@
 
 # Role hierarchy: higher numbers mean more power
+from db_inventory.models.assets import EquipmentStatus
+
+
 ROLE_HIERARCHY = {
     # Room roles
     "ROOM_VIEWER": 0,
@@ -16,4 +19,10 @@ ROLE_HIERARCHY = {
 
     # Site-wide admin
     "SITE_ADMIN": 99,
+}
+
+OWNER_ALLOWED_STATUSES = {
+    EquipmentStatus.OK,
+    EquipmentStatus.DAMAGED,
+    EquipmentStatus.UNDER_REPAIR,
 }

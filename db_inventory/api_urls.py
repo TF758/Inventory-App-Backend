@@ -1,5 +1,7 @@
 from django.urls import path, include
 
+
+
 from .viewsets import *
 
 """
@@ -40,6 +42,14 @@ urlpatterns = [
     }), name='userlocation-detail'),
     path('user-locations/users/<str:public_id>/', user_viewsets.UserLocationByUserView.as_view(), name='userlocation-by-user'),
     path('unallocated-users/', user_viewsets.UnallocatedUserViewSet.as_view({'get': 'list'}), name='unallocated-user-list'),
+    path( "profiles/me/", SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile", ),
+    path( "profiles/me/equipment/", SelfAssignedEquipmentViewSet.as_view({"get": "list"}), name="self-user-equipment", ),
+    path( "profiles/me/accessories/", SelfAccessoryViewSet.as_view({"get": "list"}), name="self-user-accessories", ),
+    path( "profiles/me/consumables/", SelfConsumableViewSet.as_view({"get": "list"}), name="self-user-consumables", ),
+    path( "profiles/me/consumables/use/", UseConsumableView.as_view(), name="use-consumable", ),
+    path( "profiles/me/consumables/<str:public_id>/", SelfConsumableAssignmentDetailView.as_view(), name="assign-consumable-detail", ),
+    path('users/profile/<str:public_id>/',UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
+
 
     path("departments/", include("db_inventory.urls.department_urls")),
 

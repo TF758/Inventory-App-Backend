@@ -4,121 +4,107 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 from db_inventory.models import User, UserLocation, Room, Department, Location, RoleAssignment
 from db_inventory.factories import UserFactory, AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserLocationFactory
+from db_inventory.tests.utils.userlocation_test_base import UserLocationPermissionTestBase
 
-class SiteAdminUserLocationTests(TestCase):
+class SiteAdminUserLocationTests(UserLocationPermissionTestBase):
+    """
+    SITE_ADMIN has full access to UserLocation objects across all scopes.
+    """
+
     def setUp(self):
-        # Create a SITE_ADMIN user
-        self.site_admin = AdminUserFactory()
-        self.site_admin_role = RoleAssignment.objects.create(
-            user=self.site_admin,
-            role="SITE_ADMIN"
-        )
-        self.site_admin.active_role = self.site_admin_role
-        self.site_admin.save()
+        super().setUp()
 
-        self.client = APIClient()
+        # Authenticate as SITE_ADMIN
         self.client.force_authenticate(user=self.site_admin)
 
-        # Create departments, locations, rooms, and users in different scopes
-        self.department1 = DepartmentFactory()
-        self.department2 = DepartmentFactory()
-
-        self.location1 = LocationFactory(department=self.department1)
-        self.location2 = LocationFactory(department=self.department2)
-
-        self.room1 = RoomFactory(location=self.location1)
-        self.room2 = RoomFactory(location=self.location2)
-
-        # Create users to assign
+        # Users to assign
         self.user1 = UserFactory()
         self.user2 = UserFactory()
 
-        # Pre-existing UserLocation objects
+        # Fresh UserLocation objects (must be per-test)
         self.user_location1 = UserLocationFactory(user=self.user1, room=self.room1)
         self.user_location2 = UserLocationFactory(user=self.user2, room=self.room2)
 
-        # Reverse URLs
-        self.url_list = reverse('userlocation-list-create')
-        self.url_detail_ul1 = reverse('userlocation-detail', args=[self.user_location1.public_id])
-        self.url_detail_ul2 = reverse('userlocation-detail', args=[self.user_location2.public_id])
+        # Detail URLs
+        self.detail_url_1 = reverse(
+            "userlocation-detail", args=[self.user_location1.public_id]
+        )
+        self.detail_url_2 = reverse(
+            "userlocation-detail", args=[self.user_location2.public_id]
+        )
 
     def test_site_admin_can_list_all_user_locations(self):
-        response = self.client.get(self.url_list)
+        response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        public_ids = [ul['public_id'] for ul in response.data]
+
+        public_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.user_location1.public_id, public_ids)
         self.assertIn(self.user_location2.public_id, public_ids)
 
     def test_site_admin_can_retrieve_any_user_location(self):
-        response = self.client.get(self.url_detail_ul1)
+        response = self.client.get(self.detail_url_1)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['public_id'], self.user_location1.public_id)
+        self.assertEqual(response.data["public_id"], self.user_location1.public_id)
 
     def test_site_admin_can_create_user_location_anywhere(self):
         payload = {
             "user_id": self.user1.public_id,
             "room_id": self.room2.public_id,
         }
-        response = self.client.post(self.url_list, payload, format='json')
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['room_id'], self.room2.public_id)
+        self.assertEqual(response.data["room_id"], self.room2.public_id)
 
     def test_site_admin_can_update_user_location_anywhere(self):
         payload = {"room_id": self.room2.public_id}
-        response = self.client.patch(self.url_detail_ul1, payload, format='json')
+        response = self.client.patch(self.detail_url_1, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['room_id'], self.room2.public_id)
+        self.assertEqual(response.data["room_id"], self.room2.public_id)
 
     def test_site_admin_can_delete_user_location_anywhere(self):
-        response = self.client.delete(self.url_detail_ul1)
+        response = self.client.delete(self.detail_url_1)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(UserLocation.objects.filter(pk=self.user_location1.pk).exists())
+        self.assertFalse(
+            UserLocation.objects.filter(pk=self.user_location1.pk).exists()
+        )
 
-class DepartmentAdminUserLocationTests(TestCase):
+class DepartmentAdminUserLocationTests(UserLocationPermissionTestBase):
+    """
+    DEPARTMENT_ADMIN can manage UserLocations within their department only.
+    """
+
     def setUp(self):
+        super().setUp()
+
+        # Authenticate as DEPARTMENT_ADMIN
         self.client = APIClient()
+        self.client.force_authenticate(user=self.dept_admin)
 
-        # Create departments
-        self.department1 = DepartmentFactory()
-        self.department2 = DepartmentFactory()
-
-        # Create locations and rooms
-        self.location1 = LocationFactory(department=self.department1)
-        self.location2 = LocationFactory(department=self.department2)
-        self.room1 = RoomFactory(location=self.location1)
-        self.room2 = RoomFactory(location=self.location2)
-
-        # Create users
-        self.dept_admin = UserFactory()
+        # Users
         self.user_in_dept = UserFactory()
         self.user_outside_dept = UserFactory()
 
-        # Assign department admin role
-        RoleAssignment.objects.create(
-            user=self.dept_admin,
-            role="DEPARTMENT_ADMIN",
-            department=self.department1
+        # UserLocations (fresh per test)
+        self.userlocation_in_dept = UserLocationFactory(
+            user=self.user_in_dept, room=self.room1
         )
-        self.dept_admin.active_role = RoleAssignment.objects.get(user=self.dept_admin)
-        self.dept_admin.save()
+        self.userlocation_outside_dept = UserLocationFactory(
+            user=self.user_outside_dept, room=self.room2
+        )
 
-        # Create UserLocations
-        self.userlocation_in_dept = UserLocationFactory(user=self.user_in_dept, room=self.room1)
-        self.userlocation_outside_dept = UserLocationFactory(user=self.user_outside_dept, room=self.room2)
-
-        # Authenticate as dept admin
-        self.client.force_authenticate(user=self.dept_admin)
-
-        # Reverse URLs
-        self.list_url = reverse('userlocation-list-create')
-        self.detail_url_in = reverse('userlocation-detail', args=[self.userlocation_in_dept.public_id])
-        self.detail_url_out = reverse('userlocation-detail', args=[self.userlocation_outside_dept.public_id])
+        # URLs
+        self.detail_url_in = reverse(
+            "userlocation-detail", args=[self.userlocation_in_dept.public_id]
+        )
+        self.detail_url_out = reverse(
+            "userlocation-detail", args=[self.userlocation_outside_dept.public_id]
+        )
 
     def test_dept_admin_can_list_userlocations_in_their_department(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Should only see userlocations in their department
-        returned_ids = [u['public_id'] for u in response.data]
+
+        returned_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.userlocation_in_dept.public_id, returned_ids)
         self.assertNotIn(self.userlocation_outside_dept.public_id, returned_ids)
 
@@ -131,32 +117,32 @@ class DepartmentAdminUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_dept_admin_can_update_userlocation_in_their_department(self):
-        payload = {'room_id': self.room1.public_id, 'is_current': True}
-        response = self.client.patch(self.detail_url_in, data=payload, format='json')
+        payload = {"room_id": self.room1.public_id, "is_current": True}
+        response = self.client.patch(self.detail_url_in, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_dept_admin_cannot_update_userlocation_outside_department(self):
-        payload = {'room_id': self.room2.public_id, 'is_current': True}
-        response = self.client.patch(self.detail_url_out, data=payload, format='json')
+        payload = {"room_id": self.room2.public_id, "is_current": True}
+        response = self.client.patch(self.detail_url_out, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_dept_admin_can_create_userlocation_in_their_department(self):
         new_user = UserFactory()
         payload = {
-            'user_id': new_user.public_id,
-            'room_id': self.room1.public_id
+            "user_id": new_user.public_id,
+            "room_id": self.room1.public_id,
         }
-        response = self.client.post(self.list_url, data=payload, format='json')
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['room_id'], self.room1.public_id)
+        self.assertEqual(response.data["room_id"], self.room1.public_id)
 
     def test_dept_admin_cannot_create_userlocation_outside_department(self):
         new_user = UserFactory()
         payload = {
-            'user_id': new_user.public_id,
-            'room_id': self.room2.public_id
+            "user_id": new_user.public_id,
+            "room_id": self.room2.public_id,
         }
-        response = self.client.post(self.list_url, data=payload, format='json')
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_dept_admin_can_delete_userlocation_in_their_department(self):
@@ -168,52 +154,45 @@ class DepartmentAdminUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class LocationAdminUserLocationTests(TestCase):
+class LocationAdminUserLocationTests(UserLocationPermissionTestBase):
+    """
+    LOCATION_ADMIN can manage UserLocations within their location only.
+    """
+
     def setUp(self):
+        super().setUp()
+
+        # Authenticate as LOCATION_ADMIN
         self.client = APIClient()
+        self.client.force_authenticate(user=self.location_admin)
 
-        # Create departments
-        self.department1 = DepartmentFactory()
-        self.department2 = DepartmentFactory()
-
-        # Create locations and rooms
-        self.location1 = LocationFactory(department=self.department1)
-        self.location2 = LocationFactory(department=self.department2)
-        self.room1 = RoomFactory(location=self.location1)
-        self.room2 = RoomFactory(location=self.location2)
-
-        # Create users
-        self.location_admin = UserFactory()
+        # Users
         self.user_in_location = UserFactory()
         self.user_outside_location = UserFactory()
 
-        # Assign location admin role
-        RoleAssignment.objects.create(
-            user=self.location_admin,
-            role="LOCATION_ADMIN",
-            location=self.location1
+        # UserLocations (fresh per test)
+        self.userlocation_in_location = UserLocationFactory(
+            user=self.user_in_location, room=self.room1
         )
-        self.location_admin.active_role = RoleAssignment.objects.get(user=self.location_admin)
-        self.location_admin.save()
+        self.userlocation_outside_location = UserLocationFactory(
+            user=self.user_outside_location, room=self.room2
+        )
 
-        # Create UserLocations
-        self.userlocation_in_location = UserLocationFactory(user=self.user_in_location, room=self.room1)
-        self.userlocation_outside_location = UserLocationFactory(user=self.user_outside_location, room=self.room2)
-
-        # Authenticate as location admin
-        self.client.force_authenticate(user=self.location_admin)
-
-        # Reverse URLs
-        self.list_url = reverse('userlocation-list-create')
-        self.detail_url_in = reverse('userlocation-detail', args=[self.userlocation_in_location.public_id])
-        self.detail_url_out = reverse('userlocation-detail', args=[self.userlocation_outside_location.public_id])
+        # URLs
+        self.detail_url_in = reverse(
+            "userlocation-detail", args=[self.userlocation_in_location.public_id]
+        )
+        self.detail_url_out = reverse(
+            "userlocation-detail", args=[self.userlocation_outside_location.public_id]
+        )
 
     def test_location_admin_can_list_userlocations_in_their_location(self):
         response = self.client.get(self.list_url)
-        returned_ids = [ul['public_id'] for ul in response.data]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        returned_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.userlocation_in_location.public_id, returned_ids)
         self.assertNotIn(self.userlocation_outside_location.public_id, returned_ids)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_location_admin_can_retrieve_userlocation_inside_location(self):
         response = self.client.get(self.detail_url_in)
@@ -225,24 +204,30 @@ class LocationAdminUserLocationTests(TestCase):
 
     def test_location_admin_can_create_userlocation_inside_location(self):
         new_user = UserFactory()
-        payload = {'user_id': new_user.public_id, 'room_id': self.room1.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": new_user.public_id,
+            "room_id": self.room1.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_location_admin_cannot_create_userlocation_outside_location(self):
         new_user = UserFactory()
-        payload = {'user_id': new_user.public_id, 'room_id': self.room2.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": new_user.public_id,
+            "room_id": self.room2.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_admin_can_update_userlocation_inside_location(self):
-        payload = {'room_id': self.room1.public_id}
-        response = self.client.patch(self.detail_url_in, payload, format='json')
+        payload = {"room_id": self.room1.public_id}
+        response = self.client.patch(self.detail_url_in, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_location_admin_cannot_update_userlocation_outside_location(self):
-        payload = {'room_id': self.room2.public_id}
-        response = self.client.patch(self.detail_url_out, payload, format='json')
+        payload = {"room_id": self.room2.public_id}
+        response = self.client.patch(self.detail_url_out, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_admin_can_delete_userlocation_inside_location(self):
@@ -253,55 +238,48 @@ class LocationAdminUserLocationTests(TestCase):
         response = self.client.delete(self.detail_url_out)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-class RoomAdminUserLocationTests(TestCase):
+
+
+
+class RoomAdminUserLocationTests(UserLocationPermissionTestBase):
+    """
+    ROOM_ADMIN can manage UserLocations within their room only.
+    """
+
     def setUp(self):
+        super().setUp()
+
+        # Authenticate as ROOM_ADMIN
         self.client = APIClient()
+        self.client.force_authenticate(user=self.room_admin)
 
-        # Create departments
-        self.department1 = DepartmentFactory()
-        self.department2 = DepartmentFactory()
-
-        # Create locations
-        self.location1 = LocationFactory(department=self.department1)
-        self.location2 = LocationFactory(department=self.department2)
-
-        # Create rooms
-        self.room1 = RoomFactory(location=self.location1)
-        self.room2 = RoomFactory(location=self.location2)
-
-        # Create users
-        self.room_admin = UserFactory()
+        # Users
         self.user_in_room = UserFactory()
         self.user_outside_room = UserFactory()
 
-        # Assign room admin role
-        RoleAssignment.objects.create(
-            user=self.room_admin,
-            role="ROOM_ADMIN",
-            room=self.room1
+        # UserLocations (fresh per test)
+        self.userlocation_in_room = UserLocationFactory(
+            user=self.user_in_room, room=self.room1
         )
-        self.room_admin.active_role = RoleAssignment.objects.get(user=self.room_admin)
-        self.room_admin.save()
-
-        # Create UserLocations
-        self.userlocation_in_room = UserLocationFactory(user=self.user_in_room, room=self.room1)
-        self.userlocation_outside_room = UserLocationFactory(user=self.user_outside_room, room=self.room2)
-
-        # Authenticate as room admin
-        self.client.force_authenticate(user=self.room_admin)
+        self.userlocation_outside_room = UserLocationFactory(
+            user=self.user_outside_room, room=self.room2
+        )
 
         # URLs
-        self.list_url = reverse('userlocation-list-create')
-        self.detail_url_in = reverse('userlocation-detail', args=[self.userlocation_in_room.public_id])
-        self.detail_url_out = reverse('userlocation-detail', args=[self.userlocation_outside_room.public_id])
-
+        self.detail_url_in = reverse(
+            "userlocation-detail", args=[self.userlocation_in_room.public_id]
+        )
+        self.detail_url_out = reverse(
+            "userlocation-detail", args=[self.userlocation_outside_room.public_id]
+        )
 
     def test_room_admin_can_list_userlocations_in_their_room(self):
         response = self.client.get(self.list_url)
-        returned_ids = [ul['public_id'] for ul in response.data]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        returned_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.userlocation_in_room.public_id, returned_ids)
         self.assertNotIn(self.userlocation_outside_room.public_id, returned_ids)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_room_admin_can_retrieve_userlocation_inside_room(self):
         response = self.client.get(self.detail_url_in)
@@ -312,23 +290,29 @@ class RoomAdminUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_admin_can_create_userlocation_inside_room(self):
-        payload = {'user_id': UserFactory().public_id, 'room_id': self.room1.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": UserFactory().public_id,
+            "room_id": self.room1.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_room_admin_cannot_create_userlocation_outside_room(self):
-        payload = {'user_id': UserFactory().public_id, 'room_id': self.room2.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": UserFactory().public_id,
+            "room_id": self.room2.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_admin_can_update_userlocation_inside_room(self):
-        payload = {'room_id': self.room1.public_id}
-        response = self.client.patch(self.detail_url_in, payload, format='json')
+        payload = {"room_id": self.room1.public_id}
+        response = self.client.patch(self.detail_url_in, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_room_admin_cannot_update_userlocation_outside_room(self):
-        payload = {'room_id': self.room2.public_id}
-        response = self.client.patch(self.detail_url_out, payload, format='json')
+        payload = {"room_id": self.room2.public_id}
+        response = self.client.patch(self.detail_url_out, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_admin_can_delete_userlocation_inside_room(self):
@@ -339,51 +323,47 @@ class RoomAdminUserLocationTests(TestCase):
         response = self.client.delete(self.detail_url_out)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-class DepartmentViewerUserLocationTests(TestCase):
+class DepartmentViewerUserLocationTests(UserLocationPermissionTestBase):
+    """
+    DEPARTMENT_VIEWER:
+    - Read-only access within their department
+    - No create/update/delete anywhere
+    """
+
     def setUp(self):
+        super().setUp()
+
+        # Authenticate as DEPARTMENT_VIEWER
         self.client = APIClient()
+        self.client.force_authenticate(user=self.department_viewer)
 
-        # Create departments
-        self.department1 = DepartmentFactory()
-        self.department2 = DepartmentFactory()
-
-        # Create locations and rooms
-        self.location1 = LocationFactory(department=self.department1)
-        self.location2 = LocationFactory(department=self.department2)
-        self.room1 = RoomFactory(location=self.location1)
-        self.room2 = RoomFactory(location=self.location2)
-
-        # Create users
-        self.department_viewer = UserFactory()
+        # Users
         self.user_in_dept = UserFactory()
         self.user_outside_dept = UserFactory()
 
-        # Assign department viewer role
-        RoleAssignment.objects.create(
-            user=self.department_viewer,
-            role="DEPARTMENT_VIEWER",
-            department=self.department1
+        # UserLocations (fresh per test)
+        self.userlocation_in_dept = UserLocationFactory(
+            user=self.user_in_dept, room=self.room1
         )
-        self.department_viewer.active_role = RoleAssignment.objects.get(user=self.department_viewer)
-        self.department_viewer.save()
+        self.userlocation_outside_dept = UserLocationFactory(
+            user=self.user_outside_dept, room=self.room2
+        )
 
-        # Create UserLocations
-        self.userlocation_in_dept = UserLocationFactory(user=self.user_in_dept, room=self.room1)
-        self.userlocation_outside_dept = UserLocationFactory(user=self.user_outside_dept, room=self.room2)
+        # URLs
+        self.detail_url_in = reverse(
+            "userlocation-detail", args=[self.userlocation_in_dept.public_id]
+        )
+        self.detail_url_out = reverse(
+            "userlocation-detail", args=[self.userlocation_outside_dept.public_id]
+        )
 
-        # Authenticate as department viewer
-        self.client.force_authenticate(user=self.department_viewer)
+    # ---------------- READ ----------------
 
-        # Reverse URLs
-        self.list_url = reverse('userlocation-list-create')
-        self.detail_url_in = reverse('userlocation-detail', args=[self.userlocation_in_dept.public_id])
-        self.detail_url_out = reverse('userlocation-detail', args=[self.userlocation_outside_dept.public_id])
-
-    # READ tests
     def test_department_viewer_can_list_userlocations_in_department(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        returned_ids = [ul['public_id'] for ul in response.data]
+
+        returned_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.userlocation_in_dept.public_id, returned_ids)
         self.assertNotIn(self.userlocation_outside_dept.public_id, returned_ids)
 
@@ -395,20 +375,24 @@ class DepartmentViewerUserLocationTests(TestCase):
         response = self.client.get(self.detail_url_out)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    # WRITE tests (should all be forbidden)
+    # ---------------- WRITE (FORBIDDEN) ----------------
+
     def test_department_viewer_cannot_create_userlocation(self):
-        payload = {'user_id': UserFactory().public_id, 'room_id': self.room1.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": UserFactory().public_id,
+            "room_id": self.room1.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_department_viewer_cannot_update_userlocation_inside_department(self):
-        payload = {'room_id': self.room1.public_id}
-        response = self.client.patch(self.detail_url_in, payload, format='json')
+        payload = {"room_id": self.room1.public_id}
+        response = self.client.patch(self.detail_url_in, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_department_viewer_cannot_update_userlocation_outside_department(self):
-        payload = {'room_id': self.room2.public_id}
-        response = self.client.patch(self.detail_url_out, payload, format='json')
+        payload = {"room_id": self.room2.public_id}
+        response = self.client.patch(self.detail_url_out, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_department_viewer_cannot_delete_userlocation_inside_department(self):
@@ -420,53 +404,50 @@ class DepartmentViewerUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class LocationViewerUserLocationTests(TestCase):
+class LocationViewerUserLocationTests(UserLocationPermissionTestBase):
+    """
+    LOCATION_VIEWER:
+    - Read-only access within their location
+    - No create/update/delete anywhere
+    """
+
     def setUp(self):
+        super().setUp()
+
         self.client = APIClient()
+        self.client.force_authenticate(user=self.location_viewer)
 
-        # Create departments and locations
-        self.department1 = DepartmentFactory()
-        self.department2 = DepartmentFactory()
-        self.location1 = LocationFactory(department=self.department1)
-        self.location2 = LocationFactory(department=self.department2)
-
-        # Create rooms
-        self.room1 = RoomFactory(location=self.location1)
-        self.room2 = RoomFactory(location=self.location2)
-
-        # Create users
-        self.location_viewer = UserFactory()
+        # Users
         self.user_in_location = UserFactory()
         self.user_outside_location = UserFactory()
 
-        # Assign location viewer role
-        RoleAssignment.objects.create(
-            user=self.location_viewer,
-            role="LOCATION_VIEWER",
-            location=self.location1
+        # UserLocations (fresh per test)
+        self.userlocation_in_location = UserLocationFactory(
+            user=self.user_in_location,
+            room=self.room1,
         )
-        self.location_viewer.active_role = RoleAssignment.objects.get(user=self.location_viewer)
-        self.location_viewer.save()
+        self.userlocation_outside_location = UserLocationFactory(
+            user=self.user_outside_location,
+            room=self.room2,
+        )
 
-        # Create UserLocations
-        self.userlocation_in_location = UserLocationFactory(user=self.user_in_location, room=self.room1)
-        self.userlocation_outside_location = UserLocationFactory(user=self.user_outside_location, room=self.room2)
+        # URLs
+        self.detail_url_in = reverse(
+            "userlocation-detail", args=[self.userlocation_in_location.public_id]
+        )
+        self.detail_url_out = reverse(
+            "userlocation-detail", args=[self.userlocation_outside_location.public_id]
+        )
 
-        # Authenticate as location viewer
-        self.client.force_authenticate(user=self.location_viewer)
+    # ---------------- READ ----------------
 
-        # Reverse URLs
-        self.list_url = reverse('userlocation-list-create')
-        self.detail_url_in = reverse('userlocation-detail', args=[self.userlocation_in_location.public_id])
-        self.detail_url_out = reverse('userlocation-detail', args=[self.userlocation_outside_location.public_id])
-
-    # READ tests
     def test_location_viewer_can_list_userlocations_in_their_location(self):
         response = self.client.get(self.list_url)
-        returned_ids = [ul['public_id'] for ul in response.data]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        returned_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.userlocation_in_location.public_id, returned_ids)
         self.assertNotIn(self.userlocation_outside_location.public_id, returned_ids)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_location_viewer_can_retrieve_userlocation_inside_location(self):
         response = self.client.get(self.detail_url_in)
@@ -476,15 +457,19 @@ class LocationViewerUserLocationTests(TestCase):
         response = self.client.get(self.detail_url_out)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    # WRITE tests
+    # ---------------- WRITE (FORBIDDEN) ----------------
+
     def test_location_viewer_cannot_create_userlocation(self):
-        payload = {'user_id': UserFactory().public_id, 'room_id': self.room1.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": UserFactory().public_id,
+            "room_id": self.room1.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_viewer_cannot_update_userlocation_inside_location(self):
-        payload = {'room_id': self.room1.public_id}
-        response = self.client.patch(self.detail_url_in, payload, format='json')
+        payload = {"room_id": self.room1.public_id}
+        response = self.client.patch(self.detail_url_in, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_viewer_cannot_delete_userlocation_inside_location(self):
@@ -492,13 +477,16 @@ class LocationViewerUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_viewer_cannot_create_userlocation_outside_location(self):
-        payload = {'user_id': UserFactory().public_id, 'room_id': self.room2.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": UserFactory().public_id,
+            "room_id": self.room2.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_viewer_cannot_update_userlocation_outside_location(self):
-        payload = {'room_id': self.room2.public_id}
-        response = self.client.patch(self.detail_url_out, payload, format='json')
+        payload = {"room_id": self.room2.public_id}
+        response = self.client.patch(self.detail_url_out, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_location_viewer_cannot_delete_userlocation_outside_location(self):
@@ -506,51 +494,50 @@ class LocationViewerUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class RoomViewerUserLocationTests(TestCase):
+class RoomViewerUserLocationTests(UserLocationPermissionTestBase):
+    """
+    ROOM_VIEWER:
+    - Read-only access within their assigned room
+    - No create/update/delete anywhere
+    """
+
     def setUp(self):
+        super().setUp()
+
         self.client = APIClient()
+        self.client.force_authenticate(user=self.room_viewer)
 
-        # Create departments and locations
-        self.department = DepartmentFactory()
-        self.location = LocationFactory(department=self.department)
-
-        # Create rooms
-        self.room1 = RoomFactory(location=self.location)
-        self.room2 = RoomFactory(location=self.location)
-
-        # Create users
-        self.room_viewer = UserFactory()
+        # Users
         self.user_in_room = UserFactory()
         self.user_outside_room = UserFactory()
 
-        # Assign ROOM_VIEWER role
-        RoleAssignment.objects.create(
-            user=self.room_viewer,
-            role="ROOM_VIEWER",
-            room=self.room1
+        # UserLocations (fresh per test)
+        self.userlocation_in_room = UserLocationFactory(
+            user=self.user_in_room,
+            room=self.room1,
         )
-        self.room_viewer.active_role = RoleAssignment.objects.get(user=self.room_viewer)
-        self.room_viewer.save()
+        self.userlocation_outside_room = UserLocationFactory(
+            user=self.user_outside_room,
+            room=self.room2,
+        )
 
-        # Create UserLocations
-        self.userlocation_in_room = UserLocationFactory(user=self.user_in_room, room=self.room1)
-        self.userlocation_outside_room = UserLocationFactory(user=self.user_outside_room, room=self.room2)
+        # URLs
+        self.detail_url_in = reverse(
+            "userlocation-detail", args=[self.userlocation_in_room.public_id]
+        )
+        self.detail_url_out = reverse(
+            "userlocation-detail", args=[self.userlocation_outside_room.public_id]
+        )
 
-        # Authenticate as room viewer
-        self.client.force_authenticate(user=self.room_viewer)
+    # ---------------- READ ----------------
 
-        # Reverse URLs
-        self.list_url = reverse('userlocation-list-create')
-        self.detail_url_in = reverse('userlocation-detail', args=[self.userlocation_in_room.public_id])
-        self.detail_url_out = reverse('userlocation-detail', args=[self.userlocation_outside_room.public_id])
-
-    # READ permissions
     def test_room_viewer_can_list_userlocations_in_their_room(self):
         response = self.client.get(self.list_url)
-        returned_ids = [ul['public_id'] for ul in response.data]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        returned_ids = [ul["public_id"] for ul in response.data]
         self.assertIn(self.userlocation_in_room.public_id, returned_ids)
         self.assertNotIn(self.userlocation_outside_room.public_id, returned_ids)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_room_viewer_can_retrieve_userlocation_inside_room(self):
         response = self.client.get(self.detail_url_in)
@@ -560,15 +547,19 @@ class RoomViewerUserLocationTests(TestCase):
         response = self.client.get(self.detail_url_out)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    # WRITE permissions blocked
+    # ---------------- WRITE (FORBIDDEN) ----------------
+
     def test_room_viewer_cannot_create_userlocation(self):
-        payload = {'user_id': UserFactory().public_id, 'room_id': self.room1.public_id}
-        response = self.client.post(self.list_url, payload, format='json')
+        payload = {
+            "user_id": UserFactory().public_id,
+            "room_id": self.room1.public_id,
+        }
+        response = self.client.post(self.list_url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_viewer_cannot_update_userlocation_inside_room(self):
-        payload = {'room_id': self.room1.public_id}
-        response = self.client.patch(self.detail_url_in, payload, format='json')
+        payload = {"room_id": self.room1.public_id}
+        response = self.client.patch(self.detail_url_in, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_viewer_cannot_delete_userlocation_inside_room(self):
@@ -576,8 +567,8 @@ class RoomViewerUserLocationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_viewer_cannot_update_userlocation_outside_room(self):
-        payload = {'room_id': self.room2.public_id}
-        response = self.client.patch(self.detail_url_out, payload, format='json')
+        payload = {"room_id": self.room2.public_id}
+        response = self.client.patch(self.detail_url_out, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_room_viewer_cannot_delete_userlocation_outside_room(self):

@@ -20,6 +20,8 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from db_inventory.utils.asset_helpers import equipment_event_from_status
 from db_inventory.utils.audit import create_audit_log
+from db_inventory.permissions.helpers import can_change_equipment_status
+from db_inventory.permissions.assets import CanUpdateEquipmentStatus
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -135,23 +137,31 @@ class EquipmentBatchImportView(EquipmentBatchMixin, APIView):
         )
 
 class EquipmentStatusChangeView(APIView):
+    """Dedicated view to update equipment status"""
 
-    """Dedicated view to update equipment sttaus"""
-    permission_classes = [AssetPermission]
+    permission_classes = [CanUpdateEquipmentStatus]
 
     def patch(self, request, public_id):
-        serializer = EquipmentStatusChangeSerializer(data=request.data)
+        equipment = get_object_or_404(
+            Equipment.objects.select_related("active_assignment"),
+            public_id=public_id,
+        )
+
+        self.check_object_permissions(request, equipment)
+
+        serializer = EquipmentStatusChangeSerializer(
+            data=request.data,
+            context={
+                "request": request,
+                "equipment": equipment,
+            },
+        )
         serializer.is_valid(raise_exception=True)
 
         new_status = serializer.validated_data["status"]
         notes = serializer.validated_data.get("notes", "")
 
-        equipment = get_object_or_404(Equipment, public_id=public_id)
-
-        self.check_object_permissions(request, equipment)
-
         old_status = equipment.status
-
         if old_status == new_status:
             return Response(
                 {"detail": "Status is already set to this value."},
@@ -162,7 +172,7 @@ class EquipmentStatusChangeView(APIView):
             equipment.status = new_status
             equipment.save(update_fields=["status"])
 
-             # Derive domain event
+            # Derive domain event
             event_type = equipment_event_from_status(new_status)
 
             EquipmentEvent.objects.create(
@@ -186,7 +196,4 @@ class EquipmentStatusChangeView(APIView):
                 },
             )
 
-        return Response(
-            {"public_id": equipment.public_id,"status": equipment.status,},
-            status=status.HTTP_200_OK,
-        )
+        return Response( status=status.HTTP_200_OK, )

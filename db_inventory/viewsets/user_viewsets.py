@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from db_inventory.serializers.users import  UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
+from db_inventory.serializers.users import  UserProfileSerializer, UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
 from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
@@ -8,7 +8,7 @@ from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.site import UserLocation, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import UserFilter, UserLocationFilter
+from db_inventory.filters import  UserFilter, UserLocationFilter
 from db_inventory.mixins import ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
@@ -16,9 +16,17 @@ from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 from db_inventory.mixins import AuditMixin
-from db_inventory.permissions.helpers import is_viewer_role, ensure_permission
+from db_inventory.permissions.helpers import ensure_permission
+from django.db.models import Count, Q
+from rest_framework.viewsets import GenericViewSet
+from rest_framework.mixins import RetrieveModelMixin
+
+
+from db_inventory.permissions.users import CanViewUserProfile
+from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
@@ -136,7 +144,7 @@ class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     Retrieve users not assigned to any room.
     """
 
-    queryset = User.objects.filter(user_locations__isnull=True)  # ✅ fixed reverse name
+    queryset = User.objects.filter(user_locations__isnull=True) 
     serializer_class = UserReadSerializerFull
     model_class = User
 
@@ -267,3 +275,43 @@ class FullUserCreateView(AuditMixin,views.APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
+    """
+    Retrieve a single user profile by public_id.
+    """
+
+    permission_classes = [CanViewUserProfile]
+    serializer_class = UserProfileSerializer
+    lookup_field = "public_id"
+
+    queryset = (
+        User.objects
+        .filter(is_active=True)
+        .annotate(
+            equipment_count=Count(
+                "equipment_assignments",
+                filter=Q(
+                    equipment_assignments__returned_at__isnull=True
+                ),
+                distinct=True,
+            ),
+            accessory_count=Count(
+                "accessory_assignments__accessory",
+                filter=Q(
+                    accessory_assignments__returned_at__isnull=True,
+                    accessory_assignments__quantity__gt=0,
+                ),
+                distinct=True,
+            ),
+            consumable_count=Count(
+                "consumable_assignments__consumable",
+                filter=Q(
+                    consumable_assignments__returned_at__isnull=True,
+                    consumable_assignments__quantity__gt=0,
+                ),
+                distinct=True,
+            ),
+        )
+    )

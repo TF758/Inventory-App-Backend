@@ -6,7 +6,6 @@ from db_inventory.models import User, Room, Location, Department, RoleAssignment
 from rest_framework.exceptions import PermissionDenied
 from django.urls import reverse
 
-
 class LocationAdminScopeTests(TestCase):
     """
     Test Location-level role permissions:
@@ -15,36 +14,38 @@ class LocationAdminScopeTests(TestCase):
       - SITE_ADMIN bypass
     """
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         # Departments
-        self.dept1 = DepartmentFactory(name="Chemistry")
-        self.dept2 = DepartmentFactory(name="Biology")
+        cls.dept1 = DepartmentFactory(name="Chemistry")
+        cls.dept2 = DepartmentFactory(name="Biology")
 
         # Locations
-        self.loc1 = LocationFactory(name="Building A", department=self.dept1)
-        self.loc2 = LocationFactory(name="Building B", department=self.dept2)
+        cls.loc1 = LocationFactory(name="Building A", department=cls.dept1)
+        cls.loc2 = LocationFactory(name="Building B", department=cls.dept2)
 
         # Rooms
-        self.room1 = RoomFactory(name="Lab 101", location=self.loc1)
-        self.room2 = RoomFactory(name="Lab 202", location=self.loc2)
+        cls.room1 = RoomFactory(name="Lab 101", location=cls.loc1)
+        cls.room2 = RoomFactory(name="Lab 202", location=cls.loc2)
 
         # Users
-        self.user = UserFactory()
-        self.admin_user = AdminUserFactory()
+        cls.user = UserFactory()
+        cls.admin_user = AdminUserFactory()
 
         # Site admin role
-        self.site_admin_role = RoleAssignment.objects.create(
-            user=self.admin_user, role="SITE_ADMIN"
+        cls.site_admin_role = RoleAssignment.objects.create(
+            user=cls.admin_user,
+            role="SITE_ADMIN",
         )
-        self.admin_user.active_role = self.site_admin_role
-        self.site_admin_role.save()
-
-
-
+        cls.admin_user.active_role = cls.site_admin_role
+        cls.admin_user.save()
 
     def test_location_admin_access_own_location(self):
-        """LocationAdmin can access their assigned location"""
-        role = RoleAssignment.objects.create(user=self.user, role="LOCATION_ADMIN", location=self.loc1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="LOCATION_ADMIN",
+            location=self.loc1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -52,8 +53,11 @@ class LocationAdminScopeTests(TestCase):
         self.assertTrue(is_in_scope(role, location=self.loc1))
 
     def test_location_admin_access_own_rooms(self):
-        """LocationAdmin can access rooms under their location"""
-        role = RoleAssignment.objects.create(user=self.user, role="LOCATION_ADMIN", location=self.loc1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="LOCATION_ADMIN",
+            location=self.loc1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -61,8 +65,11 @@ class LocationAdminScopeTests(TestCase):
         self.assertTrue(is_in_scope(role, room=self.room1))
 
     def test_location_admin_cannot_access_other_location(self):
-        """LocationAdmin cannot access locations outside their scope"""
-        role = RoleAssignment.objects.create(user=self.user, role="LOCATION_ADMIN", location=self.loc1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="LOCATION_ADMIN",
+            location=self.loc1,
+        )
         self.user.active_role = role
         self.user.save()
 
@@ -70,91 +77,80 @@ class LocationAdminScopeTests(TestCase):
         self.assertFalse(is_in_scope(role, location=self.loc2))
 
     def test_location_admin_cannot_access_rooms_outside_scope(self):
-        """LocationAdmin cannot access rooms outside their assigned location"""
-        role = RoleAssignment.objects.create(user=self.user, role="LOCATION_ADMIN", location=self.loc1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="LOCATION_ADMIN",
+            location=self.loc1,
+        )
         self.user.active_role = role
         self.user.save()
 
         self.assertFalse(check_permission(self.user, "ROOM_VIEWER", room=self.room2))
         self.assertFalse(is_in_scope(role, room=self.room2))
 
-   
     def test_site_admin_bypass_location_scope(self):
-        """SITE_ADMIN can access any location or room regardless of assignment"""
         self.assertTrue(check_permission(self.admin_user, "LOCATION_ADMIN", location=self.loc1))
         self.assertTrue(check_permission(self.admin_user, "ROOM_ADMIN", room=self.room2))
         self.assertTrue(is_in_scope(self.site_admin_role, location=self.loc2))
         self.assertTrue(is_in_scope(self.site_admin_role, room=self.room1))
 
     def test_missing_active_role_denied(self):
-        """User without an active role cannot access locations or rooms"""
         self.assertFalse(check_permission(self.user, "LOCATION_ADMIN", location=self.loc1))
         self.assertFalse(check_permission(self.user, "ROOM_ADMIN", room=self.room1))
 
     def test_ensure_permission_raises_for_out_of_scope(self):
-        """ensure_permission should raise PermissionDenied if access is out of scope"""
-        role = RoleAssignment.objects.create(user=self.user, role="LOCATION_ADMIN", location=self.loc1)
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="LOCATION_ADMIN",
+            location=self.loc1,
+        )
         self.user.active_role = role
         self.user.save()
-
 
         with self.assertRaises(PermissionDenied):
             ensure_permission(self.user, "ROOM_ADMIN", room=self.room2)
 
 
-
 class LocationViewerTests(TestCase):
     """
-    Tests for LocationViewer role:
-      - Can view locations and rooms within their assigned scope
-      - Cannot create, update, or delete (CRUD) locations or rooms
-      - Enforces read-only permissions correctly
+    Tests for LocationViewer role.
     """
 
-    def setUp(self):
-        # Departments
-        self.dept1 = DepartmentFactory(name="Chemistry")
+    @classmethod
+    def setUpTestData(cls):
+        cls.dept1 = DepartmentFactory(name="Chemistry")
+        cls.loc1 = LocationFactory(name="Building A", department=cls.dept1)
+        cls.room1 = RoomFactory(name="Lab 101", location=cls.loc1)
 
-        # Location & Room
-        self.loc1 = LocationFactory(name="Building A", department=self.dept1)
-        self.room1 = RoomFactory(name="Lab 101", location=self.loc1)
-
-        # User and role
-        self.user = UserFactory()
-        self.role = RoleAssignment.objects.create(
-            user=self.user,
+        cls.user = UserFactory()
+        cls.role = RoleAssignment.objects.create(
+            user=cls.user,
             role="LOCATION_VIEWER",
-            location=self.loc1
+            location=cls.loc1,
         )
-        self.user.active_role = self.role
-        self.user.save()
+        cls.user.active_role = cls.role
+        cls.user.save()
 
     def test_location_viewer_can_view_location(self):
-        """LocationViewer can view their assigned location"""
         self.assertTrue(check_permission(self.user, "LOCATION_VIEWER", location=self.loc1))
         self.assertTrue(is_in_scope(self.role, location=self.loc1))
 
     def test_location_viewer_cannot_create_location(self):
-        """LocationViewer cannot create a new location"""
         self.assertFalse(check_permission(self.user, "LOCATION_ADMIN", location=self.loc1))
 
     def test_location_viewer_cannot_update_location(self):
-        """LocationViewer cannot update their assigned location"""
         self.assertFalse(check_permission(self.user, "LOCATION_ADMIN", location=self.loc1))
 
     def test_location_viewer_cannot_delete_location(self):
-        """LocationViewer cannot delete their assigned location"""
         self.assertFalse(check_permission(self.user, "LOCATION_ADMIN", location=self.loc1))
 
     def test_location_viewer_can_view_rooms_in_scope(self):
-        """LocationViewer can view rooms under their assigned location"""
         self.assertTrue(check_permission(self.user, "ROOM_VIEWER", room=self.room1))
         self.assertTrue(is_in_scope(self.role, room=self.room1))
 
     def test_location_viewer_cannot_create_update_delete_room(self):
-        """LocationViewer cannot perform admin actions on rooms in their location"""
         self.assertFalse(check_permission(self.user, "ROOM_ADMIN", room=self.room1))
-        self.assertFalse(check_permission(self.user, "ROOM_CLERK", room=self.room1)) 
+        self.assertFalse(check_permission(self.user, "ROOM_CLERK", room=self.room1))
 
 class LocationPermissionAPITests(APITestCase):
     """
@@ -165,40 +161,47 @@ class LocationPermissionAPITests(APITestCase):
       - Role hierarchy
     """
 
-    def setUp(self):
-        self.client = APIClient()
+    @classmethod
+    def setUpTestData(cls):
+        cls.dept = DepartmentFactory(name="Physics")
+        cls.other_dept = DepartmentFactory(name="Other Dept")
 
-        self.dept = DepartmentFactory(name="Physics")
-        self.other_dept = DepartmentFactory(name="Other Dept")
+        cls.loc = LocationFactory(name="Building A", department=cls.dept)
+        cls.other_loc = LocationFactory(name="Building B", department=cls.other_dept)
 
-        self.loc = LocationFactory(name="Building A", department=self.dept)
-        self.other_loc = LocationFactory(name="Building B", department=self.other_dept)
+        cls.viewer = UserFactory()
+        cls.loc_admin = UserFactory()
+        cls.dep_admin = UserFactory()
+        cls.site_admin = AdminUserFactory()
 
-        self.viewer = UserFactory()
-        self.loc_admin = UserFactory()
-        self.dep_admin = UserFactory()
-        self.site_admin = AdminUserFactory()
-
-        # Roles
-        self.viewer.active_role = RoleAssignment.objects.create(
-            user=self.viewer, role="LOCATION_VIEWER", location=self.loc
+        cls.viewer.active_role = RoleAssignment.objects.create(
+            user=cls.viewer,
+            role="LOCATION_VIEWER",
+            location=cls.loc,
         )
-        self.loc_admin.active_role = RoleAssignment.objects.create(
-            user=self.loc_admin, role="LOCATION_ADMIN", location=self.loc
+        cls.loc_admin.active_role = RoleAssignment.objects.create(
+            user=cls.loc_admin,
+            role="LOCATION_ADMIN",
+            location=cls.loc,
         )
-        self.dep_admin.active_role = RoleAssignment.objects.create(
-            user=self.dep_admin, role="DEPARTMENT_ADMIN", department=self.dept
+        cls.dep_admin.active_role = RoleAssignment.objects.create(
+            user=cls.dep_admin,
+            role="DEPARTMENT_ADMIN",
+            department=cls.dept,
         )
-        self.site_admin.active_role = RoleAssignment.objects.create(
-            user=self.site_admin, role="SITE_ADMIN"
+        cls.site_admin.active_role = RoleAssignment.objects.create(
+            user=cls.site_admin,
+            role="SITE_ADMIN",
         )
 
-        for u in [self.viewer, self.loc_admin, self.dep_admin, self.site_admin]:
+        for u in (cls.viewer, cls.loc_admin, cls.dep_admin, cls.site_admin):
             u.save()
 
-        self.url = reverse("location-detail", args=[self.loc.public_id])
-        self.other_url = reverse("location-detail", args=[self.other_loc.public_id])
+        cls.url = reverse("location-detail", args=[cls.loc.public_id])
+        cls.other_url = reverse("location-detail", args=[cls.other_loc.public_id])
 
+    def setUp(self):
+            self.client = APIClient()
     # ---------------- VIEWER ----------------
 
     def test_location_viewer_can_get(self):

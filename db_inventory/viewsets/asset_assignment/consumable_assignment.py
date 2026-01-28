@@ -151,7 +151,7 @@ class UseConsumableView(AuditMixin, APIView):
     permission_classes = [CanUseAsset]
 
     def post(self, request):
-        serializer = UseConsumableSerializer(data=request.data)
+        serializer = UseConsumableSerializer( data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         consumable = serializer.validated_data["consumable"]
@@ -160,12 +160,19 @@ class UseConsumableView(AuditMixin, APIView):
 
         with transaction.atomic():
             # Find an active issue for this user + consumable
-            issue = get_object_or_404(
-                ConsumableIssue.objects.select_for_update(),
-                consumable=consumable,
-                user=request.user,
-                returned_at__isnull=True,
+            issue = (
+            ConsumableIssue.objects
+                .select_for_update()
+                .filter(
+                    consumable=consumable,
+                    user=request.user,
+                    returned_at__isnull=True,
+                )
+                .first()
             )
+
+            if not issue:
+                raise ValidationError( "You no longer have any remaining quantity of this consumable.")
 
             if quantity > issue.quantity:
                 raise ValidationError(

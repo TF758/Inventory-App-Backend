@@ -21,10 +21,9 @@ urlpatterns = [
     path("accessories/return/", accessory_assignnment.AdminReturnAccessoryView.as_view(), name="return-accessory"),
     path("accessories/<str:public_id>/distribution/", accessory_assignnment.AccessoryDistributionView.as_view(),name="accessory-distribution",),
 
-    path("inventory/accessories/<str:public_id>/events/", accessory_assignnment.AccessoryEventHistoryViewSet.as_view({"get": "list"}), name="accessory-event-history"),
-    path("inventory/accessories/return/", accessory_assignnment.AdminReturnAccessoryView.as_view(), name="accessory-return"),
-    path("inventory/accessories/restock/", accessory_assignnment.RestockAccessoryView.as_view(), name="accessory-restock"),
-    path("inventory/accessories/use/", accessory_assignnment.UseAccessoryView.as_view(), name="use-accessory"),
+    path("accessories/<str:public_id>/events/", accessory_assignnment.AccessoryEventHistoryViewSet.as_view({"get": "list"}), name="accessory-event-history"),
+    path("accessories/restock/", accessory_assignnment.RestockAccessoryView.as_view(), name="accessory-restock"),
+    path("accessories/use/", accessory_assignnment.UseAccessoryView.as_view(), name="use-accessory"),
 
     path("consumables/<str:public_id>/events/", ConsumableEventHistoryViewSet.as_view({"get": "list"}), name="consumable-event-history"),
     path("consumables/restock/", RestockConsumableView.as_view(), name="consumable-restock"),
