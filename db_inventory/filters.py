@@ -1,6 +1,7 @@
 import django_filters
 from db_inventory.models import *
 from django.db.models import Case, When, Value, IntegerField, Q
+from db_inventory.utils.filters import BaseAssetNameFilter
 
 class UserFilter(django_filters.FilterSet):
     email = django_filters.CharFilter(lookup_expr="istartswith")
@@ -449,3 +450,24 @@ class SiteNameChangeHistoryFilter(django_filters.FilterSet):
             "object_public_id",
             "user_email",
         ]
+
+class SelfEquipmentFilter(BaseAssetNameFilter):
+    name_field = "equipment__name"
+
+    class Meta:
+        model = EquipmentAssignment
+        fields = ["name"]
+
+class SelfAccessoryFilter(BaseAssetNameFilter):
+    name_field = "accessory__name"
+
+    class Meta:
+        model = AccessoryAssignment
+        fields = ["name"]
+
+class SelfConsumableFilter(BaseAssetNameFilter):
+    name_field = "consumable__name"
+
+    class Meta:
+        model = ConsumableIssue
+        fields = ["name"]

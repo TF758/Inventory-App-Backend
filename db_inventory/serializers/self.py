@@ -139,9 +139,9 @@ class SelfConsumableIssueSerializer(serializers.ModelSerializer):
         fields = (
             "public_id",
             "name",
-            "quantity",        # ← remaining quantity (important)
+            "quantity",       
             "assigned_at",
             "room_name",
             "room_public_id",
-            "purpose",         # optional but useful context
+            "purpose",       
         )

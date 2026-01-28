@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from db_inventory.serializers.self import  SelfAccessoryAssignmentSerializer, SelfConsumableIssueSerializer, SelfUserProfileSerializer
 from django_filters.rest_framework import DjangoFilterBackend
-from db_inventory.filters import EquipmentAssignmentFilter
+from db_inventory.filters import EquipmentAssignmentFilter, SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter
 from db_inventory.pagination import FlexiblePagination
 from django.db.models import Count, Q
 from rest_framework.viewsets import GenericViewSet
@@ -69,7 +69,7 @@ class SelfAssignedEquipmentViewSet(ListModelMixin, GenericViewSet):
     pagination_class = FlexiblePagination
 
     filter_backends = [DjangoFilterBackend]
-    filterset_class = EquipmentAssignmentFilter
+    filterset_class = SelfEquipmentFilter
 
     def get_queryset(self):
        return (
@@ -97,7 +97,9 @@ class SelfAccessoryViewSet(ListModelMixin, GenericViewSet):
     serializer_class = SelfAccessoryAssignmentSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
-    # filterset_class = EquipmentAssignmentFilter 
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfAccessoryFilter 
 
     def get_queryset(self):
         return (
@@ -123,6 +125,9 @@ class SelfConsumableViewSet(ListModelMixin, GenericViewSet):
     serializer_class = SelfConsumableIssueSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfConsumableFilter 
 
     def get_queryset(self):
         return (
