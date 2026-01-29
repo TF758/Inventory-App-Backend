@@ -28,6 +28,12 @@ class FlexiblePagination(PageNumberPagination):
 
     def paginate_queryset(self, queryset, request, view=None):
         paginate_param = request.query_params.get("paginate")
-        if paginate_param and paginate_param.lower() == "false":
-            return None  # disables pagination, returns full queryset
+
+        if (
+            paginate_param
+            and paginate_param.lower() == "false"
+            and request.user.is_staff
+        ):
+            return None
+
         return super().paginate_queryset(queryset, request, view)

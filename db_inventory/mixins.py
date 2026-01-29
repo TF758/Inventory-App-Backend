@@ -7,6 +7,8 @@ from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWrit
 from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
 from django.utils.text import capfirst
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 class ScopeFilterMixin:
     """
@@ -426,10 +428,10 @@ class ListDetailSerializerMixin:
             return self.list_serializer_class
         return super().get_serializer_class()
 
+
 class NotificationMixin:
     """
     Mixin to create user-facing notifications after successful DB commits.
-
     """
 
     def notify(
@@ -443,16 +445,14 @@ class NotificationMixin:
         entity=None,
         actor=None,
     ):
-        """
-        Schedule a notification after transaction commit.
-        """
-
         if not recipient or recipient.is_anonymous:
             return
 
-        def _create_notification():
-            Notification.objects.create(
-                recipient=recipient,
+        channel_layer = get_channel_layer()
+
+        def _create_and_send(user, *, title, message, notif_type):
+            notification = Notification.objects.create(
+                recipient=user,
                 type=notif_type,
                 level=level,
                 title=title,
@@ -461,4 +461,39 @@ class NotificationMixin:
                 entity_id=getattr(entity, "public_id", None),
             )
 
-        transaction.on_commit(_create_notification)
+            payload = {
+                "public_id": notification.public_id,
+                "type": notification.type,
+                "level": notification.level,
+                "title": notification.title,
+                "message": notification.message,
+                "created_at": notification.created_at.isoformat(),
+            }
+
+            group_name = f"user_{user.public_id}"
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "notification",
+                    "payload": payload,
+                },
+            )
+
+        def _on_commit():
+            _create_and_send(
+                recipient,
+                title=title,
+                message=message,
+                notif_type=notif_type,
+            )
+
+            # # 2️⃣ ALSO notify the actor with a generic confirmation
+            # if actor and not actor.is_anonymous:
+            #     _create_and_send(
+            #         actor,
+            #         title="Action completed",
+            #         message="Your action was completed successfully.",
+            #         notif_type="action_confirmation",
+            #     )
+
+        transaction.on_commit(_on_commit)
