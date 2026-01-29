@@ -6,8 +6,16 @@ import logging
 from db_inventory.models.users import User
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.audit import AuditLog
+from db_inventory.models.security import Notification
+from django.utils import timezone
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
+
+def retention_delta(*, minutes_setting=None, days_setting=None):
+    if minutes_setting and hasattr(settings, minutes_setting):
+        return timedelta(minutes=getattr(settings, minutes_setting))
+    return timedelta(days=getattr(settings, days_setting))
 
 @shared_task(
     bind=True,
@@ -118,4 +126,133 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
         target_model="User",
         target_id=user.public_id,
         target_name=user.email,
+    )
+
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def auto_read_stale_notifications(self):
+    now = timezone.now()
+
+    info_cutoff = now - retention_delta(
+        minutes_setting="NOTIF_INFO_AUTO_READ_MINUTES",
+        days_setting="NOTIF_INFO_AUTO_READ_DAYS",
+    )
+
+    warning_cutoff = now - retention_delta(
+        minutes_setting="NOTIF_WARNING_AUTO_READ_MINUTES",
+        days_setting="NOTIF_WARNING_AUTO_READ_DAYS",
+    )
+
+    info_updated = (
+        Notification.objects
+        .filter(
+            level=Notification.Level.INFO,
+            is_read=False,
+            is_deleted=False,
+            created_at__lt=info_cutoff,
+        )
+        .update(is_read=True, read_at=now)
+    )
+
+    warning_updated = (
+        Notification.objects
+        .filter(
+            level=Notification.Level.WARNING,
+            is_read=False,
+            is_deleted=False,
+            created_at__lt=warning_cutoff,
+        )
+        .update(is_read=True, read_at=now)
+    )
+
+    return {
+        "info_auto_read": info_updated,
+        "warning_auto_read": warning_updated,
+    }
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def cleanup_notifications(self):
+    now = timezone.now()
+    deleted = {}
+
+    # -------------------------------
+    # Soft-deleted notifications
+    # -------------------------------
+    deleted["soft_info"] = (
+        Notification.objects
+        .filter(
+            is_deleted=True,
+            level=Notification.Level.INFO,
+            deleted_at__lt=now - retention_delta(
+                minutes_setting="NOTIF_INFO_SOFT_DELETE_MINUTES",
+                days_setting="NOTIF_INFO_SOFT_DELETE_DAYS",
+            ),
+        )
+        .delete()[0]
+    )
+
+    deleted["soft_warning"] = (
+        Notification.objects
+        .filter(
+            is_deleted=True,
+            level=Notification.Level.WARNING,
+            deleted_at__lt=now - retention_delta(
+                minutes_setting="NOTIF_WARNING_SOFT_DELETE_MINUTES",
+                days_setting="NOTIF_WARNING_SOFT_DELETE_DAYS",
+            ),
+        )
+        .delete()[0]
+    )
+
+    # -------------------------------
+    # Read notifications
+    # -------------------------------
+    deleted["read_info"] = (
+        Notification.objects
+        .filter(
+            is_read=True,
+            level=Notification.Level.INFO,
+            read_at__lt=now - retention_delta(
+                minutes_setting="NOTIF_INFO_DELETE_MINUTES",
+                days_setting="NOTIF_INFO_DELETE_DAYS",
+            ),
+        )
+        .delete()[0]
+    )
+
+    deleted["read_warning"] = (
+        Notification.objects
+        .filter(
+            is_read=True,
+            level=Notification.Level.WARNING,
+            read_at__lt=now - retention_delta(
+                minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
+                days_setting="NOTIF_WARNING_DELETE_DAYS",
+            ),
+        )
+        .delete()[0]
+    )
+
+    deleted["read_critical"] = (
+        Notification.objects
+        .filter(
+            is_read=True,
+            level=Notification.Level.CRITICAL,
+            read_at__lt=now - retention_delta(
+                minutes_setting="NOTIF_CRITICAL_DELETE_MINUTES",
+                days_setting="NOTIF_CRITICAL_DELETE_DAYS",
+            ),
+        )
+        .delete()[0]
     )

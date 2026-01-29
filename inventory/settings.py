@@ -330,7 +330,22 @@ CSRF_TRUSTED_ORIGINS = env.list(
     ],
 )
 
+# -------------------------------------------------
+# Notification retention (days)
+# -------------------------------------------------
 
+# Auto-read grace periods
+NOTIF_INFO_AUTO_READ_DAYS = env.int("NOTIF_INFO_AUTO_READ_DAYS", default=7)
+NOTIF_WARNING_AUTO_READ_DAYS = env.int("NOTIF_WARNING_AUTO_READ_DAYS", default=14)
+
+# Hard delete after read
+NOTIF_INFO_DELETE_DAYS = env.int("NOTIF_INFO_DELETE_DAYS", default=7)
+NOTIF_WARNING_DELETE_DAYS = env.int("NOTIF_WARNING_DELETE_DAYS", default=14)
+NOTIF_CRITICAL_DELETE_DAYS = env.int("NOTIF_CRITICAL_DELETE_DAYS", default=90)
+
+# Hard delete after soft delete
+NOTIF_INFO_SOFT_DELETE_DAYS = env.int("NOTIF_INFO_SOFT_DELETE_DAYS", default=3)
+NOTIF_WARNING_SOFT_DELETE_DAYS = env.int("NOTIF_WARNING_SOFT_DELETE_DAYS", default=7)
 try:
     SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
     SESSION_ABSOLUTE_DAYS = int(os.environ["SESSION_ABSOLUTE_DAYS"])
@@ -350,3 +365,14 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_BACKEND = "django-db"
 
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+
+NOTIF_AUTO_READ_CRON = env(
+    "NOTIF_AUTO_READ_CRON",
+    default="0 2 * * *",
+)
+
+NOTIF_CLEANUP_CRON = env(
+    "NOTIF_CLEANUP_CRON",
+    default="0 3 * * *",
+)
