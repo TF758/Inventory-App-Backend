@@ -8,7 +8,7 @@ from django.conf import settings
 from db_inventory.utils.tokens import PasswordResetToken
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
-
+from db_inventory.tasks import admin_reset_user_password
 
 
 class TempPasswordChangeSerializer(serializers.Serializer):
@@ -79,29 +79,13 @@ class AdminPasswordResetSerializer(serializers.Serializer):
 
         return value
 
-    def save(self, admin):
-        token_service = PasswordResetToken()
-        event = token_service.generate_token(
+    def save(self, *, admin):
+
+
+        admin_reset_user_password.delay(
             user_public_id=self.user.public_id,
             admin_public_id=admin.public_id,
         )
-
-        reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
-
-        send_mail(
-            subject="Administrator-Initiated Password Reset",
-            message=(
-                "An administrator has initiated a password reset for your account.\n\n"
-                "This link expires in 10 minutes:\n\n"
-                f"{reset_link}\n\n"
-                "If you did not expect this, contact support immediately."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[self.user.email],
-            fail_silently=False,
-        )
-
-        return reset_link
     
 
 class PasswordResetConfirmSerializer(serializers.Serializer):

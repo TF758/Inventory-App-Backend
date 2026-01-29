@@ -106,29 +106,19 @@ class AdminResetUserPasswordView(AuditMixin, APIView):
     Admin triggers a password reset for a user using public_id.
     Sends an email with a token-based reset link.
     """
+
     def post(self, request, user_public_id):
         serializer = AdminPasswordResetSerializer(
             data={"user_public_id": user_public_id}
         )
         serializer.is_valid(raise_exception=True)
-        
-        self.audit(
-            event_type=AuditLog.Events.ADMIN_RESET_PASSWORD,
-            target=serializer.user,
-            description="Admin initiated password reset",
-            metadata={
-                "initiated_by_admin": True,
-                "admin_public_id": request.user.public_id,
-            },
-        )
+
+        serializer.save(admin=request.user)
 
         return Response(
-            {
-                "detail": "Password reset link sent to user.",
-            },
-            status=status.HTTP_200_OK
+            {"detail": "Password reset link sent to user."},
+            status=status.HTTP_200_OK,
         )
-    
 
 class ChangePasswordView(APIView):
 

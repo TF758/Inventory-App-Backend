@@ -69,3 +69,53 @@ def send_password_reset_email(self, email: str):
             user.public_id,
         )
         raise
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 3, "countdown": 10},
+    retry_backoff=True,
+)
+def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str):
+    user = User.objects.get(public_id=user_public_id)
+    admin = User.objects.get(public_id=admin_public_id)
+
+    token_service = PasswordResetToken()
+    event = token_service.generate_token(
+        user_public_id=user.public_id,
+        admin_public_id=admin.public_id,
+    )
+
+    reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
+
+    send_mail(
+        subject="Administrator-Initiated Password Reset",
+        message=(
+            "An administrator has initiated a password reset for your account.\n\n"
+            "This link expires in 10 minutes:\n\n"
+            f"{reset_link}\n\n"
+            "If you did not expect this, contact support immediately."
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+    AuditLog.objects.create(
+        user=admin,
+        user_public_id=admin.public_id,
+        user_email=admin.email,
+
+        event_type=AuditLog.Events.ADMIN_RESET_PASSWORD,
+        description="Admin initiated password reset",
+        metadata={
+            "initiated_by_admin": True,
+            "admin_public_id": admin.public_id,
+        },
+
+        target_model="User",
+        target_id=user.public_id,
+        target_name=user.email,
+    )
