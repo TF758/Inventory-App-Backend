@@ -21,25 +21,25 @@ import sys
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ------------------------------------------------------------
+# Environment detection & configuration
+# ------------------------------------------------------------
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
+IN_DOCKER = os.path.exists("/.dockerenv")
 
+# Default to local unless explicitly told otherwise
+DJANGO_ENV = os.environ.get(
+    "DJANGO_ENV",
+    "dev" if IN_DOCKER else "local",
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# Initialize environment variables
-env = environ.Env(DEBUG=(bool, False))  # default value for DEBUG if not in .env )
+env = environ.Env(DEBUG=(bool, False))
 
-
-# Read the .env file
-ENV = os.environ.get("DJANGO_ENV", "dev")  # default to dev
-
-env_file = BASE_DIR / f".env.{ENV}"
-
+env_file = BASE_DIR / f".env.{DJANGO_ENV}"
 if env_file.exists():
-    environ.Env.read_env(env_file=env_file)
+    environ.Env.read_env(env_file)
 else:
     print(f"Warning: env file not found: {env_file}")
 

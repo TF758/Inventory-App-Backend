@@ -9,6 +9,8 @@ services:
       - "8000:8000"
     env_file:
       - .env.dev
+    environment:
+      DJANGO_ENV: dev
     depends_on:
       - db
 
@@ -25,6 +27,7 @@ services:
     env_file:
       - .env.dev
     environment:
+      DJANGO_ENV: dev
       DJANGO_SETTINGS_MODULE: inventory.settings
     depends_on:
       - redis
