@@ -8,6 +8,7 @@ from db_inventory.models import PasswordResetEvent, User
 
 class PasswordResetToken:
     EXPIRY_MINUTES = 10
+    COOLDOWN_MINUTES = 2
 
     def __init__(self):
         self.signer = TimestampSigner(salt="password-reset")
@@ -24,6 +25,16 @@ class PasswordResetToken:
             user = User.objects.get(public_id=user_public_id)
         except User.DoesNotExist:
             raise ValueError("User not found")
+        
+        recent_token_exists = PasswordResetEvent.objects.filter(
+            user=user,
+            is_active=True,
+            used_at__isnull=True,
+            created_at__gte=timezone.now() - timedelta(minutes=self.COOLDOWN_MINUTES),
+        ).exists()
+
+        if recent_token_exists:
+            return None
 
         admin_user = None
         if admin_public_id:

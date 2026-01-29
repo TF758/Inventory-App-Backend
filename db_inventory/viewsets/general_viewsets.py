@@ -377,10 +377,7 @@ class SerializerFieldsView(APIView):
 
 class PasswordResetRequestView(AuditMixin, APIView):
 
-    throttle_classes = [PasswordResetThrottle]
-
-    """Initiate password reset by sending email with reset link."""
-
+    # throttle_classes = [PasswordResetThrottle]
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -388,18 +385,10 @@ class PasswordResetRequestView(AuditMixin, APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        user = getattr(serializer, "user", None)
-
-        if user:
-            self.audit(
-                event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
-                target=user,
-                description="Password reset requested",
-                metadata={
-                    "initiated_by_admin": False,
-                },
+        return Response(
+            {"detail": "If an account exists, a password reset email has been sent."},
+            status=200,
         )
-        return Response({"detail": "If an account exists, a password reset email has been sent."}, status=200)
 
 class PasswordResetConfirmView(AuditMixin, APIView):
     """
