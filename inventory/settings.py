@@ -87,9 +87,21 @@ INSTALLED_APPS = [
     "django_extensions",
 
      "django_celery_results",
-      "django_celery_beat",
+    "django_celery_beat",
+     "channels",
     
 ]
+
+ASGI_APPLICATION = "inventory.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
