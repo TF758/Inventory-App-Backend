@@ -91,14 +91,33 @@ INSTALLED_APPS = [
      "channels",
     
 ]
+# -------------------------------------------------
+# Redis configuration
+# -------------------------------------------------
 
+REDIS_HOST = env("REDIS_HOST", default="redis")
+REDIS_PORT = env.int("REDIS_PORT", default=6379)
+
+# Logical Redis DBs (single Redis instance)
+REDIS_DB_CELERY = env.int("REDIS_DB_CELERY", default=0)
+REDIS_DB_CHANNELS = env.int("REDIS_DB_CHANNELS", default=1)
+REDIS_DB_REPORTS = env.int("REDIS_DB_REPORTS", default=2)
+
+REDIS_BASE_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+
+REDIS_CELERY_URL = f"{REDIS_BASE_URL}/{REDIS_DB_CELERY}"
+REDIS_CHANNELS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_CHANNELS}"
+REDIS_REPORTS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_REPORTS}"
+
+# Report cache
+REPORT_CACHE_TTL_SECONDS = env.int("REPORT_CACHE_TTL_SECONDS", default=900)
 ASGI_APPLICATION = "inventory.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],
+           "hosts": [REDIS_CHANNELS_URL],
         },
     },
 }
@@ -359,7 +378,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
 
-CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_BROKER_URL = REDIS_CELERY_URL
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_BACKEND = "django-db"

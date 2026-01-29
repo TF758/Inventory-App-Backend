@@ -1,12 +1,12 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils import timezone
 import io
 from openpyxl import Workbook
 from db_inventory.models import Equipment, Component, Consumable, Accessory
 from django.db.models import Q
+
 
 class TimeSeriesViewset(ReadOnlyModelViewSet):
     """Base class for returning date-based metrics suitable for graphs."""
@@ -46,6 +46,8 @@ class TimeSeriesViewset(ReadOnlyModelViewSet):
             "labels": labels,
             "data": data
         })
+
+
     
 def build_site_filter(site_type, site_obj, model_class):
     """

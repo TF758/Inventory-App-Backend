@@ -1,4 +1,5 @@
-from inventory_metrics.utils import generate_site_asset_excel
+
+from inventory_metrics.utils.viewset_helpers import generate_site_asset_excel
 from inventory_metrics.serializers.site_reports import SiteAssetRequestSerializer
 from rest_framework.views import APIView
 from db_inventory.models import Department, Location, Room, AuditLog

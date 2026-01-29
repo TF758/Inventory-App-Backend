@@ -7,7 +7,6 @@ from django.db.models import Count, Q
 from db_inventory.permissions import ROLE_HIERARCHY
 from django.utils import timezone
 
-# provides snapshot data for application
 
 class AdminMetricsOverview(APIView):
     def get(self, request):
