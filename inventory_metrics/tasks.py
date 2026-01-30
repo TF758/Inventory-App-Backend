@@ -68,7 +68,10 @@ def generate_user_summary_report_task(self, report_job_id: int):
                 title="Your report is ready",
                 message="Click to download your report.",
                 entity=job,
-            )
+                meta={
+                "report_type": "user_summary",
+                "formats": ["xlsx", "json"],
+            },)
             job.notification_sent = True
             job.save(update_fields=["notification_sent"])
 

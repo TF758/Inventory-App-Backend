@@ -444,6 +444,7 @@ class NotificationMixin:
         level: Notification.Level = Notification.Level.INFO,
         entity=None,
         actor=None,
+        meta=None, 
     ):
         if not recipient or recipient.is_anonymous:
             return
@@ -459,6 +460,7 @@ class NotificationMixin:
                 message=message,
                 entity_type=entity.__class__.__name__.lower() if entity else None,
                 entity_id=getattr(entity, "public_id", None),
+                meta=meta,
             )
 
             # 🔔 Payload sent over WebSocket
@@ -477,6 +479,7 @@ class NotificationMixin:
                     if notification.entity_id
                     else None
                 ),
+                "meta": notification.meta, 
             }
 
             group_name = f"user_{user.public_id}"

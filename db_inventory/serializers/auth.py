@@ -270,6 +270,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             "entity",
             "is_read",
             "created_at",
+             "meta",  
         ]
 
     def get_entity(self, obj):
