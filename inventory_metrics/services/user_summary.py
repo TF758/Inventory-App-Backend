@@ -66,4 +66,31 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
             "events": {e["event_type"]: e["count"] for e in event_counts},
         }
 
+    if "roleSummary" in sections:
+        roles = user.role_assignments.select_related(
+            "department", "location", "room"
+        )
+
+        data["roleSummary"] = [
+            {
+                "role_name": role.get_role_display(),
+                "scope": (
+                    role.department.name if role.department else
+                    role.location.name if role.location else
+                    role.room.name if role.room else
+                    "Entire Site"
+                ),
+                "assigned_date": role.assigned_date,
+            }
+            for role in roles
+        ]
+
+    if "passwordevents" in sections:
+        resets = user.password_reset_events.all()
+
+        data["passwordevents"] = {
+            "total_password_reset_events": resets.count(),
+            "active_reset_tokens": resets.filter(is_active=True).count(),
+        }
+
     return data

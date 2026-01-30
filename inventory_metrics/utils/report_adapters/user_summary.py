@@ -41,4 +41,30 @@ def user_summary_to_workbook_spec(payload: dict) -> dict:
             "rows": rows,
         }
 
+    if "roleSummary" in payload:
+        roles = payload["roleSummary"]
+
+        spec["Role Summary"] = {
+            "headers": ["Role", "Scope", "Assigned Date"],
+            "rows": [
+                [
+                    r["role_name"],
+                    r["scope"],
+                    r["assigned_date"],
+                ]
+                for r in roles
+            ],
+        }
+
+    if "passwordevents" in payload:
+        pe = payload["passwordevents"]
+
+        spec["Password Events"] = {
+            "headers": ["Metric", "Value"],
+            "rows": [
+                ["Total password reset events", pe["total_password_reset_events"]],
+                ["Active reset tokens", pe["active_reset_tokens"]],
+            ],
+        }
+
     return spec
