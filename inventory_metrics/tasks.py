@@ -8,9 +8,10 @@ from inventory_metrics.models import ReportJob
 from inventory_metrics.services.user_summary import build_user_summary_report
 from django.conf import settings
 import redis
+from inventory_metrics.redis import redis_reports_client
+from db_inventory.models.security import Notification
+redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
-
-redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
 
 @shared_task(
@@ -23,53 +24,61 @@ def generate_user_summary_report_task(self, report_job_id: int):
     job = ReportJob.objects.select_related("user").get(id=report_job_id)
     notifier = NotificationMixin()
 
-    # ---- mark running -------------------------------------------------
+    # -----------------------------
+    # Mark RUNNING
+    # -----------------------------
     with transaction.atomic():
         job.status = ReportJob.Status.RUNNING
         job.started_at = timezone.now()
         job.save(update_fields=["status", "started_at"])
 
     try:
-        # ---- build report payload -------------------------------------
+        # -----------------------------
+        # Build payload
+        # -----------------------------
         payload = build_user_summary_report(
             user_identifier=job.params["user"],
             sections=job.params["sections"],
         )
 
-        serialized_payload = json.dumps(payload, default=str)
-
         redis_key = f"report:{job.public_id}"
 
-        # ---- cache in Redis (TTL handled by Redis) --------------------
-        redis_client.setex(
+        # -----------------------------
+        # Cache in Redis (DB 2)
+        # -----------------------------
+        redis_reports_client.setex(
             redis_key,
             settings.REPORT_CACHE_TTL_SECONDS,
-            serialized_payload,
+            json.dumps(payload, default=str),
         )
 
-        # ---- mark done + notify (after commit) ------------------------
+        # -----------------------------
+        # Mark DONE + notify
+        # -----------------------------
         with transaction.atomic():
             job.status = ReportJob.Status.DONE
             job.finished_at = timezone.now()
             job.save(update_fields=["status", "finished_at"])
 
             if not job.notification_sent:
-                notifier.notify(
-                    recipient=job.user,
-                    notif_type="report_ready",
-                    title="Your report is ready",
-                    message="Click to download your report.",
-                    entity=job,
-                )
-                job.notification_sent = True
-                job.save(update_fields=["notification_sent"])
+              notifier.notify(
+                recipient=job.user,
+                notif_type=Notification.NotificationType.REPORT_READY,
+                level=Notification.Level.INFO,
+                title="Your report is ready",
+                message="Click to download your report.",
+                entity=job,
+            )
+            job.notification_sent = True
+            job.save(update_fields=["notification_sent"])
 
     except Exception as exc:
-        # ---- mark failed ---------------------------------------------
+        # -----------------------------
+        # Mark FAILED
+        # -----------------------------
         with transaction.atomic():
             job.status = ReportJob.Status.FAILED
             job.error = str(exc)
             job.finished_at = timezone.now()
             job.save(update_fields=["status", "error", "finished_at"])
-
         raise

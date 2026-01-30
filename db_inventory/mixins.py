@@ -438,10 +438,10 @@ class NotificationMixin:
         self,
         *,
         recipient,
-        notif_type,
-        title,
-        message,
-        level=Notification.Level.INFO,
+        notif_type: Notification.NotificationType,
+        title: str,
+        message: str,
+        level: Notification.Level = Notification.Level.INFO,
         entity=None,
         actor=None,
     ):
@@ -450,7 +450,7 @@ class NotificationMixin:
 
         channel_layer = get_channel_layer()
 
-        def _create_and_send(user, *, title, message, notif_type):
+        def _create_and_send(user):
             notification = Notification.objects.create(
                 recipient=user,
                 type=notif_type,
@@ -461,6 +461,7 @@ class NotificationMixin:
                 entity_id=getattr(entity, "public_id", None),
             )
 
+            # 🔔 Payload sent over WebSocket
             payload = {
                 "public_id": notification.public_id,
                 "type": notification.type,
@@ -468,9 +469,18 @@ class NotificationMixin:
                 "title": notification.title,
                 "message": notification.message,
                 "created_at": notification.created_at.isoformat(),
+                "entity": (
+                    {
+                        "type": notification.entity_type,
+                        "id": notification.entity_id,
+                    }
+                    if notification.entity_id
+                    else None
+                ),
             }
 
             group_name = f"user_{user.public_id}"
+
             async_to_sync(channel_layer.group_send)(
                 group_name,
                 {
@@ -479,21 +489,5 @@ class NotificationMixin:
                 },
             )
 
-        def _on_commit():
-            _create_and_send(
-                recipient,
-                title=title,
-                message=message,
-                notif_type=notif_type,
-            )
-
-            # # 2️⃣ ALSO notify the actor with a generic confirmation
-            # if actor and not actor.is_anonymous:
-            #     _create_and_send(
-            #         actor,
-            #         title="Action completed",
-            #         message="Your action was completed successfully.",
-            #         notif_type="action_confirmation",
-            #     )
-
-        transaction.on_commit(_on_commit)
+        # ✅ Ensure notification fires only after DB commit
+        transaction.on_commit(lambda: _create_and_send(recipient))

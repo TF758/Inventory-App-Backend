@@ -264,6 +264,10 @@ CORS_ALLOW_HEADERS = [
      "Content-Disposition",
 ]
 
+CORS_EXPOSE_HEADERS = [
+    "Content-Disposition",
+]
+
 SIMPLE_JWT = {
     # Lifetimes
     "ACCESS_TOKEN_LIFETIME": timedelta(

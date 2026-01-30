@@ -12,25 +12,18 @@ def autosize_columns(ws):
         ws.column_dimensions[col_letter].width = max_length + 2
 
 
-def render_workbook(workbook_spec: dict) -> Workbook:
-    """
-    Generic Excel renderer.
 
-    workbook_spec = {
-        "Sheet Name": {
-            "headers": [...],
-            "rows": [[...], [...]]
-        }
-    }
-    """
+def render_workbook(spec: dict) -> Workbook:
     wb = Workbook()
-    wb.remove(wb.active)
+    default_ws = wb.active
+    created_any = False
 
-    for sheet_name, spec in workbook_spec.items():
-        ws = wb.create_sheet(title=sheet_name)
+    for sheet_name, sheet in spec.items():
+        ws = wb.create_sheet(title=str(sheet_name)[:31])
+        created_any = True
 
-        headers = spec.get("headers", [])
-        rows = spec.get("rows", [])
+        headers = sheet.get("headers", [])
+        rows = sheet.get("rows", [])
 
         if headers:
             ws.append(headers)
@@ -38,6 +31,13 @@ def render_workbook(workbook_spec: dict) -> Workbook:
         for row in rows:
             ws.append(row)
 
-        autosize_columns(ws)
+    # Remove default sheet if we created our own
+    if created_any and default_ws.title == "Sheet":
+        wb.remove(default_ws)
+
+    # Safety: Excel REQUIRES at least one visible sheet
+    if not wb.sheetnames:
+        ws = wb.create_sheet(title="Report")
+        ws.append(["No data available"])
 
     return wb

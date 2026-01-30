@@ -54,7 +54,6 @@ class UserSession(models.Model):
         return hashlib.sha256((ua or "").encode()).hexdigest()
     
 class Notification(PublicIDModel):
-   
     PUBLIC_ID_PREFIX = "NTF"
 
     class Level(models.TextChoices):
@@ -62,22 +61,29 @@ class Notification(PublicIDModel):
         WARNING = "warning", "Warning"
         CRITICAL = "critical", "Critical"
 
-    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications", )
-    type = models.CharField(max_length=100, help_text="Machine-readable notification type (e.g. asset_assigned)", )
-    level = models.CharField(max_length=20, choices=Level.choices, default=Level.INFO, db_index=True, help_text="Severity level of the notification", )
-    title = models.CharField( max_length=150, help_text="Short notification title", )
-    message = models.CharField( max_length=255, help_text="Human-readable message shown to the user", )
-    entity_type = models.CharField( max_length=100, null=True, blank=True, help_text="Model or domain type (e.g. asset)", )
-    entity_id = models.CharField( max_length=100, null=True, blank=True, help_text="Public ID of the related object", )
-    # State
+    class NotificationType(models.TextChoices):
+        REPORT_READY = "report_ready", "Report Ready"
+        ASSET_ASSIGNED = "asset_assigned", "Asset Assigned"
+        PASSWORD_RESET = "password_reset", "Password Reset"
+
+    recipient = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications", )
+
+    type = models.CharField( max_length=100, choices=NotificationType.choices, db_index=True, )
+
+    level = models.CharField( max_length=20, choices=Level.choices, default=Level.INFO, db_index=True, )
+    title = models.CharField(max_length=150)
+    message = models.CharField(max_length=255)
+
+    entity_type = models.CharField(max_length=100, null=True, blank=True)
+    entity_id = models.CharField(max_length=100, null=True, blank=True)
+
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
 
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
-    created_at = models.DateTimeField( default=timezone.now, db_index=True, )
-
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
     class Meta:
         ordering = ["-created_at"]
         indexes = [

@@ -11,7 +11,7 @@ import json
 from inventory_metrics.utils.excel_renderer import render_workbook
 from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
 from inventory_metrics.models.reports import ReportJob
-
+from inventory_metrics.redis import redis_reports_client
 from django.utils import timezone
 
 
@@ -55,7 +55,7 @@ class DownloadReport(APIView):
             )
 
         redis_key = f"report:{job.public_id}"
-        cached_payload = redis_client.get(redis_key)
+        cached_payload = redis_reports_client.get(redis_key)
 
         if not cached_payload:
             raise Http404("Report expired. Please regenerate.")
