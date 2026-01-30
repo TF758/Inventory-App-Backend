@@ -77,6 +77,8 @@ class Notification(PublicIDModel):
     entity_type = models.CharField(max_length=100, null=True, blank=True)
     entity_id = models.CharField(max_length=100, null=True, blank=True)
 
+    meta = models.JSONField(null=True, blank=True) 
+
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
 
