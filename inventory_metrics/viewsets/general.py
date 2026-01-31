@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 import io
 import json
-from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec
+from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec, site_audit_log_to_workbook_spec
 from inventory_metrics.utils.excel_renderer import render_workbook
 from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
 from inventory_metrics.models.reports import ReportJob
@@ -21,14 +21,17 @@ redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 REPORT_RENDERERS = {
     "user_summary": {
         "xlsx": user_summary_to_workbook_spec,
-        "json": None,  # raw payload is returned
+        "json": None,
     },
     "site_assets": {
         "xlsx": site_asset_to_workbook_spec,
         "json": None,
     },
+    "site_audit_logs": {
+        "xlsx": site_audit_log_to_workbook_spec,
+        "json": None,
+    },
 }
-
 
 class DownloadReport(APIView):
     permission_classes = [IsAuthenticated]

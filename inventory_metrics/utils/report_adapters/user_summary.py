@@ -1,70 +1,98 @@
 def user_summary_to_workbook_spec(payload: dict) -> dict:
+    if not payload:
+        raise ValueError("Empty user summary payload")
+
     spec = {}
 
     # --------------------
     # Demographics
     # --------------------
-    if "demographics" in payload:
-        spec["Demographics"] = {
-            "headers": ["Field", "Value"],
-            "rows": [
-                [key.replace("_", " ").title(), value]
-                for key, value in payload["demographics"].items()
-            ],
-        }
+    demographics = payload.get("demographics")
+    if demographics:
+        rows = [
+            [key.replace("_", " ").title(), value]
+            for key, value in demographics.items()
+        ]
+    else:
+        rows = [["Message", "No demographic data available."]]
+
+    spec["Demographics"] = {
+        "headers": ["Field", "Value"],
+        "rows": rows,
+    }
 
     # --------------------
     # Login Stats
     # --------------------
-    if "loginStats" in payload:
-        stats = payload["loginStats"]
+    login_stats = payload.get("loginStats")
+    if login_stats:
         spec["Login Stats"] = {
-            "headers": list(stats.keys()),
-            "rows": [list(stats.values())],
+            "headers": list(login_stats.keys()),
+            "rows": [list(login_stats.values())],
+        }
+    else:
+        spec["Login Stats"] = {
+            "headers": ["Message"],
+            "rows": [["No login statistics available."]],
         }
 
     # --------------------
     # Audit Summary
     # --------------------
-    if "auditSummary" in payload:
-        summary = payload["auditSummary"]
-
+    audit_summary = payload.get("auditSummary")
+    if audit_summary:
         rows = [
-            ["Total Events", summary.get("total")]
+            ["Total Events", audit_summary.get("total", 0)]
         ]
 
-        for event, count in summary.get("events", {}).items():
+        for event, count in audit_summary.get("events", {}).items():
             rows.append([event, count])
+    else:
+        rows = [["No audit events found for this user.", ""]]
 
-        spec["Audit Summary"] = {
-            "headers": ["Metric", "Count"],
-            "rows": rows,
-        }
+    spec["Audit Summary"] = {
+        "headers": ["Metric", "Count"],
+        "rows": rows,
+    }
 
-    if "roleSummary" in payload:
-        roles = payload["roleSummary"]
+    # --------------------
+    # Role Summary
+    # --------------------
+    role_summary = payload.get("roleSummary")
+    if role_summary:
+        rows = [
+            [
+                r.get("role_name"),
+                r.get("scope"),
+                r.get("assigned_date"),
+            ]
+            for r in role_summary
+        ]
+        headers = ["Role", "Scope", "Assigned Date"]
+    else:
+        headers = ["Message"]
+        rows = [["No roles assigned to this user."]]
 
-        spec["Role Summary"] = {
-            "headers": ["Role", "Scope", "Assigned Date"],
-            "rows": [
-                [
-                    r["role_name"],
-                    r["scope"],
-                    r["assigned_date"],
-                ]
-                for r in roles
-            ],
-        }
+    spec["Role Summary"] = {
+        "headers": headers,
+        "rows": rows,
+    }
 
-    if "passwordevents" in payload:
-        pe = payload["passwordevents"]
+    # --------------------
+    # Password Events
+    # --------------------
+    password_events = payload.get("passwordevents")
+    if password_events:
+        rows = [
+            ["Total password reset events", password_events.get("total_password_reset_events", 0)],
+            ["Active reset tokens", password_events.get("active_reset_tokens", 0)],
+        ]
+    else:
+        rows = [["Message", "No password-related events recorded."]]
 
-        spec["Password Events"] = {
-            "headers": ["Metric", "Value"],
-            "rows": [
-                ["Total password reset events", pe["total_password_reset_events"]],
-                ["Active reset tokens", pe["active_reset_tokens"]],
-            ],
-        }
+    spec["Password Events"] = {
+        "headers": ["Metric", "Value"],
+        "rows": rows,
+    }
 
     return spec

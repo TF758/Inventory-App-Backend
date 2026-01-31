@@ -26,9 +26,12 @@ class UserSummaryReport(APIView):
         serializer.is_valid(raise_exception=True)
 
         job = ReportJob.objects.create(
-            user=request.user,
-            params=serializer.validated_data,
-        )
+        user=request.user,
+        params={
+            **serializer.validated_data,
+            "report_type": "user_summary",
+        },
+         )
 
         generate_user_summary_report_task.delay(job.id)
 
