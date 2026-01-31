@@ -13,7 +13,7 @@ from django.core.management import call_command
 from db_inventory.models.site import Department, Location, Room, UserLocation
 from db_inventory.models.users import User
 from db_inventory.models import RoleAssignment
-
+import factory
 from db_inventory.factories import (
     UserFactory,
     AdminUserFactory,
@@ -281,7 +281,14 @@ class Command(BaseCommand):
         for eq in tqdm(equipment, desc="Components"):
             ComponentFactory.create_batch(2, equipment=eq)
 
-        AccessoryFactory.create_batch(len(rooms) * 2, room=random.choice(rooms))
-        ConsumableFactory.create_batch(len(rooms) * 3, room=random.choice(rooms))
+        AccessoryFactory.create_batch(
+            len(rooms) * 2,
+            room=factory.Iterator(rooms, cycle=True),
+        )
 
-        self.stdout.write( self.style.SUCCESS("Assets generated successfully 🎉") )
+        ConsumableFactory.create_batch(
+            len(rooms) * 3,
+            room=factory.Iterator(rooms, cycle=True),
+        )
+
+        self.stdout.write(self.style.SUCCESS("Assets generated successfully 🎉"))
