@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 import io
 import json
+from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec
 from inventory_metrics.utils.excel_renderer import render_workbook
 from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
 from inventory_metrics.models.reports import ReportJob
@@ -16,6 +17,19 @@ from django.utils import timezone
 
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
+
+REPORT_RENDERERS = {
+    "user_summary": {
+        "xlsx": user_summary_to_workbook_spec,
+        "json": None,  # raw payload is returned
+    },
+    "site_assets": {
+        "xlsx": site_asset_to_workbook_spec,
+        "json": None,
+    },
+}
+
+
 class DownloadReport(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -34,7 +48,9 @@ class DownloadReport(APIView):
             user=request.user,
         )
 
-        # still running
+        # -----------------------------
+        # Job state handling
+        # -----------------------------
         if job.status in (
             ReportJob.Status.PENDING,
             ReportJob.Status.RUNNING,
@@ -44,7 +60,6 @@ class DownloadReport(APIView):
                 status=202,
             )
 
-        # failed
         if job.status == ReportJob.Status.FAILED:
             return JsonResponse(
                 {
@@ -54,6 +69,9 @@ class DownloadReport(APIView):
                 status=409,
             )
 
+        # -----------------------------
+        # Fetch cached payload
+        # -----------------------------
         redis_key = f"report:{job.public_id}"
         cached_payload = redis_reports_client.get(redis_key)
 
@@ -63,15 +81,36 @@ class DownloadReport(APIView):
         payload = json.loads(cached_payload.decode("utf-8"))
         timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
 
+        report_type = job.params.get("report_type")
+        renderer_cfg = REPORT_RENDERERS.get(report_type)
+
+        if not renderer_cfg:
+            return JsonResponse(
+                {"detail": "Unsupported report type."},
+                status=400,
+            )
+
+        # -----------------------------
+        # JSON response
+        # -----------------------------
         if fmt == "json":
             response = JsonResponse(payload, safe=False)
             response["Content-Disposition"] = (
-                f'attachment; filename="report-{job.public_id}-{timestamp}.json"'
+                f'attachment; filename="report-{report_type}-{job.public_id}-{timestamp}.json"'
             )
             return response
 
-        # xlsx
-        workbook_spec = user_summary_to_workbook_spec(payload)
+        # -----------------------------
+        # XLSX response
+        # -----------------------------
+        renderer = renderer_cfg.get("xlsx")
+        if not renderer:
+            return JsonResponse(
+                {"detail": "XLSX format not supported for this report."},
+                status=400,
+            )
+
+        workbook_spec = renderer(payload)
         wb = render_workbook(workbook_spec)
 
         buffer = io.BytesIO()
@@ -85,6 +124,6 @@ class DownloadReport(APIView):
             ),
         )
         response["Content-Disposition"] = (
-            f'attachment; filename="report-{job.public_id}-{timestamp}.xlsx"'
+            f'attachment; filename="report-{report_type}-{job.public_id}-{timestamp}.xlsx"'
         )
         return response
