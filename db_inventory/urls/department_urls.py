@@ -38,7 +38,7 @@ urlpatterns = [
 
     # --- Department Components ---
     path( "<str:public_id>/components/", department_viewsets.DepartmentComponentsViewSet.as_view({"get": "list"}), name="department-components", ),
-    path( "<str:public_id>/components-light/", department_viewsets.DepartmentComponentsMiniViewSet.as_view({"get": "list"}, pagination_class=None,), name="department-components-light", ),
+    path( "<str:public_id>/components-light/", department_viewsets.DepartmentComponentsViewSet.as_view({"get": "list"}, pagination_class=None,), name="department-components-light", ),
 
     # --- Department Roles ---
     path( "<str:public_id>/roles/", department_viewsets.DepartmentRolesViewSet.as_view({"get": "list"}), name="department-roles", ),
