@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
-from db_inventory.mixins import AccessoryDashboardMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers import *
@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from db_inventory.models.assets import EquipmentStatus
 from django.db.models import Count
+from django.shortcuts import get_object_or_404
 
 class RoomModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
@@ -232,7 +233,19 @@ class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
         kwargs['exclude_room'] = True
         return super().get_serializer(*args, **kwargs)
     
-    
+class RoomConsumableDashboardView( ConsumableDashboardMixin, APIView, ):
+    permission_classes = [IsAuthenticated]
+
+    def get_rooms(self, public_id):
+        room = get_object_or_404(Room, public_id=public_id)
+        return Room.objects.filter(id=room.id)
+
+    def get(self, request, public_id):
+        rooms = self.get_rooms(public_id)
+        period = self.get_period(request)
+
+        data = self.build_dashboard_response(rooms, period)
+        return Response(data)   
 
 class RoomAccessoriesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
     """Retrieves a list of accessories in a given room"""

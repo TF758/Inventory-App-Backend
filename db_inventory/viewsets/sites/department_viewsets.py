@@ -6,7 +6,7 @@ from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
-from db_inventory.mixins import AccessoryDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
 from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
 from db_inventory.pagination import  FlexiblePagination
 from django.db.models import Q
@@ -309,7 +309,20 @@ class DepartmentConsumablesViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewS
         kwargs['exclude_department'] = True
         return super().get_serializer(*args, **kwargs)
     
+class DepartmentConsumableDashboardView( ConsumableDashboardMixin, APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get_rooms(self, public_id):
+        return Room.objects.filter(
+            location__department__public_id=public_id
+        )
+
+    def get(self, request, public_id):
+        rooms = self.get_rooms(public_id)
+        period = self.get_period(request)
+
+        data = self.build_dashboard_response(rooms, period)
+        return Response(data)
 
 class DepartmentConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = ConsumableAreaReaSerializer

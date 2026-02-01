@@ -12,7 +12,7 @@ from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
-from db_inventory.mixins import AccessoryDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
@@ -22,7 +22,7 @@ from rest_framework import mixins
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-
+from django.shortcuts import get_object_or_404
 from django.db.models import Count
 from db_inventory.permissions.assets import HasAssignmentScopePermission
 
@@ -296,7 +296,21 @@ class LocationConsumablesView(ScopeFilterMixin, ExcludeFiltersMixin,viewsets.Mod
         kwargs['exclude_department'] = True
         kwargs['exclude_location'] = True
         return super().get_serializer(*args, **kwargs)
-    
+
+class LocationConsumableDashboardView( ConsumableDashboardMixin, APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_rooms(self, public_id):
+        location = get_object_or_404(Location, public_id=public_id)
+        return location.rooms.all()
+
+    def get(self, request, public_id):
+        rooms = self.get_rooms(public_id)
+        period = self.get_period(request)
+
+        data = self.build_dashboard_response(rooms, period)
+        return Response(data)
+       
 class LocationConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = 'public_id'

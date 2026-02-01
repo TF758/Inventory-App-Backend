@@ -27,6 +27,7 @@ urlpatterns = [
     path( "<str:public_id>/equipment-light/", department_viewsets.DepartmentEquipmentMiniViewSet.as_view({"get": "list"}), name="department-equipment-light", ),
     # --- Department Consumables ---
     path( "<str:public_id>/consumables-full/", department_viewsets.DepartmentConsumablesViewSet.as_view({"get": "list"}), name="department-consumables", ),
+    path( "<str:public_id>/consumables/dashboard/", department_viewsets.DepartmentConsumableDashboardView.as_view(), name="department-consumables-dashboard", ),
     path( "<str:public_id>/consumables-light/", department_viewsets.DepartmentConsumablesMiniViewSet.as_view({"get": "list"}), name="department-consumables-light", ),
 
     # --- Department Accessories ---
