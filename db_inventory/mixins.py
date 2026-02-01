@@ -9,6 +9,10 @@ from collections import Counter
 from django.utils.text import capfirst
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from datetime import timedelta
+from django.db.models import Count, Sum, Q, F
+from django.utils import timezone
+from rest_framework.response import Response
 
 class ScopeFilterMixin:
     """
@@ -491,6 +495,205 @@ class NotificationMixin:
                     "payload": payload,
                 },
             )
-
-        # ✅ Ensure notification fires only after DB commit
         transaction.on_commit(lambda: _create_and_send(recipient))
+
+
+
+class AccessoryDashboardMixin:
+    DEFAULT_PERIOD_DAYS = 7
+    MIN_PERIOD_DAYS = 1
+    MAX_PERIOD_DAYS = 30
+
+    def get_rooms(self, public_id):
+        """
+        Must be implemented by the concrete view.
+        Should return a Room queryset.
+        """
+        raise NotImplementedError
+
+    def get_period(self, request):
+        try:
+            period = int(
+                request.query_params.get(
+                    "period", self.DEFAULT_PERIOD_DAYS
+                )
+            )
+        except ValueError:
+            period = self.DEFAULT_PERIOD_DAYS
+
+        return max(self.MIN_PERIOD_DAYS, min(period, self.MAX_PERIOD_DAYS))
+
+    def build_dashboard_response(self, rooms, period):
+        from .models import (
+            Accessory,
+            AccessoryAssignment,
+            AccessoryEvent,
+        )
+
+        since = timezone.now() - timedelta(days=period)
+
+        accessories_qs = Accessory.objects.filter(
+            room__in=rooms
+        )
+
+        summary = accessories_qs.aggregate(
+            accessory_types=Count("id"),
+            total_quantity=Sum("quantity"),
+        )
+
+        total_quantity = summary["total_quantity"] or 0
+
+        active_assignments_qs = AccessoryAssignment.objects.filter(
+            accessory__room__in=rooms,
+            returned_at__isnull=True
+        )
+
+        assigned_quantity = (
+            active_assignments_qs.aggregate(
+                total=Sum("quantity")
+            )["total"] or 0
+        )
+
+        event_counts = (
+            AccessoryEvent.objects.filter(
+                accessory__room__in=rooms,
+                occurred_at__gte=since
+            )
+            .values("event_type")
+            .annotate(count=Count("id"))
+        )
+
+        event_map = {
+            row["event_type"]: row["count"]
+            for row in event_counts
+        }
+
+        return {
+            "summary": {
+                "accessory_types": summary["accessory_types"],
+                "total_quantity": total_quantity,
+                "assigned_quantity": assigned_quantity,
+                "unassigned_quantity": max(
+                    total_quantity - assigned_quantity, 0
+                ),
+                "active_assignments": active_assignments_qs.count(),
+            },
+            "events": {
+                "assigned": event_map.get("assigned", 0),
+                "returned": event_map.get("returned", 0),
+                "used": event_map.get("used", 0),
+                "lost": event_map.get("lost", 0),
+                "damaged": event_map.get("damaged", 0),
+                "condemned": event_map.get("condemned", 0),
+                "restocked": event_map.get("restocked", 0),
+                "adjusted": event_map.get("adjusted", 0),
+            },
+            "meta": {
+                "period_days": period,
+            },
+        }
+
+class ConsumableDashboardMixin:
+    DEFAULT_PERIOD_DAYS = 7
+    MIN_PERIOD_DAYS = 1
+    MAX_PERIOD_DAYS = 30
+
+    def get_rooms(self, public_id):
+        """
+        Must be implemented by the concrete view.
+        Should return a Room queryset.
+        """
+        raise NotImplementedError
+
+    def get_period(self, request):
+        try:
+            period = int(
+                request.query_params.get(
+                    "period", self.DEFAULT_PERIOD_DAYS
+                )
+            )
+        except ValueError:
+            period = self.DEFAULT_PERIOD_DAYS
+
+        return max(self.MIN_PERIOD_DAYS, min(period, self.MAX_PERIOD_DAYS))
+
+    def build_dashboard_response(self, rooms, period):
+        from .models import (
+            Consumable,
+            ConsumableIssue,
+            ConsumableEvent,
+        )
+
+        since = timezone.now() - timedelta(days=period)
+
+        # ─────────────────────────────
+        # Inventory health (NOT time-bound)
+        # ─────────────────────────────
+
+        consumables_qs = Consumable.objects.filter(
+            room__in=rooms
+        )
+
+        summary_base = consumables_qs.aggregate(
+            consumable_types=Count("id"),
+            total_quantity=Sum("quantity"),
+        )
+
+        total_quantity = summary_base["total_quantity"] or 0
+
+        low_stock_count = consumables_qs.filter(
+            quantity__lte=F("low_stock_threshold")
+        ).count()
+
+        out_of_stock_count = consumables_qs.filter(
+            quantity=0
+        ).count()
+
+        # ─────────────────────────────
+        # Flow / usage (time-bound)
+        # ─────────────────────────────
+
+        events_qs = ConsumableEvent.objects.filter(
+            consumable__room__in=rooms,
+            occurred_at__gte=since
+        )
+
+        # Quantity movement per event type
+        event_sums = (
+            events_qs
+            .values("event_type")
+            .annotate(
+                quantity=Sum("quantity_change")
+            )
+        )
+
+        event_map = {
+            row["event_type"]: abs(row["quantity"] or 0)
+            for row in event_sums
+        }
+
+        issued_quantity = event_map.get("issued", 0)
+
+        return {
+            "summary": {
+                "consumable_types": summary_base["consumable_types"],
+                "total_quantity": total_quantity,
+                "low_stock_count": low_stock_count,
+                "out_of_stock_count": out_of_stock_count,
+                "issued_quantity": issued_quantity,
+            },
+            "events": {
+                "issued": event_map.get("issued", 0),
+                "used": event_map.get("used", 0),
+                "returned": event_map.get("returned", 0),
+                "lost": event_map.get("lost", 0),
+                "damaged": event_map.get("damaged", 0),
+                "expired": event_map.get("expired", 0),
+                "condemned": event_map.get("condemned", 0),
+                "restocked": event_map.get("restocked", 0),
+                "adjusted": event_map.get("adjusted", 0),
+            },
+            "meta": {
+                "period_days": period,
+            },
+        }

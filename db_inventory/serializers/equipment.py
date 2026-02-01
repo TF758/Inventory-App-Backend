@@ -2,6 +2,7 @@
 from rest_framework import serializers
 from  db_inventory.models.assets import Equipment, EquipmentStatus
 from db_inventory.models.site import  Room
+from db_inventory.permissions.helpers import is_admin_role, is_in_scope
 
 class EquipmentSerializer(serializers.ModelSerializer):
     is_assigned = serializers.SerializerMethodField()
@@ -154,39 +155,47 @@ class EquipmentStatusChangeSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=EquipmentStatus.choices)
     notes = serializers.CharField( required=False, allow_blank=True, trim_whitespace=True, )
 
-    def validate_status(self, new_status):
-        request = self.context["request"]
-        equipment = self.context["equipment"]
-        user = request.user
+def validate_status(self, new_status):
+    request = self.context["request"]
+    equipment = self.context["equipment"]
+    user = request.user
 
-        active_role = getattr(user, "active_role", None)
+    active_role = getattr(user, "active_role", None)
 
-        # --- SITE_ADMIN: unrestricted ---
-        if active_role and active_role.role == "SITE_ADMIN":
-            return new_status
+    # --- SITE_ADMIN: unrestricted ---
+    if active_role and active_role.role == "SITE_ADMIN":
+        return new_status
 
-        # --- Assigned user: limited self-reporting statuses ---
-        assignment = getattr(equipment, "active_assignment", None)
-        if (
-            assignment
-            and assignment.returned_at is None
-            and assignment.user_id == user.id
-        ):
-            allowed_statuses = {
-                EquipmentStatus.OK,
-                EquipmentStatus.DAMAGED,
-                EquipmentStatus.UNDER_REPAIR,
-            }
-            if new_status not in allowed_statuses:
-                raise serializers.ValidationError(
-                    "You can only update the status to OK, DAMAGED, or UNDER_REPAIR."
-                )
-            return new_status
+    # --- Scoped admin: unrestricted ---
+    if (
+        active_role
+        and is_admin_role(active_role.role)
+        and is_in_scope(active_role, room=getattr(equipment, "room", None))
+    ):
+        return new_status
 
-        # --- Everyone else ---
-        raise serializers.ValidationError(
-            "You are not allowed to set this status."
-        )
+    # --- Assigned user: limited self-reporting statuses ---
+    assignment = getattr(equipment, "active_assignment", None)
+    if (
+        assignment
+        and assignment.returned_at is None
+        and assignment.user_id == user.id
+    ):
+        allowed_statuses = {
+            EquipmentStatus.OK,
+            EquipmentStatus.DAMAGED,
+            EquipmentStatus.UNDER_REPAIR,
+        }
+        if new_status not in allowed_statuses:
+            raise serializers.ValidationError(
+                "You can only update the status to OK, DAMAGED, or UNDER_REPAIR."
+            )
+        return new_status
+
+    # --- Everyone else ---
+    raise serializers.ValidationError(
+        "You are not allowed to set this status."
+    )
 
 __all__ = [
     "EquipmentSerializer",

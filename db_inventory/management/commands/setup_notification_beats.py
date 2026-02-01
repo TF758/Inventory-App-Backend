@@ -19,7 +19,7 @@ class Command(BaseCommand):
                 day_of_month=day,
                 month_of_year=month,
                 day_of_week=dow,
-                timezone=settings.TIME_ZONE,  # ✅ FIX #1
+                timezone=settings.TIME_ZONE,  
             )
 
             PeriodicTask.objects.update_or_create(
@@ -29,7 +29,7 @@ class Command(BaseCommand):
                     "crontab": schedule,
                     "enabled": True,
                     "kwargs": json.dumps({}),
-                    "date_changed": timezone.now(),  # ✅ FIX #2
+                    "date_changed": timezone.now(),  
                 },
             )
 

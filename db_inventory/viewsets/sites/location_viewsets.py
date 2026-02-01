@@ -6,133 +6,110 @@ from db_inventory.serializers.users import UserAreaSerializer
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
-from db_inventory.models.assets import Equipment, Consumable, Accessory, Component
+from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
 from db_inventory.models.site import Location, Room, UserLocation
 from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
-from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from django.db.models import Q
 from db_inventory.mixins import AuditMixin
 from rest_framework import mixins
-
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from django.db.models import Count
 from db_inventory.permissions.assets import HasAssignmentScopePermission
 
-class LocationModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
-    """ViewSet for managing Location objects.
-    This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Location objects."""
+class LocationViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+    """ViewSet for managing Location objects"""
 
-    queryset = Location.objects.all()
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
+    permission_classes = [LocationPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['^name', 'name']
-
-    permission_classes =[LocationPermission]
-
+    search_fields = ["^name", "name"]
     filterset_class = LocationFilter
 
     pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        if self.action in ["create", "update", "partial_update"]:
             return LocationWriteSerializer
+
+        # Light list endpoint (unpaginated)
+        if self.action == "list" and self.pagination_class is None:
+            return LocationListSerializer
+
         return LocationReadSerializer
-    
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        search_term = self.request.query_params.get('search', None)
+        qs = Location.objects.all()
+        search_term = self.request.query_params.get("search")
 
         if search_term:
-            # Annotate results: 1 if starts with search_term, 2 otherwise
             qs = qs.annotate(
                 starts_with_order=Case(
                     When(name__istartswith=search_term, then=Value(1)),
                     default=Value(2),
-                    output_field=IntegerField()
+                    output_field=IntegerField(),
                 )
-            ).order_by('starts_with_order', 'name')  # starts-with results first
+            ).order_by("starts_with_order", "name")
 
         return qs
-    
-class LocationListViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
 
-    """Returns a flat list of location objects"""
-
-    queryset = Location.objects.all()
-    lookup_field = 'public_id'
-    pagination_class = None 
-
-    filter_backends = [SearchFilter]
-    search_fields = ['name']
-
-    permission_classes =[LocationPermission]
-
-    serializer_class = LocationListSerializer 
-
-class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of rooms in a given location"""
     serializer_class = LocationRoomSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
-    exclude_filter_fields = ["department", "location"]
-
-    permission_classes =[LocationPermission]
-
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Room.objects.filter(location__public_id=location_id)
+    permission_classes = [LocationPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
+    search_fields = ["name"]
     filterset_class = RoomFilter
+    exclude_filter_fields = ["department", "location"]
 
     pagination_class = FlexiblePagination
 
-
-class LocationRoomsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationRoomSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
-
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
-    permission_classes =[LocationPermission]
-
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Room.objects.filter(location__public_id=location_id)
+        location_id = self.kwargs["public_id"]
+
+        qs = Room.objects.filter(location__public_id=location_id)
+
+        # Light endpoint → unpaginated + capped
+        if self.pagination_class is None:
+            qs = qs[:20]
+
+        return qs
 
 
-class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+
+class LocationUsersView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of users in a given location"""
     serializer_class = UserAreaSerializer
 
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['user__email']
+    permission_classes = [UserPermission]
 
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ["user__email"]
+    filterset_class = AreaUserFilter
     exclude_filter_fields = ["department", "location"]
 
-    filterset_class =  AreaUserFilter
-
-    permission_classes =[UserPermission]
-
     pagination_class = FlexiblePagination
-    
 
     def get_queryset(self):
-        location_id = self.kwargs.get("public_id")
+        location_id = self.kwargs["public_id"]
 
-        return (
-            UserLocation.objects.filter(
+        qs = (
+            UserLocation.objects
+            .filter(
                 is_current=True,
                 room__location__public_id=location_id,
             )
@@ -141,216 +118,248 @@ class LocationUsersView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
                 "room",
             )
         )
-    
+
+        # Light endpoint → unpaginated + capped
+        if self.pagination_class is None:
+            qs = qs[:20]
+
+        return qs
+
     def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
+        kwargs["exclude_department"] = True
+        kwargs["exclude_location"] = True
         return super().get_serializer(*args, **kwargs)
 
+
     
-class LocationUsersMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = UserAreaSerializer
-    pagination_class = None
 
-    permission_classes =[UserPermission]
 
-    def get_queryset(self):
-        location_id = self.kwargs.get("public_id")
-
-        return (
-            UserLocation.objects.filter(
-                is_current=True,
-                room__location__public_id=location_id,
-            )
-            .select_related(
-                "user",
-                "room",
-            )
-        )
-
-class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+class LocationEquipmentView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of equipment in a given location"""
     serializer_class = EquipmentSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
-    exclude_filter_fields = ["department", "location"]
+    permission_classes = [AssetPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
+    search_fields = ["name"]
     filterset_class = EquipmentFilter
-
-    permission_classes =[AssetPermission]
+    exclude_filter_fields = ["department", "location"]
 
     pagination_class = FlexiblePagination
 
-
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Equipment.objects.filter(room__location__public_id=location_id).order_by('-id')
-    
+        location_id = self.kwargs["public_id"]
+
+        qs = (
+            Equipment.objects
+            .filter(room__location__public_id=location_id)
+            .order_by("-id")
+        )
+
+        # Light endpoint → unpaginated + capped
+        if self.pagination_class is None:
+            qs = qs[:20]
+
+        return qs
+
     def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
-        return super().get_serializer(*args, **kwargs)
-    
-class LocationEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = EquipmentSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
-
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
-    permission_classes =[AssetPermission]
-
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Equipment.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
-    
-    def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
+        kwargs["exclude_department"] = True
+        kwargs["exclude_location"] = True
         return super().get_serializer(*args, **kwargs)
 
+class LocationEquipmentDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
 
-class LocationConsumablesView(ScopeFilterMixin, ExcludeFiltersMixin,viewsets.ModelViewSet):
+    def get(self, request, public_id):
+
+        equipment_qs = Equipment.objects.filter(
+            room__location__public_id=public_id
+        ).select_related(
+            "room__location"
+        )
+        status_counts = (
+            equipment_qs
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+
+        status_map = {
+            row["status"]: row["count"]
+            for row in status_counts
+        }
+
+        total_equipment = sum(status_map.values())
+
+        active_assignments = EquipmentAssignment.objects.filter(
+            equipment__in=equipment_qs,
+            returned_at__isnull=True
+        ).count()
+
+
+        available = equipment_qs.filter(
+            status=EquipmentStatus.OK,
+            active_assignment__returned_at__isnull=True
+        ).count()
+
+        return Response({
+            "equipment_health": {
+                "total": total_equipment,
+                "available": available,
+                "under_repair": status_map.get(EquipmentStatus.UNDER_REPAIR, 0),
+                "damaged": status_map.get(EquipmentStatus.DAMAGED, 0),
+                "lost": status_map.get(EquipmentStatus.LOST, 0),
+            },
+            "utilization": {
+                "active_assignments": active_assignments,
+                "percent_assigned": round(
+                    (active_assignments / total_equipment * 100)
+                    if total_equipment else 0,
+                    1
+                ),
+            },
+        })
+
+
+class LocationConsumablesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of consumables in a given location"""
     serializer_class = ConsumableAreaReaSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
+
+    permission_classes = [AssetPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
-    exclude_filter_fields = ["department", "location"]
-
+    search_fields = ["name"]
     filterset_class = ConsumableFilter
-
-    permission_classes =[AssetPermission]
+    exclude_filter_fields = ["department", "location"]
 
     pagination_class = FlexiblePagination
 
-
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
+        location_id = self.kwargs["public_id"]
 
-        return Consumable.objects.filter(room__location__public_id=location_id).order_by('-id')
-    
+        qs = (
+            Consumable.objects
+            .filter(room__location__public_id=location_id)
+            .order_by("-id")
+        )
+
+        # Light endpoint → unpaginated + capped
+        if self.pagination_class is None:
+            qs = qs[:20]
+
+        return qs
+
     def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
-        return super().get_serializer(*args, **kwargs)
-    
-class LocationConsumablesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = ConsumableAreaReaSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
+        kwargs["exclude_department"] = True
+        kwargs["exclude_location"] = True
 
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
+class LocationConsumableDashboardView( ConsumableDashboardMixin, APIView):
+    permission_classes = [IsAuthenticated]
 
-    permission_classes =[AssetPermission]
+    def get_rooms(self, public_id):
+        location = get_object_or_404(Location, public_id=public_id)
+        return location.rooms.all()
 
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Consumable.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
+    def get(self, request, public_id):
+        rooms = self.get_rooms(public_id)
+        period = self.get_period(request)
+
+        data = self.build_dashboard_response(rooms, period)
+        return Response(data)
+
     
-    def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
-        return super().get_serializer(*args, **kwargs)
-    
-    
-    
-class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.ModelViewSet):
+class LocationAccessoriesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of accessories in a given location"""
     serializer_class = AccessoryFullSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
-    exclude_filter_fields = ["department", "location"]
+    permission_classes = [AssetPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
+    search_fields = ["name"]
     filterset_class = AccessoryFilter
-
-    permission_classes =[AssetPermission]
+    exclude_filter_fields = ["department", "location"]
 
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Accessory.objects.filter(room__location__public_id=location_id).order_by('-id')
-    
+        location_id = self.kwargs["public_id"]
+
+        qs = (
+            Accessory.objects
+            .filter(room__location__public_id=location_id)
+            .order_by("-id")
+        )
+
+        # Light endpoint → unpaginated + capped
+        if self.pagination_class is None:
+            qs = qs[:20]
+
+        return qs
 
     def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
+        kwargs["exclude_department"] = True
+        kwargs["exclude_location"] = True
         return super().get_serializer(*args, **kwargs)
     
 
-class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = AccessoryFullSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
+class LocationAccessoryDashboardView(
+    AccessoryDashboardMixin,
+    APIView
+):
+    permission_classes = [IsAuthenticated]
 
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
+    def get_rooms(self, public_id):
+        return Room.objects.filter(
+            location__public_id=public_id
+        )
 
-    permission_classes =[AssetPermission]
-
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Accessory.objects.filter(room__location__public_id=location_id).order_by('-id')[:20]
+    def get(self, request, public_id):
+        period = self.get_period(request)
+        rooms = self.get_rooms(public_id)
+        data = self.build_dashboard_response(rooms, period)
+        return Response(data)
     
-    def get_serializer(self, *args, **kwargs):
-        kwargs['exclude_department'] = True
-        kwargs['exclude_location'] = True
-        return super().get_serializer(*args, **kwargs)
     
 
 
-class LocationComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet):
+class LocationComponentsViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     """Retrieves a list of components in a given location"""
     serializer_class = LocationComponentSerializer
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
 
-    permission_classes=[AssetPermission]
+    permission_classes = [AssetPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
+    search_fields = ["name"]
+    filterset_class = ComponentFilter
     exclude_filter_fields = ["department", "location"]
 
-    filterset_class = ComponentFilter
-
     pagination_class = FlexiblePagination
-    
+
     def get_queryset(self):
         location_id = self.kwargs.get("public_id")
 
         if not location_id:
             return Component.objects.none()
 
-        return Component.objects.filter(
-            equipment__room__location__public_id=location_id
-        ).select_related(
-            "equipment__room__location__department" 
+        qs = (
+            Component.objects
+            .filter(
+                equipment__room__location__public_id=location_id
+            )
+            .select_related(
+                "equipment__room__location__department"
+            )
         )
-    
-class LocationComponentsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationComponentSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
 
-    permission_classes=[AssetPermission]
+        # Light endpoint → unpaginated + capped
+        if self.pagination_class is None:
+            qs = qs[:20]
 
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return (
-            Component.objects.filter(equipment__room__location__public_id=location_id)
-            .order_by('-id')[:20]
-        )
+        return qs
+
 
 class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyModelViewSet):
     """
