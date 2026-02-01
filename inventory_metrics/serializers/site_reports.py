@@ -42,3 +42,43 @@ class SiteAssetRequestSerializer(serializers.Serializer):
                 f"{siteType.capitalize()} with id '{siteId}' does not exist."
             )
         return data
+
+class SiteAuditLogRequestSerializer(serializers.Serializer):
+    site = serializers.DictField()
+    audit_period_days = serializers.IntegerField( default=30, required=False, )
+
+    ALLOWED_SITE_TYPES = {"department", "location", "room"}
+    ALLOWED_PERIODS = {30, 60, 90, 120}
+
+    def validate_site(self, value):
+        site_type = value.get("siteType")
+        site_id = value.get("siteId")
+
+        if not site_type:
+            raise serializers.ValidationError("siteType is required.")
+
+        if site_type not in self.ALLOWED_SITE_TYPES:
+            raise serializers.ValidationError(
+                "Invalid siteType. Must be one of: department, location, room."
+            )
+
+        if not site_id:
+            raise serializers.ValidationError("siteId is required.")
+
+        return {
+            "siteType": site_type,
+            "siteId": site_id,
+        }
+
+    def validate_audit_period_days(self, value):
+        if value not in self.ALLOWED_PERIODS:
+            raise serializers.ValidationError(
+                "Invalid audit_period_days. Allowed values: 30, 60, 90, 120."
+            )
+        return value
+
+    def validate(self, attrs):
+        # normalize shape for ReportJob.params
+        attrs["site"] = attrs["site"]
+        attrs["audit_period_days"] = attrs.get("audit_period_days", 30)
+        return attrs

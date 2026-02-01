@@ -7,6 +7,8 @@ from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWrit
 from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
 from django.utils.text import capfirst
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 class ScopeFilterMixin:
     """
@@ -426,39 +428,69 @@ class ListDetailSerializerMixin:
             return self.list_serializer_class
         return super().get_serializer_class()
 
+
 class NotificationMixin:
     """
     Mixin to create user-facing notifications after successful DB commits.
-
     """
 
     def notify(
         self,
         *,
         recipient,
-        notif_type,
-        title,
-        message,
-        level=Notification.Level.INFO,
+        notif_type: Notification.NotificationType,
+        title: str,
+        message: str,
+        level: Notification.Level = Notification.Level.INFO,
         entity=None,
         actor=None,
+        meta=None, 
     ):
-        """
-        Schedule a notification after transaction commit.
-        """
-
         if not recipient or recipient.is_anonymous:
             return
 
-        def _create_notification():
-            Notification.objects.create(
-                recipient=recipient,
+        channel_layer = get_channel_layer()
+
+        def _create_and_send(user):
+            notification = Notification.objects.create(
+                recipient=user,
                 type=notif_type,
                 level=level,
                 title=title,
                 message=message,
                 entity_type=entity.__class__.__name__.lower() if entity else None,
                 entity_id=getattr(entity, "public_id", None),
+                meta=meta,
             )
 
-        transaction.on_commit(_create_notification)
+            # 🔔 Payload sent over WebSocket
+            payload = {
+                "public_id": notification.public_id,
+                "type": notification.type,
+                "level": notification.level,
+                "title": notification.title,
+                "message": notification.message,
+                "created_at": notification.created_at.isoformat(),
+                "entity": (
+                    {
+                        "type": notification.entity_type,
+                        "id": notification.entity_id,
+                    }
+                    if notification.entity_id
+                    else None
+                ),
+                "meta": notification.meta, 
+            }
+
+            group_name = f"user_{user.public_id}"
+
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "notification",
+                    "payload": payload,
+                },
+            )
+
+        # ✅ Ensure notification fires only after DB commit
+        transaction.on_commit(lambda: _create_and_send(recipient))

@@ -7,6 +7,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 import logging
 
+from db_inventory.tasks import send_password_reset_email
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -49,41 +51,11 @@ class SessionTokenLoginViewSerializer(TokenObtainSerializer):
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
-    def validate_email(self, value):
-        # Case-insensitive lookup, but DO NOT raise if missing
-        self.user = User.objects.filter(email__iexact=value).first()
-        return value
-
     def save(self):
-        # IMPORTANT:
-        # If user does not exist → silently succeed
-        if not self.user:
-            return None
+      
+        email = self.validated_data["email"]
 
-        user = self.user
-
-        token_service = PasswordResetToken()
-        event = token_service.generate_token(user_public_id=user.public_id)
-        token = event.token
-
-        reset_link = f"{settings.FRONTEND_URL}/password-reset?token={token}"
-
-        try:
-            send_mail(
-                subject="Password Reset Instructions",
-                message=(
-                    "You requested a password reset.\n\n"
-                    "Your reset link (expires in 10 minutes):\n\n"
-                    f"{reset_link}\n\n"
-                    "If you did not request this, you can safely ignore this email."
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-        except Exception:
-            logger.exception("Failed to send password reset email for user %s", user.public_id)
-            # Do NOT leak error details
-            raise serializers.ValidationError({"detail": "Could not send password reset email, please try again later."})
+        # Fire-and-forget
+        send_password_reset_email.delay(email)
 
         return None

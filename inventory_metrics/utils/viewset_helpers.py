@@ -1,12 +1,12 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils import timezone
 import io
 from openpyxl import Workbook
 from db_inventory.models import Equipment, Component, Consumable, Accessory
 from django.db.models import Q
+
 
 class TimeSeriesViewset(ReadOnlyModelViewSet):
     """Base class for returning date-based metrics suitable for graphs."""
@@ -46,27 +46,44 @@ class TimeSeriesViewset(ReadOnlyModelViewSet):
             "labels": labels,
             "data": data
         })
+
+
     
 def build_site_filter(site_type, site_obj, model_class):
-    """
-    Returns a Q object to filter a model by site.
-    """
-    if site_type == 'department':
-        if model_class in [Equipment, Accessory, Consumable]:
+    if site_type == "department":
+        if model_class == Equipment:
             return Q(room__location__department=site_obj)
-        elif model_class == Component:
+
+        if model_class in [Accessory, Consumable]:
+            return Q(room__location__department=site_obj)
+
+        if model_class == Component:
             return Q(equipment__room__location__department=site_obj)
-    elif site_type == 'location':
-        if model_class in [Equipment, Accessory, Consumable]:
+
+    elif site_type == "location":
+        if model_class == Equipment:
             return Q(room__location=site_obj)
-        elif model_class == Component:
+
+        if model_class in [Accessory, Consumable]:
+            return Q(room__location=site_obj)
+
+        if model_class == Component:
             return Q(equipment__room__location=site_obj)
-    elif site_type == 'room':
-        if model_class in [Equipment, Accessory, Consumable]:
+
+    elif site_type == "room":
+        if model_class == Equipment:
             return Q(room=site_obj)
-        elif model_class == Component:
+
+        if model_class in [Accessory, Consumable]:
+            return Q(room=site_obj)
+
+        if model_class == Component:
             return Q(equipment__room=site_obj)
-    return Q()
+
+    raise ValueError(
+        f"Unsupported site_type={site_type} or model={model_class.__name__}"
+    )
+
 
 def generate_site_asset_excel(
     site_type,

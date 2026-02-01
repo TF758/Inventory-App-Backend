@@ -21,27 +21,28 @@ import sys
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ------------------------------------------------------------
+# Environment detection & configuration
+# ------------------------------------------------------------
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
+IN_DOCKER = os.path.exists("/.dockerenv")
 
+# Default to local unless explicitly told otherwise
+DJANGO_ENV = os.environ.get(
+    "DJANGO_ENV",
+    "dev" if IN_DOCKER else "local",
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# Initialize environment variables
-env = environ.Env(DEBUG=(bool, False))  # default value for DEBUG if not in .env )
+env = environ.Env(DEBUG=(bool, False))
 
-
-# Read the .env file
-ENV = os.environ.get("DJANGO_ENV", "dev")  # default to dev
-
-env_file = BASE_DIR / f".env.{ENV}"
-
+env_file = BASE_DIR / f".env.{DJANGO_ENV}"
 if env_file.exists():
-    environ.Env.read_env(env_file=env_file)
+    environ.Env.read_env(env_file)
 else:
-    raise RuntimeError(f"Missing env file: {env_file}")
+    print(f"Warning: env file not found: {env_file}")
+
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-secret")
 
 
@@ -84,8 +85,42 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     "django_extensions",
+
+     "django_celery_results",
+    "django_celery_beat",
+     "channels",
     
 ]
+# -------------------------------------------------
+# Redis configuration
+# -------------------------------------------------
+
+REDIS_HOST = env("REDIS_HOST", default="redis")
+REDIS_PORT = env.int("REDIS_PORT", default=6379)
+
+# Logical Redis DBs (single Redis instance)
+REDIS_DB_CELERY = env.int("REDIS_DB_CELERY", default=0)
+REDIS_DB_CHANNELS = env.int("REDIS_DB_CHANNELS", default=1)
+REDIS_DB_REPORTS = env.int("REDIS_DB_REPORTS", default=2)
+
+REDIS_BASE_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+
+REDIS_CELERY_URL = f"{REDIS_BASE_URL}/{REDIS_DB_CELERY}"
+REDIS_CHANNELS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_CHANNELS}"
+REDIS_REPORTS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_REPORTS}"
+
+# Report cache
+REPORT_CACHE_TTL_SECONDS = env.int("REPORT_CACHE_TTL_SECONDS", default=900)
+ASGI_APPLICATION = "inventory.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+           "hosts": [REDIS_CHANNELS_URL],
+        },
+    },
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -229,6 +264,10 @@ CORS_ALLOW_HEADERS = [
      "Content-Disposition",
 ]
 
+CORS_EXPOSE_HEADERS = [
+    "Content-Disposition",
+]
+
 SIMPLE_JWT = {
     # Lifetimes
     "ACCESS_TOKEN_LIFETIME": timedelta(
@@ -267,12 +306,17 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-    raise ValueError("EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in environment variables")
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER or "no-reply@localhost"
+
+if not DEBUG:
+    if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+        raise ValueError(
+            "EMAIL_HOST_USER and EMAIL_HOST_PASSWORD must be set in production"
+        )
 
 # ----------------------------------------
 # Cookie / Security Settings
@@ -281,19 +325,18 @@ if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
 # Detect test mode
 IS_TESTING = "test" in sys.argv
 
-
 if DEBUG or IS_TESTING:
-    # Local dev + tests (HTTPS dev server)
-    COOKIE_SECURE = True
-    COOKIE_SAMESITE = "None"
+    # Local dev + tests (HTTP, Docker-friendly)
+    COOKIE_SECURE = False
+    COOKIE_SAMESITE = "Lax"
 
-    CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
 
-    # Do NOT force redirect in dev
+    # Do NOT force HTTPS redirect in dev
     SECURE_SSL_REDIRECT = False
 else:
-    # Production
+    # Production (HTTPS only)
     COOKIE_SECURE = True
     COOKIE_SAMESITE = "None"
 
@@ -302,12 +345,30 @@ else:
 
     SECURE_SSL_REDIRECT = True
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://localhost:5173",
-    "https://127.0.0.1:5173",
-]
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ],
+)
 
+# -------------------------------------------------
+# Notification retention (days)
+# -------------------------------------------------
 
+# Auto-read grace periods
+NOTIF_INFO_AUTO_READ_DAYS = env.int("NOTIF_INFO_AUTO_READ_DAYS", default=7)
+NOTIF_WARNING_AUTO_READ_DAYS = env.int("NOTIF_WARNING_AUTO_READ_DAYS", default=14)
+
+# Hard delete after read
+NOTIF_INFO_DELETE_DAYS = env.int("NOTIF_INFO_DELETE_DAYS", default=7)
+NOTIF_WARNING_DELETE_DAYS = env.int("NOTIF_WARNING_DELETE_DAYS", default=14)
+NOTIF_CRITICAL_DELETE_DAYS = env.int("NOTIF_CRITICAL_DELETE_DAYS", default=90)
+
+# Hard delete after soft delete
+NOTIF_INFO_SOFT_DELETE_DAYS = env.int("NOTIF_INFO_SOFT_DELETE_DAYS", default=3)
+NOTIF_WARNING_SOFT_DELETE_DAYS = env.int("NOTIF_WARNING_SOFT_DELETE_DAYS", default=7)
 try:
     SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
     SESSION_ABSOLUTE_DAYS = int(os.environ["SESSION_ABSOLUTE_DAYS"])
@@ -316,3 +377,25 @@ except KeyError as e:
 
 SESSION_IDLE_TIMEOUT = timedelta(minutes=SESSION_IDLE_MINUTES)
 SESSION_ABSOLUTE_LIFETIME = timedelta(days=SESSION_ABSOLUTE_DAYS)
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+
+CELERY_BROKER_URL = REDIS_CELERY_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_BACKEND = "django-db"
+
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+
+NOTIF_AUTO_READ_CRON = env(
+    "NOTIF_AUTO_READ_CRON",
+    default="0 2 * * *",
+)
+
+NOTIF_CLEANUP_CRON = env(
+    "NOTIF_CLEANUP_CRON",
+    default="0 3 * * *",
+)
