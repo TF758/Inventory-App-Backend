@@ -26,59 +26,43 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count
 from db_inventory.permissions.assets import HasAssignmentScopePermission
 
-class LocationModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
-    """ViewSet for managing Location objects.
-    This viewset provides `list`, `create`, `retrieve`, `update`, and `destroy` actions for Location objects."""
+class LocationViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+    """ViewSet for managing Location objects"""
 
-    queryset = Location.objects.all()
-    lookup_field = 'public_id'
+    lookup_field = "public_id"
+    permission_classes = [LocationPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['^name', 'name']
-
-    permission_classes =[LocationPermission]
-
+    search_fields = ["^name", "name"]
     filterset_class = LocationFilter
 
     pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        if self.action in ["create", "update", "partial_update"]:
             return LocationWriteSerializer
+
+        # Light list endpoint (unpaginated)
+        if self.action == "list" and self.pagination_class is None:
+            return LocationListSerializer
+
         return LocationReadSerializer
-    
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        search_term = self.request.query_params.get('search', None)
+        qs = Location.objects.all()
+        search_term = self.request.query_params.get("search")
 
         if search_term:
-            # Annotate results: 1 if starts with search_term, 2 otherwise
             qs = qs.annotate(
                 starts_with_order=Case(
                     When(name__istartswith=search_term, then=Value(1)),
                     default=Value(2),
-                    output_field=IntegerField()
+                    output_field=IntegerField(),
                 )
-            ).order_by('starts_with_order', 'name')  # starts-with results first
+            ).order_by("starts_with_order", "name")
 
         return qs
-    
-class LocationListViewSet(ScopeFilterMixin, viewsets.ModelViewSet):
-
-    """Returns a flat list of location objects"""
-
-    queryset = Location.objects.all()
-    lookup_field = 'public_id'
-    pagination_class = None 
-
-    filter_backends = [SearchFilter]
-    search_fields = ['name']
-
-    permission_classes =[LocationPermission]
-
-    serializer_class = LocationListSerializer 
 
 class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of rooms in a given location"""
@@ -105,20 +89,6 @@ class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
 
         return qs
 
-
-class LocationRoomsMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    serializer_class = LocationRoomSerializer
-    lookup_field = 'public_id'
-    pagination_class = None
-
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ['name']
-
-    permission_classes =[LocationPermission]
-
-    def get_queryset(self):
-        location_id = self.kwargs.get('public_id')
-        return Room.objects.filter(location__public_id=location_id)
 
 
 class LocationUsersView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
