@@ -18,6 +18,10 @@ from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.serializers.rooms import RoomSerializer
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import mixins
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from db_inventory.models.assets import EquipmentStatus
+from rest_framework.views import APIView
 
 
 
@@ -206,6 +210,59 @@ class DepartmentEquipmentViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
         return super().get_serializer(*args, **kwargs)
     
 
+class DepartmentEquipmentDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, public_id):
+
+        equipment_qs = Equipment.objects.filter(
+            room__location__department__public_id=public_id
+        ).select_related(
+            "room__location__department"
+        )
+
+        status_counts = (
+            equipment_qs
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+
+        status_map = {
+            row["status"]: row["count"]
+            for row in status_counts
+        }
+
+        total_equipment = sum(status_map.values())
+
+
+        active_assignments = EquipmentAssignment.objects.filter(
+            equipment__in=equipment_qs,
+            returned_at__isnull=True
+        ).count()
+
+        available = equipment_qs.filter(
+            status=EquipmentStatus.OK,
+            active_assignment__returned_at__isnull=True
+        ).count()
+
+        return Response({
+            "equipment_health": {
+                "total": total_equipment,
+                "available": available,
+                "under_repair": status_map.get(EquipmentStatus.UNDER_REPAIR, 0),
+                "ok": status_map.get(EquipmentStatus.OK, 0),
+                "damaged": status_map.get(EquipmentStatus.DAMAGED, 0),
+                "lost": status_map.get(EquipmentStatus.LOST, 0),
+            },
+            "utilization": {
+                "active_assignments": active_assignments,
+                "percent_assigned": round(
+                    (active_assignments / total_equipment * 100)
+                    if total_equipment else 0,
+                    1
+                ),
+            },
+        })
 
 class DepartmentEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = EquipmentSerializer

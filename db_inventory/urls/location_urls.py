@@ -24,6 +24,7 @@ urlpatterns = [
 
     # --- Location Equipment ---
     path( "<str:public_id>/equipment-full/", location_viewsets.LocationEquipmentView.as_view({"get": "list"}), name="location-equipment", ),
+    path( "<str:public_id>/equipment/dashboard/", location_viewsets.LocationEquipmentDashboardView.as_view(), name="location-equipment-dashboard", ),
     path( "<str:public_id>/equipment-light/", location_viewsets.LocationEquipmentMiniViewSet.as_view({"get": "list"}), name="location-equipment-light", ),
     # --- Location Consumables ---
     path( "<str:public_id>/consumables-full/", location_viewsets.LocationConsumablesView.as_view({"get": "list"}), name="location-consumables", ),

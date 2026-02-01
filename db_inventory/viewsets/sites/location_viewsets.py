@@ -6,7 +6,7 @@ from db_inventory.serializers.users import UserAreaSerializer
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
-from db_inventory.models.assets import Equipment, Consumable, Accessory, Component
+from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
 from db_inventory.models.site import Location, Room, UserLocation
 from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
@@ -19,7 +19,11 @@ from db_inventory.pagination import FlexiblePagination
 from django.db.models import Q
 from db_inventory.mixins import AuditMixin
 from rest_framework import mixins
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
+from django.db.models import Count
 from db_inventory.permissions.assets import HasAssignmentScopePermission
 
 class LocationModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
@@ -193,7 +197,59 @@ class LocationEquipmentView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
         kwargs['exclude_department'] = True
         kwargs['exclude_location'] = True
         return super().get_serializer(*args, **kwargs)
-    
+
+class LocationEquipmentDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, public_id):
+
+        equipment_qs = Equipment.objects.filter(
+            room__location__public_id=public_id
+        ).select_related(
+            "room__location"
+        )
+        status_counts = (
+            equipment_qs
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+
+        status_map = {
+            row["status"]: row["count"]
+            for row in status_counts
+        }
+
+        total_equipment = sum(status_map.values())
+
+        active_assignments = EquipmentAssignment.objects.filter(
+            equipment__in=equipment_qs,
+            returned_at__isnull=True
+        ).count()
+
+
+        available = equipment_qs.filter(
+            status=EquipmentStatus.OK,
+            active_assignment__returned_at__isnull=True
+        ).count()
+
+        return Response({
+            "equipment_health": {
+                "total": total_equipment,
+                "available": available,
+                "under_repair": status_map.get(EquipmentStatus.UNDER_REPAIR, 0),
+                "damaged": status_map.get(EquipmentStatus.DAMAGED, 0),
+                "lost": status_map.get(EquipmentStatus.LOST, 0),
+            },
+            "utilization": {
+                "active_assignments": active_assignments,
+                "percent_assigned": round(
+                    (active_assignments / total_equipment * 100)
+                    if total_equipment else 0,
+                    1
+                ),
+            },
+        })
+
 class LocationEquipmentMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = EquipmentSerializer
     lookup_field = 'public_id'

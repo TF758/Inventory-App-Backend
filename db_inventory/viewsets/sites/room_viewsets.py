@@ -12,7 +12,11 @@ from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers import *
 from django.db.models import Q
 from rest_framework import mixins
-
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from db_inventory.models.assets import EquipmentStatus
+from django.db.models import Count
 
 class RoomModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Room objects.
@@ -131,6 +135,74 @@ class RoomEquipmentViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Model
         kwargs['exclude_location'] = True
         kwargs['exclude_room'] = True
         return super().get_serializer(*args, **kwargs)
+    
+
+class RoomEquipmentDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, public_id):
+        # ---------------------------------------------
+        # 1. Base queryset: all equipment in the room
+        # ---------------------------------------------
+        equipment_qs = Equipment.objects.filter(
+            room__public_id=public_id
+        ).select_related(
+            "room"
+        )
+
+        # ---------------------------------------------
+        # 2. Equipment status aggregation
+        # ---------------------------------------------
+        status_counts = (
+            equipment_qs
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+
+        status_map = {
+            row["status"]: row["count"]
+            for row in status_counts
+        }
+
+        total_equipment = sum(status_map.values())
+
+        # ---------------------------------------------
+        # 3. Active assignments
+        # ---------------------------------------------
+        active_assignments = EquipmentAssignment.objects.filter(
+            equipment__in=equipment_qs,
+            returned_at__isnull=True
+        ).count()
+
+        # ---------------------------------------------
+        # 4. Available equipment
+        # (OK + not currently assigned)
+        # ---------------------------------------------
+        available = equipment_qs.filter(
+            status=EquipmentStatus.OK,
+            active_assignment__returned_at__isnull=True
+        ).count()
+
+        # ---------------------------------------------
+        # 5. Response
+        # ---------------------------------------------
+        return Response({
+            "equipment_health": {
+                "total": total_equipment,
+                "available": available,
+                "under_repair": status_map.get(EquipmentStatus.UNDER_REPAIR, 0),
+                "damaged": status_map.get(EquipmentStatus.DAMAGED, 0),
+                "lost": status_map.get(EquipmentStatus.LOST, 0),
+            },
+            "utilization": {
+                "active_assignments": active_assignments,
+                "percent_assigned": round(
+                    (active_assignments / total_equipment * 100)
+                    if total_equipment else 0,
+                    1
+                ),
+            },
+        })
     
 
 class RoomConsumablesViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
