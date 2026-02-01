@@ -12,7 +12,7 @@ from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
-from db_inventory.mixins import ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
@@ -345,6 +345,24 @@ class LocationAccessoriesView(ScopeFilterMixin,ExcludeFiltersMixin, viewsets.Mod
         return super().get_serializer(*args, **kwargs)
     
 
+class LocationAccessoryDashboardView(
+    AccessoryDashboardMixin,
+    APIView
+):
+    permission_classes = [IsAuthenticated]
+
+    def get_rooms(self, public_id):
+        return Room.objects.filter(
+            location__public_id=public_id
+        )
+
+    def get(self, request, public_id):
+        period = self.get_period(request)
+        rooms = self.get_rooms(public_id)
+        data = self.build_dashboard_response(rooms, period)
+        return Response(data)
+    
+    
 class LocationAccessoriesMiniViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = AccessoryFullSerializer
     lookup_field = 'public_id'

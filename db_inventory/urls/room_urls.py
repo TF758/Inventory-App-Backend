@@ -30,6 +30,7 @@ urlpatterns = [
 
     # --- Room Accessories ---
     path( "<str:public_id>/accessories-full/", room_viewsets.RoomAccessoriesViewSet.as_view({"get": "list"}), name="room-accessories", ),
+    path( "<str:public_id>/accessories/dashboard/", room_viewsets.RoomAccessoryDashboardView.as_view(), name="room-accessories-dashboard", ),
     path( "<str:public_id>/accessories-light/", room_viewsets.RoomAccessoriesMiniViewSet.as_view({"get": "list"}), name="room-accessories-light", ),
 
     # --- Room Components ---

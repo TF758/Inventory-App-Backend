@@ -32,6 +32,7 @@ urlpatterns = [
 
     # --- Location Accessories ---
     path( "<str:public_id>/accessories-full/", location_viewsets.LocationAccessoriesView.as_view({"get": "list"}), name="location-accessories", ),
+    path( "<str:public_id>/accessories/dashboard/", location_viewsets.LocationAccessoryDashboardView.as_view(), name="location-accessories-dashboard", ),
     path( "<str:public_id>/accessories-light/", location_viewsets.LocationAccessoriesMiniViewSet.as_view({"get": "list"}), name="location-accessories-light", ),
     # --- Location Components ---
     path( "<str:public_id>/components-full/", location_viewsets.LocationComponentsViewSet.as_view({"get": "list"}), name="location-components", ),
