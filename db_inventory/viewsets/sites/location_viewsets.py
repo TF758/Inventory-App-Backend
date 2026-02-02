@@ -129,11 +129,6 @@ class LocationUsersView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVi
         kwargs["exclude_department"] = True
         kwargs["exclude_location"] = True
         return super().get_serializer(*args, **kwargs)
-
-
-    
-
-
 class LocationEquipmentView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of equipment in a given location"""
     serializer_class = EquipmentSerializer
@@ -253,6 +248,7 @@ class LocationConsumablesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.M
     def get_serializer(self, *args, **kwargs):
         kwargs["exclude_department"] = True
         kwargs["exclude_location"] = True
+        return super().get_serializer(*args, **kwargs)
 
 class LocationConsumableDashboardView( ConsumableDashboardMixin, APIView):
     permission_classes = [IsAuthenticated]

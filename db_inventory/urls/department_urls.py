@@ -44,6 +44,6 @@ urlpatterns = [
     path( "<str:public_id>/roles/", department_viewsets.DepartmentRolesViewSet.as_view({"get": "list"}), name="department-roles", ),
 
     # --- Department Rooms ---
-    path( "<str:public_id>/rooms-full/", department_viewsets.DepartmentRoomsViewSet.as_view({"get": "list"}), name="department-rooms", ), 
+    path( "<str:public_id>/rooms/", department_viewsets.DepartmentRoomsViewSet.as_view({"get": "list"}), name="department-rooms", ), 
     
 ]
