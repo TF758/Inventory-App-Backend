@@ -1,4 +1,7 @@
 from db_inventory.models.security import Notification
+from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.models.assets import Component, Consumable, EquipmentStatus
+from db_inventory.models.roles import RoleAssignment
 from .permissions import filter_queryset_by_scope
 from db_inventory.models import AuditLog, Equipment, Accessory
 from django.db import transaction
@@ -696,4 +699,172 @@ class ConsumableDashboardMixin:
             "meta": {
                 "period_days": period,
             },
+        }
+    
+class AreaDashboardMixin:
+    ACTIVITY_DAYS = 7
+    ACTIVITY_LIMIT = 10
+
+    ACTIVITY_EVENTS = [
+        AuditLog.Events.MODEL_CREATED,
+        AuditLog.Events.MODEL_UPDATED,
+        AuditLog.Events.MODEL_DELETED,
+        AuditLog.Events.CONSUMABLE_ISSUED,
+        AuditLog.Events.CONSUMABLE_RETURNED,
+        AuditLog.Events.CONSUMABLE_USED,
+        AuditLog.Events.STOCK_USED,
+        AuditLog.Events.ASSET_ASSIGNED,
+        AuditLog.Events.ASSET_RETURNED,
+        AuditLog.Events.ASSET_REASSIGNED,
+        AuditLog.Events.ASSET_UNASSIGNED,
+        AuditLog.Events.ASSET_CONDEMNED,
+        AuditLog.Events.ASSET_RESTOCKED,
+        AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
+    ]
+
+    # -------- MUST BE IMPLEMENTED --------
+    def get_rooms(self, public_id):
+        raise NotImplementedError
+
+    def get_activity_filter(self, obj):
+        """
+        Returns a Q() filter for AuditLog scoping.
+        """
+        raise NotImplementedError
+    # ------------------------------------
+
+    def build_dashboard(self, obj):
+        rooms = self.get_rooms(obj.public_id)
+        since = timezone.now() - timedelta(days=self.ACTIVITY_DAYS)
+
+        # --------------------
+        # Equipment
+        # --------------------
+        equipment_qs = Equipment.objects.filter(room__in=rooms)
+        total_equipment = equipment_qs.count()
+
+        assigned_equipment = EquipmentAssignment.objects.filter(
+            equipment__room__in=rooms,
+            returned_at__isnull=True,
+        ).count()
+
+        utilization = round(
+            (assigned_equipment / total_equipment * 100)
+            if total_equipment else 0,
+            1,
+        )
+
+        damaged_equipment = equipment_qs.filter(
+            status__in=[
+                EquipmentStatus.DAMAGED,
+                EquipmentStatus.UNDER_REPAIR,
+            ]
+        ).count()
+
+        lost_or_condemned_recent = equipment_qs.filter(
+            events__event_type__in=["lost", "condemned"],
+            events__occurred_at__gte=since,
+        ).distinct().count()
+
+        # --------------------
+        # Consumables
+        # --------------------
+        consumables_qs = Consumable.objects.filter(room__in=rooms)
+
+        low_stock = consumables_qs.filter(
+            quantity__gt=0,
+            quantity__lte=F("low_stock_threshold"),
+        ).count()
+
+        out_of_stock = consumables_qs.filter(quantity=0).count()
+
+        accessories_qs = Accessory.objects.filter(room__in=rooms)
+        components_qs = Component.objects.filter(
+            equipment__room__in=rooms
+        )
+
+
+        # --------------------
+        # Users & Roles
+        # --------------------
+        roles_qs = RoleAssignment.objects.filter(
+            Q(department=obj)
+            | Q(location__department=obj)
+            | Q(room__location__department=obj)
+            if hasattr(obj, "locations")
+            else Q(location=obj)
+            | Q(room__location=obj)
+            if hasattr(obj, "rooms")
+            else Q(room=obj)
+        )
+
+        total_users = roles_qs.values("user").distinct().count()
+
+        admin_users = roles_qs.filter(
+            role__in=[
+                "SITE_ADMIN",
+                "DEPARTMENT_ADMIN",
+                "LOCATION_ADMIN",
+                "ROOM_ADMIN",
+            ]
+        ).values("user").distinct().count()
+
+        # --------------------
+        # Recent Activity
+        # --------------------
+        activity_qs = (
+            AuditLog.objects.filter(
+                self.get_activity_filter(obj),
+                event_type__in=self.ACTIVITY_EVENTS,
+                created_at__gte=since,
+            )
+            .order_by("-created_at")[: self.ACTIVITY_LIMIT]
+        )
+
+        recent_activity = [
+            {
+                "event_type": log.event_type,
+                "description": log.description,
+                "target_model": log.target_model,
+                "target_name": log.target_name,
+                "room": log.room_name,
+                "user": log.user_email,
+                "occurred_at": log.created_at,
+            }
+            for log in activity_qs
+        ]
+
+        return {
+            "summary": {
+                "assets": {
+                    "equipment": total_equipment,
+                    "accessories": accessories_qs.count(),
+                    "components": components_qs.count(),
+                    "consumables": consumables_qs.count(),
+                },
+                "equipment_utilization": {
+                    "assigned": assigned_equipment,
+                    "total": total_equipment,
+                    "percent": utilization,
+                },
+                "stock_risk": {
+                    "low_stock_consumables": low_stock,
+                    "out_of_stock_consumables": out_of_stock,
+                },
+                "equipment_issues": {
+                    "damaged": damaged_equipment,
+                    "lost_or_condemned_recent": lost_or_condemned_recent,
+                },
+                "users": {
+                    "total": total_users,
+                    "admins": admin_users,
+                    "non_admins": max(total_users - admin_users, 0),
+                },
+            },
+            "attention": {
+                "damaged_equipment": damaged_equipment,
+                "out_of_stock_consumables": out_of_stock,
+                "low_stock_consumables": low_stock,
+            },
+            "recent_activity": recent_activity,
         }

@@ -12,7 +12,7 @@ from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
-from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
@@ -26,6 +26,18 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count
 from db_inventory.permissions.assets import HasAssignmentScopePermission
 
+class LocationDashboardView(AreaDashboardMixin, APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_rooms(self, public_id):
+        return Room.objects.filter(location__public_id=public_id)
+
+    def get_activity_filter(self, location):
+        return Q(location=location)
+
+    def get(self, request, public_id):
+        location = get_object_or_404(Location, public_id=public_id)
+        return Response(self.build_dashboard(location))
 
 class LocationViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Location objects"""

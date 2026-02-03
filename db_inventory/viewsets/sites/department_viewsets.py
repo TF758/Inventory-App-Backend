@@ -6,7 +6,7 @@ from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
-from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
 from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
 from db_inventory.pagination import  FlexiblePagination
 from django.db.models import Q
@@ -16,13 +16,29 @@ from db_inventory.serializers.users import UserAreaSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.serializers.rooms import RoomSerializer
-from django.contrib.contenttypes.models import ContentType
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from db_inventory.models.assets import EquipmentStatus
 from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from datetime import timedelta
 
+class DepartmentDashboardView(AreaDashboardMixin, APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_rooms(self, public_id):
+        return Room.objects.filter(
+            location__department__public_id=public_id
+        )
+
+    def get_activity_filter(self, department):
+        return Q(department=department)
+
+    def get(self, request, public_id):
+        department = get_object_or_404(Department, public_id=public_id)
+        return Response(self.build_dashboard(department))
 
 class DepartmentViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """ViewSet for managing Department objects"""

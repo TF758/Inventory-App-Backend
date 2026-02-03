@@ -98,28 +98,14 @@ class EquipmentEvent(models.Model):
         CONDEMNED = "condemned", "Condemned"
     
 
-    equipment = models.ForeignKey(
-        Equipment,
-        on_delete=models.PROTECT,
-        related_name="events"
-    )
+    equipment = models.ForeignKey( Equipment, on_delete=models.PROTECT, related_name="events" )
 
-    user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
+    user = models.ForeignKey( User, on_delete=models.SET_NULL, null=True, blank=True )
 
     event_type = models.CharField(max_length=20, choices=Event_Choices)
     occurred_at = models.DateTimeField(auto_now_add=True)
 
-    reported_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="reported_equipment_events"
-    )
+    reported_by = models.ForeignKey( User, on_delete=models.SET_NULL, null=True, related_name="reported_equipment_events" )
 
     notes = models.TextField(blank=True)
 
@@ -177,13 +163,7 @@ class ConsumableEvent(models.Model):
         ADJUSTED = "adjusted"
 
     consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, related_name="events")
-    issue = models.ForeignKey(
-        ConsumableIssue,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="events"
-    )
+    issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.SET_NULL, related_name="events" )
 
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -193,9 +173,5 @@ class ConsumableEvent(models.Model):
     event_type = models.CharField(max_length=20, choices=EventType.choices)
     occurred_at = models.DateTimeField(auto_now_add=True)
 
-    reported_by = models.ForeignKey(
-        User, null=True, on_delete=models.SET_NULL,
-        related_name="reported_consumable_events"
-    )
-
+    reported_by = models.ForeignKey( User, null=True, on_delete=models.SET_NULL, related_name="reported_consumable_events" )
     notes = models.TextField(blank=True)

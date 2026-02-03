@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
-from db_inventory.mixins import AccessoryDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers import *
@@ -20,6 +20,18 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404
 
 
+class RoomDashboardView(AreaDashboardMixin, APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_rooms(self, public_id):
+        return Room.objects.filter(public_id=public_id)
+
+    def get_activity_filter(self, room):
+        return Q(room=room)
+
+    def get(self, request, public_id):
+        room = get_object_or_404(Room, public_id=public_id)
+        return Response(self.build_dashboard(room))
     
 class RoomViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     lookup_field = "public_id"

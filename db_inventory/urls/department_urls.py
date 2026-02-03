@@ -14,6 +14,7 @@ urlpatterns = [
         "patch": "partial_update",
         "delete": "destroy",
     }), name="department-detail", ),
+    path( "<str:public_id>/dashboard/", department_viewsets.DepartmentDashboardView.as_view(), name="department-dashboard", ),
 
     # --- Department Users ---
     path( "<str:public_id>/users/", department_viewsets.DepartmentUsersViewSet.as_view({"get": "list"}), name="department-users", ),
