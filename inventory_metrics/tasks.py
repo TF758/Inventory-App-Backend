@@ -4,7 +4,8 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.db import transaction
 from db_inventory.mixins import NotificationMixin
-from inventory_metrics.services.snapshots import generate_daily_system_metrics
+from db_inventory.models.site import Department
+from inventory_metrics.services.snapshots import generate_daily_department_snapshot, generate_daily_system_metrics
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from inventory_metrics.models import ReportJob
 from inventory_metrics.services.user_summary import build_user_summary_report
@@ -340,4 +341,65 @@ def run_daily_system_metrics_snapshot(self):
 
     finally:
         run.duration_ms = int((time.monotonic() - start) * 1000)
+        run.save()
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 3},
+    retry_backoff=True,
+)
+def run_daily_department_snapshots(self):
+    """
+    Generate daily snapshots for all departments.
+    Safe to run multiple times per day (idempotent).
+    """
+
+    start_ts = time.monotonic()
+
+    run = ScheduledTaskRun.objects.create(
+        task_name="run_daily_department_snapshots",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting department snapshot generation",
+    )
+
+    created_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    try:
+        departments = Department.objects.all()
+
+        for department in departments:
+            try:
+                created = generate_daily_department_snapshot(
+                    department=department,
+                    snapshot_date=timezone.localdate(),
+                    created_by="celery",
+                )
+
+                if created:
+                    created_count += 1
+                else:
+                    skipped_count += 1
+
+            except Exception as exc:
+                # Do NOT fail the entire task for one bad department
+                error_count += 1
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = (
+            f"Departments processed={departments.count()}, "
+            f"created={created_count}, "
+            f"skipped={skipped_count}, "
+            f"errors={error_count}"
+        )
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
         run.save()
