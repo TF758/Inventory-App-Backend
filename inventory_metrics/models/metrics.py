@@ -25,7 +25,7 @@ class DailySystemMetrics(models.Model):
     total_accessories = models.IntegerField()
     total_accessories_quantity = models.IntegerField()
 
-
+    schema_version = models.PositiveSmallIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
 

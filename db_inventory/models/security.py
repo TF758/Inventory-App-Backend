@@ -106,3 +106,19 @@ class Notification(PublicIDModel):
             f"{self.type} [{self.level}] → "
             f"{self.recipient} ({'read' if self.is_read else 'unread'})"
         )
+
+class ScheduledTaskRun(models.Model):
+    class Status(models.TextChoices):
+        STARTED = "started", "Started"
+        SUCCESS = "success", "Success"
+        SKIPPED = "skipped", "Skipped"
+        FAILED = "failed", "Failed"
+
+    task_name = models.CharField(max_length=100, db_index=True)
+    run_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=Status.choices)
+    message = models.TextField(blank=True)
+
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+
+    schema_version = models.PositiveSmallIntegerField(null=True, blank=True)

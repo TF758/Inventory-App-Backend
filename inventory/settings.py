@@ -399,3 +399,5 @@ NOTIF_CLEANUP_CRON = env(
     "NOTIF_CLEANUP_CRON",
     default="0 3 * * *",
 )
+
+SNAPSHOT_SCHEMA_VERSION = 1
