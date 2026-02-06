@@ -13,6 +13,7 @@ urlpatterns = [
         "patch": "partial_update",
         "delete": "destroy",
     }), name="location-detail", ),
+    path( "<str:public_id>/dashboard/", location_viewsets.LocationDashboardView.as_view(), name="location-dashboard", ),
         
     # --- Location Rooms ---
     path( "<str:public_id>/rooms/", location_viewsets.LocationRoomsView.as_view({"get": "list"}), name="location-rooms", ),

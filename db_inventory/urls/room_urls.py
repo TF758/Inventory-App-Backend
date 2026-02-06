@@ -16,6 +16,7 @@ urlpatterns = [
         "patch": "partial_update",
         "delete": "destroy",
     }), name="room-detail", ),
+    path( "<str:public_id>/dashboard/", room_viewsets.RoomDashboardView.as_view(), name="room-dashboard", ),
 
     # --- Room Users ---
     path( "<str:public_id>/users/", room_viewsets.RoomUsersViewSet.as_view({"get": "list"}), name="room-users", ),
