@@ -400,4 +400,10 @@ NOTIF_CLEANUP_CRON = env(
     default="0 3 * * *",
 )
 
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = env.int("SNAPSHOT_SCHEMA_VERSION", default=1)
+
+DAILY_SYSTEM_METRICS_CRON  = env(
+    "DAILY_SYSTEM_METRICS_CRON",
+    default="0 2 * * *",
+)
+
