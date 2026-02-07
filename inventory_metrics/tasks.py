@@ -5,6 +5,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from db_inventory.mixins import NotificationMixin
 from db_inventory.models.site import Department
+from inventory.inventory_metrics.utils.report_payload import wrap_report_payload
 from inventory_metrics.services.snapshots import generate_daily_department_snapshot, generate_daily_system_metrics
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from inventory_metrics.models import ReportJob
@@ -49,9 +50,14 @@ def generate_user_summary_report_task(self, report_job_id: int):
         # -----------------------------
         # Build payload
         # -----------------------------
-        payload = build_user_summary_report(
+
+        raw_data = build_user_summary_report(
             user_identifier=job.params["user"],
             sections=job.params["sections"],
+        )
+        payload = wrap_report_payload(
+            report_type="user_summary",
+            data=raw_data,
         )
 
         redis_key = f"report:{job.public_id}"
@@ -151,11 +157,19 @@ def generate_site_asset_report_task(self, report_job_id: int):
         site = params["site"]
         asset_types = params["asset_types"]
 
-        payload = build_site_asset_report(
+        raw_data = build_site_asset_report(
             site_type=site["siteType"],
             site_id=site["siteId"],
             asset_types=asset_types,
             generated_by=job.user,
+        )
+
+        if not raw_data:
+            raise RuntimeError("Site asset report payload is empty")
+
+        payload = wrap_report_payload(
+            report_type="site_assets",
+            data=raw_data,
         )
 
         if payload is None:
@@ -251,11 +265,20 @@ def generate_site_audit_log_report_task(self, report_job_id: int):
         # -----------------------------
         params = job.params
 
-        payload = build_site_audit_log_report(
+        raw_data = build_site_audit_log_report(
             site=params["site"],
             audit_period_days=params.get("audit_period_days", 30),
             generated_by=job.user,
         )
+
+        if not raw_data:
+            raise RuntimeError("Site audit log report payload is empty")
+
+        payload = wrap_report_payload(
+            report_type="site_audit_logs",
+            data=raw_data,
+        )
+
 
         redis_key = f"report:{job.public_id}"
 
