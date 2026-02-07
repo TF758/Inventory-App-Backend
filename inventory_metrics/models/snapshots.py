@@ -87,7 +87,7 @@ class DailyDepartmentSnapshot(models.Model):
 
 class DailyLocationSnapshot(models.Model):
     location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name="daily_snapshots")
-    snapshot_date = models.DateField(default=timezone.now, db_index=True)
+    snapshot_date = models.DateField(default=timezone.localdate, db_index=True)
 
     total_users = models.IntegerField()
     total_admins = models.IntegerField(default=0)
