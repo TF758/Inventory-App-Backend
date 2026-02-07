@@ -40,7 +40,7 @@ class Command(BaseCommand):
         # ------------------------------------------------------------------
         upsert_task(
             name="Generate daily system metrics snapshot",
-            task="metrics.tasks.run_daily_system_metrics_snapshot",
+            task="inventory_metrics.tasks.run_daily_system_metrics_snapshot",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 

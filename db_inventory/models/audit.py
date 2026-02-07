@@ -75,6 +75,7 @@ class AuditLog(PublicIDModel):
 
     class Events:
         LOGIN = "login"
+        LOGIN_FAILED = "login_failed"
         LOGOUT = "logout"
         USER_CREATED = "user_created"
         USER_UPDATED = "user_updated"

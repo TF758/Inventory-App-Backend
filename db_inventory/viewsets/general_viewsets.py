@@ -35,42 +35,70 @@ class SessionTokenLoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginThrottle]
 
-
     def post(self, request, *args, **kwargs):
-        # Authenticate user via serializer
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)  # Will automatically raise ForcePasswordChangeException if needed
-        user = serializer.user
 
-        # Generate opaque refresh token (raw) and its hash
+        # -------------------------
+        # Authenticate user
+        # -------------------------
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as exc:
+            # Log failed login attempt
+            AuditLog.objects.create(
+                event_type=AuditLog.Events.LOGIN_FAILED,
+                description="Login failed",
+                metadata={
+                    "reason": str(exc),
+                },
+                ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT"),
+            )
+            raise
+
+        user = serializer.user
+        now = timezone.now()
+
+        # -------------------------
+        # Generate refresh token
+        # -------------------------
         raw_refresh = secrets.token_urlsafe(64)
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
-            logger.exception("Refresh token hashing failed", extra={"user_id": user.pk})
+            logger.exception(
+                "Refresh token hashing failed",
+                extra={"user_id": user.pk},
+            )
             raise APIException("Authentication failed.")
-        
-        now = timezone.now()
 
-        # Create session and ensure atomicity — if anything after creation fails, we will remove the session
+        # -------------------------
+        # Create session (atomic)
+        # -------------------------
         try:
             with transaction.atomic():
                 ua_hash = UserSession.hash_user_agent(
                     request.META.get("HTTP_USER_AGENT", "")
                 )
+
                 session = UserSession.objects.create(
-                user=user,
-                refresh_token_hash=hashed_refresh,
-                expires_at= now + settings.SESSION_IDLE_TIMEOUT,
-                absolute_expires_at=now + settings.SESSION_ABSOLUTE_LIFETIME,
-                user_agent_hash=ua_hash,  
-                ip_address=request.META.get("REMOTE_ADDR"),
-            )
+                    user=user,
+                    refresh_token_hash=hashed_refresh,
+                    expires_at=now + settings.SESSION_IDLE_TIMEOUT,
+                    absolute_expires_at=now + settings.SESSION_ABSOLUTE_LIFETIME,
+                    user_agent_hash=ua_hash,
+                    ip_address=request.META.get("REMOTE_ADDR"),
+                )
         except Exception:
-            logger.exception("Session creation failed", extra={"user_id": user.pk})
+            logger.exception(
+                "Session creation failed",
+                extra={"user_id": user.pk},
+            )
             raise APIException("Authentication failed.")
 
-        # Generate access token bound to the created session.
+        # -------------------------
+        # Generate access token
+        # -------------------------
         try:
             access_token_obj = AccessToken.for_user(user)
             access_token_obj["session_id"] = str(session.id)
@@ -78,18 +106,34 @@ class SessionTokenLoginView(TokenObtainPairView):
             access_token_obj["idle_exp"] = int(session.expires_at.timestamp())
             access_token = str(access_token_obj)
         except Exception:
-                session.delete()
-                logger.exception("Access token generation failed", extra={"user_id": user.pk})
-                raise APIException("Authentication failed.")
+            session.delete()
+            logger.exception(
+                "Access token generation failed",
+                extra={"user_id": user.pk},
+            )
+            raise APIException("Authentication failed.")
 
-        # Build response including metadata
+        # -------------------------
+        # Successful login audit
+        # -------------------------
+        AuditLog.objects.create(
+            event_type=AuditLog.Events.LOGIN,
+            user=user,
+            user_public_id=str(user.public_id),
+            user_email=user.email,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT"),
+        )
+
+        # -------------------------
+        # Response
+        # -------------------------
         response_data = {
             "access": access_token,
             "public_id": str(user.public_id),
             "role_id": user.active_role.public_id if user.active_role else None,
         }
 
-        # Set refresh token as HttpOnly cookie only after everything succeeded
         response = Response(response_data, status=200)
         response.set_cookie(
             key="refresh",
