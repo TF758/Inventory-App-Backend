@@ -4,101 +4,74 @@ from django.db import models
 
 class DailySystemMetrics(models.Model):
     date = models.DateField(unique=True)
+
     # User metrics
-    total_users = models.IntegerField()
-    active_users_last_24h = models.IntegerField()
-    active_users_last_7d = models.IntegerField()
-    new_users_last_24h = models.IntegerField()
-    locked_users = models.IntegerField()
+    total_users = models.PositiveIntegerField(default=0)
+    active_users_last_24h = models.PositiveIntegerField(default=0)
+    active_users_last_7d = models.PositiveIntegerField(default=0)
+    new_users_last_24h = models.PositiveIntegerField(default=0)
+    locked_users = models.PositiveIntegerField(default=0)
+
     # Session metrics
-    total_sessions = models.IntegerField()
-    active_sessions = models.IntegerField()
-    revoked_sessions = models.IntegerField()
-    expired_sessions_last_24h = models.IntegerField()
-    unique_users_logged_in_last_24h = models.IntegerField()
+    total_sessions = models.PositiveIntegerField(default=0)
+    active_sessions = models.PositiveIntegerField(default=0)
+    revoked_sessions = models.PositiveIntegerField(default=0)
+    expired_sessions_last_24h = models.PositiveIntegerField(default=0)
+    unique_users_logged_in_last_24h = models.PositiveIntegerField(default=0)
+
     # Inventory metrics
-    total_equipment = models.IntegerField()
-    total_components = models.IntegerField()
-    total_components_quantity = models.IntegerField()
-    total_consumables = models.IntegerField()
-    total_consumables_quantity = models.IntegerField()
-    total_accessories = models.IntegerField()
-    total_accessories_quantity = models.IntegerField()
+    total_equipment = models.PositiveIntegerField(default=0)
+    equipment_ok = models.PositiveIntegerField(default=0)
+    equipment_under_repair = models.PositiveIntegerField(default=0)
+    equipment_damaged = models.PositiveIntegerField(default=0)
+
+    total_components = models.PositiveIntegerField(default=0)
+    total_components_quantity = models.PositiveIntegerField(default=0)
+    total_consumables = models.PositiveIntegerField(default=0)
+    total_consumables_quantity = models.PositiveIntegerField(default=0)
+    total_accessories = models.PositiveIntegerField(default=0)
+    total_accessories_quantity = models.PositiveIntegerField(default=0)
 
     schema_version = models.PositiveSmallIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
-
 
     class Meta:
         ordering = ["-date"]
         verbose_name = "Daily System Metric"
         verbose_name_plural = "Daily System Metrics"
 
-
     def __str__(self):
         return f"DailySystemMetrics - {self.date.isoformat()}"
     
-class DailySecurityMetrics(models.Model):
-    date = models.DateField(unique=True)
-    password_resets = models.IntegerField()
-    active_password_resets = models.IntegerField()
-    expired_password_resets = models.IntegerField()
-    users_multiple_active_sessions = models.IntegerField()
-    users_with_revoked_sessions = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-    class Meta:
-        verbose_name = "Daily Security Metric"
-        verbose_name_plural = "Daily Security Metrics"
-
-
-    def __str__(self):
-        return f"DailySecurityMetrics - {self.date.isoformat()}"
-    
-
-class DailyRoleMetrics(models.Model):
-    date = models.DateField(db_index=True)
-    role = models.CharField(max_length=64, db_index=True)
-    total_users_with_role = models.IntegerField()
-    total_users_active_with_role = models.IntegerField()
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-    class Meta:
-        unique_together = ("date", "role")
-        verbose_name = "Daily Role Metric"
-        verbose_name_plural = "Daily Role Metrics"
-
-
-    def __str__(self):
-        return f"{self.date} - {self.role}"
-
-class DailyLoginMetrics(models.Model):
+class DailyAuthMetrics(models.Model):
     date = models.DateField(unique=True, db_index=True)
 
     # Login events
-    total_logins = models.IntegerField()
-    unique_users_logged_in = models.IntegerField()
-    failed_logins = models.IntegerField()
-    lockouts = models.IntegerField()
+    total_logins = models.PositiveIntegerField(default=0)
+    unique_users_logged_in = models.PositiveIntegerField(default=0)
+    failed_logins = models.PositiveIntegerField(default=0)
+    lockouts = models.PositiveIntegerField(default=0)
 
-    # Session-related
-    active_sessions = models.IntegerField()
-    revoked_sessions = models.IntegerField()
-    expired_sessions = models.IntegerField()
+    # Sessions
+    active_sessions = models.PositiveIntegerField(default=0)
+    revoked_sessions = models.PositiveIntegerField(default=0)
+    expired_sessions = models.PositiveIntegerField(default=0)
+    users_multiple_active_sessions = models.PositiveIntegerField(default=0)
+    users_with_revoked_sessions = models.PositiveIntegerField(default=0)
 
-    # Password recovery
-    password_resets_started = models.IntegerField()
-    password_resets_completed = models.IntegerField()
+    # Password resets
+    password_resets_started = models.PositiveIntegerField(default=0)
+    password_resets_completed = models.PositiveIntegerField(default=0)
+    active_password_resets = models.PositiveIntegerField(default=0)
+    expired_password_resets = models.PositiveIntegerField(default=0)
 
+    schema_version = models.PositiveSmallIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-date"]
-        verbose_name = "Daily Login Metric"
-        verbose_name_plural = "Daily Login Metrics"
+        verbose_name = "Daily Auth Metric"
+        verbose_name_plural = "Daily Auth Metrics"
 
     def __str__(self):
-        return f"DailyLoginMetrics - {self.date}"    
+        return f"DailyAuthMetrics - {self.date}"

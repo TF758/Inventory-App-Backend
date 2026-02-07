@@ -86,6 +86,15 @@ def issue_consumable(consumable, user, when):
     if consumable.quantity <= 0:
         return None
 
+    existing_issue = (
+        ConsumableIssue.objects
+        .filter(consumable=consumable, user=user, returned_at__isnull=True)
+        .first()
+    )
+
+    if existing_issue:
+        return existing_issue  
+
     qty = random.randint(1, min(5, consumable.quantity))
 
     issue = ConsumableIssue.objects.create(
