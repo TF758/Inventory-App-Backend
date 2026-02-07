@@ -5,7 +5,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from db_inventory.mixins import NotificationMixin
 from db_inventory.models.site import Department
-from inventory.inventory_metrics.utils.report_payload import wrap_report_payload
+from inventory_metrics.utils.report_payload import wrap_report_payload
 from inventory_metrics.services.snapshots import generate_daily_department_snapshot, generate_daily_system_metrics
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from inventory_metrics.models import ReportJob

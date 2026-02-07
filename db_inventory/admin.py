@@ -13,6 +13,8 @@ from django.utils.translation import gettext_lazy as _
 
 admin.site.register(Notification)
 
+admin.site.register(ScheduledTaskRun)
+
 admin.site.register(EquipmentAssignment)
 
 admin.site.register(EquipmentEvent)

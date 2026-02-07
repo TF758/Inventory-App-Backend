@@ -229,7 +229,7 @@ AUTH_USER_MODEL = 'db_inventory.User'
 LANGUAGE_CODE = 'en-us'
 
 USE_TZ = True
-TIME_ZONE = 'America/New_York'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
