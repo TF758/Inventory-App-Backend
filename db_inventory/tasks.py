@@ -2,11 +2,11 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 import logging
-
+import time
 from db_inventory.models.users import User
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.security import Notification
+from db_inventory.models.security import Notification, ScheduledTaskRun
 from django.utils import timezone
 from datetime import timedelta
 
@@ -137,44 +137,68 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
     retry_kwargs={"max_retries": 3},
 )
 def auto_read_stale_notifications(self):
+    start_ts = time.monotonic()
     now = timezone.now()
 
-    info_cutoff = now - retention_delta(
-        minutes_setting="NOTIF_INFO_AUTO_READ_MINUTES",
-        days_setting="NOTIF_INFO_AUTO_READ_DAYS",
+    run = ScheduledTaskRun.objects.create(
+        task_name="auto_read_stale_notifications",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting auto-read of stale notifications",
     )
 
-    warning_cutoff = now - retention_delta(
-        minutes_setting="NOTIF_WARNING_AUTO_READ_MINUTES",
-        days_setting="NOTIF_WARNING_AUTO_READ_DAYS",
-    )
-
-    info_updated = (
-        Notification.objects
-        .filter(
-            level=Notification.Level.INFO,
-            is_read=False,
-            is_deleted=False,
-            created_at__lt=info_cutoff,
+    try:
+        info_cutoff = now - retention_delta(
+            minutes_setting="NOTIF_INFO_AUTO_READ_MINUTES",
+            days_setting="NOTIF_INFO_AUTO_READ_DAYS",
         )
-        .update(is_read=True, read_at=now)
-    )
 
-    warning_updated = (
-        Notification.objects
-        .filter(
-            level=Notification.Level.WARNING,
-            is_read=False,
-            is_deleted=False,
-            created_at__lt=warning_cutoff,
+        warning_cutoff = now - retention_delta(
+            minutes_setting="NOTIF_WARNING_AUTO_READ_MINUTES",
+            days_setting="NOTIF_WARNING_AUTO_READ_DAYS",
         )
-        .update(is_read=True, read_at=now)
-    )
 
-    return {
-        "info_auto_read": info_updated,
-        "warning_auto_read": warning_updated,
-    }
+        info_updated = (
+            Notification.objects
+            .filter(
+                level=Notification.Level.INFO,
+                is_read=False,
+                is_deleted=False,
+                created_at__lt=info_cutoff,
+            )
+            .update(is_read=True, read_at=now)
+        )
+
+        warning_updated = (
+            Notification.objects
+            .filter(
+                level=Notification.Level.WARNING,
+                is_read=False,
+                is_deleted=False,
+                created_at__lt=warning_cutoff,
+            )
+            .update(is_read=True, read_at=now)
+        )
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = (
+            f"info_auto_read={info_updated}, "
+            f"warning_auto_read={warning_updated}"
+        )
+
+        return {
+            "info_auto_read": info_updated,
+            "warning_auto_read": warning_updated,
+        }
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+        run.save()
+
 
 @shared_task(
     bind=True,
@@ -183,76 +207,154 @@ def auto_read_stale_notifications(self):
     retry_kwargs={"max_retries": 3},
 )
 def cleanup_notifications(self):
+    start_ts = time.monotonic()
+    now = timezone.now()
+    deleted = {}
+
+    run = ScheduledTaskRun.objects.create(
+        task_name="cleanup_notifications",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting notification cleanup",
+    )
+
+    try:
+        # -------------------------------
+        # Soft-deleted notifications
+        # -------------------------------
+        deleted["soft_info"] = (
+            Notification.objects
+            .filter(
+                is_deleted=True,
+                level=Notification.Level.INFO,
+                deleted_at__lt=now - retention_delta(
+                    minutes_setting="NOTIF_INFO_SOFT_DELETE_MINUTES",
+                    days_setting="NOTIF_INFO_SOFT_DELETE_DAYS",
+                ),
+            )
+            .delete()[0]
+        )
+
+        deleted["soft_warning"] = (
+            Notification.objects
+            .filter(
+                is_deleted=True,
+                level=Notification.Level.WARNING,
+                deleted_at__lt=now - retention_delta(
+                    minutes_setting="NOTIF_WARNING_SOFT_DELETE_MINUTES",
+                    days_setting="NOTIF_WARNING_SOFT_DELETE_DAYS",
+                ),
+            )
+            .delete()[0]
+        )
+
+        # -------------------------------
+        # Read notifications
+        # -------------------------------
+        deleted["read_info"] = (
+            Notification.objects
+            .filter(
+                is_read=True,
+                level=Notification.Level.INFO,
+                read_at__lt=now - retention_delta(
+                    minutes_setting="NOTIF_INFO_DELETE_MINUTES",
+                    days_setting="NOTIF_INFO_DELETE_DAYS",
+                ),
+            )
+            .delete()[0]
+        )
+
+        deleted["read_warning"] = (
+            Notification.objects
+            .filter(
+                is_read=True,
+                level=Notification.Level.WARNING,
+                read_at__lt=now - retention_delta(
+                    minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
+                    days_setting="NOTIF_WARNING_DELETE_DAYS",
+                ),
+            )
+            .delete()[0]
+        )
+
+        deleted["read_critical"] = (
+            Notification.objects
+            .filter(
+                is_read=True,
+                level=Notification.Level.CRITICAL,
+                read_at__lt=now - retention_delta(
+                    minutes_setting="NOTIF_CRITICAL_DELETE_MINUTES",
+                    days_setting="NOTIF_CRITICAL_DELETE_DAYS",
+                ),
+            )
+            .delete()[0]
+        )
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = ", ".join(
+            f"{k}={v}" for k, v in deleted.items()
+        )
+
+        return deleted
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+        run.save()
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def cleanup_scheduled_task_runs(self):
     now = timezone.now()
     deleted = {}
 
     # -------------------------------
-    # Soft-deleted notifications
+    # Successful runs
     # -------------------------------
-    deleted["soft_info"] = (
-        Notification.objects
+    deleted["success"] = (
+        ScheduledTaskRun.objects
         .filter(
-            is_deleted=True,
-            level=Notification.Level.INFO,
-            deleted_at__lt=now - retention_delta(
-                minutes_setting="NOTIF_INFO_SOFT_DELETE_MINUTES",
-                days_setting="NOTIF_INFO_SOFT_DELETE_DAYS",
-            ),
-        )
-        .delete()[0]
-    )
-
-    deleted["soft_warning"] = (
-        Notification.objects
-        .filter(
-            is_deleted=True,
-            level=Notification.Level.WARNING,
-            deleted_at__lt=now - retention_delta(
-                minutes_setting="NOTIF_WARNING_SOFT_DELETE_MINUTES",
-                days_setting="NOTIF_WARNING_SOFT_DELETE_DAYS",
+            status=ScheduledTaskRun.Status.SUCCESS,
+            run_at__lt=now - retention_delta(
+                days_setting="TASKRUN_SUCCESS_RETENTION_DAYS",
             ),
         )
         .delete()[0]
     )
 
     # -------------------------------
-    # Read notifications
+    # Skipped runs
     # -------------------------------
-    deleted["read_info"] = (
-        Notification.objects
+    deleted["skipped"] = (
+        ScheduledTaskRun.objects
         .filter(
-            is_read=True,
-            level=Notification.Level.INFO,
-            read_at__lt=now - retention_delta(
-                minutes_setting="NOTIF_INFO_DELETE_MINUTES",
-                days_setting="NOTIF_INFO_DELETE_DAYS",
+            status=ScheduledTaskRun.Status.SKIPPED,
+            run_at__lt=now - retention_delta(
+                days_setting="TASKRUN_SKIPPED_RETENTION_DAYS",
             ),
         )
         .delete()[0]
     )
 
-    deleted["read_warning"] = (
-        Notification.objects
+    # -------------------------------
+    # Failed runs (keep longest)
+    # -------------------------------
+    deleted["failed"] = (
+        ScheduledTaskRun.objects
         .filter(
-            is_read=True,
-            level=Notification.Level.WARNING,
-            read_at__lt=now - retention_delta(
-                minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
-                days_setting="NOTIF_WARNING_DELETE_DAYS",
+            status=ScheduledTaskRun.Status.FAILED,
+            run_at__lt=now - retention_delta(
+                days_setting="TASKRUN_FAILED_RETENTION_DAYS",
             ),
         )
         .delete()[0]
     )
 
-    deleted["read_critical"] = (
-        Notification.objects
-        .filter(
-            is_read=True,
-            level=Notification.Level.CRITICAL,
-            read_at__lt=now - retention_delta(
-                minutes_setting="NOTIF_CRITICAL_DELETE_MINUTES",
-                days_setting="NOTIF_CRITICAL_DELETE_DAYS",
-            ),
-        )
-        .delete()[0]
-    )
+    return deleted
