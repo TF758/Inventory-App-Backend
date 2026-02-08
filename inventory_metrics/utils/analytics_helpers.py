@@ -22,3 +22,17 @@ def truncate_date(field, granularity):
     if granularity == "monthly":
         return TruncMonth(field)
     raise ValueError("Invalid granularity")
+
+
+RANGE_TO_DAYS = {
+    "7d": 7,
+    "30d": 30,
+    "90d": 90,
+    "1y": 365,
+}
+
+def parse_range_to_days(range_param: str) -> int:
+    try:
+        return RANGE_TO_DAYS[range_param]
+    except KeyError:
+        raise ValueError(f"Invalid range parameter: {range_param}")

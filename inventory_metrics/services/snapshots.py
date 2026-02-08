@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-def generate_daily_system_metrics(for_date=None, created_by="celery"):
+def generate_daily_system_metrics(for_date=None):
     if for_date is None:
         for_date = timezone.now().date()
 
@@ -31,7 +31,7 @@ def generate_daily_system_metrics(for_date=None, created_by="celery"):
         DailySystemMetrics.objects.create(
             date=for_date,
             schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
-            created_by=created_by,
+           
 
             # User metrics
             total_users=User.objects.filter(is_system_user=False).count(),

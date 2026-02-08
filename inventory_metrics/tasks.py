@@ -348,7 +348,7 @@ def run_daily_system_metrics_snapshot(self):
     )
 
     try:
-        created = generate_daily_system_metrics(created_by="celery")
+        created = generate_daily_system_metrics()
 
         run.status = (
             ScheduledTaskRun.Status.SUCCESS
