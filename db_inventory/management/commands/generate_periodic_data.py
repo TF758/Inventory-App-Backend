@@ -50,6 +50,12 @@ class Command(BaseCommand):
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
+        upsert_task(
+            name="Generate daily auth metric snapshot",
+            task="inventory_metrics.tasks.run_daily_auth_metrics_snapshot",
+            cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
+        )
+
         self.stdout.write(
             self.style.SUCCESS("Periodic data Celery Beat tasks configured.")
         )

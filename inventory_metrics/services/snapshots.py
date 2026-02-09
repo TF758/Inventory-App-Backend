@@ -1,15 +1,16 @@
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count
 from django.utils import timezone
 from datetime import timedelta
 from datetime import date as date_type
 from db_inventory.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from db_inventory.models.security import UserSession
-from db_inventory.models.users import User
+from db_inventory.models.users import PasswordResetEvent, User
 from db_inventory.models.site import Department, Location, Room
+from db_inventory.models.audit import AuditLog
 from inventory_metrics.models.snapshots import DailyDepartmentSnapshot
-from inventory_metrics.models.metrics import DailySystemMetrics
+from inventory_metrics.models.metrics import DailyAuthMetrics, DailySystemMetrics
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -208,6 +209,91 @@ def generate_daily_department_snapshot(
             total_accessories_quantity=accessories_qs.aggregate(
                 total=Sum("quantity")
             )["total"] or 0,
+        )
+
+    return True
+
+def generate_daily_auth_metrics(for_date=None):
+    if for_date is None:
+        for_date = timezone.now().date()
+
+    if DailyAuthMetrics.objects.filter(date=for_date).exists():
+        return False
+
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+
+    with transaction.atomic():
+        DailyAuthMetrics.objects.create(
+            date=for_date,
+            schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
+
+            # Login events
+            total_logins=AuditLog.objects.filter(
+                event_type=AuditLog.Events.LOGIN,
+                created_at__gte=last_24h,
+            ).count(),
+
+            unique_users_logged_in=AuditLog.objects.filter(
+                event_type=AuditLog.Events.LOGIN,
+                created_at__gte=last_24h,
+                user__isnull=False,
+            ).values("user_id").distinct().count(),
+
+            failed_logins=AuditLog.objects.filter(
+                event_type=AuditLog.Events.LOGIN_FAILED,
+                created_at__gte=last_24h,
+            ).count(),
+
+            lockouts=AuditLog.objects.filter(
+                event_type="lockout",  # adjust if you have a constant
+                created_at__gte=last_24h,
+            ).count(),
+
+            # Session state
+            active_sessions=UserSession.objects.filter(
+                status=UserSession.Status.ACTIVE
+            ).count(),
+
+            revoked_sessions=UserSession.objects.filter(
+                status=UserSession.Status.REVOKED
+            ).count(),
+
+            expired_sessions=UserSession.objects.filter(
+                status=UserSession.Status.EXPIRED
+            ).count(),
+
+            users_multiple_active_sessions=(
+                UserSession.objects
+                .filter(status=UserSession.Status.ACTIVE)
+                .values("user_id")
+                .annotate(c=Count("id"))
+                .filter(c__gt=1)
+                .count()
+            ),
+
+            users_with_revoked_sessions=UserSession.objects.filter(
+                status=UserSession.Status.REVOKED
+            ).values("user_id").distinct().count(),
+
+            # Password resets
+            password_resets_started=PasswordResetEvent.objects.filter(
+                created_at__gte=last_24h
+            ).count(),
+
+            password_resets_completed=PasswordResetEvent.objects.filter(
+                used_at__gte=last_24h
+            ).count(),
+
+            active_password_resets=PasswordResetEvent.objects.filter(
+                is_active=True,
+                expires_at__gte=now,
+            ).count(),
+
+            expired_password_resets=PasswordResetEvent.objects.filter(
+                expires_at__lt=now,
+                expires_at__gte=last_24h,
+            ).count(),
         )
 
     return True

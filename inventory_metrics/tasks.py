@@ -6,7 +6,7 @@ from django.db import transaction
 from db_inventory.mixins import NotificationMixin
 from db_inventory.models.site import Department
 from inventory_metrics.utils.report_payload import wrap_report_payload
-from inventory_metrics.services.snapshots import generate_daily_department_snapshot, generate_daily_system_metrics
+from inventory_metrics.services.snapshots import generate_daily_auth_metrics, generate_daily_department_snapshot, generate_daily_system_metrics
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from inventory_metrics.models import ReportJob
 from inventory_metrics.services.user_summary import build_user_summary_report
@@ -425,4 +425,35 @@ def run_daily_department_snapshots(self):
 
     finally:
         run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+        run.save()
+
+@shared_task(bind=True, 
+             autoretry_for=(Exception,), 
+             retry_kwargs={"max_retries": 3, "countdown": 60})
+def run_daily_auth_metrics_snapshot(self):
+    start = time.monotonic()
+
+    run = ScheduledTaskRun.objects.create(
+        task_name="daily_auth_metrics_snapshot",
+        status=ScheduledTaskRun.Status.STARTED,
+        schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
+    )
+
+    try:
+        created = generate_daily_auth_metrics()
+
+        run.status = (
+            ScheduledTaskRun.Status.SUCCESS
+            if created
+            else ScheduledTaskRun.Status.SKIPPED
+        )
+        run.message = "Snapshot created" if created else "Snapshot already exists"
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int((time.monotonic() - start) * 1000)
         run.save()
