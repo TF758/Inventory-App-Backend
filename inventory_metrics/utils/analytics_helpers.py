@@ -1,5 +1,6 @@
 from typing import Optional
 from datetime import date
+from django.db.models import F
 from django.db.models.functions import (TruncDate, TruncWeek, TruncMonth)
 
 def percentage_delta(current: int, previous: Optional[int]) -> Optional[float]:
@@ -16,13 +17,15 @@ def timeseries_point(d: date, **values):
 
 def truncate_date(field, granularity):
     if granularity == "daily":
-        return TruncDate(field)
+        return F(field)
+
     if granularity == "weekly":
         return TruncWeek(field)
+
     if granularity == "monthly":
         return TruncMonth(field)
-    raise ValueError("Invalid granularity")
 
+    raise ValueError("Invalid granularity")
 
 RANGE_TO_DAYS = {
     "7d": 7,
