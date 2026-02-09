@@ -30,35 +30,95 @@ def build_system_kpis():
     def safe_delta(current, previous):
         return percentage_delta(current, previous) if current is not None else None
 
+    if not today:
+        return {}
+
     return {
+        # -------------------------
+        # Snapshot totals
+        # -------------------------
         "total_users": {
-            "value": today.total_users if today else 0,
+            "value": today.total_users,
             "delta": safe_delta(
-                today.total_users if today else None,
+                today.total_users,
                 yesterday.total_users if yesterday else None,
             ),
         },
-        "active_users": {
-            "value": today.active_users_last_7d if today else 0,
-            "delta": safe_delta(
-                today.active_users_last_7d if today else None,
-                yesterday.active_users_last_7d if yesterday else None,
-            ),
+       "human_users": {
+        "value": today.human_users,
+        "delta": safe_delta(
+            today.human_users,
+            yesterday.human_users if yesterday else None,
+        ),
+        },
+        "system_users": {
+        "value": today.system_users,
+        "delta": safe_delta(
+            today.system_users,
+            yesterday.system_users if yesterday else None,
+        ),
         },
         "total_equipment": {
-            "value": today.total_equipment if today else 0,
+            "value": today.total_equipment,
             "delta": safe_delta(
-                today.total_equipment if today else None,
+                today.total_equipment,
                 yesterday.total_equipment if yesterday else None,
             ),
         },
         "active_sessions": {
-            "value": today.active_sessions if today else 0,
+            "value": today.active_sessions,
             "delta": safe_delta(
-                today.active_sessions if today else None,
+                today.active_sessions,
                 yesterday.active_sessions if yesterday else None,
             ),
         },
+
+        # -------------------------
+        # Rolling user activity
+        # -------------------------
+        "active_users_24h": {
+            "value": today.active_users_last_24h,
+            "delta": safe_delta(
+                today.active_users_last_24h,
+                yesterday.active_users_last_24h if yesterday else None,
+            ),
+        },
+        "active_users_7d": {
+            "value": today.active_users_last_7d,
+            "delta": safe_delta(
+                today.active_users_last_7d,
+                yesterday.active_users_last_7d if yesterday else None,
+            ),
+        },
+        "new_users_24h": {
+            "value": today.new_users_last_24h,
+            "delta": safe_delta(
+                today.new_users_last_24h,
+                yesterday.new_users_last_24h if yesterday else None,
+            ),
+        },
+
+        # -------------------------
+        # Rolling session health
+        # -------------------------
+        "unique_users_logged_in_24h": {
+            "value": today.unique_users_logged_in_last_24h,
+            "delta": safe_delta(
+                today.unique_users_logged_in_last_24h,
+                yesterday.unique_users_logged_in_last_24h if yesterday else None,
+            ),
+        },
+        "expired_sessions_24h": {
+            "value": today.expired_sessions_last_24h,
+            "delta": safe_delta(
+                today.expired_sessions_last_24h,
+                yesterday.expired_sessions_last_24h if yesterday else None,
+            ),
+        },
+
+        # -------------------------
+        # Security
+        # -------------------------
         "failed_logins": {
             "value": auth_today.failed_logins if auth_today else 0,
             "delta": safe_delta(
