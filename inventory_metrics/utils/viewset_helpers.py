@@ -25,21 +25,28 @@ def get_snapshot_range_start(
     model,
     days: int,
     date_field: str = "date",
+    filters: dict | None = None,
 ):
     """
     Computes the range start date anchored to the latest
     available snapshot instead of wall-clock time.
-    """
-    latest_date = get_latest_snapshot_date(
-        model,
-        date_field=date_field,
-    )
 
-    if not latest_date:
+    Optionally scopes snapshots using model filters
+    (e.g. department=..., location=...).
+    """
+    qs = model.objects.all()
+
+    if filters:
+        qs = qs.filter(**filters)
+
+    latest = qs.order_by(f"-{date_field}").values_list(
+        date_field, flat=True
+    ).first()
+
+    if not latest:
         return None
 
-    return latest_date - timedelta(days=days)
-
+    return latest - timedelta(days=days)
     
 def build_site_filter(site_type, site_obj, model_class):
     if site_type == "department":
