@@ -35,7 +35,9 @@ def generate_daily_system_metrics(for_date=None):
            
 
             # User metrics
-            total_users=User.objects.filter(is_system_user=False).count(),
+            total_users = User.objects.count(),
+            human_users = User.objects.filter(is_system_user=False).count(),
+            system_users = User.objects.filter(is_system_user=True).count(),
             active_users_last_24h=User.objects.filter(last_login__gte=last_24h).count(),
             active_users_last_7d=User.objects.filter(last_login__gte=last_7d).count(),
             new_users_last_24h=User.objects.filter(date_joined__gte=last_24h).count(),
@@ -55,6 +57,13 @@ def generate_daily_system_metrics(for_date=None):
 
             # Inventory metrics
             total_equipment=Equipment.objects.count(),
+            equipment_ok=Equipment.objects.filter(status="ok").count(),
+            equipment_under_repair=Equipment.objects.filter(
+                status="under_repair"
+            ).count(),
+            equipment_damaged=Equipment.objects.filter(
+                status="damaged"
+            ).count(),
 
             total_components=Component.objects.count(),
             total_components_quantity=Component.objects.aggregate(
