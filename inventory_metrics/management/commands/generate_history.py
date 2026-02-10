@@ -17,191 +17,169 @@ from inventory_metrics.models import (
 )
 
 
+def clamp(val: int) -> int:
+    return max(0, int(val))
 
+
+def trend(base: int, days_ago: int, total_days: int, growth: float = 0.6) -> int:
+    """
+    Long-term growth curve.
+    growth ~0.5 = slow growth, ~1.0 = aggressive growth
+    """
+    t = 1 - (days_ago / total_days)
+    factor = 0.7 + (growth * t)
+    return clamp(base * factor)
+
+
+def weekly_seasonality(value: int, date, amplitude: float = 0.2) -> int:
+    """
+    Weekdays busier than weekends.
+    """
+    weekday = date.weekday()  # 0=Mon … 6=Sun
+    factor = 1 + amplitude * (0.25 if weekday < 5 else -0.35)
+    return clamp(value * factor)
+
+
+def noise(value: int, pct: float = 0.15) -> int:
+    return clamp(value * random.uniform(1 - pct, 1 + pct))
+
+
+def incident_multiplier(chance: float = 0.03):
+    """
+    Rare security incidents / outages / attacks.
+    """
+    if random.random() < chance:
+        return random.uniform(1.5, 4.0)
+    return 1.0
+
+
+def regime_shift(value: int, days_ago: int, period: int = 90) -> int:
+    """
+    Stepwise changes every N days.
+    """
+    shift = (days_ago // period) * random.uniform(-0.08, 0.12)
+    return clamp(value * (1 + shift))
 
 
 class Command(BaseCommand):
-    help = "Backfill ~2 years of historical metrics (system/auth/department)"
+    help = "Backfill ~2 years of realistic analytics data"
 
     def handle(self, *args, **kwargs):
         DAYS = 730
         BATCH_SIZE = 5000
         today = timezone.localdate()
 
-        def vary(value: int, pct: float = 0.05) -> int:
-            return max(0, int(value * random.uniform(1 - pct, 1 + pct)))
-
-        def decay(value: int, days_ago: int, daily_decay: float = 0.001) -> int:
-            factor = max(0.6, 1 - days_ago * daily_decay)
-            return max(0, int(value * factor))
-
-        # -------------------------------------------------
-        # 1) Clear existing metrics
-        # -------------------------------------------------
-        self.stdout.write(self.style.WARNING("Clearing old metric history..."))
+        self.stdout.write(self.style.WARNING("Clearing existing metrics…"))
         DailySystemMetrics.objects.all().delete()
         DailyAuthMetrics.objects.all().delete()
         DailyDepartmentSnapshot.objects.all().delete()
-        self.stdout.write(self.style.SUCCESS("Metrics cleared."))
 
-        # -------------------------------------------------
-        # 2) Baseline (computed once)
-        # -------------------------------------------------
-        self.stdout.write(self.style.MIGRATE_HEADING("Computing baselines..."))
+        # ------------------------------
+        # Baselines (current state)
+        # ------------------------------
+        baseline_users = User.objects.filter(is_active=True).count()
+        baseline_sessions = UserSession.objects.count()
+        baseline_equipment = Equipment.objects.count()
 
-        baseline_system = {
-            "total_users": User.objects.count(),
-            "active_users": User.objects.filter(is_active=True).count(),
-            "locked_users": User.objects.filter(is_locked=True).count(),
-
-            "total_sessions": UserSession.objects.count(),
-            "active_sessions": UserSession.objects.filter(status=UserSession.Status.ACTIVE).count(),
-            "revoked_sessions": UserSession.objects.filter(status=UserSession.Status.REVOKED).count(),
-
-            "total_equipment": Equipment.objects.count(),
-            "equipment_ok": Equipment.objects.filter(status="ok").count(),
-            "equipment_under_repair": Equipment.objects.filter(status="under_repair").count(),
-            "equipment_damaged": Equipment.objects.filter(status="damaged").count(),
-
-            "total_components": Component.objects.count(),
-            "total_components_quantity": Component.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
-
-            "total_consumables": Consumable.objects.count(),
-            "total_consumables_quantity": Consumable.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
-
-            "total_accessories": Accessory.objects.count(),
-            "total_accessories_quantity": Accessory.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
-        }
-
-        baseline_auth = {
-            "total_logins": baseline_system["active_users"],
-            "unique_users_logged_in": int(baseline_system["active_users"] * 0.8),
-            "failed_logins": max(10, baseline_system["active_users"] // 20),
-            "lockouts": max(1, baseline_system["active_users"] // 200),
-
-            "active_sessions": baseline_system["active_sessions"],
-            "revoked_sessions": baseline_system["revoked_sessions"],
-            "expired_sessions": baseline_system["total_sessions"] // 10,
-
-            "password_resets_started": max(1, baseline_system["active_users"] // 100),
-            "password_resets_completed": max(1, baseline_system["active_users"] // 120),
-            "active_password_resets": max(0, baseline_system["active_users"] // 300),
-            "expired_password_resets": max(0, baseline_system["active_users"] // 400),
-        }
+        baseline_failed_logins = max(10, baseline_users // 20)
 
         departments = list(Department.objects.all())
-        if not departments:
-            self.stdout.write(self.style.WARNING("No departments found; department snapshots will be empty."))
-
-        baseline_departments: dict[int, dict[str, int]] = {}
-
-        for dept in departments:
-            baseline_departments[dept.id] = {
-                # NOTE: you may prefer UserLocation-based membership; this keeps your earlier approach
-                "total_users": User.objects.filter(active_role__department=dept).count(),
-                "total_admins": User.objects.filter(
-                    role_assignments__department=dept,
-                    role__endswith="ADMIN",
-                ).distinct().count(),
-
-                "total_locations": Location.objects.filter(department=dept).count(),
-                "total_rooms": Room.objects.filter(location__department=dept).count(),
-
-                "total_equipment": Equipment.objects.filter(room__location__department=dept).count(),
-                "equipment_ok": Equipment.objects.filter(room__location__department=dept, status="ok").count(),
-                "equipment_under_repair": Equipment.objects.filter(room__location__department=dept, status="under_repair").count(),
-                "equipment_damaged": Equipment.objects.filter(room__location__department=dept, status="damaged").count(),
-
-                "total_components": Component.objects.filter(equipment__room__location__department=dept).count(),
-                "total_components_quantity": Component.objects.filter(
-                    equipment__room__location__department=dept
-                ).aggregate(q=models.Sum("quantity"))["q"] or 0,
-
-                "total_consumables": Consumable.objects.filter(room__location__department=dept).count(),
-                "total_consumables_quantity": Consumable.objects.filter(
-                    room__location__department=dept
-                ).aggregate(q=models.Sum("quantity"))["q"] or 0,
-
-                "total_accessories": Accessory.objects.filter(room__location__department=dept).count(),
-                "total_accessories_quantity": Accessory.objects.filter(
-                    room__location__department=dept
-                ).aggregate(q=models.Sum("quantity"))["q"] or 0,
-            }
-
-        # -------------------------------------------------
-        # 3) Generate ~2 years of rows
-        # -------------------------------------------------
-        self.stdout.write(self.style.MIGRATE_HEADING(f"Generating {DAYS} days of history..."))
 
         system_rows = []
         auth_rows = []
         dept_rows = []
 
-        for days_ago in tqdm(
-            range(DAYS, 0, -1),
-            desc="Generating daily metrics",
-            unit="day",
-        ):
+        # ------------------------------
+        # Generate timeline
+        # ------------------------------
+        for days_ago in tqdm(range(DAYS, 0, -1), desc="Generating days"):
             date = today - datetime.timedelta(days=days_ago)
+
+            # === SYSTEM METRICS ===
+            total_users = trend(baseline_users, days_ago, DAYS, growth=0.8)
+            active_users = weekly_seasonality(
+                noise(int(total_users * 0.75), 0.1),
+                date,
+            )
+
+            active_sessions = clamp(active_users * random.uniform(0.9, 1.4))
 
             system_rows.append(
                 DailySystemMetrics(
                     date=date,
                     schema_version=1,
 
-                    total_users=decay(baseline_system["total_users"], days_ago),
-                    active_users_last_24h=vary(baseline_system["active_users"], 0.10),
-                    active_users_last_7d=vary(baseline_system["active_users"], 0.05),
-                    new_users_last_24h=random.randint(0, max(1, baseline_system["total_users"] // 100)),
-                    locked_users=vary(baseline_system["locked_users"], 0.10),
+                    total_users=total_users,
+                    active_users_last_24h=noise(active_users, 0.15),
+                    active_users_last_7d=noise(active_users, 0.1),
+                    new_users_last_24h=random.randint(0, max(1, total_users // 200)),
+                    locked_users=random.randint(0, max(1, total_users // 500)),
 
-                    total_sessions=decay(baseline_system["total_sessions"], days_ago),
-                    active_sessions=vary(baseline_system["active_sessions"], 0.10),
-                    revoked_sessions=vary(baseline_system["revoked_sessions"], 0.15),
-                    expired_sessions_last_24h=random.randint(0, max(1, baseline_system["total_sessions"] // 20)),
-                    unique_users_logged_in_last_24h=vary(baseline_system["active_users"], 0.10),
+                    total_sessions=trend(baseline_sessions, days_ago, DAYS),
+                    active_sessions=active_sessions,
+                    revoked_sessions=random.randint(0, active_sessions // 8),
+                    expired_sessions_last_24h=random.randint(0, active_sessions // 6),
+                    unique_users_logged_in_last_24h=noise(active_users, 0.1),
 
-                    total_equipment=baseline_system["total_equipment"],
-                    equipment_ok=vary(baseline_system["equipment_ok"], 0.05),
-                    equipment_under_repair=vary(baseline_system["equipment_under_repair"], 0.15),
-                    equipment_damaged=vary(baseline_system["equipment_damaged"], 0.15),
+                    total_equipment=baseline_equipment,
+                    equipment_ok=noise(int(baseline_equipment * 0.9), 0.05),
+                    equipment_under_repair=noise(int(baseline_equipment * 0.07), 0.2),
+                    equipment_damaged=noise(int(baseline_equipment * 0.03), 0.3),
 
-                    total_components=baseline_system["total_components"],
-                    total_components_quantity=vary(baseline_system["total_components_quantity"], 0.03),
-                    total_consumables=baseline_system["total_consumables"],
-                    total_consumables_quantity=vary(baseline_system["total_consumables_quantity"], 0.03),
-                    total_accessories=baseline_system["total_accessories"],
-                    total_accessories_quantity=vary(baseline_system["total_accessories_quantity"], 0.03),
+                    total_components=Component.objects.count(),
+                    total_components_quantity=noise(
+                        Component.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
+                        0.05,
+                    ),
+                    total_consumables=Consumable.objects.count(),
+                    total_consumables_quantity=noise(
+                        Consumable.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
+                        0.05,
+                    ),
+                    total_accessories=Accessory.objects.count(),
+                    total_accessories_quantity=noise(
+                        Accessory.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
+                        0.05,
+                    ),
                 )
             )
+
+            # === AUTH METRICS ===
+            incident = incident_multiplier()
+
+            failed_logins = clamp(
+                weekly_seasonality(
+                    noise(baseline_failed_logins, 0.3),
+                    date,
+                ) * incident
+            )
+
+            lockouts = clamp(failed_logins * random.uniform(0.05, 0.15))
 
             auth_rows.append(
                 DailyAuthMetrics(
                     date=date,
                     schema_version=1,
 
-                    total_logins=vary(baseline_auth["total_logins"], 0.20),
-                    unique_users_logged_in=vary(baseline_auth["unique_users_logged_in"], 0.15),
-                    failed_logins=random.randint(0, baseline_auth["failed_logins"] * 2),
-                    lockouts=random.randint(0, baseline_auth["lockouts"] * 2),
+                    total_logins=noise(active_users, 0.2),
+                    unique_users_logged_in=noise(int(active_users * 0.85), 0.1),
+                    failed_logins=failed_logins,
+                    lockouts=lockouts,
 
-                    active_sessions=vary(baseline_auth["active_sessions"], 0.10),
-                    revoked_sessions=vary(baseline_auth["revoked_sessions"], 0.15),
-                    expired_sessions=random.randint(0, max(1, baseline_auth["expired_sessions"])),
+                    active_sessions=active_sessions,
+                    revoked_sessions=random.randint(0, active_sessions // 6),
+                    expired_sessions=random.randint(0, active_sessions // 4),
 
-                    password_resets_started=random.randint(0, baseline_auth["password_resets_started"] * 2),
-                    password_resets_completed=random.randint(0, baseline_auth["password_resets_completed"] * 2),
-                    active_password_resets=random.randint(0, baseline_auth["active_password_resets"] * 2),
-                    expired_password_resets=random.randint(0, baseline_auth["expired_password_resets"] * 2),
+                    password_resets_started=random.randint(0, max(1, active_users // 150)),
+                    password_resets_completed=random.randint(0, max(1, active_users // 180)),
+                    active_password_resets=random.randint(0, max(1, active_users // 400)),
+                    expired_password_resets=random.randint(0, max(1, active_users // 500)),
                 )
             )
 
-            for dept in tqdm(
-                departments,
-                desc=f"Departments ({date})",
-                leave=False,
-            ):
-                base = baseline_departments[dept.id]
+            # === DEPARTMENT METRICS ===
+            for dept in departments:
+                dept_users = User.objects.filter(active_role__department=dept).count()
                 dept_rows.append(
                     DailyDepartmentSnapshot(
                         department=dept,
@@ -209,34 +187,36 @@ class Command(BaseCommand):
                         schema_version=1,
                         created_by="backfill",
 
-                        total_users=vary(base["total_users"], 0.05),
-                        total_admins=vary(base["total_admins"], 0.10),
+                        total_users=noise(dept_users, 0.05),
+                        total_admins=random.randint(1, max(1, dept_users // 20)),
 
-                        total_locations=base["total_locations"],
-                        total_rooms=base["total_rooms"],
+                        total_locations=Location.objects.filter(department=dept).count(),
+                        total_rooms=Room.objects.filter(location__department=dept).count(),
 
-                        total_equipment=base["total_equipment"],
-                        equipment_ok=vary(base["equipment_ok"], 0.05),
-                        equipment_under_repair=vary(base["equipment_under_repair"], 0.10),
-                        equipment_damaged=vary(base["equipment_damaged"], 0.10),
+                        total_equipment=Equipment.objects.filter(
+                            room__location__department=dept
+                        ).count(),
+                        equipment_ok=random.randint(10, 100),
+                        equipment_under_repair=random.randint(0, 20),
+                        equipment_damaged=random.randint(0, 10),
 
-                        total_components=base["total_components"],
-                        total_components_quantity=vary(base["total_components_quantity"], 0.05),
-                        total_consumables=base["total_consumables"],
-                        total_consumables_quantity=vary(base["total_consumables_quantity"], 0.05),
-                        total_accessories=base["total_accessories"],
-                        total_accessories_quantity=vary(base["total_accessories_quantity"], 0.05),
+                        total_components=random.randint(100, 500),
+                        total_components_quantity=random.randint(500, 5000),
+                        total_consumables=random.randint(50, 200),
+                        total_consumables_quantity=random.randint(500, 4000),
+                        total_accessories=random.randint(30, 150),
+                        total_accessories_quantity=random.randint(200, 3000),
                     )
                 )
 
-        # -------------------------------------------------
-        # 4) Bulk insert
-        # -------------------------------------------------
-        self.stdout.write(self.style.MIGRATE_HEADING("Bulk inserting rows..."))
+        # ------------------------------
+        # Bulk insert
+        # ------------------------------
+        self.stdout.write(self.style.MIGRATE_HEADING("Bulk inserting rows…"))
 
         with transaction.atomic():
             DailySystemMetrics.objects.bulk_create(system_rows, batch_size=BATCH_SIZE)
             DailyAuthMetrics.objects.bulk_create(auth_rows, batch_size=BATCH_SIZE)
             DailyDepartmentSnapshot.objects.bulk_create(dept_rows, batch_size=BATCH_SIZE)
 
-        self.stdout.write(self.style.SUCCESS("✓ Backfill complete (system/auth/department)."))
+        self.stdout.write(self.style.SUCCESS("✓ Backfill complete with realistic variation"))
