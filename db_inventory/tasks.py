@@ -6,9 +6,15 @@ import time
 from db_inventory.models.users import User
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.security import Notification, ScheduledTaskRun
+from db_inventory.models.security import Notification, ScheduledTaskRun, UserSession
 from django.utils import timezone
 from datetime import timedelta
+
+from db_inventory.utils.task_helpers import acquire_lock, batched_delete, batched_notification_delete
+
+NOTIFICATION_CLEANUP_LOCK = 842001
+TASKRUN_CLEANUP_LOCK = 842002
+USERSESSION_CLEANUP_LOCK = 842003
 
 logger = logging.getLogger(__name__)
 
@@ -200,13 +206,12 @@ def auto_read_stale_notifications(self):
         run.save()
 
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_kwargs={"max_retries": 3},
-)
+@shared_task(bind=True)
 def cleanup_notifications(self):
+    # Prevent concurrent cleanups
+    if not acquire_lock(NOTIFICATION_CLEANUP_LOCK):
+        return {"skipped": "cleanup already running"}
+
     start_ts = time.monotonic()
     now = timezone.now()
     deleted = {}
@@ -221,9 +226,8 @@ def cleanup_notifications(self):
         # -------------------------------
         # Soft-deleted notifications
         # -------------------------------
-        deleted["soft_info"] = (
-            Notification.objects
-            .filter(
+        deleted["soft_info"] = batched_notification_delete(
+            Notification.objects.filter(
                 is_deleted=True,
                 level=Notification.Level.INFO,
                 deleted_at__lt=now - retention_delta(
@@ -231,12 +235,10 @@ def cleanup_notifications(self):
                     days_setting="NOTIF_INFO_SOFT_DELETE_DAYS",
                 ),
             )
-            .delete()[0]
         )
 
-        deleted["soft_warning"] = (
-            Notification.objects
-            .filter(
+        deleted["soft_warning"] = batched_notification_delete(
+            Notification.objects.filter(
                 is_deleted=True,
                 level=Notification.Level.WARNING,
                 deleted_at__lt=now - retention_delta(
@@ -244,15 +246,13 @@ def cleanup_notifications(self):
                     days_setting="NOTIF_WARNING_SOFT_DELETE_DAYS",
                 ),
             )
-            .delete()[0]
         )
 
         # -------------------------------
         # Read notifications
         # -------------------------------
-        deleted["read_info"] = (
-            Notification.objects
-            .filter(
+        deleted["read_info"] = batched_notification_delete(
+            Notification.objects.filter(
                 is_read=True,
                 level=Notification.Level.INFO,
                 read_at__lt=now - retention_delta(
@@ -260,12 +260,10 @@ def cleanup_notifications(self):
                     days_setting="NOTIF_INFO_DELETE_DAYS",
                 ),
             )
-            .delete()[0]
         )
 
-        deleted["read_warning"] = (
-            Notification.objects
-            .filter(
+        deleted["read_warning"] = batched_notification_delete(
+            Notification.objects.filter(
                 is_read=True,
                 level=Notification.Level.WARNING,
                 read_at__lt=now - retention_delta(
@@ -273,12 +271,10 @@ def cleanup_notifications(self):
                     days_setting="NOTIF_WARNING_DELETE_DAYS",
                 ),
             )
-            .delete()[0]
         )
 
-        deleted["read_critical"] = (
-            Notification.objects
-            .filter(
+        deleted["read_critical"] = batched_notification_delete(
+            Notification.objects.filter(
                 is_read=True,
                 level=Notification.Level.CRITICAL,
                 read_at__lt=now - retention_delta(
@@ -286,7 +282,6 @@ def cleanup_notifications(self):
                     days_setting="NOTIF_CRITICAL_DELETE_DAYS",
                 ),
             )
-            .delete()[0]
         )
 
         run.status = ScheduledTaskRun.Status.SUCCESS
@@ -302,8 +297,11 @@ def cleanup_notifications(self):
         raise
 
     finally:
-        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+        run.duration_ms = int(
+            (time.monotonic() - start_ts) * 1000
+        )
         run.save()
+
 
 @shared_task(
     bind=True,
@@ -311,50 +309,116 @@ def cleanup_notifications(self):
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
+
+@shared_task(bind=True)
 def cleanup_scheduled_task_runs(self):
+    if not acquire_lock(TASKRUN_CLEANUP_LOCK):
+        return {"skipped": "cleanup already running"}
+
+    start_ts = time.monotonic()
     now = timezone.now()
     deleted = {}
 
-    # -------------------------------
-    # Successful runs
-    # -------------------------------
-    deleted["success"] = (
-        ScheduledTaskRun.objects
-        .filter(
-            status=ScheduledTaskRun.Status.SUCCESS,
-            run_at__lt=now - retention_delta(
-                days_setting="TASKRUN_SUCCESS_RETENTION_DAYS",
-            ),
-        )
-        .delete()[0]
+    run = ScheduledTaskRun.objects.create(
+        task_name="cleanup_scheduled_task_runs",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting scheduled task run cleanup",
     )
 
-    # -------------------------------
-    # Skipped runs
-    # -------------------------------
-    deleted["skipped"] = (
-        ScheduledTaskRun.objects
-        .filter(
-            status=ScheduledTaskRun.Status.SKIPPED,
-            run_at__lt=now - retention_delta(
-                days_setting="TASKRUN_SKIPPED_RETENTION_DAYS",
-            ),
+    try:
+        deleted["success"] = batched_delete(
+            ScheduledTaskRun.objects.filter(
+                status=ScheduledTaskRun.Status.SUCCESS,
+                run_at__lt=now - retention_delta(
+                    days_setting="TASKRUN_SUCCESS_RETENTION_DAYS",
+                ),
+            )
         )
-        .delete()[0]
+
+        deleted["skipped"] = batched_delete(
+            ScheduledTaskRun.objects.filter(
+                status=ScheduledTaskRun.Status.SKIPPED,
+                run_at__lt=now - retention_delta(
+                    days_setting="TASKRUN_SKIPPED_RETENTION_DAYS",
+                ),
+            )
+        )
+
+        deleted["failed"] = batched_delete(
+            ScheduledTaskRun.objects.filter(
+                status=ScheduledTaskRun.Status.FAILED,
+                run_at__lt=now - retention_delta(
+                    days_setting="TASKRUN_FAILED_RETENTION_DAYS",
+                ),
+            )
+        )
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = ", ".join(
+            f"{k}={v}" for k, v in deleted.items()
+        )
+
+        return deleted
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int(
+            (time.monotonic() - start_ts) * 1000
+        )
+        run.save()
+
+@shared_task(bind=True)
+def cleanup_user_sessions(self):
+    if not acquire_lock(USERSESSION_CLEANUP_LOCK):
+        return {"skipped": "cleanup already running"}
+
+    start_ts = time.monotonic()
+    now = timezone.now()
+    deleted = {}
+
+    run = ScheduledTaskRun.objects.create(
+        task_name="cleanup_user_sessions",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting user session cleanup",
     )
 
-    # -------------------------------
-    # Failed runs (keep longest)
-    # -------------------------------
-    deleted["failed"] = (
-        ScheduledTaskRun.objects
-        .filter(
-            status=ScheduledTaskRun.Status.FAILED,
-            run_at__lt=now - retention_delta(
-                days_setting="TASKRUN_FAILED_RETENTION_DAYS",
-            ),
+    try:
+        deleted["expired"] = batched_delete(
+            UserSession.objects.filter(
+                status=UserSession.Status.EXPIRED,
+                absolute_expires_at__lt=now - retention_delta(
+                    days_setting="SESSION_EXPIRED_RETENTION_DAYS",
+                ),
+            )
         )
-        .delete()[0]
-    )
 
-    return deleted
+        deleted["revoked"] = batched_delete(
+            UserSession.objects.filter(
+                status=UserSession.Status.REVOKED,
+                absolute_expires_at__lt=now - retention_delta(
+                    days_setting="SESSION_REVOKED_RETENTION_DAYS",
+                ),
+            )
+        )
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = ", ".join(
+            f"{k}={v}" for k, v in deleted.items()
+        )
+
+        return deleted
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int(
+            (time.monotonic() - start_ts) * 1000
+        )
+        run.save()

@@ -39,10 +39,4 @@ class Command(BaseCommand):
             cron_expr=settings.NOTIF_AUTO_READ_CRON,
         )
 
-        upsert_task(
-            name="Cleanup notifications",
-            task="db_inventory.tasks.cleanup_notifications",
-            cron_expr=settings.NOTIF_CLEANUP_CRON,
-        )
-
         self.stdout.write(self.style.SUCCESS("Notification beat tasks configured."))
