@@ -1,15 +1,12 @@
 from celery import shared_task
 from django.conf import settings
-from django.core.mail import send_mail
 import logging
 import time
-from db_inventory.models.users import User
-from db_inventory.utils.tokens import PasswordResetToken
-from db_inventory.models.audit import AuditLog
 from db_inventory.models.security import Notification, ScheduledTaskRun, UserSession
 from django.utils import timezone
 from datetime import timedelta
-
+import time
+from datetime import timedelta
 from db_inventory.utils.task_helpers import acquire_lock, batched_delete, batched_notification_delete
 
 NOTIFICATION_CLEANUP_LOCK = 842001
@@ -22,118 +19,6 @@ def retention_delta(*, minutes_setting=None, days_setting=None):
     if minutes_setting and hasattr(settings, minutes_setting):
         return timedelta(minutes=getattr(settings, minutes_setting))
     return timedelta(days=getattr(settings, days_setting))
-
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_kwargs={"max_retries": 3, "countdown": 10},
-    retry_backoff=True,
-)
-def send_password_reset_email(self, email: str):
-
-    # Case-insensitive lookup
-    user = User.objects.filter(email__iexact=email).first()
-
-    # IMPORTANT: silently exit if user does not exist
-    if not user:
-        return
-
-    # Audit only for real users
-    AuditLog.objects.create(
-        # Actor
-        user=user,
-        user_public_id=user.public_id,
-        user_email=user.email,
-
-        # Event
-        event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
-        description="Password reset requested",
-        metadata={"initiated_by_admin": False},
-
-        # Target snapshot (mirror AuditMixin behavior)
-        target_model="User",
-        target_id=user.public_id,
-        target_name=user.email,
-    )
-
-    token_service = PasswordResetToken()
-    event = token_service.generate_token(user_public_id=user.public_id)
-    if not event:
-        return
-    token = event.token
-
-    reset_link = f"{settings.FRONTEND_URL}/password-reset?token={token}"
-
-    try:
-        send_mail(
-            subject="Password Reset Instructions",
-            message=(
-                "You requested a password reset.\n\n"
-                "Your reset link (expires in 10 minutes):\n\n"
-                f"{reset_link}\n\n"
-                "If you did not request this, you can safely ignore this email."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-    except Exception:
-        logger.exception(
-            "Failed to send password reset email for user %s",
-            user.public_id,
-        )
-        raise
-
-
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_kwargs={"max_retries": 3, "countdown": 10},
-    retry_backoff=True,
-)
-def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str):
-    user = User.objects.get(public_id=user_public_id)
-    admin = User.objects.get(public_id=admin_public_id)
-
-    token_service = PasswordResetToken()
-    event = token_service.generate_token(
-        user_public_id=user.public_id,
-        admin_public_id=admin.public_id,
-    )
-
-    reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
-
-    send_mail(
-        subject="Administrator-Initiated Password Reset",
-        message=(
-            "An administrator has initiated a password reset for your account.\n\n"
-            "This link expires in 10 minutes:\n\n"
-            f"{reset_link}\n\n"
-            "If you did not expect this, contact support immediately."
-        ),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
-    )
-
-
-    AuditLog.objects.create(
-        user=admin,
-        user_public_id=admin.public_id,
-        user_email=admin.email,
-
-        event_type=AuditLog.Events.ADMIN_RESET_PASSWORD,
-        description="Admin initiated password reset",
-        metadata={
-            "initiated_by_admin": True,
-            "admin_public_id": admin.public_id,
-        },
-
-        target_model="User",
-        target_id=user.public_id,
-        target_name=user.email,
-    )
-
 
 
 @shared_task(
@@ -302,14 +187,6 @@ def cleanup_notifications(self):
         )
         run.save()
 
-
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_kwargs={"max_retries": 3},
-)
-
 @shared_task(bind=True)
 def cleanup_scheduled_task_runs(self):
     if not acquire_lock(TASKRUN_CLEANUP_LOCK):
@@ -411,6 +288,48 @@ def cleanup_user_sessions(self):
         )
 
         return deleted
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int(
+            (time.monotonic() - start_ts) * 1000
+        )
+        run.save()
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def expire_user_sessions(self):
+    start_ts = time.monotonic()
+    now = timezone.now()
+
+    run = ScheduledTaskRun.objects.create(
+        task_name="expire_user_sessions",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting user session expiry",
+    )
+
+    try:
+        expired = (
+            UserSession.objects
+            .filter(
+                status=UserSession.Status.ACTIVE,
+                expires_at__lt=now,
+            )
+            .update(status=UserSession.Status.EXPIRED)
+        )
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = f"expired={expired}"
+
+        return {"expired": expired}
 
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED

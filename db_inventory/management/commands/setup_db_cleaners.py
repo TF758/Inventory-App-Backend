@@ -40,24 +40,42 @@ class Command(BaseCommand):
             )
 
         # -------------------------------
-        # DB maintenance tasks
+        # Notification lifecycle
         # -------------------------------
         upsert_task(
+            name="Auto-read stale notifications",
+            task="db_inventory.tasks.cleanup.auto_read_stale_notifications",
+            cron_expr=settings.NOTIF_AUTO_READ_CRON,
+        )
+
+        upsert_task(
             name="DB Maintenance: cleanup notifications",
-            task="db_inventory.tasks.cleanup_notifications",
+            task="db_inventory.tasks.cleanup.cleanup_notifications",
             cron_expr=settings.NOTIF_CLEANUP_CRON,
         )
 
+        # -------------------------------
+        # Session lifecycle
+        # -------------------------------
         upsert_task(
-            name="DB Maintenance: cleanup scheduled task runs",
-            task="db_inventory.tasks.cleanup_scheduled_task_runs",
-            cron_expr=settings.TASKRUN_CLEANUP_CRON,
+            name="DB Maintenance: expire user sessions",
+            task="db_inventory.tasks.cleanup.expire_user_sessions",
+            cron_expr=settings.USERSESSION_EXPIRE_CRON,
         )
 
         upsert_task(
-        name="DB Maintenance: cleanup user sessions",
-        task="db_inventory.tasks.cleanup_user_sessions",
-        cron_expr=settings.USERSESSION_CLEANUP_CRON,
+            name="DB Maintenance: cleanup user sessions",
+            task="db_inventory.tasks.cleanup.cleanup_user_sessions",
+            cron_expr=settings.USERSESSION_CLEANUP_CRON,
+        )
+
+        # -------------------------------
+        # Internal maintenance
+        # -------------------------------
+        upsert_task(
+            name="DB Maintenance: cleanup scheduled task runs",
+            task="db_inventory.tasks.cleanup.cleanup_scheduled_task_runs",
+            cron_expr=settings.TASKRUN_CLEANUP_CRON,
         )
 
         self.stdout.write(
