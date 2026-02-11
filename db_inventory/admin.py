@@ -13,7 +13,31 @@ from django.utils.translation import gettext_lazy as _
 
 admin.site.register(Notification)
 
-admin.site.register(ScheduledTaskRun)
+@admin.register(ScheduledTaskRun)
+class ScheduledTaskRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "task_name",
+        "status",
+        "run_at",
+        "duration_ms",
+        "message",
+    )
+
+    list_filter = (
+        "status",
+        "task_name",
+    )
+
+    ordering = ("-run_at",)
+
+    readonly_fields = (
+        "task_name",
+        "status",
+        "run_at",
+        "duration_ms",
+        "schema_version",
+        "message",
+    )
 
 admin.site.register(EquipmentAssignment)
 
