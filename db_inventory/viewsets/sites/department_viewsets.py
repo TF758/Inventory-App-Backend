@@ -33,9 +33,6 @@ class DepartmentDashboardView(AreaDashboardMixin, APIView):
             location__department__public_id=public_id
         )
 
-    def get_activity_filter(self, department):
-        return Q(department=department)
-
     def get(self, request, public_id):
         department = get_object_or_404(Department, public_id=public_id)
         return Response(self.build_dashboard(department))

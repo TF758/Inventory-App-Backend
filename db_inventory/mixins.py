@@ -707,16 +707,8 @@ class AreaDashboardMixin:
     def get_rooms(self, public_id):
         raise NotImplementedError
 
-    def get_activity_filter(self, obj):
-        """
-        Returns a Q() filter for AuditLog scoping.
-        """
-        raise NotImplementedError
-    # ------------------------------------
-
     def build_dashboard(self, obj):
         rooms = self.get_rooms(obj.public_id)
-        since = timezone.now() - timedelta(days=self.ACTIVITY_DAYS)
 
         # --------------------
         # Equipment
@@ -742,10 +734,12 @@ class AreaDashboardMixin:
             ]
         ).count()
 
-        lost_or_condemned_recent = equipment_qs.filter(
-            events__event_type__in=["lost", "condemned"],
-            events__occurred_at__gte=since,
-        ).distinct().count()
+        lost_or_condemned = equipment_qs.filter(
+            status__in=[
+                EquipmentStatus.LOST,
+                EquipmentStatus.CONDEMNED,
+            ]
+        ).count()
 
         # --------------------
         # Consumables
@@ -763,7 +757,6 @@ class AreaDashboardMixin:
         components_qs = Component.objects.filter(
             equipment__room__in=rooms
         )
-
 
         # --------------------
         # Users & Roles
@@ -790,6 +783,9 @@ class AreaDashboardMixin:
             ]
         ).values("user").distinct().count()
 
+        # --------------------
+        # Response
+        # --------------------
         return {
             "summary": {
                 "assets": {
@@ -809,7 +805,7 @@ class AreaDashboardMixin:
                 },
                 "equipment_issues": {
                     "damaged": damaged_equipment,
-                    "lost_or_condemned_recent": lost_or_condemned_recent,
+                    "lost_or_condemned": lost_or_condemned,
                 },
                 "users": {
                     "total": total_users,

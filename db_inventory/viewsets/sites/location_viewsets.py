@@ -32,9 +32,6 @@ class LocationDashboardView(AreaDashboardMixin, APIView):
     def get_rooms(self, public_id):
         return Room.objects.filter(location__public_id=public_id)
 
-    def get_activity_filter(self, location):
-        return Q(location=location)
-
     def get(self, request, public_id):
         location = get_object_or_404(Location, public_id=public_id)
         return Response(self.build_dashboard(location))
