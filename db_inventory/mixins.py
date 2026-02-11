@@ -702,25 +702,6 @@ class ConsumableDashboardMixin:
         }
     
 class AreaDashboardMixin:
-    ACTIVITY_DAYS = 7
-    ACTIVITY_LIMIT = 10
-
-    ACTIVITY_EVENTS = [
-        AuditLog.Events.MODEL_CREATED,
-        AuditLog.Events.MODEL_UPDATED,
-        AuditLog.Events.MODEL_DELETED,
-        AuditLog.Events.CONSUMABLE_ISSUED,
-        AuditLog.Events.CONSUMABLE_RETURNED,
-        AuditLog.Events.CONSUMABLE_USED,
-        AuditLog.Events.STOCK_USED,
-        AuditLog.Events.ASSET_ASSIGNED,
-        AuditLog.Events.ASSET_RETURNED,
-        AuditLog.Events.ASSET_REASSIGNED,
-        AuditLog.Events.ASSET_UNASSIGNED,
-        AuditLog.Events.ASSET_CONDEMNED,
-        AuditLog.Events.ASSET_RESTOCKED,
-        AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
-    ]
 
     # -------- MUST BE IMPLEMENTED --------
     def get_rooms(self, public_id):
@@ -809,31 +790,6 @@ class AreaDashboardMixin:
             ]
         ).values("user").distinct().count()
 
-        # --------------------
-        # Recent Activity
-        # --------------------
-        activity_qs = (
-            AuditLog.objects.filter(
-                self.get_activity_filter(obj),
-                event_type__in=self.ACTIVITY_EVENTS,
-                created_at__gte=since,
-            )
-            .order_by("-created_at")[: self.ACTIVITY_LIMIT]
-        )
-
-        recent_activity = [
-            {
-                "event_type": log.event_type,
-                "description": log.description,
-                "target_model": log.target_model,
-                "target_name": log.target_name,
-                "room": log.room_name,
-                "user": log.user_email,
-                "occurred_at": log.created_at,
-            }
-            for log in activity_qs
-        ]
-
         return {
             "summary": {
                 "assets": {
@@ -866,5 +822,4 @@ class AreaDashboardMixin:
                 "out_of_stock_consumables": out_of_stock,
                 "low_stock_consumables": low_stock,
             },
-            "recent_activity": recent_activity,
         }
