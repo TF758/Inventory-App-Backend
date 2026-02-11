@@ -6,18 +6,18 @@ from django.conf import settings
 import redis
 from db_inventory.models.security import ScheduledTaskRun
 import time
-
+from django.db import DatabaseError
 
 redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 60})
+@shared_task(bind=True,  autoretry_for=(DatabaseError,), retry_kwargs={"max_retries": 3, "countdown": 60})
 def run_daily_system_metrics_snapshot(self):
     start = time.monotonic()
 
     run = ScheduledTaskRun.objects.create(
-        task_name="daily_system_metrics_snapshot",
+        task_name="run_daily_system_metrics_snapshot",
         status=ScheduledTaskRun.Status.STARTED,
         schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
     )
@@ -109,7 +109,7 @@ def run_daily_auth_metrics_snapshot(self):
     start = time.monotonic()
 
     run = ScheduledTaskRun.objects.create(
-        task_name="daily_auth_metrics_snapshot",
+        task_name="run_daily_auth_metrics_snapshot",
         status=ScheduledTaskRun.Status.STARTED,
         schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
     )
