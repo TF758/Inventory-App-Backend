@@ -5,7 +5,6 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django_celery_beat.models import CrontabSchedule, PeriodicTask
 
-
 class Command(BaseCommand):
     help = "Setup periodic Celery Beat tasks for automated data generation"
 
@@ -36,17 +35,23 @@ class Command(BaseCommand):
             )
 
         # ------------------------------------------------------------------
-        # Daily system metrics snapshot (automated, non-user task)
+        # Daily system metrics snapshots (automated, non-user tasks)
         # ------------------------------------------------------------------
         upsert_task(
             name="Generate daily system metrics snapshot",
-            task="inventory_metrics.tasks.run_daily_system_metrics_snapshot",
+            task="inventory_metrics.tasks.snapshots.run_daily_system_metrics_snapshot",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
         upsert_task(
             name="Generate daily department snapshots",
-            task="inventory_metrics.tasks.run_daily_department_snapshots",
+            task="inventory_metrics.tasks.snapshots.run_daily_department_snapshots",
+            cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
+        )
+
+        upsert_task(
+            name="Generate daily auth metrics snapshot",
+            task="inventory_metrics.tasks.snapshots.run_daily_auth_metrics_snapshot",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 

@@ -1,77 +1,74 @@
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count
 from django.utils import timezone
 from datetime import timedelta
 from datetime import date as date_type
 from db_inventory.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from db_inventory.models.security import UserSession
-from db_inventory.models.users import User
+from db_inventory.models.users import PasswordResetEvent, User
 from db_inventory.models.site import Department, Location, Room
+from db_inventory.models.audit import AuditLog
 from inventory_metrics.models.snapshots import DailyDepartmentSnapshot
-from inventory_metrics.models.metrics import DailySystemMetrics
+from inventory_metrics.models.metrics import DailyAuthMetrics, DailySystemMetrics
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-def generate_daily_system_metrics(for_date=None, created_by="celery"):
+def generate_daily_system_metrics(for_date=None):
     if for_date is None:
-        for_date = timezone.now().date()
-
-    # Prevent double-run
-    if DailySystemMetrics.objects.filter(date=for_date).exists():
-        return False
+        for_date = timezone.localdate()  
 
     now = timezone.now()
     last_24h = now - timedelta(hours=24)
     last_7d = now - timedelta(days=7)
 
     with transaction.atomic():
-        DailySystemMetrics.objects.create(
+        obj, created = DailySystemMetrics.objects.get_or_create(
             date=for_date,
-            schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
-            created_by=created_by,
+            defaults={
+                "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
 
-            # User metrics
-            total_users=User.objects.filter(is_system_user=False).count(),
-            active_users_last_24h=User.objects.filter(last_login__gte=last_24h).count(),
-            active_users_last_7d=User.objects.filter(last_login__gte=last_7d).count(),
-            new_users_last_24h=User.objects.filter(date_joined__gte=last_24h).count(),
-            locked_users=User.objects.filter(is_locked=True).count(),
+                # User metrics
+                "total_users": User.objects.count(),
+                "human_users": User.objects.filter(is_system_user=False).count(),
+                "system_users": User.objects.filter(is_system_user=True).count(),
+                "active_users_last_24h": User.objects.filter(last_login__gte=last_24h).count(),
+                "active_users_last_7d": User.objects.filter(last_login__gte=last_7d).count(),
+                "new_users_last_24h": User.objects.filter(date_joined__gte=last_24h).count(),
+                "locked_users": User.objects.filter(is_locked=True).count(),
 
-            # Session metrics
-            total_sessions=UserSession.objects.count(),
-            active_sessions=UserSession.objects.filter(status=UserSession.Status.ACTIVE).count(),
-            revoked_sessions=UserSession.objects.filter(status=UserSession.Status.REVOKED).count(),
-            expired_sessions_last_24h=UserSession.objects.filter(
-                status=UserSession.Status.EXPIRED,
-                expires_at__gte=last_24h
-            ).count(),
-            unique_users_logged_in_last_24h=UserSession.objects.filter(
-                last_used_at__gte=last_24h
-            ).values("user_id").distinct().count(),
+                # Session metrics
+                "total_sessions": UserSession.objects.count(),
+                "active_sessions": UserSession.objects.filter(status=UserSession.Status.ACTIVE).count(),
+                "revoked_sessions": UserSession.objects.filter(status=UserSession.Status.REVOKED).count(),
+                "expired_sessions_last_24h": UserSession.objects.filter(
+                    status=UserSession.Status.EXPIRED,
+                    expires_at__gte=last_24h,
+                ).count(),
+                "unique_users_logged_in_last_24h": UserSession.objects.filter(
+                    last_used_at__gte=last_24h
+                ).values("user_id").distinct().count(),
 
-            # Inventory metrics
-            total_equipment=Equipment.objects.count(),
+                # Inventory metrics
+                "total_equipment": Equipment.objects.count(),
+                "equipment_ok": Equipment.objects.filter(status="ok").count(),
+                "equipment_under_repair": Equipment.objects.filter(status="under_repair").count(),
+                "equipment_damaged": Equipment.objects.filter(status="damaged").count(),
 
-            total_components=Component.objects.count(),
-            total_components_quantity=Component.objects.aggregate(
-                total=Sum("quantity")
-            )["total"] or 0,
+                "total_components": Component.objects.count(),
+                "total_components_quantity": Component.objects.aggregate(total=Sum("quantity"))["total"] or 0,
 
-            total_consumables=Consumable.objects.count(),
-            total_consumables_quantity=Consumable.objects.aggregate(
-                total=Sum("quantity")
-            )["total"] or 0,
+                "total_consumables": Consumable.objects.count(),
+                "total_consumables_quantity": Consumable.objects.aggregate(total=Sum("quantity"))["total"] or 0,
 
-            total_accessories=Accessory.objects.count(),
-            total_accessories_quantity=Accessory.objects.aggregate(
-                total=Sum("quantity")
-            )["total"] or 0,
+                "total_accessories": Accessory.objects.count(),
+                "total_accessories_quantity": Accessory.objects.aggregate(total=Sum("quantity"))["total"] or 0,
+            },
         )
 
-    return True
+    return created
 
 
 
@@ -93,36 +90,16 @@ def generate_daily_department_snapshot(
         snapshot_date = timezone.localdate()
 
     # -------------------------------------------------
-    # Idempotency guard
-    # -------------------------------------------------
-    if DailyDepartmentSnapshot.objects.filter(
-        department=department,
-        snapshot_date=snapshot_date,
-    ).exists():
-        return False
-
-    # -------------------------------------------------
     # Base querysets (scoped once)
     # -------------------------------------------------
-    rooms_qs = Room.objects.filter(
-        location__department=department
-    )
+    rooms_qs = Room.objects.filter(location__department=department)
 
-    equipment_qs = Equipment.objects.filter(
-        room__in=rooms_qs
-    )
+    equipment_qs = Equipment.objects.filter(room__in=rooms_qs)
+    components_qs = Component.objects.filter(equipment__room__in=rooms_qs)
 
-    components_qs = Component.objects.filter(
-        equipment__room__in=rooms_qs
-    )
+    consumables_qs = Consumable.objects.filter( room__in=rooms_qs)
 
-    consumables_qs = Consumable.objects.filter(
-        room__in=rooms_qs
-    )
-
-    accessories_qs = Accessory.objects.filter(
-        room__in=rooms_qs
-    )
+    accessories_qs = Accessory.objects.filter( room__in=rooms_qs)
 
     # -------------------------------------------------
     # Users (current assignments only)
@@ -134,9 +111,6 @@ def generate_daily_department_snapshot(
 
     total_users = users_qs.count()
 
-    # -------------------------------------------------
-    # Admin users (scoped + present)
-    # -------------------------------------------------
     admin_roles = [
         "DEPARTMENT_ADMIN",
         "LOCATION_ADMIN",
@@ -153,61 +127,153 @@ def generate_daily_department_snapshot(
         Q(role_assignments__role="SITE_ADMIN")
     ).distinct().count()
 
-    # -------------------------------------------------
-    # Equipment status breakdown
-    # -------------------------------------------------
     total_equipment = equipment_qs.count()
 
-    equipment_ok = equipment_qs.filter(
-        Q(status=EquipmentStatus.OK) | Q(status__isnull=True)
-    ).count()
-
-    equipment_under_repair = equipment_qs.filter(
-        status=EquipmentStatus.UNDER_REPAIR
-    ).count()
-
-    equipment_damaged = equipment_qs.filter(
-        status=EquipmentStatus.DAMAGED
-    ).count()
-
     # -------------------------------------------------
-    # Persist snapshot atomically
+    # Atomic get_or_create
     # -------------------------------------------------
     with transaction.atomic():
-        DailyDepartmentSnapshot.objects.create(
+        obj, created = DailyDepartmentSnapshot.objects.get_or_create(
             department=department,
             snapshot_date=snapshot_date,
-            schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
-            created_by=created_by,
+            defaults={
+                "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
+                "created_by": created_by,
 
-            total_users=total_users,
-            total_admins=total_admins,
+                "total_users": total_users,
+                "total_admins": total_admins,
 
-            total_locations=Location.objects.filter(
-                department=department
-            ).count(),
+                "total_locations": Location.objects.filter(
+                    department=department
+                ).count(),
 
-            total_rooms=rooms_qs.count(),
+                "total_rooms": rooms_qs.count(),
 
-            total_equipment=total_equipment,
-            equipment_ok=equipment_ok,
-            equipment_under_repair=equipment_under_repair,
-            equipment_damaged=equipment_damaged,
+                "total_equipment": total_equipment,
+                "equipment_ok": equipment_qs.filter(
+                    Q(status=EquipmentStatus.OK) | Q(status__isnull=True)
+                ).count(),
+                "equipment_under_repair": equipment_qs.filter(
+                    status=EquipmentStatus.UNDER_REPAIR
+                ).count(),
+                "equipment_damaged": equipment_qs.filter(
+                    status=EquipmentStatus.DAMAGED
+                ).count(),
 
-            total_components=components_qs.count(),
-            total_components_quantity=components_qs.aggregate(
-                total=Sum("quantity")
-            )["total"] or 0,
+                "total_components": components_qs.count(),
+                "total_components_quantity": components_qs.aggregate(
+                    total=Sum("quantity")
+                )["total"] or 0,
 
-            total_consumables=consumables_qs.count(),
-            total_consumables_quantity=consumables_qs.aggregate(
-                total=Sum("quantity")
-            )["total"] or 0,
+                "total_consumables": consumables_qs.count(),
+                "total_consumables_quantity": consumables_qs.aggregate(
+                    total=Sum("quantity")
+                )["total"] or 0,
 
-            total_accessories=accessories_qs.count(),
-            total_accessories_quantity=accessories_qs.aggregate(
-                total=Sum("quantity")
-            )["total"] or 0,
+                "total_accessories": accessories_qs.count(),
+                "total_accessories_quantity": accessories_qs.aggregate(
+                    total=Sum("quantity")
+                )["total"] or 0,
+            },
         )
 
-    return True
+    return created
+
+def generate_daily_auth_metrics(for_date=None):
+    if for_date is None:
+        for_date = timezone.localdate()
+
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+
+    with transaction.atomic():
+        obj, created = DailyAuthMetrics.objects.get_or_create(
+            date=for_date,
+            defaults={
+                "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
+
+                # -----------------------------
+                # Login events
+                # -----------------------------
+                "total_logins": AuditLog.objects.filter(
+                    event_type=AuditLog.Events.LOGIN,
+                    created_at__gte=last_24h,
+                ).count(),
+
+                "unique_users_logged_in": (
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.LOGIN,
+                        created_at__gte=last_24h,
+                        user__isnull=False,
+                    )
+                    .values("user_id")
+                    .distinct()
+                    .count()
+                ),
+
+                "failed_logins": AuditLog.objects.filter(
+                    event_type=AuditLog.Events.LOGIN_FAILED,
+                    created_at__gte=last_24h,
+                ).count(),
+
+                "lockouts": AuditLog.objects.filter(
+                    event_type="lockout",
+                    created_at__gte=last_24h,
+                ).count(),
+
+                # -----------------------------
+                # Session state
+                # -----------------------------
+                "active_sessions": UserSession.objects.filter(
+                    status=UserSession.Status.ACTIVE
+                ).count(),
+
+                "revoked_sessions": UserSession.objects.filter(
+                    status=UserSession.Status.REVOKED
+                ).count(),
+
+                "expired_sessions": UserSession.objects.filter(
+                    status=UserSession.Status.EXPIRED
+                ).count(),
+
+                "users_multiple_active_sessions": (
+                    UserSession.objects
+                    .filter(status=UserSession.Status.ACTIVE)
+                    .values("user_id")
+                    .annotate(c=Count("id"))
+                    .filter(c__gt=1)
+                    .count()
+                ),
+
+                "users_with_revoked_sessions": (
+                    UserSession.objects
+                    .filter(status=UserSession.Status.REVOKED)
+                    .values("user_id")
+                    .distinct()
+                    .count()
+                ),
+
+                # -----------------------------
+                # Password resets
+                # -----------------------------
+                "password_resets_started": PasswordResetEvent.objects.filter(
+                    created_at__gte=last_24h
+                ).count(),
+
+                "password_resets_completed": PasswordResetEvent.objects.filter(
+                    used_at__gte=last_24h
+                ).count(),
+
+                "active_password_resets": PasswordResetEvent.objects.filter(
+                    is_active=True,
+                    expires_at__gte=now,
+                ).count(),
+
+                "expired_password_resets": PasswordResetEvent.objects.filter(
+                    expires_at__lt=now,
+                    expires_at__gte=last_24h,
+                ).count(),
+            },
+        )
+
+    return created

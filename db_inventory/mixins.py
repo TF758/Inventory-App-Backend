@@ -702,40 +702,13 @@ class ConsumableDashboardMixin:
         }
     
 class AreaDashboardMixin:
-    ACTIVITY_DAYS = 7
-    ACTIVITY_LIMIT = 10
-
-    ACTIVITY_EVENTS = [
-        AuditLog.Events.MODEL_CREATED,
-        AuditLog.Events.MODEL_UPDATED,
-        AuditLog.Events.MODEL_DELETED,
-        AuditLog.Events.CONSUMABLE_ISSUED,
-        AuditLog.Events.CONSUMABLE_RETURNED,
-        AuditLog.Events.CONSUMABLE_USED,
-        AuditLog.Events.STOCK_USED,
-        AuditLog.Events.ASSET_ASSIGNED,
-        AuditLog.Events.ASSET_RETURNED,
-        AuditLog.Events.ASSET_REASSIGNED,
-        AuditLog.Events.ASSET_UNASSIGNED,
-        AuditLog.Events.ASSET_CONDEMNED,
-        AuditLog.Events.ASSET_RESTOCKED,
-        AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
-    ]
 
     # -------- MUST BE IMPLEMENTED --------
     def get_rooms(self, public_id):
         raise NotImplementedError
 
-    def get_activity_filter(self, obj):
-        """
-        Returns a Q() filter for AuditLog scoping.
-        """
-        raise NotImplementedError
-    # ------------------------------------
-
     def build_dashboard(self, obj):
         rooms = self.get_rooms(obj.public_id)
-        since = timezone.now() - timedelta(days=self.ACTIVITY_DAYS)
 
         # --------------------
         # Equipment
@@ -761,10 +734,12 @@ class AreaDashboardMixin:
             ]
         ).count()
 
-        lost_or_condemned_recent = equipment_qs.filter(
-            events__event_type__in=["lost", "condemned"],
-            events__occurred_at__gte=since,
-        ).distinct().count()
+        lost_or_condemned = equipment_qs.filter(
+            status__in=[
+                EquipmentStatus.LOST,
+                EquipmentStatus.CONDEMNED,
+            ]
+        ).count()
 
         # --------------------
         # Consumables
@@ -782,7 +757,6 @@ class AreaDashboardMixin:
         components_qs = Component.objects.filter(
             equipment__room__in=rooms
         )
-
 
         # --------------------
         # Users & Roles
@@ -810,30 +784,8 @@ class AreaDashboardMixin:
         ).values("user").distinct().count()
 
         # --------------------
-        # Recent Activity
+        # Response
         # --------------------
-        activity_qs = (
-            AuditLog.objects.filter(
-                self.get_activity_filter(obj),
-                event_type__in=self.ACTIVITY_EVENTS,
-                created_at__gte=since,
-            )
-            .order_by("-created_at")[: self.ACTIVITY_LIMIT]
-        )
-
-        recent_activity = [
-            {
-                "event_type": log.event_type,
-                "description": log.description,
-                "target_model": log.target_model,
-                "target_name": log.target_name,
-                "room": log.room_name,
-                "user": log.user_email,
-                "occurred_at": log.created_at,
-            }
-            for log in activity_qs
-        ]
-
         return {
             "summary": {
                 "assets": {
@@ -853,7 +805,7 @@ class AreaDashboardMixin:
                 },
                 "equipment_issues": {
                     "damaged": damaged_equipment,
-                    "lost_or_condemned_recent": lost_or_condemned_recent,
+                    "lost_or_condemned": lost_or_condemned,
                 },
                 "users": {
                     "total": total_users,
@@ -866,5 +818,4 @@ class AreaDashboardMixin:
                 "out_of_stock_consumables": out_of_stock,
                 "low_stock_consumables": low_stock,
             },
-            "recent_activity": recent_activity,
         }

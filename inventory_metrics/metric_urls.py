@@ -7,6 +7,7 @@ from inventory_metrics.viewsets.admin_metrics_viewset import AdminMetricsOvervie
 urlpatterns = [
 
     path("reports/", include("inventory_metrics.urls.report_urls")),
+    path("analytics/", include("inventory_metrics.urls.analytics_urls")),
 
     path("general/", AdminMetricsOverview.as_view() , name="admin_metrics_general"),
     path("login/", LoginMetricsOverview.as_view(), name="admin_metrics_login"),

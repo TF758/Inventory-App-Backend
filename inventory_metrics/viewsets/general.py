@@ -82,6 +82,11 @@ class DownloadReport(APIView):
             raise Http404("Report expired. Please regenerate.")
 
         payload = json.loads(cached_payload.decode("utf-8"))
+        if "data" not in payload:
+            return JsonResponse(
+                {"detail": "Invalid report payload format."},
+                status=500,
+            )
         timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         report_type = job.params.get("report_type")
@@ -113,7 +118,7 @@ class DownloadReport(APIView):
                 status=400,
             )
 
-        workbook_spec = renderer(payload)
+        workbook_spec = renderer(payload["data"])
         wb = render_workbook(workbook_spec)
 
         buffer = io.BytesIO()

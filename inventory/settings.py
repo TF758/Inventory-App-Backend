@@ -197,7 +197,7 @@ DATABASES = {
         "NAME": env("DB_NAME"),
         "USER": env("DB_USER"),
         "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST", default="localhost"),
+        "HOST": env("DB_HOST", default="db"),
         "PORT": env("DB_PORT", default="5432"),
     }
 }
@@ -229,7 +229,7 @@ AUTH_USER_MODEL = 'db_inventory.User'
 LANGUAGE_CODE = 'en-us'
 
 USE_TZ = True
-TIME_ZONE = 'America/New_York'
+TIME_ZONE = env("TIME_ZONE", default="UTC")
 
 USE_I18N = True
 
@@ -404,6 +404,11 @@ NOTIF_CLEANUP_CRON = env(
     default="0 3 * * *",
 )
 
+TASKRUN_CLEANUP_CRON = env(
+    "TASKRUN_CLEANUP_CRON",
+    default="0 12 * * *",
+)
+
 SNAPSHOT_SCHEMA_VERSION = env.int("SNAPSHOT_SCHEMA_VERSION", default=1)
 
 DAILY_SYSTEM_METRICS_CRON  = env(
@@ -411,3 +416,19 @@ DAILY_SYSTEM_METRICS_CRON  = env(
     default="0 2 * * *",
 )
 
+# ScheduledTaskRun retention
+TASKRUN_SUCCESS_RETENTION_DAYS=env.int("TASKRUN_SUCCESS_RETENTION_DAYS", default=7)
+TASKRUN_SKIPPED_RETENTION_DAYS=env.int("TASKRUN_SKIPPED_RETENTION_DAYS", default=14)
+TASKRUN_FAILED_RETENTION_DAYS=env.int("TASKRUN_FAILED_RETENTION_DAYS", default=90)
+
+USERSESSION_CLEANUP_CRON  = env(
+    "USERSESSION_CLEANUP_CRON ",
+    default="40 12 * * *",
+)
+USERSESSION_EXPIRE_CRON=env(
+    "USERSESSION_EXPIRE_CRON ",
+    default="15 * * * *",
+)
+
+SESSION_EXPIRED_RETENTION_DAYS = env.int("SESSION_EXPIRED_RETENTION_DAYS", default=5)
+SESSION_REVOKED_RETENTION_DAYS = env.int("SESSION_REVOKED_RETENTION_DAYS", default=20)

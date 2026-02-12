@@ -7,6 +7,8 @@ class DailySystemMetrics(models.Model):
 
     # User metrics
     total_users = models.PositiveIntegerField(default=0)
+    human_users = models.PositiveIntegerField(default=0)
+    system_users = models.PositiveIntegerField(default=0)
     active_users_last_24h = models.PositiveIntegerField(default=0)
     active_users_last_7d = models.PositiveIntegerField(default=0)
     new_users_last_24h = models.PositiveIntegerField(default=0)

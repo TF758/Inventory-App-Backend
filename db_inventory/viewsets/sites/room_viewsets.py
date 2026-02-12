@@ -26,9 +26,6 @@ class RoomDashboardView(AreaDashboardMixin, APIView):
     def get_rooms(self, public_id):
         return Room.objects.filter(public_id=public_id)
 
-    def get_activity_filter(self, room):
-        return Q(room=room)
-
     def get(self, request, public_id):
         room = get_object_or_404(Room, public_id=public_id)
         return Response(self.build_dashboard(room))

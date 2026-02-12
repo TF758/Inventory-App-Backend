@@ -1,53 +1,52 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.decorators import action
-from django.utils.dateparse import parse_date
+from datetime import timedelta
 from django.utils import timezone
 import io
 from openpyxl import Workbook
 from db_inventory.models import Equipment, Component, Consumable, Accessory
-from django.db.models import Q
+from django.db.models import Q, Max
 
 
-class TimeSeriesViewset(ReadOnlyModelViewSet):
-    """Base class for returning date-based metrics suitable for graphs."""
 
-    date_field = "date"  # override in child classes
+def get_latest_snapshot_date(model, *, date_field: str = "date"):
+    """
+    Returns the most recent snapshot date for a model,
+    or None if no data exists.
+    """
+    return (
+        model.objects
+        .aggregate(latest=Max(date_field))
+        .get("latest")
+    )
 
-    def filter_queryset_by_date(self, qs):
-        start = self.request.query_params.get("start")
-        end = self.request.query_params.get("end")
+def get_snapshot_range_start(
+    *,
+    model,
+    days: int,
+    date_field: str = "date",
+    filters: dict | None = None,
+):
+    """
+    Computes the range start date anchored to the latest
+    available snapshot instead of wall-clock time.
 
-        if start:
-            qs = qs.filter(**{f"{self.date_field}__gte": parse_date(start)})
-        if end:
-            qs = qs.filter(**{f"{self.date_field}__lte": parse_date(end)})
+    Optionally scopes snapshots using model filters
+    (e.g. department=..., location=...).
+    """
+    qs = model.objects.all()
 
-        return qs.order_by(self.date_field)
+    if filters:
+        qs = qs.filter(**filters)
 
-    @action(detail=False, methods=["get"])
-    def timeseries(self, request):
-        """Return all numeric fields as arrays for chart rendering."""
-        qs = self.filter_queryset_by_date(self.get_queryset())
+    latest = qs.order_by(f"-{date_field}").values_list(
+        date_field, flat=True
+    ).first()
 
-        if not qs.exists():
-            return Response({"labels": [], "data": {} })
+    if not latest:
+        return None
 
-        labels = [getattr(i, self.date_field).isoformat() for i in qs]
-
-        # Include only integer fields
-        fields = [
-            f.name for f in qs.model._meta.get_fields()
-            if f.get_internal_type() in ("IntegerField", "PositiveIntegerField")
-        ]
-
-        data = {field: [getattr(i, field) for i in qs] for field in fields}
-
-        return Response({
-            "labels": labels,
-            "data": data
-        })
-
-
+    return latest - timedelta(days=days)
     
 def build_site_filter(site_type, site_obj, model_class):
     if site_type == "department":
