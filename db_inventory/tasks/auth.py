@@ -93,6 +93,12 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
         admin_public_id=admin.public_id,
     )
 
+    if not event:
+        return
+
+    user.force_password_change = True
+    user.save(update_fields=["force_password_change"])
+
     reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
 
     send_mail(
@@ -108,22 +114,18 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
         fail_silently=False,
     )
 
-
     AuditLog.objects.create(
         user=admin,
         user_public_id=admin.public_id,
         user_email=admin.email,
-
         event_type=AuditLog.Events.ADMIN_RESET_PASSWORD,
         description="Admin initiated password reset",
         metadata={
             "initiated_by_admin": True,
             "admin_public_id": admin.public_id,
         },
-
         target_model="User",
         target_id=user.public_id,
         target_name=user.email,
     )
-
 

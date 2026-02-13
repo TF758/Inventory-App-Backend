@@ -132,6 +132,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             "access": access_token,
             "public_id": str(user.public_id),
             "role_id": user.active_role.public_id if user.active_role else None,
+            "force_password_change": user.force_password_change, 
         }
 
         response = Response(response_data, status=200)
@@ -472,16 +473,33 @@ class PasswordResetValidateView(APIView):
                 status=400,
             )
 
-        payload = PasswordResetToken().verify_token(token)
+        token_service = PasswordResetToken()
+        event, status = token_service.verify_token(token)
 
-        if payload is None:
-            # Could be expired or invalid; we can distinguish based on internal checks
+        if status == "expired":
             return Response(
-                {"code": "TOKEN_INVALID", "detail": "This password reset link is invalid or expired."},
+                {
+                    "code": "TOKEN_EXPIRED",
+                    "detail": "This password reset link has expired.",
+                },
                 status=400,
             )
 
-        # Token is valid → return success
-        return Response({"status": "valid"}, status=200)
+        if status != "valid":
+            return Response(
+                {
+                    "code": "TOKEN_INVALID",
+                    "detail": "This password reset link is invalid.",
+                },
+                status=400,
+            )
 
+        # Token is valid
+        return Response(
+            {
+                "code": "SUCCESS",
+                "detail": "Token is valid.",
+            },
+            status=200,
+        )
 

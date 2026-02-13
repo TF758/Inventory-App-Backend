@@ -9,7 +9,7 @@ from db_inventory.utils.tokens import PasswordResetToken
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from db_inventory.tasks import admin_reset_user_password
-
+from django.db import transaction
 
 class TempPasswordChangeSerializer(serializers.Serializer):
     temp_password = serializers.CharField(write_only=True)
@@ -59,12 +59,62 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         user = self.context["request"].user
+        user.force_password_change = False
         user.set_password(self.validated_data["new_password"])
         user.save()
         return user
     
 
+class AdminSetTemporaryPasswordSerializer(serializers.Serializer):
+    user_public_id = serializers.CharField()
+    temporary_password = serializers.CharField(write_only=True)
 
+    def validate_user_public_id(self, value):
+        try:
+            self.user = User.objects.get(public_id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+        if self.user.is_locked:
+            raise serializers.ValidationError("User account is locked.")
+
+        return value
+
+    def validate(self, data):
+        password_validation.validate_password(data["temporary_password"])
+        return data
+
+    def save(self, *, admin):
+        user = self.user
+
+        with transaction.atomic():
+            # Set temporary password
+            user.set_password(self.validated_data["temporary_password"])
+            user.force_password_change = True
+            user.save(update_fields=["password", "force_password_change"])
+
+            # Revoke all active sessions
+            UserSession.objects.filter(
+                user=user,
+                status=UserSession.Status.ACTIVE,
+            ).update(status=UserSession.Status.REVOKED)
+
+        # Audit
+        AuditLog.objects.create(
+            user=admin,
+            user_public_id=admin.public_id,
+            user_email=admin.email,
+            event_type=AuditLog.Events.ADMIN_RESET_PASSWORD,
+            description="Admin set temporary password",
+            metadata={"initiated_by_admin": True},
+            target_model="User",
+            target_id=user.public_id,
+            target_name=user.email,
+        )
+
+        return user
+    
+    
 class AdminPasswordResetSerializer(serializers.Serializer):
     user_public_id = serializers.CharField()
 
@@ -89,36 +139,35 @@ class AdminPasswordResetSerializer(serializers.Serializer):
     
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    token = serializers.CharField()
+    token = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        if data["new_password"] != data["confirm_password"]:
-            raise serializers.ValidationError({
-                "code": "PASSWORD_MISMATCH",
-                "detail": "Passwords do not match."
-            })
-        return data
+        token_value = data["token"]
 
-    def save(self):
-        token_value = self.validated_data["token"]
-
-        # --- NEW: use your updated token verification ---
         token_service = PasswordResetToken()
-        event = token_service.verify_token(token_value)
+        event, status = token_service.verify_token(token_value)
 
-        if event is None:
-            # Could be expired OR invalid → separate logic
+        if status == "expired":
+            raise serializers.ValidationError({
+                "code": "TOKEN_EXPIRED",
+                "detail": "This reset link has expired. Please request a new one."
+            })
+
+        if status != "valid":
             raise serializers.ValidationError({
                 "code": "TOKEN_INVALID",
-                "detail": "The reset link is invalid or has expired."
+                "detail": "The reset link is invalid."
             })
 
-        # event is a PasswordResetEvent instance
         user = event.user
 
-        # Additional user checks:
+        # Store for save()
+        self.event = event
+        self.user = user
+
+        # Account state checks
         if user.is_locked:
             raise serializers.ValidationError({
                 "code": "ACCOUNT_LOCKED",
@@ -131,18 +180,38 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
                 "detail": "Your account is inactive. Please contact support."
             })
 
-        # Update the password
-        user.password = make_password(self.validated_data["new_password"])
-        user.force_password_change = False
-        user.save(update_fields=["password", "force_password_change"])
+        # Password match check
+        if data["new_password"] != data["confirm_password"]:
+            raise serializers.ValidationError({
+                "code": "PASSWORD_MISMATCH",
+                "detail": "Passwords do not match."
+            })
 
-        # Mark token as used
-        event.mark_used()
+        # Enforce Django password policy
+        password_validation.validate_password(
+            data["new_password"],
+            user=user
+        )
 
-        # Revoke active sessions
-        UserSession.objects.filter(
-            user=user, status=UserSession.Status.ACTIVE
-        ).update(status=UserSession.Status.REVOKED)
+        return data
+
+    def save(self):
+        user = self.user
+        event = self.event
+
+        with transaction.atomic():
+            user.set_password(self.validated_data["new_password"])
+            user.force_password_change = False
+            user.save(update_fields=["password", "force_password_change"])
+
+            # Mark token used
+            event.mark_used()
+
+            # Revoke active sessions
+            UserSession.objects.filter(
+                user=user,
+                status=UserSession.Status.ACTIVE
+            ).update(status=UserSession.Status.REVOKED)
 
         return user
 

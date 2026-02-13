@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, User, AuditLog, Department, Location, Room, SiteNameChangeHistory, SiteRelocationHistory
-from db_inventory.serializers.auth import ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
+from db_inventory.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import AuditLogFilter, SiteNameChangeHistoryFilter
@@ -119,7 +119,28 @@ class AdminResetUserPasswordView(AuditMixin, APIView):
             {"detail": "Password reset link sent to user."},
             status=status.HTTP_200_OK,
         )
+    
+class AdminSetTemporaryPasswordView(AuditMixin, APIView):
+    """
+    Admin sets a temporary password for a user.
+    User will be forced to change password at next login.
+    """
 
+    def post(self, request, user_public_id):
+        serializer = AdminSetTemporaryPasswordSerializer(
+            data={
+                "user_public_id": user_public_id,
+                "temporary_password": request.data.get("temporary_password"),
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(admin=request.user)
+
+        return Response(
+            {"detail": "Temporary password set successfully."},
+            status=status.HTTP_200_OK,
+        )
+    
 class ChangePasswordView(APIView):
 
     """Allows an authneticated user to change thier password."""

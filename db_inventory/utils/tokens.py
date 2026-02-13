@@ -5,6 +5,7 @@ import secrets
 from datetime import timedelta
 from django.db import transaction
 from db_inventory.models import PasswordResetEvent, User
+from django.core.signing import SignatureExpired, BadSignature
 
 class PasswordResetToken:
     EXPIRY_MINUTES = 10
@@ -68,26 +69,35 @@ class PasswordResetToken:
 
         return event
 
-    def verify_token(self, signed_token: str) -> PasswordResetEvent | None:
+    def verify_token(self, signed_token: str):
         """
-        Verifies the token signature & checks DB validity.
-        Returns the valid PasswordResetEvent or None.
+        Returns:
+            (event, "valid" | "expired" | "invalid")
         """
 
         try:
-            # Ensure signature is correct
-            value = self.signer.unsign(signed_token, max_age=self.EXPIRY_MINUTES * 60)
-            user_public_id, raw_token = value.split(":", 1)
+            self.signer.unsign(
+                signed_token,
+                max_age=self.EXPIRY_MINUTES * 60
+            )
+        except SignatureExpired:
+            return None, "expired"
+        except BadSignature:
+            return None, "invalid"
         except Exception:
-            return None
+            return None, "invalid"
 
         try:
             event = PasswordResetEvent.objects.get(token=signed_token)
         except PasswordResetEvent.DoesNotExist:
-            return None
+            return None, "invalid"
 
-        if not event.is_active or not event.is_valid():
-            return None
+        if not event.is_active:
+            return None, "invalid"
 
-        return event
+        if not event.is_valid():
+            return None, "expired"
+
+        return event, "valid"
+
     

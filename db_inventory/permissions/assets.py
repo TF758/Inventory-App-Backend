@@ -29,9 +29,6 @@ class AssetPermission(BasePermission):
         active_role = getattr(request.user, "active_role", None)
         if not active_role:
             return False
-        
-
-        print(request.user, getattr(request.user, "active_role", None))
 
         # SITE_ADMIN bypass
         if active_role.role == "SITE_ADMIN":

@@ -20,7 +20,6 @@ class SessionTokenLoginViewSerializer(TokenObtainSerializer):
     """
 
     def validate(self, attrs):
-        # Call base validation to authenticate user
         data = super().validate(attrs)
         user = self.user
 
@@ -34,13 +33,6 @@ class SessionTokenLoginViewSerializer(TokenObtainSerializer):
             raise serializers.ValidationError({
                 "code": "ACCOUNT_INACTIVE",
                 "detail": "Your account is inactive. Please contact support."
-            })
-
-        if user.force_password_change:
-            raise serializers.ValidationError({
-                "code": "FORCE_PASSWORD_CHANGE",
-                "detail": "You must reset your temporary password before logging in.",
-                "email": user.email,
             })
 
         return {
