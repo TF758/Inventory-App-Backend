@@ -17,6 +17,9 @@ urlpatterns = [
     # --- Admin Password Reset ---
     path( "users/<str:user_public_id>/reset-password/", auth_viewsets.AdminResetUserPasswordView.as_view(), name="admin-reset-user-password", ),
 
+      # --- Admin Set Temp Pass ---
+    path( "users/<str:user_public_id>/set-temp-password/", auth_viewsets.AdminSetTemporaryPasswordView.as_view(), name="admin-set-temp-password", ),
+
     # --- Site Admin ---
     path( "site/rename/", auth_viewsets.SiteNameChangeAPIView.as_view(), name="site-rename", ),
     path( "site/relocate/", auth_viewsets.SiteRelocationAPIView.as_view(), name="site-relocate", ),

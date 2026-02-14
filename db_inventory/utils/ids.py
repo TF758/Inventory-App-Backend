@@ -1,5 +1,7 @@
 import secrets
 import uuid
+from typing import Iterable
+from django.db import models
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -30,3 +32,18 @@ def generate_prefixed_id(prefix: str, length: int = 10) -> str:
     """
     u = uuid.uuid4().int >> 64
     return f"{prefix}{int_to_base62(u)[:length]}"
+
+
+def generate_public_ids(objs: Iterable[models.Model]):
+    """
+    Assign public_id to any object that looks like a PublicIDModel.
+
+    IMPORTANT:
+    - Does NOT import models to avoid circular imports.
+    - Uses duck-typing instead.
+    """
+    for obj in objs:
+        if hasattr(obj, "PUBLIC_ID_PREFIX") and not getattr(obj, "public_id", None):
+            obj.public_id = generate_prefixed_id(obj.PUBLIC_ID_PREFIX)
+
+    return objs

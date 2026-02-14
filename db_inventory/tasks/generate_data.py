@@ -8,7 +8,7 @@ import uuid
 import random
 from datetime import timedelta
 from django.contrib.auth import get_user_model
-
+from db_inventory.utils.ids import generate_public_ids
 
 @shared_task(bind=True)
 def generate_notifications(self):
@@ -22,15 +22,19 @@ def generate_notifications(self):
     )
 
     try:
-        users = list(
-            get_user_model().objects.all()
-        )
+        User = get_user_model()
+
+        users = list(User.objects.all())
         if not users:
             run.status = ScheduledTaskRun.Status.SKIPPED
             run.message = "No users found"
             return {"created": 0}
 
         notifications = []
+
+        # ----------------------------------
+        # Random synthetic notifications
+        # ----------------------------------
         for _ in range(20):  # ← rate knob
             notifications.append(
                 Notification(
@@ -48,8 +52,38 @@ def generate_notifications(self):
                     ),
                     title="Simulated notification",
                     message="Synthetic event for lifecycle testing",
+                    meta={"synthetic": True},
                 )
             )
+
+        # ----------------------------------
+        # Guaranteed admin notifications
+        # ----------------------------------
+        admin = User.objects.filter(email="admin@gmail.com").first()
+
+        if admin:
+            for level in [
+                Notification.Level.INFO,
+                Notification.Level.WARNING,
+                Notification.Level.CRITICAL,
+            ]:
+                notifications.append(
+                    Notification(
+                        recipient=admin,
+                        level=level,
+                        type=random.choice(
+                            list(Notification.NotificationType.values)
+                        ),
+                        title=f"Admin {level.title()} test",
+                        message="Guaranteed admin lifecycle notification",
+                        meta={"synthetic": True, "forced_admin": True},
+                    )
+                )
+
+        # ----------------------------------
+        # Assign public IDs BEFORE bulk insert
+        # ----------------------------------
+        generate_public_ids(notifications)
 
         Notification.objects.bulk_create(notifications)
 
@@ -63,10 +97,9 @@ def generate_notifications(self):
         raise
 
     finally:
-        run.duration_ms = int(
-            (time.monotonic() - start_ts) * 1000
-        )
+        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
         run.save()
+        
 
 @shared_task(bind=True)
 def generate_user_sessions(self):
@@ -99,7 +132,7 @@ def generate_user_sessions(self):
                     ),
                     status=UserSession.Status.ACTIVE,
                     expires_at=created_at + timedelta(hours=2),
-                    absolute_expires_at=created_at + timedelta(days=7),
+                    absolute_expires_at=created_at + timedelta(days=1),
                 )
             )
 

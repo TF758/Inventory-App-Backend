@@ -126,7 +126,7 @@ urlpatterns = [
 
     path('password-reset/request/',  general_viewsets.PasswordResetRequestView.as_view(), name='password-reset-request'),
     path('password-reset/confirm/', general_viewsets.PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
-    path('password-change/', auth_viewsets.ChangePasswordView.as_view(), name='password_change'),
+    path('change-password/', auth_viewsets.ChangePasswordView.as_view(), name='password_change'),
 
     # used to confirm validity of password reset token
     path("reset-password/validate-token/", general_viewsets.PasswordResetValidateView.as_view(), name="password-reset-validate"),
