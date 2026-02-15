@@ -87,13 +87,13 @@ class Notification(PublicIDModel):
 
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-created_at",  "-id"]
         indexes = [
-            models.Index(fields=["recipient", "is_read"]),
-            models.Index(fields=["recipient", "level"]),
-            models.Index(fields=["type"]),
-            models.Index(fields=["created_at"]),
-        ]
+        models.Index(fields=["recipient", "is_deleted", "-created_at"]),
+        models.Index(fields=["recipient", "is_read"]),
+        models.Index(fields=["recipient", "level"]),
+        models.Index(fields=["type"]),
+    ]
 
     def mark_as_read(self):
         if not self.is_read:

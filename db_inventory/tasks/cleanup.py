@@ -93,41 +93,54 @@ def auto_read_stale_notifications(self):
 
 @shared_task(bind=True)
 def auto_soft_delete_notifications(self):
+    start_ts = time.monotonic()
     now = timezone.now()
 
-    info_cutoff = now - retention_delta(
-        minutes_setting="NOTIF_INFO_DELETE_MINUTES",
-        days_setting="NOTIF_INFO_DELETE_DAYS",
+    run = ScheduledTaskRun.objects.create(
+        task_name="auto_soft_delete_notifications",
+        status=ScheduledTaskRun.Status.STARTED,
+        message="Starting auto soft delete",
     )
 
-    warning_cutoff = now - retention_delta(
-        minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
-        days_setting="NOTIF_WARNING_DELETE_DAYS",
-    )
+    try:
+        info_cutoff = now - retention_delta(
+            minutes_setting="NOTIF_INFO_DELETE_MINUTES",
+            days_setting="NOTIF_INFO_DELETE_DAYS",
+        )
 
-    updated = {}
+        warning_cutoff = now - retention_delta(
+            minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
+            days_setting="NOTIF_WARNING_DELETE_DAYS",
+        )
 
-    updated["info"] = Notification.objects.filter(
-        level=Notification.Level.INFO,
-        is_read=True,
-        is_deleted=False,
-        read_at__lt=info_cutoff,
-    ).update(
-        is_deleted=True,
-        deleted_at=now,
-    )
+        updated = {}
 
-    updated["warning"] = Notification.objects.filter(
-        level=Notification.Level.WARNING,
-        is_read=True,
-        is_deleted=False,
-        read_at__lt=warning_cutoff,
-    ).update(
-        is_deleted=True,
-        deleted_at=now,
-    )
+        updated["info"] = Notification.objects.filter(
+            level=Notification.Level.INFO,
+            is_read=True,
+            is_deleted=False,
+            read_at__lt=info_cutoff,
+        ).update(is_deleted=True, deleted_at=now)
 
-    return updated
+        updated["warning"] = Notification.objects.filter(
+            level=Notification.Level.WARNING,
+            is_read=True,
+            is_deleted=False,
+            read_at__lt=warning_cutoff,
+        ).update(is_deleted=True, deleted_at=now)
+
+        run.status = ScheduledTaskRun.Status.SUCCESS
+        run.message = f"info={updated['info']}, warning={updated['warning']}"
+        return updated
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+        run.save()
 
 @shared_task(bind=True)
 def cleanup_notifications(self):

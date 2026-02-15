@@ -62,7 +62,6 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
                 recipient=self.request.user,
                 is_deleted=False,
             )
-            .order_by("-created_at")
         )
 
     # -------------------------------------------------
@@ -142,3 +141,26 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         notification.save(update_fields=["is_deleted", "deleted_at"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    # -------------------------------------------------
+    # Clear all notifications (bulk soft delete)
+    # -------------------------------------------------
+
+    @action(detail=False, methods=["post"], url_path="clear-all")
+    def clear_all(self, request):
+        queryset = self.get_queryset()
+
+        # Only delete notifications that are allowed
+        deletable = queryset.exclude(
+            level=Notification.Level.CRITICAL
+        ).exclude(
+            level=Notification.Level.WARNING,
+            is_read=False,
+        )
+
+        updated = deletable.update(
+            is_deleted=True,
+            deleted_at=timezone.now(),
+        )
+
+        return Response({"cleared": updated}, status=status.HTTP_200_OK)
