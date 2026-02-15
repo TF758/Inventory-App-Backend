@@ -54,7 +54,7 @@ def auto_read_stale_notifications(self):
                 level=Notification.Level.INFO,
                 is_read=False,
                 is_deleted=False,
-                created_at__lt=info_cutoff,
+                created_at__lte=info_cutoff,  
             )
             .update(is_read=True, read_at=now)
         )
@@ -65,7 +65,7 @@ def auto_read_stale_notifications(self):
                 level=Notification.Level.WARNING,
                 is_read=False,
                 is_deleted=False,
-                created_at__lt=warning_cutoff,
+                created_at__lte=warning_cutoff,  
             )
             .update(is_read=True, read_at=now)
         )
@@ -92,6 +92,44 @@ def auto_read_stale_notifications(self):
 
 
 @shared_task(bind=True)
+def auto_soft_delete_notifications(self):
+    now = timezone.now()
+
+    info_cutoff = now - retention_delta(
+        minutes_setting="NOTIF_INFO_DELETE_MINUTES",
+        days_setting="NOTIF_INFO_DELETE_DAYS",
+    )
+
+    warning_cutoff = now - retention_delta(
+        minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
+        days_setting="NOTIF_WARNING_DELETE_DAYS",
+    )
+
+    updated = {}
+
+    updated["info"] = Notification.objects.filter(
+        level=Notification.Level.INFO,
+        is_read=True,
+        is_deleted=False,
+        read_at__lt=info_cutoff,
+    ).update(
+        is_deleted=True,
+        deleted_at=now,
+    )
+
+    updated["warning"] = Notification.objects.filter(
+        level=Notification.Level.WARNING,
+        is_read=True,
+        is_deleted=False,
+        read_at__lt=warning_cutoff,
+    ).update(
+        is_deleted=True,
+        deleted_at=now,
+    )
+
+    return updated
+
+@shared_task(bind=True)
 def cleanup_notifications(self):
     # Prevent concurrent cleanups
     if not acquire_lock(NOTIFICATION_CLEANUP_LOCK):
@@ -109,7 +147,7 @@ def cleanup_notifications(self):
 
     try:
         # -------------------------------
-        # Soft-deleted notifications
+        # Soft-deleted notifications ONLY
         # -------------------------------
         deleted["soft_info"] = batched_notification_delete(
             Notification.objects.filter(
@@ -129,42 +167,6 @@ def cleanup_notifications(self):
                 deleted_at__lt=now - retention_delta(
                     minutes_setting="NOTIF_WARNING_SOFT_DELETE_MINUTES",
                     days_setting="NOTIF_WARNING_SOFT_DELETE_DAYS",
-                ),
-            )
-        )
-
-        # -------------------------------
-        # Read notifications
-        # -------------------------------
-        deleted["read_info"] = batched_notification_delete(
-            Notification.objects.filter(
-                is_read=True,
-                level=Notification.Level.INFO,
-                read_at__lt=now - retention_delta(
-                    minutes_setting="NOTIF_INFO_DELETE_MINUTES",
-                    days_setting="NOTIF_INFO_DELETE_DAYS",
-                ),
-            )
-        )
-
-        deleted["read_warning"] = batched_notification_delete(
-            Notification.objects.filter(
-                is_read=True,
-                level=Notification.Level.WARNING,
-                read_at__lt=now - retention_delta(
-                    minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
-                    days_setting="NOTIF_WARNING_DELETE_DAYS",
-                ),
-            )
-        )
-
-        deleted["read_critical"] = batched_notification_delete(
-            Notification.objects.filter(
-                is_read=True,
-                level=Notification.Level.CRITICAL,
-                read_at__lt=now - retention_delta(
-                    minutes_setting="NOTIF_CRITICAL_DELETE_MINUTES",
-                    days_setting="NOTIF_CRITICAL_DELETE_DAYS",
                 ),
             )
         )

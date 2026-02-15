@@ -396,12 +396,17 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 NOTIF_AUTO_READ_CRON = env(
     "NOTIF_AUTO_READ_CRON",
-    default="0 2 * * *",
+    default="0 2 * * *",  
+)
+
+NOTIF_SOFT_DELETE_CRON = env(
+    "NOTIF_SOFT_DELETE_CRON",
+    default="15 2 * * *", 
 )
 
 NOTIF_CLEANUP_CRON = env(
     "NOTIF_CLEANUP_CRON",
-    default="0 3 * * *",
+    default="30 2 * * *", 
 )
 
 TASKRUN_CLEANUP_CRON = env(

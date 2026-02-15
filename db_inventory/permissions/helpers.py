@@ -489,7 +489,6 @@ def can_change_equipment_status(user, equipment, new_status):
             EquipmentStatus.DAMAGED,
             EquipmentStatus.UNDER_REPAIR,
         }
-    print("In scope")
 
     # Admin / clerk rule
     return (

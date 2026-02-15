@@ -3,6 +3,7 @@ from django_celery_beat.models import PeriodicTask, CrontabSchedule
 from django.conf import settings
 import json
 from django.utils import timezone
+
 class Command(BaseCommand):
     help = "Setup DB maintenance Celery Beat tasks (cleanup / pruning)"
 
@@ -43,13 +44,19 @@ class Command(BaseCommand):
         # Notification lifecycle
         # -------------------------------
         upsert_task(
-            name="Auto-read stale notifications",
+            name="01 Auto-read stale notifications",
             task="db_inventory.tasks.cleanup.auto_read_stale_notifications",
             cron_expr=settings.NOTIF_AUTO_READ_CRON,
         )
 
         upsert_task(
-            name="DB Maintenance: cleanup notifications",
+            name="01 Auto-soft-delete notifications",
+            task="db_inventory.tasks.cleanup.auto_soft_delete_notifications",
+            cron_expr=settings.NOTIF_SOFT_DELETE_CRON,
+        )
+
+        upsert_task(
+            name="01 DB Maintenance: cleanup notifications",
             task="db_inventory.tasks.cleanup.cleanup_notifications",
             cron_expr=settings.NOTIF_CLEANUP_CRON,
         )
