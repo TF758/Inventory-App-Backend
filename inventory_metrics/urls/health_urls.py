@@ -1,0 +1,18 @@
+# inventory_metrics/urls/health_urls.py
+
+from django.urls import path
+
+from inventory_metrics.viewsets.health import AssetHealthView, HealthOverviewView, SecurityHealthView, SessionHealthView, SiteStructureHealthView, UserHealthView
+
+
+urlpatterns = [
+    # Aggregated dashboard payload
+    path("overview/", HealthOverviewView.as_view(), name="admin_health_overview"),
+
+    # Individual health domains
+    path("sites/", SiteStructureHealthView.as_view(), name="admin_health_sites"),
+    path("users/", UserHealthView.as_view(), name="admin_health_users"),
+    path("sessions/", SessionHealthView.as_view(), name="admin_health_sessions"),
+    path("security/", SecurityHealthView.as_view(), name="admin_health_security"),
+    path("assets/", AssetHealthView.as_view(), name="admin_health_assets"),
+]
