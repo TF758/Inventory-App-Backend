@@ -30,4 +30,9 @@ urlpatterns = [
 
     # --- Admin User Updates ---
     path( "users/<str:public_id>/update-profile/", auth_viewsets.AdminUpdateUserView.as_view(), name="admin-update-user-profile", ),
+
+    # --- Session Activity ---
+    path( "sessions/activity/", auth_viewsets.SessionActivityAPIView.as_view(), name="session-activity", ),
+
+    
 ]

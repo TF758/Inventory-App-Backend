@@ -18,6 +18,12 @@ from db_inventory.utils.audit import create_audit_log
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from db_inventory.models.security import Notification
 from db_inventory.utils.viewset_helpers import get_users_affected_by_site
+from django.conf import settings
+from rest_framework.permissions import IsAuthenticated
+from db_inventory.authentication import SessionJWTAuthentication
+from django.utils import timezone
+from datetime import timedelta
+
 
 class RevokeUserSessionsViewset(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
@@ -492,3 +498,41 @@ class AdminUpdateUserView(APIView):
             AdminUserDemographicsSerializer(user).data,
             status=status.HTTP_200_OK,
         )
+    
+class SessionActivityAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [SessionJWTAuthentication]
+
+    def post(self, request):
+        auth = request.successful_authenticator
+        session = getattr(auth, "session", None)
+
+        if not session:
+            return Response({"detail": "No active session."}, status=401)
+
+        now = timezone.now()
+
+        # --- Absolute expiry protection ---
+        # Never extend beyond absolute lifetime
+        if session.absolute_expires_at <= now:
+            session.status = UserSession.Status.EXPIRED
+            session.save(update_fields=["status"])
+            return Response({"detail": "Session expired."}, status=401)
+
+        # --- Extend idle timeout ---
+        new_expiry = now + settings.SESSION_IDLE_TIMEOUT
+
+        # Clamp to absolute expiry
+        if new_expiry > session.absolute_expires_at:
+            new_expiry = session.absolute_expires_at
+
+        # Prevent DB write spam
+        if new_expiry - session.expires_at > timedelta(seconds=30):
+            session.expires_at = new_expiry
+            session.last_used_at = now
+            session.save(update_fields=["expires_at", "last_used_at"])
+
+        return Response({
+            "ok": True,
+            "idle_exp": int(session.expires_at.timestamp())
+        })
