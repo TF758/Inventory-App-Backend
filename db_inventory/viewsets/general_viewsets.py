@@ -113,6 +113,8 @@ class SessionTokenLoginView(TokenObtainPairView):
             )
             raise APIException("Authentication failed.")
 
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
         # -------------------------
         # Successful login audit
         # -------------------------
@@ -124,6 +126,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             ip_address=request.META.get("REMOTE_ADDR"),
             user_agent=request.META.get("HTTP_USER_AGENT"),
         )
+
 
         # -------------------------
         # Response

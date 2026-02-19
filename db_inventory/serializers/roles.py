@@ -141,6 +141,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             "assigned_date",
         ]
         read_only_fields = ["assigned_by", "assigned_date"]
+        validators = [] 
 
     # -------------------------------------------------
     # GLOBAL VALIDATION
@@ -237,9 +238,11 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             existing = existing.exclude(pk=self.instance.pk)
 
         if existing.exists():
-            raise serializers.ValidationError(
-                "User already has this role in the specified scope."
-            )
+            raise serializers.ValidationError({
+                "non_field_errors": [
+                    "User already has this role in the specified scope."
+                ]
+            })
 
         # Final normalized attrs
         attrs.update({

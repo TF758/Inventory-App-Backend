@@ -15,7 +15,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import RoleAssignmentFilter
 from db_inventory.permissions import RolePermission
 from django.db.models import Q
-
+from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from db_inventory.permissions.constants import ROLE_HIERARCHY
 
 # --- Role Assignments CRUD ---
@@ -117,7 +118,15 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             data.get('department')
         )
 
-        serializer.save(assigned_by=user)
+        try:
+            serializer.save(assigned_by=user)
+
+        except IntegrityError:
+            raise ValidationError({
+                "non_field_errors": [
+                    "User already has this role in the specified scope."
+                ]
+            })
 
     def perform_update(self, serializer):
         user = self.request.user
@@ -131,7 +140,15 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             data.get('department', serializer.instance.department)
         )
 
-        serializer.save(assigned_by=user)
+        try:
+            serializer.save(assigned_by=user)
+
+        except IntegrityError:
+            raise ValidationError({
+                "non_field_errors": [
+                    "User already has this role in the specified scope."
+                ]
+            })
 
     def perform_destroy(self, instance):
         user = self.request.user

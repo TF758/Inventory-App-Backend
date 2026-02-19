@@ -49,7 +49,7 @@ class RoleAssignment(PublicIDModel):
     assigned_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="assigned_roles",)
     assigned_date = models.DateTimeField(default=timezone.now)
 
-    class Meta:
+    class Meta:  
         indexes = [
             models.Index(fields=["public_id"]),
             models.Index(fields=["role"]),
@@ -124,6 +124,7 @@ class RoleAssignment(PublicIDModel):
                 name="unique_room_role_per_user",
             ),
         ]
+        
         
 
     # --------------------
