@@ -384,3 +384,73 @@ def change_equipment_status(
         with transaction.atomic():
             return _execute()
     return _execute()
+
+def condemn_equipment(
+    *,
+    actor,
+    equipment,
+    notes="",
+    now=None,
+    use_atomic=True,
+    lock_equipment=True,
+):
+    if now is None:
+        now = timezone.now()
+
+    EquipmentAssignment = apps.get_model("db_inventory", "EquipmentAssignment")
+
+    def _execute():
+
+        eq = equipment
+
+        if lock_equipment:
+            eq = Equipment.objects.select_for_update().get(pk=equipment.pk)
+
+        old_status = eq.status
+        new_status = EquipmentStatus.CONDEMNED
+
+        if old_status == new_status:
+            return StatusChangeResult.SKIPPED
+
+        if not can_user_set_equipment_status(
+            actor=actor,
+            equipment=eq,
+            new_status=new_status,
+        ):
+            raise PermissionError("Not allowed to condemn equipment.")
+
+        eq.status = new_status
+        eq.save(update_fields=["status"])
+
+        EquipmentEvent.objects.create(
+            equipment=eq,
+            user=actor,
+            reported_by=actor,
+            event_type=equipment_event_from_status(new_status),
+            notes=notes or f"{old_status} → CONDEMNED",
+        )
+
+        AuditLog.objects.create(
+            user=actor,
+            user_public_id=actor.public_id,
+            user_email=actor.email,
+            event_type=AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
+            description=f"Equipment condemned (previous status: {old_status})",
+            metadata={
+                "change_type": "equipment_condemned",
+                "old_status": old_status,
+                "new_status": new_status,
+                "notes": notes,
+                "batch": True,
+            },
+            target_model="Equipment",
+            target_id=eq.public_id,
+            target_name=eq.audit_label(),
+        )
+
+        return StatusChangeResult.SUCCESS
+
+    if use_atomic:
+        with transaction.atomic():
+            return _execute()
+    return _execute()

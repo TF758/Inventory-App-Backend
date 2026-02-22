@@ -75,3 +75,25 @@ class BatchEquipmentStatusChangeSerializer(serializers.Serializer):
         if not cleaned:
             raise serializers.ValidationError("No valid equipment IDs provided.")
         return cleaned
+
+class BatchEquipmentCondemnSerializer(serializers.Serializer):
+    equipment_public_ids = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+    notes = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_equipment_public_ids(self, value):
+        seen = set()
+        cleaned = []
+        for pid in value:
+            pid = pid.strip()
+            if not pid:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                cleaned.append(pid)
+
+        if not cleaned:
+            raise serializers.ValidationError("No valid equipment IDs provided.")
+        return cleaned

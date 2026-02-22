@@ -23,10 +23,10 @@ from db_inventory.utils.asset_helpers import equipment_event_from_status
 from db_inventory.utils.audit import create_audit_log
 from django.utils import timezone
 from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
-from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentStatusChangeSerializer
+from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentStatusChangeSerializer
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, unassign_equipment
-from inventory.db_inventory.models.assets import EquipmentStatus
+from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, unassign_equipment
+from db_inventory.models.assets import EquipmentStatus
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -440,6 +440,65 @@ class BatchEquipmentStatusChangeView(APIView):
                         actor=actor,
                         equipment=eq,
                         new_status=new_status,
+                        notes=notes,
+                        now=now,
+                        use_atomic=False,
+                        lock_equipment=False,
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except Exception:
+                    failed += 1
+
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
+        )
+
+class BatchEquipmentCondemnView(APIView):
+
+    permission_classes = [CanUpdateEquipmentStatus]
+
+    def post(self, request):
+        serializer = BatchEquipmentCondemnSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        notes = serializer.validated_data["notes"]
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+                Equipment.objects
+                .select_for_update()
+                .filter(public_id__in=equipment_public_ids)
+                .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+
+            for public_id in equipment_public_ids:
+
+                eq = equipment_map.get(public_id)
+                if not eq:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, eq)
+
+                    result = condemn_equipment(
+                        actor=actor,
+                        equipment=eq,
                         notes=notes,
                         now=now,
                         use_atomic=False,
