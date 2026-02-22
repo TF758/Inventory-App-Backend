@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from db_inventory.serializers.equipment import (
+EquipmentCondemnSerializer,
 EquipmentStatusChangeSerializer,
 EquipmentWriteSerializer
 ,EquipmentSerializer
@@ -25,6 +26,7 @@ from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEqui
 from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentStatusChangeSerializer
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
 from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, unassign_equipment
+from inventory.db_inventory.models.assets import EquipmentStatus
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -201,6 +203,65 @@ class EquipmentStatusChangeView(APIView):
 
         return Response( status=status.HTTP_200_OK, )
 
+class EquipmentCondemnView(APIView):
+    permission_classes = [CanUpdateEquipmentStatus]
+
+    def patch(self, request, public_id):
+        equipment = get_object_or_404(
+            Equipment.objects.select_related("active_assignment"),
+            public_id=public_id,
+        )
+
+        self.check_object_permissions(request, equipment)
+
+        if equipment.status == EquipmentStatus.CONDEMNED:
+            return Response(
+                {"detail": "Equipment is already condemned."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if equipment.is_assigned:
+            return Response(
+                {"detail": "Equipment must be unassigned before condemnation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = EquipmentCondemnSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        notes = serializer.validated_data["notes"]
+
+        old_status = equipment.status
+        new_status = EquipmentStatus.CONDEMNED
+
+        with transaction.atomic():
+            equipment.status = new_status
+            equipment.save(update_fields=["status"])
+
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=request.user,
+                reported_by=request.user,
+                event_type=EquipmentEvent.Event_Choices.CONDEMNED,
+                notes=notes,
+            )
+
+            create_audit_log(
+                request=request,
+                event_type=AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
+                target=equipment,
+                description=f"Equipment condemned (previous status: {old_status})",
+                metadata={
+                    "change_type": "equipment_condemned",
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "notes": notes,
+                },
+            )
+
+        return Response(status=status.HTTP_200_OK)
+    
+    
 class BatchUnassignEquipmentView(APIView):
 
     permission_classes = [CanManageAssetCustody]
@@ -336,19 +397,12 @@ class BatchAssignEquipmentView(APIView):
         )
     
 
-class BatchEquipmentStatusChangeView(APIView):
-    """
-    Batch change equipment status.
 
-    Behavior:
-    - If status already equals new_status => SKIPPED
-    - Permission checked per-equipment using same rules as single endpoint
-    - Returns aggregate counts (success/skipped/failed)
-    """
+class BatchEquipmentStatusChangeView(APIView):
 
     permission_classes = [CanUpdateEquipmentStatus]
 
-    def patch(self, request):
+    def post(self, request):
         serializer = BatchEquipmentStatusChangeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -362,24 +416,24 @@ class BatchEquipmentStatusChangeView(APIView):
         success = skipped = failed = 0
 
         with transaction.atomic():
+
             equipment_qs = (
-                Equipment.objects
-                .select_for_update()
-                .select_related("room", "active_assignment", "active_assignment__user")
-                .filter(public_id__in=equipment_public_ids)
-                .order_by("id")
+            Equipment.objects
+            .select_for_update()
+            .filter(public_id__in=equipment_public_ids)
+            .order_by("id")
             )
 
             equipment_map = {e.public_id: e for e in equipment_qs}
 
             for public_id in equipment_public_ids:
+
                 eq = equipment_map.get(public_id)
                 if not eq:
                     failed += 1
                     continue
 
                 try:
-                    # object-level permission check hook
                     self.check_object_permissions(request, eq)
 
                     result = change_equipment_status(
@@ -388,8 +442,8 @@ class BatchEquipmentStatusChangeView(APIView):
                         new_status=new_status,
                         notes=notes,
                         now=now,
-                        use_atomic=False,     # outer atomic handles it
-                        lock_equipment=False, # outer select_for_update handles it
+                        use_atomic=False,
+                        lock_equipment=False,
                     )
 
                     if result == StatusChangeResult.SUCCESS:

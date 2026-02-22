@@ -8,9 +8,9 @@ from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
-from inventory.db_inventory.models.assets import EquipmentStatus
-from inventory.db_inventory.permissions.helpers import is_admin_role, is_in_scope
-from inventory.db_inventory.utils.asset_helpers import equipment_event_from_status
+from db_inventory.models.assets import EquipmentStatus
+from db_inventory.permissions.helpers import is_admin_role, is_in_scope
+from db_inventory.utils.asset_helpers import equipment_event_from_status
 
 class UnassignResult:
     SUCCESS = "success"
@@ -314,23 +314,37 @@ def change_equipment_status(
     use_atomic=True,
     lock_equipment=True,
 ):
+
     if now is None:
         now = timezone.now()
 
+    EquipmentAssignment = apps.get_model("db_inventory", "EquipmentAssignment")
+
     def _execute():
+
         eq = equipment
 
         if lock_equipment:
             eq = Equipment.objects.select_for_update().get(pk=equipment.pk)
 
-        # No-op skip
         old_status = eq.status
+
         if old_status == new_status:
             return StatusChangeResult.SKIPPED
 
-        # Permission check per-equipment (batch safe)
-        if not can_user_set_equipment_status(actor=actor, equipment=eq, new_status=new_status):
-            # treat as failed so caller can count it
+        # safer assignment fetch (batch friendly)
+        assignment = (
+            EquipmentAssignment.objects
+            .filter(equipment=eq, returned_at__isnull=True)
+            .only("user_id")
+            .first()
+        )
+
+        if not can_user_set_equipment_status(
+            actor=actor,
+            equipment=eq,
+            new_status=new_status,
+        ):
             raise PermissionError("Not allowed to set this status.")
 
         eq.status = new_status
@@ -340,16 +354,17 @@ def change_equipment_status(
 
         EquipmentEvent.objects.create(
             equipment=eq,
-            user=actor,          # keeping your single view signature
+            user=actor,
             reported_by=actor,
             event_type=event_type,
             notes=notes or f"{old_status} → {new_status}",
         )
 
         AuditLog.objects.create(
-            request=None,  # if your helper requires request, see note below
+            user=actor,
+            user_public_id=actor.public_id,
+            user_email=actor.email,
             event_type=AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
-            target=eq,
             description=f"Status changed from {old_status} to {new_status}",
             metadata={
                 "change_type": "equipment_status_change",
@@ -358,7 +373,9 @@ def change_equipment_status(
                 "notes": notes,
                 "batch": True,
             },
-            actor=actor,  # recommended: update helper signature to accept actor for services
+            target_model="Equipment",
+            target_id=eq.public_id,
+            target_name=eq.audit_label(),
         )
 
         return StatusChangeResult.SUCCESS
