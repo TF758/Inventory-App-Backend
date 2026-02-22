@@ -501,7 +501,7 @@ class BatchEquipmentCondemnView(APIView):
                         equipment=eq,
                         notes=notes,
                         now=now,
-                        use_atomic=False,
+                        use_atomic=False,  
                         lock_equipment=False,
                     )
 
@@ -510,9 +510,10 @@ class BatchEquipmentCondemnView(APIView):
                     else:
                         skipped += 1
 
-                except Exception:
+                except PermissionError:
                     failed += 1
 
+               
         return Response(
             {"success": success, "skipped": skipped, "failed": failed},
             status=status.HTTP_200_OK,

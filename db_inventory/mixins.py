@@ -536,7 +536,8 @@ class AccessoryDashboardMixin:
         since = timezone.now() - timedelta(days=period)
 
         accessories_qs = Accessory.objects.filter(
-            room__in=rooms
+            room__in=rooms,
+                is_deleted=False
         )
 
         summary = accessories_qs.aggregate(
@@ -548,6 +549,7 @@ class AccessoryDashboardMixin:
 
         active_assignments_qs = AccessoryAssignment.objects.filter(
             accessory__room__in=rooms,
+            accessory__is_deleted=False,
             returned_at__isnull=True
         )
 
@@ -560,6 +562,7 @@ class AccessoryDashboardMixin:
         event_counts = (
             AccessoryEvent.objects.filter(
                 accessory__room__in=rooms,
+                accessory__is_deleted=False, 
                 occurred_at__gte=since
             )
             .values("event_type")
@@ -634,7 +637,8 @@ class ConsumableDashboardMixin:
         # ─────────────────────────────
 
         consumables_qs = Consumable.objects.filter(
-            room__in=rooms
+            room__in=rooms,
+                is_deleted=False
         )
 
         summary_base = consumables_qs.aggregate(
@@ -658,6 +662,7 @@ class ConsumableDashboardMixin:
 
         events_qs = ConsumableEvent.objects.filter(
             consumable__room__in=rooms,
+            consumable__is_deleted=False,
             occurred_at__gte=since
         )
 
@@ -713,11 +718,13 @@ class AreaDashboardMixin:
         # --------------------
         # Equipment
         # --------------------
-        equipment_qs = Equipment.objects.filter(room__in=rooms)
+        equipment_qs = Equipment.objects.filter(room__in=rooms,
+                is_deleted=False)
         total_equipment = equipment_qs.count()
 
         assigned_equipment = EquipmentAssignment.objects.filter(
             equipment__room__in=rooms,
+            equipment__is_deleted=False,
             returned_at__isnull=True,
         ).count()
 
@@ -744,7 +751,8 @@ class AreaDashboardMixin:
         # --------------------
         # Consumables
         # --------------------
-        consumables_qs = Consumable.objects.filter(room__in=rooms)
+        consumables_qs = Consumable.objects.filter(room__in=rooms,
+                is_deleted=False)
 
         low_stock = consumables_qs.filter(
             quantity__gt=0,
@@ -753,7 +761,8 @@ class AreaDashboardMixin:
 
         out_of_stock = consumables_qs.filter(quantity=0).count()
 
-        accessories_qs = Accessory.objects.filter(room__in=rooms)
+        accessories_qs = Accessory.objects.filter(room__in=rooms,
+                is_deleted=False)
         components_qs = Component.objects.filter(
             equipment__room__in=rooms
         )

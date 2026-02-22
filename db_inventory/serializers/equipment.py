@@ -26,6 +26,8 @@ class EquipmentSerializer(serializers.ModelSerializer):
             'status',
             'is_assigned',   
             'serial_number',
+            'is_deleted',
+            'deleted_at',
             'room_id',
             'room_name',
             'location_id',
@@ -150,7 +152,7 @@ class EquipmentDropdownSerializer(serializers.ModelSerializer):
     class Meta:
         model = Equipment
         fields = ["name", "public_id"]
-        
+
 class EquipmentCondemnSerializer(serializers.Serializer):
     notes = serializers.CharField(
         required=True,

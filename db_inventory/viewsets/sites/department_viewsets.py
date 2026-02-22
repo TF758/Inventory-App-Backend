@@ -152,7 +152,8 @@ class DepartmentEquipmentViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewset
 
         qs = (
             Equipment.objects
-            .filter(room__location__department__public_id=department_id)
+            .filter(room__location__department__public_id=department_id,
+                is_deleted=False)
             .order_by("-id")
         )
 
@@ -172,7 +173,8 @@ class DepartmentEquipmentDashboardView(APIView):
     def get(self, request, public_id):
 
         equipment_qs = Equipment.objects.filter(
-            room__location__department__public_id=public_id
+            room__location__department__public_id=public_id,
+                is_deleted=False
         ).select_related(
             "room__location__department"
         )
@@ -240,7 +242,8 @@ class DepartmentConsumablesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, views
 
         qs = (
             Consumable.objects
-            .filter(room__location__department__public_id=department_id)
+            .filter(room__location__department__public_id=department_id,
+                is_deleted=False)
             .order_by("-id")
         )
 
@@ -289,7 +292,8 @@ class DepartmentAccessoriesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, views
 
         qs = (
             Accessory.objects
-            .filter(room__location__department__public_id=department_id)
+            .filter(room__location__department__public_id=department_id,
+                is_deleted=False)
             .order_by("-id")
         )
 
