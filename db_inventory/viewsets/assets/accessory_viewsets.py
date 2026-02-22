@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from db_inventory.models import Accessory,Room
+from db_inventory.models import Accessory
 from db_inventory.serializers.accessories import *
 from db_inventory.mixins import ScopeFilterMixin, AccessoryBatchMixin
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,8 +11,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.permissions import AssetPermission, is_in_scope
-from rest_framework.exceptions import PermissionDenied
 from db_inventory.mixins import AuditMixin
+from django.utils import timezone
+from django.shortcuts import get_object_or_404
+
 
 class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -53,7 +55,22 @@ class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
         return qs
     
+class AccessoryDeleteViewSet(viewsets.ViewSet):
+    permission_classes = [ AssetPermission]
+    lookup_field = "public_id"
 
+    def destroy(self, request, public_id=None):
+        accessory = get_object_or_404(
+            Accessory,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        accessory.is_deleted = True
+        accessory.deleted_at = timezone.now()
+        accessory.save(update_fields=["is_deleted", "deleted_at"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
 
 class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):

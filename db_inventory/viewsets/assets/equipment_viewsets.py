@@ -87,7 +87,28 @@ def perform_create(self, serializer):
             raise PermissionDenied("You do not have permission to create equipment in this room.")
 
         serializer.save(room=room)
-    
+
+class EquipmentDeleteViewSet(viewsets.ViewSet):
+    """
+    Soft delete Equipment by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+    lookup_field = "public_id"
+
+    def destroy(self, request, public_id=None):
+        equipment = get_object_or_404(
+            Equipment,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        equipment.is_deleted = True
+        equipment.deleted_at = timezone.now()
+        equipment.save(update_fields=["is_deleted", "deleted_at"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+      
 class EquipmentBatchValidateView(EquipmentBatchMixin, APIView):
     """
     Validate a batch of equipment rows without saving.

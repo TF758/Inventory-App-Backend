@@ -15,6 +15,8 @@ from rest_framework.exceptions import PermissionDenied
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMixin
 from db_inventory.permissions import AssetPermission, is_in_scope
+from django.utils import timezone
+from django.shortcuts import get_object_or_404
 
 
 class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
@@ -75,6 +77,23 @@ class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet)
                 raise PermissionDenied("You do not have permission to create consumable in this room.")
 
             serializer.save(room=room)
+
+class ConsumableDeleteViewSet(viewsets.ViewSet):
+    permission_classes = [ AssetPermission]
+    lookup_field = "public_id"
+
+    def destroy(self, request, public_id=None):
+        consumable = get_object_or_404(
+            Consumable,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        consumable.is_deleted = True
+        consumable.deleted_at = timezone.now()
+        consumable.save(update_fields=["is_deleted", "deleted_at"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ConsumableBatchValidateView(ConsumableBatchMixin, APIView):
     save_to_db = False

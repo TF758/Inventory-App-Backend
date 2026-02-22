@@ -65,6 +65,7 @@ urlpatterns = [
     'patch': 'partial_update',
     'delete': 'destroy'
         }), name='equipment-detail'),
+    path('equipments/<str:public_id>/delete/', equipment_viewsets.EquipmentDeleteViewSet.as_view(), name='equipment-delete'),
 
     path('equipments/<str:public_id>/status/', equipment_viewsets.EquipmentStatusChangeView.as_view(), name='update-equipment-status'),
     path('equipments/<str:public_id>/condemn/', equipment_viewsets.EquipmentCondemnView.as_view(), name='condemn-equipment'),
@@ -93,7 +94,7 @@ urlpatterns = [
             'patch': 'partial_update',
             'delete': 'destroy'
         }), name='accessory-detail'),
-
+    path('accessories/<str:public_id>/delete/', accessory_viewsets.AccessoryDeleteViewSet.as_view(), name='accessory-delete'),
     path("accessories-validate-import/",  accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
     path("accessories-import/",  accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
 
@@ -104,7 +105,7 @@ urlpatterns = [
     'patch': 'partial_update',
     'delete': 'destroy'
     }), name='consumable-detail'),
-
+    path('consumables/<str:public_id>/delete/', consumable_viewsets.ConsumableDeleteViewSet.as_view(), name='consumable-delete'),
     path('consumables-import/', consumable_viewsets.ConsumableBatchImportView.as_view(), name='consumables-batch-import'),
     path('consumables-validate-import/', consumable_viewsets.ConsumableBatchValidateView.as_view(), name='consumables-batch-validate'),
 

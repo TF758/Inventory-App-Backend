@@ -114,6 +114,7 @@ class UserLocationAdmin(admin.ModelAdmin):
     def room_public_id(self, obj):
         return obj.room.public_id if obj.room else "-"
     room_public_id.short_description = "Room Public ID"
+    
 admin.site.register(Accessory)
 
 
@@ -165,7 +166,7 @@ class RoomAdmin(admin.ModelAdmin):
 class EquipmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'serial_number', 'public_id')  
     readonly_fields = ('public_id',) 
-    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room', 'status')
+    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room', 'status', 'is_deleted', 'deleted_at')
 
 
 @admin.register(Component)
