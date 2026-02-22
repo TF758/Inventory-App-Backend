@@ -1,5 +1,6 @@
 from django.contrib import admin
 from db_inventory.models.site import *
+from db_inventory.models.base import *
 from db_inventory.models.assets import *
 from db_inventory.models.users import *
 from db_inventory.models.security import *
@@ -12,6 +13,48 @@ from django.utils.translation import gettext_lazy as _
 # Simple models
 
 admin.site.register(Notification)
+
+
+
+
+@admin.register(PublicIDRegistry)
+class PublicIDRegistryAdmin(admin.ModelAdmin):
+    list_display = (
+        "public_id",
+        "model_label",
+        "created_at",
+    )
+
+    search_fields = (
+        "public_id",
+        "model_label",
+    )
+
+    list_filter = (
+        "model_label",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    readonly_fields = (
+        "public_id",
+        "model_label",
+        "created_at",
+    )
+
+    # --------------------
+    # Safety: make registry immutable in admin
+    # --------------------
+
+    def has_add_permission(self, request):
+        return False  # IDs must only be created via code
+
+    def has_change_permission(self, request, obj=None):
+        return False  # prevent edits
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # never allow deletion
 
 @admin.register(ScheduledTaskRun)
 class ScheduledTaskRunAdmin(admin.ModelAdmin):

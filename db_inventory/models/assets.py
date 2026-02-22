@@ -28,6 +28,8 @@ class Equipment(PublicIDModel):
     serial_number = models.CharField(max_length=50, unique=True, blank=True, null=True,  validators=[serial_validator])
     status = models.CharField(max_length=20,choices=EquipmentStatus.choices,default=EquipmentStatus.OK,db_index=True, null=True)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -115,6 +117,8 @@ class Consumable(PublicIDModel):
     quantity = models.PositiveIntegerField(default=0)
     low_stock_threshold = models.PositiveIntegerField( default=0, help_text="Alert when available quantity is at or below this value" )
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="consumables")
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -139,6 +143,8 @@ class Accessory(PublicIDModel):
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.PositiveIntegerField(default=0)
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="accessories")
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [

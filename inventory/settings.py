@@ -361,18 +361,27 @@ CSRF_TRUSTED_ORIGINS = env.list(
 # Notification retention (days)
 # -------------------------------------------------
 
+## -------------------------------
 # Auto-read grace periods
+# -------------------------------
 NOTIF_INFO_AUTO_READ_DAYS = env.int("NOTIF_INFO_AUTO_READ_DAYS", default=7)
 NOTIF_WARNING_AUTO_READ_DAYS = env.int("NOTIF_WARNING_AUTO_READ_DAYS", default=14)
+NOTIF_CRITICAL_AUTO_READ_DAYS = env.int("NOTIF_CRITICAL_AUTO_READ_DAYS", default=30)
 
-# Hard delete after read
+# -------------------------------
+# Soft delete after read
+# -------------------------------
 NOTIF_INFO_DELETE_DAYS = env.int("NOTIF_INFO_DELETE_DAYS", default=7)
 NOTIF_WARNING_DELETE_DAYS = env.int("NOTIF_WARNING_DELETE_DAYS", default=14)
 NOTIF_CRITICAL_DELETE_DAYS = env.int("NOTIF_CRITICAL_DELETE_DAYS", default=90)
 
+# -------------------------------
 # Hard delete after soft delete
+# -------------------------------
 NOTIF_INFO_SOFT_DELETE_DAYS = env.int("NOTIF_INFO_SOFT_DELETE_DAYS", default=3)
 NOTIF_WARNING_SOFT_DELETE_DAYS = env.int("NOTIF_WARNING_SOFT_DELETE_DAYS", default=7)
+NOTIF_CRITICAL_SOFT_DELETE_DAYS = env.int("NOTIF_CRITICAL_SOFT_DELETE_DAYS", default=30)
+
 try:
     SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
     SESSION_ABSOLUTE_DAYS = int(os.environ["SESSION_ABSOLUTE_DAYS"])

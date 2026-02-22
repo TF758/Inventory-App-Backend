@@ -1,5 +1,5 @@
 from .users import User, PasswordResetEvent, CustomUserManager
-from .base import PublicIDModel
+from .base import PublicIDModel, PublicIDRegistry
 
 # import other models too
 from .site import Department, Location, Room, UserLocation

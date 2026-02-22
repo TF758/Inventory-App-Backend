@@ -6,7 +6,7 @@ from django.db.models import Q, F
 
 
 class EquipmentAssignment(models.Model):
-    equipment = models.OneToOneField(Equipment,on_delete=models.PROTECT,related_name="active_assignment")
+    equipment = models.OneToOneField(Equipment,on_delete=models.CASCADE,related_name="active_assignment")
     user = models.ForeignKey(User,on_delete=models.PROTECT,related_name="equipment_assignments")
 
     assigned_at = models.DateTimeField(auto_now_add=True)
@@ -17,7 +17,7 @@ class EquipmentAssignment(models.Model):
     notes = models.TextField(blank=True)
 
 class AccessoryAssignment(models.Model):
-    accessory = models.ForeignKey(Accessory,on_delete=models.PROTECT,related_name="assignments")
+    accessory = models.ForeignKey(Accessory,on_delete=models.CASCADE,related_name="assignments")
     user = models.ForeignKey(User,on_delete=models.PROTECT,related_name="accessory_assignments")
 
     quantity = models.PositiveIntegerField()
@@ -28,7 +28,7 @@ class AccessoryAssignment(models.Model):
 
 
 class ConsumableIssue(models.Model):
-    consumable = models.ForeignKey(Consumable,on_delete=models.PROTECT,related_name="issues",)
+    consumable = models.ForeignKey(Consumable,on_delete=models.CASCADE,related_name="issues",)
     user = models.ForeignKey(User,on_delete=models.PROTECT,related_name="consumable_assignments",)
     quantity = models.PositiveIntegerField(help_text="Remaining quantity currently held by the user")
     # For audit/reference only 
@@ -98,9 +98,9 @@ class EquipmentEvent(models.Model):
         CONDEMNED = "condemned", "Condemned"
     
 
-    equipment = models.ForeignKey( Equipment, on_delete=models.PROTECT, related_name="events" )
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="events" )
 
-    user = models.ForeignKey( User, on_delete=models.SET_NULL, null=True, blank=True )
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True )
 
     event_type = models.CharField(max_length=20, choices=Event_Choices)
     occurred_at = models.DateTimeField(auto_now_add=True)
@@ -127,7 +127,7 @@ class AccessoryEvent(models.Model):
         RESTOCKED = "restocked", "Restocked"
         ADJUSTED = "adjusted", "Adjusted"
 
-    accessory = models.ForeignKey(Accessory,on_delete=models.PROTECT,related_name="events")
+    accessory = models.ForeignKey(Accessory,on_delete=models.CASCADE,related_name="events")
 
     user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True)
 
@@ -162,7 +162,7 @@ class ConsumableEvent(models.Model):
         RESTOCKED = "restocked"
         ADJUSTED = "adjusted"
 
-    consumable = models.ForeignKey(Consumable, on_delete=models.PROTECT, related_name="events")
+    consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name="events")
     issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.SET_NULL, related_name="events" )
 
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)

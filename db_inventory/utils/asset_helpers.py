@@ -18,6 +18,7 @@ def equipment_event_from_status(status: str) -> str:
         "damaged": "damaged",
         "under_repair": "sent_for_repair",
         "retired": "retired",
+         "condemned": "condemned",
     }
 
     try:
