@@ -9,7 +9,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from db_inventory.models.assets import EquipmentStatus
-from db_inventory.permissions.helpers import can_soft_delete_asset, is_admin_role, is_in_scope
+from db_inventory.permissions.helpers import can_hard_delete_asset, can_soft_delete_asset, is_admin_role, is_in_scope
 from db_inventory.utils.asset_helpers import equipment_event_from_status
 
 class UnassignResult:
@@ -524,6 +524,63 @@ def soft_delete_equipment(
             target_id=eq.public_id,
             target_name=eq.audit_label(),
         )
+
+        return StatusChangeResult.SUCCESS
+
+    if use_atomic:
+        with transaction.atomic():
+            return _execute()
+
+    return _execute()
+
+def hard_delete_equipment(
+    *,
+    actor,
+    equipment,
+    notes="",
+    now=None,
+    use_atomic=True,
+    lock_equipment=True,
+):
+
+    if now is None:
+        now = timezone.now()
+
+    def _execute():
+
+        eq = equipment
+
+        # --- Optional locking ---
+        if lock_equipment:
+            eq = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
+
+        # --- Permission guard ---
+        if not can_hard_delete_asset(actor):
+            raise PermissionError("Not allowed to permanently delete equipment.")
+
+        # --- Audit BEFORE deletion ---
+        AuditLog.objects.create(
+            user=actor,
+            user_public_id=actor.public_id,
+            user_email=actor.email,
+            event_type=AuditLog.Events.EQUIPMENT_PERMANENTLY_DELETED,
+            description="Equipment permanently deleted",
+            metadata={
+                "change_type": "equipment_hard_deleted",
+                "notes": notes,
+                "batch": True,
+            },
+            target_model="Equipment",
+            target_id=eq.public_id,
+            target_name=eq.audit_label(),
+        )
+
+        # --- HARD DELETE ---
+        eq.delete()
 
         return StatusChangeResult.SUCCESS
 

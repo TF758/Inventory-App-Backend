@@ -534,3 +534,17 @@ def can_soft_delete_asset(user: User, asset) -> bool:
         location=location,
         department=department,
     )
+
+def can_hard_delete_asset(user: User, asset=None) -> bool:
+    """
+    Hard delete permission.
+
+    Only SITE_ADMIN may permanently delete assets.
+    Scope and hierarchy checks are intentionally bypassed.
+    """
+
+    active_role = getattr(user, "active_role", None)
+    if not active_role:
+        return False
+
+    return active_role.role == "SITE_ADMIN"

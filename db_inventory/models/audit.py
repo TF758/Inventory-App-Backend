@@ -92,6 +92,7 @@ class AuditLog(PublicIDModel):
         MODEL_CREATED = "model_created"
         MODEL_UPDATED = "model_updated"
         MODEL_DELETED = "model_deleted"
+        EQUIPMENT_PERMANENTLY_DELETED = "model_permanently_deleted"
         CONSUMABLE_ISSUED = "consumable_issued"
         CONSUMABLE_RETURNED = "consumable_returned"
         CONSUMABLE_USED = "consumable_used"
