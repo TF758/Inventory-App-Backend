@@ -71,6 +71,8 @@ urlpatterns = [
 
     path('equipments/<str:public_id>/status/', equipment_viewsets.EquipmentStatusChangeView.as_view(), name='update-equipment-status'),
     path('equipments/<str:public_id>/condemn/', equipment_viewsets.EquipmentCondemnView.as_view(), name='condemn-equipment'),
+    path('equipments/<str:public_id>/restore/', equipment_viewsets.EquipmentRestoreViewSet.as_view(), name='restore-equipment'),
+    path('equipments/<str:public_id>/soft-delete/', equipment_viewsets.EquipmentSoftDeleteView.as_view(), name='soft-delete-equipment'),
 
     path('equipments/<str:public_id>/', equipment_viewsets.EquipmentModelViewSet.as_view({
         'get': 'retrieve',

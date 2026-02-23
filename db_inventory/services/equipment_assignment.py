@@ -589,3 +589,68 @@ def hard_delete_equipment(
             return _execute()
 
     return _execute()
+
+def restore_equipment(
+    *,
+    actor,
+    equipment,
+    now=None,
+    use_atomic=True,
+    lock_equipment=True,
+):
+    """
+    Restore a soft-deleted equipment record.
+    """
+
+    if now is None:
+        now = timezone.now()
+
+    def _execute():
+
+        eq = equipment
+
+        # --- Optional locking ---
+        if lock_equipment:
+            eq = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
+
+        # --- Skip if not deleted ---
+        if not eq.is_deleted:
+            return StatusChangeResult.SKIPPED
+
+        # --- Permission guard ---
+        # Restore should follow same rule as soft delete (scoped admins allowed)
+        if not can_soft_delete_asset(actor, eq):
+            raise PermissionError("Not allowed to restore equipment.")
+
+        # --- Restore state ---
+        eq.is_deleted = False
+        eq.deleted_at = None
+        eq.save(update_fields=["is_deleted", "deleted_at"])
+
+        # --- Audit log ---
+        AuditLog.objects.create(
+            user=actor,
+            user_public_id=actor.public_id,
+            user_email=actor.email,
+            event_type=AuditLog.Events.ASSET_RESTORED,
+            description="Equipment restored from soft delete",
+            metadata={
+                "change_type": "equipment_restored",
+                "batch": False,
+            },
+            target_model="Equipment",
+            target_id=eq.public_id,
+            target_name=eq.audit_label(),
+        )
+
+        return StatusChangeResult.SUCCESS
+
+    if use_atomic:
+        with transaction.atomic():
+            return _execute()
+
+    return _execute()

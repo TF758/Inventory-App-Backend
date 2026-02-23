@@ -666,7 +666,7 @@ class BatchEquipmentHardDeleteView(APIView):
             status=status.HTTP_200_OK,
         )
 
-class EquipmentRestoreViewSet(viewsets.ViewSet):
+class EquipmentRestoreViewSet(APIView):
     """
     Restore a soft-deleted Equipment by public_id.
     """
@@ -674,7 +674,7 @@ class EquipmentRestoreViewSet(viewsets.ViewSet):
     permission_classes = [AssetPermission]
     lookup_field = "public_id"
 
-    def create(self, request, public_id=None):
+    def get(self, request, public_id=None):
         equipment = get_object_or_404(
             Equipment,
             public_id=public_id,
@@ -688,5 +688,41 @@ class EquipmentRestoreViewSet(viewsets.ViewSet):
             )
         except PermissionError:
             raise PermissionDenied("Not allowed to restore equipment.")
+
+        return Response(status=status.HTTP_200_OK)
+
+class EquipmentSoftDeleteView(APIView):
+    """
+    Soft delete a single equipment item by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+
+    def delete(self, request, public_id):
+
+        equipment = get_object_or_404(
+            Equipment,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        for permission in self.get_permissions():
+            if hasattr(permission, "has_object_permission"):
+                if not permission.has_object_permission(request, self, equipment):
+                    raise PermissionDenied()
+
+        result = soft_delete_equipment(
+            actor=request.user,
+            equipment=equipment,
+            now=timezone.now(),
+            use_atomic=True,
+            lock_equipment=True,
+        )
+
+        if result == StatusChangeResult.SKIPPED:
+            return Response(
+                {"detail": "Equipment already deleted."},
+                status=status.HTTP_200_OK,
+            )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
