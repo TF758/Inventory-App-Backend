@@ -7,6 +7,8 @@ from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.audit import AuditLog
 from datetime import timedelta
 
+from db_inventory.models.security import UserSession
+
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,8 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
     user.force_password_change = True
     user.save(update_fields=["force_password_change"])
 
+
+
     reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
 
     send_mail(
@@ -128,4 +132,9 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
         target_id=user.public_id,
         target_name=user.email,
     )
+    # kill all of The user's actve session to force relogin wiht new password
+    UserSession.objects.filter(
+    user=user,
+    status=UserSession.Status.ACTIVE).update(
+        status=UserSession.Status.REVOKED)
 
