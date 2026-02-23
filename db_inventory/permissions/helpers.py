@@ -495,3 +495,42 @@ def can_change_equipment_status(user, equipment, new_status):
         has_hierarchy_permission(active_role.role, "ROOM_CLERK")
         and is_in_scope(active_role, room=equipment.room)
     )
+
+def can_soft_delete_asset(user: User, asset) -> bool:
+    """
+    Generic permission check for soft-deleting a room-scoped asset.
+
+    Applies to Equipment, Accessory, Consumable, etc.
+    """
+
+    active_role = getattr(user, "active_role", None)
+    if not active_role:
+        return False
+
+    role_name = active_role.role
+
+    # --- SITE ADMIN ---
+    if role_name == "SITE_ADMIN":
+        return True
+
+    # --- Viewer roles cannot modify ---
+    if is_viewer_role(role_name):
+        return False
+
+    # --- Must be an admin/write role ---
+    if not is_admin_role(role_name):
+        return False
+
+    room = getattr(asset, "room", None)
+    if not room:
+        return False
+
+    location = getattr(room, "location", None)
+    department = getattr(location, "department", None)
+
+    return is_in_scope(
+        active_role,
+        room=room,
+        location=location,
+        department=department,
+    )

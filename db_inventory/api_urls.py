@@ -65,7 +65,7 @@ urlpatterns = [
     'patch': 'partial_update',
     'delete': 'destroy'
         }), name='equipment-detail'),
-    path('equipments/<str:public_id>/delete/', equipment_viewsets.EquipmentDeleteViewSet.as_view(), name='equipment-delete'),
+    path('equipment/<str:public_id>/soft-delete/', equipment_viewsets.EquipmentDeleteViewSet.as_view({'delete': 'destroy'}), name='equipment-delete'),
 
     path('equipments/<str:public_id>/status/', equipment_viewsets.EquipmentStatusChangeView.as_view(), name='update-equipment-status'),
     path('equipments/<str:public_id>/condemn/', equipment_viewsets.EquipmentCondemnView.as_view(), name='condemn-equipment'),
@@ -75,6 +75,7 @@ urlpatterns = [
     path('equipment/batch-assign/', BatchAssignEquipmentView.as_view(), name='batch-assign-equipment'),
     path('equipment/batch-condemn/', BatchEquipmentCondemnView.as_view(), name='batch-condemn-equipment'),
     path('equipment/batch-status-change/', BatchEquipmentStatusChangeView.as_view(), name='batch-equipment-status-change'),
+    path('equipment/batch-soft-delete/', BatchEquipmentSoftDeleteView.as_view(), name='batch-equipment-soft-delete'),
     path('equipments-validate-import/', equipment_viewsets.EquipmentBatchValidateView.as_view(), name='equipment-batch-validate'),
     
 
@@ -94,7 +95,7 @@ urlpatterns = [
             'patch': 'partial_update',
             'delete': 'destroy'
         }), name='accessory-detail'),
-    path('accessories/<str:public_id>/delete/', accessory_viewsets.AccessoryDeleteViewSet.as_view(), name='accessory-delete'),
+    path('accessories/<str:public_id>/soft-delete/', accessory_viewsets.AccessoryDeleteViewSet.as_view({'delete': 'destroy'}), name='accessory-delete'),
     path("accessories-validate-import/",  accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
     path("accessories-import/",  accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
 
@@ -105,7 +106,7 @@ urlpatterns = [
     'patch': 'partial_update',
     'delete': 'destroy'
     }), name='consumable-detail'),
-    path('consumables/<str:public_id>/delete/', consumable_viewsets.ConsumableDeleteViewSet.as_view(), name='consumable-delete'),
+    path('consumables/<str:public_id>/soft-delete/', consumable_viewsets.ConsumableDeleteViewSet.as_view({'delete': 'destroy'}), name='consumable-delete'),
     path('consumables-import/', consumable_viewsets.ConsumableBatchImportView.as_view(), name='consumables-batch-import'),
     path('consumables-validate-import/', consumable_viewsets.ConsumableBatchValidateView.as_view(), name='consumables-batch-validate'),
 

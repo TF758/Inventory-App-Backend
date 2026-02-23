@@ -9,7 +9,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from db_inventory.models.assets import EquipmentStatus
-from db_inventory.permissions.helpers import is_admin_role, is_in_scope
+from db_inventory.permissions.helpers import can_soft_delete_asset, is_admin_role, is_in_scope
 from db_inventory.utils.asset_helpers import equipment_event_from_status
 
 class UnassignResult:
@@ -385,6 +385,7 @@ def change_equipment_status(
             return _execute()
     return _execute()
 
+
 def condemn_equipment(
     *,
     actor,
@@ -394,6 +395,7 @@ def condemn_equipment(
     use_atomic=True,
     lock_equipment=True,
 ):
+
     if now is None:
         now = timezone.now()
 
@@ -403,15 +405,22 @@ def condemn_equipment(
 
         eq = equipment
 
+        # Optional row locking (disabled in batch view because rows are already locked)
         if lock_equipment:
-            eq = Equipment.objects.select_for_update().get(pk=equipment.pk)
+            eq = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
 
         old_status = eq.status
         new_status = EquipmentStatus.CONDEMNED
 
+        # --- Skip if already condemned ---
         if old_status == new_status:
             return StatusChangeResult.SKIPPED
 
+        # --- Permission guard ---
         if not can_user_set_equipment_status(
             actor=actor,
             equipment=eq,
@@ -419,9 +428,11 @@ def condemn_equipment(
         ):
             raise PermissionError("Not allowed to condemn equipment.")
 
+        # --- State change ---
         eq.status = new_status
         eq.save(update_fields=["status"])
 
+        # --- Domain event ---
         EquipmentEvent.objects.create(
             equipment=eq,
             user=actor,
@@ -430,6 +441,7 @@ def condemn_equipment(
             notes=notes or f"{old_status} → CONDEMNED",
         )
 
+        # --- Audit trail ---
         AuditLog.objects.create(
             user=actor,
             user_public_id=actor.public_id,
@@ -450,7 +462,73 @@ def condemn_equipment(
 
         return StatusChangeResult.SUCCESS
 
+
     if use_atomic:
         with transaction.atomic():
             return _execute()
+
+    # Used by batch views already running inside a transaction
+    return _execute()
+
+def soft_delete_equipment(
+    *,
+    actor,
+    equipment,
+    notes="",
+    now=None,
+    use_atomic=True,
+    lock_equipment=True,
+):
+
+    if now is None:
+        now = timezone.now()
+
+    def _execute():
+
+        eq = equipment
+
+        # --- Optional row locking ---
+        if lock_equipment:
+            eq = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
+
+        # --- Skip if already deleted ---
+        if eq.is_deleted:
+            return StatusChangeResult.SKIPPED
+
+        # --- Permission guard ---
+        if not can_soft_delete_asset(actor, eq):
+            raise PermissionError("Not allowed to delete equipment.")
+
+        # --- Soft delete ---
+        eq.is_deleted = True
+        eq.deleted_at = now
+        eq.save(update_fields=["is_deleted", "deleted_at"])
+
+        # --- Audit trail ---
+        AuditLog.objects.create(
+            user=actor,
+            user_public_id=actor.public_id,
+            user_email=actor.email,
+            event_type=AuditLog.Events.MODEL_DELETED,
+            description="Equipment soft deleted",
+            metadata={
+                "change_type": "equipment_soft_deleted",
+                "notes": notes,
+                "batch": True,
+            },
+            target_model="Equipment",
+            target_id=eq.public_id,
+            target_name=eq.audit_label(),
+        )
+
+        return StatusChangeResult.SUCCESS
+
+    if use_atomic:
+        with transaction.atomic():
+            return _execute()
+
     return _execute()
