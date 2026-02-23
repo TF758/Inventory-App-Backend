@@ -25,7 +25,7 @@ from django.utils import timezone
 from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
 from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, hard_delete_equipment, soft_delete_equipment, unassign_equipment
+from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, hard_delete_equipment, restore_equipment, soft_delete_equipment, unassign_equipment
 from db_inventory.models.assets import EquipmentStatus
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
@@ -665,3 +665,28 @@ class BatchEquipmentHardDeleteView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+class EquipmentRestoreViewSet(viewsets.ViewSet):
+    """
+    Restore a soft-deleted Equipment by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+    lookup_field = "public_id"
+
+    def create(self, request, public_id=None):
+        equipment = get_object_or_404(
+            Equipment,
+            public_id=public_id,
+            is_deleted=True,  
+        )
+
+        try:
+            restore_equipment(
+                actor=request.user,
+                equipment=equipment,
+            )
+        except PermissionError:
+            raise PermissionDenied("Not allowed to restore equipment.")
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
