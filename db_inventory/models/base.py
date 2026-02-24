@@ -1,10 +1,9 @@
 from django.db import models
 from db_inventory.utils.ids import reserve_public_id
-import ulid
+from ulid import ULID
 
 def generate_public_id(prefix: str) -> str:
-    """Generate a prefixed ULID public identifier."""
-    return f"{prefix}-{ulid.new().str}"
+    return f"{prefix}{str(ULID())}"
 
 
 class PublicIDRegistry(models.Model):

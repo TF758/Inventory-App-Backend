@@ -12,7 +12,67 @@ from django.utils.translation import gettext_lazy as _
 
 # Simple models
 
-admin.site.register(Notification)
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "public_id",
+        "recipient",
+        "type",
+        "level",
+        "entity_type",
+        "entity_id",
+        "is_read",
+        "is_deleted",
+        "created_at",
+    )
+
+    list_filter = (
+        "type",
+        "level",
+        "is_read",
+        "is_deleted",
+        "created_at",
+    )
+
+    search_fields = (
+        "public_id",
+        "title",
+        "message",
+        "recipient__email",
+        "recipient__username",
+        "entity_id",
+    )
+
+    list_select_related = ("recipient",)
+
+    ordering = ("-created_at", "-id")
+
+    readonly_fields = (
+        "public_id",
+        "created_at",
+        "read_at",
+        "deleted_at",
+    )
+
+    fieldsets = (
+        ("Identity", {
+            "fields": ("public_id", "recipient")
+        }),
+        ("Content", {
+            "fields": ("type", "level", "title", "message")
+        }),
+        ("Entity Context", {
+            "fields": ("entity_type", "entity_id", "meta"),
+            "classes": ("collapse",),
+        }),
+        ("Status", {
+            "fields": ("is_read", "read_at", "is_deleted", "deleted_at"),
+        }),
+        ("Timestamps", {
+            "fields": ("created_at",),
+        }),
+    )
 
 
 
@@ -225,7 +285,6 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     list_filter = (
         "event_type",
-        "user",
         "department",
         "location",
         "room",

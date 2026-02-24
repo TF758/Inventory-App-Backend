@@ -40,7 +40,7 @@ class AdminUserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
 
-    email = "admin@gmail.com"
+    email = factory.Sequence(lambda n: f"admin{n}@gmail.com")
     password = factory.PostGenerationMethodCall('set_password', 'admin')
     fname = factory.Faker('first_name')
     lname = factory.Faker('last_name')

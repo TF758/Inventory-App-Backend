@@ -85,7 +85,7 @@ class PasswordResetConfirmTests(APITestCase):
         self.user = User.objects.create_user( email="test@example.com", password="OldPass123!", is_active=True, )
         self.url = reverse("password-reset-confirm")
 
-    @patch("db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=None)
+    @patch( "db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=(None, "expired"),)
     def test_confirm_expired_token(self, mock_verify):
         """
         Expired or invalid tokens both result in: TOKEN_INVALID
@@ -99,9 +99,9 @@ class PasswordResetConfirmTests(APITestCase):
         response = self.client.post(self.url, data, format="json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["code"], "TOKEN_INVALID")
+        self.assertEqual(response.json()["code"][0], "TOKEN_EXPIRED")
 
-    @patch("db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=None)
+    @patch( "db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=(None, "invalid"), )
     def test_confirm_invalid_token(self, mock_verify):
         data = {
             "token": "invalid-token",
@@ -112,8 +112,7 @@ class PasswordResetConfirmTests(APITestCase):
         response = self.client.post(self.url, data, format="json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["code"], "TOKEN_INVALID")
-
+        self.assertEqual(response.json()["code"][0], "TOKEN_INVALID")
 
 @patch(
     "db_inventory.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
@@ -123,7 +122,6 @@ class PasswordResetTokenExpirationTests(TestCase):
 
     def test_token_expired(self):
         user = UserFactory(is_active=True)
-
         service = PasswordResetToken()
 
         # Generate a token normally
@@ -133,9 +131,15 @@ class PasswordResetTokenExpirationTests(TestCase):
         event.expires_at = timezone.now() - timezone.timedelta(hours=1)
         event.save()
 
-        # Should now be invalid
+        # Verify token should now be expired
         result = service.verify_token(event.token)
-        self.assertIsNone(result)
+
+        # New behaviour: verify_token returns (event, status)
+        self.assertIsNotNone(result)
+
+        returned_event, status = result
+        self.assertIsNone(returned_event)
+        self.assertEqual(status, "expired")
 
 class PasswordResetTokenTamperingTests(TestCase):
 
@@ -154,4 +158,6 @@ class PasswordResetTokenTamperingTests(TestCase):
 
         # Tampering must break verification
         result = service.verify_token(tampered_token)
-        self.assertIsNone(result)
+        returned_event, status = result
+        self.assertIsNone(returned_event)
+        self.assertEqual(status, "invalid")
