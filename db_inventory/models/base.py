@@ -1,16 +1,20 @@
 from django.db import models
 from db_inventory.utils.ids import reserve_public_id
+import ulid
+
+def generate_public_id(prefix: str) -> str:
+    """Generate a prefixed ULID public identifier."""
+    return f"{prefix}-{ulid.new().str}"
 
 
 class PublicIDRegistry(models.Model):
     """
     Permanent ledger of every public_id ever issued.
-
-    This prevents reuse even if the original object is deleted.
+    Prevents reuse even if original object is deleted.
     """
 
-    public_id = models.CharField( max_length=32, unique=True, db_index=True, )
-    model_label = models.CharField( max_length=100, help_text="app_label.ModelName that reserved this id", )
+    public_id = models.CharField(max_length=32, unique=True, db_index=True)
+    model_label = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -22,7 +26,10 @@ class PublicIDRegistry(models.Model):
         return f"{self.public_id} ({self.model_label})"
 
 class PublicIDModel(models.Model):
-    """Abstract base model that provides a unique public_id field."""
+    """
+    Abstract base model that provides a unique public_id field.
+    Supports permanent and operational identity strategies.
+    """
 
     public_id = models.CharField(
         max_length=32,
@@ -33,17 +40,22 @@ class PublicIDModel(models.Model):
     )
 
     PUBLIC_ID_PREFIX = ""
+    PUBLIC_ID_PERMANENT = True 
 
     class Meta:
         abstract = True
 
     def save(self, *args, **kwargs):
         if not self.public_id:
-          
 
-            self.public_id = reserve_public_id(
-                prefix=self.PUBLIC_ID_PREFIX,
-                model_label=self._meta.label,
-            )
+            if self.PUBLIC_ID_PERMANENT:
+                self.public_id = reserve_public_id(
+                    prefix=self.PUBLIC_ID_PREFIX,
+                    model_label=self._meta.label,
+                )
+            else:
+                self.public_id = generate_public_id(
+                    prefix=self.PUBLIC_ID_PREFIX,
+                )
 
         super().save(*args, **kwargs)

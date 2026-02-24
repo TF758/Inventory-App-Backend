@@ -44,6 +44,8 @@ def generate_public_ids(objs: Iterable[models.Model]):
     IMPORTANT:
     - Still duck-typed (no model imports)
     - Now reserves IDs in PublicIDRegistry
+
+    used for data generation function
     """
 
     for obj in objs:
@@ -84,3 +86,4 @@ def reserve_public_id(prefix: str, model_label: str) -> str:
             continue
 
     raise RuntimeError("Failed to reserve unique public_id")
+
