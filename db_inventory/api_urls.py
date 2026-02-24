@@ -92,24 +92,41 @@ urlpatterns = [
 
 
     path('accessories/', accessory_viewsets.AccessoryModelViewSet.as_view({'get': 'list', 'post':'create'}), name='accessories'),
+
+    # --- Accessory batch routes  ---
+    path('accessory/batch-soft-delete/', accessory_viewsets.BatchAccessorySoftDeleteView.as_view(), name='batch-soft-delete-accessory'),
+    path('accessory/batch-hard-delete/', accessory_viewsets.BatchAccessoryHardDeleteView.as_view(), name='batch-hard-delete-accessory'),
+
+
+    path('accessories/<str:public_id>/restore/', accessory_viewsets.AccessoryRestoreViewSet.as_view(), name='restore-accessory'),
+    path('accessories/<str:public_id>/soft-delete/', accessory_viewsets.AccessorySoftDeleteView.as_view(), name='soft-delete-accessory'),
+
     path('accessories/<str:public_id>/', accessory_viewsets.AccessoryModelViewSet.as_view({
             'get': 'retrieve',
             'put': 'update',
             'patch': 'partial_update',
             'delete': 'destroy'
         }), name='accessory-detail'),
-    path('accessories/<str:public_id>/soft-delete/', accessory_viewsets.AccessoryDeleteViewSet.as_view({'delete': 'destroy'}), name='accessory-delete'),
+   
     path("accessories-validate-import/",  accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
     path("accessories-import/",  accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
 
     path('consumables/', consumable_viewsets.ConsumableModelViewSet.as_view({'get': 'list', 'post':'create'}), name="consumables"),
+
+    # --- Consumable batch routes ---
+    path('consumable/batch-soft-delete/', consumable_viewsets.BatchConsumableSoftDeleteView.as_view(), name='batch-soft-delete-consumable'),
+    path('consumable/batch-hard-delete/', consumable_viewsets.BatchConsumableHardDeleteView.as_view(), name='batch-hard-delete-consumable'),
+
+    path('consumables/<str:public_id>/restore/', consumable_viewsets.ConsumableRestoreViewSet.as_view(), name='restore-consumable'),
+    path('consumables/<str:public_id>/soft-delete/', consumable_viewsets.ConsumableSoftDeleteView.as_view(), name='soft-delete-consumable'),
+
     path('consumables/<str:public_id>/', consumable_viewsets.ConsumableModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',
     'patch': 'partial_update',
     'delete': 'destroy'
     }), name='consumable-detail'),
-    path('consumables/<str:public_id>/soft-delete/', consumable_viewsets.ConsumableDeleteViewSet.as_view({'delete': 'destroy'}), name='consumable-delete'),
+
     path('consumables-import/', consumable_viewsets.ConsumableBatchImportView.as_view(), name='consumables-batch-import'),
     path('consumables-validate-import/', consumable_viewsets.ConsumableBatchValidateView.as_view(), name='consumables-batch-validate'),
 

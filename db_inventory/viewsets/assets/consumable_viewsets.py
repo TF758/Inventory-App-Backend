@@ -1,5 +1,7 @@
 from rest_framework import viewsets
 from db_inventory.serializers.consumables import (
+BatchConsumableHardDeleteSerializer,
+BatchConsumableSoftDeleteSerializer,
 ConsumableWriteSerializer,
 ConsumableAreaReaSerializer
 )
@@ -17,6 +19,10 @@ from db_inventory.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMix
 from db_inventory.permissions import AssetPermission, is_in_scope
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
+from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
+from db_inventory.services.equipment_assignment import StatusChangeResult
+from django.db import transaction
 
 
 class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
@@ -78,23 +84,7 @@ class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet)
 
             serializer.save(room=room)
 
-class ConsumableDeleteViewSet(viewsets.ViewSet):
-    permission_classes = [ AssetPermission]
-    lookup_field = "public_id"
-
-    def destroy(self, request, public_id=None):
-        consumable = get_object_or_404(
-            Consumable,
-            public_id=public_id,
-            is_deleted=False,
-        )
-
-        consumable.is_deleted = True
-        consumable.deleted_at = timezone.now()
-        consumable.save(update_fields=["is_deleted", "deleted_at"])
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
+    
 class ConsumableBatchValidateView(ConsumableBatchMixin, APIView):
     save_to_db = False
 
@@ -132,4 +122,190 @@ class ConsumableBatchImportView(ConsumableBatchMixin, APIView):
                 "summary": {"total": len(data), "success": len(successes), "failed": len(errors)},
             },
             status=status.HTTP_207_MULTI_STATUS,
+        )
+
+class ConsumableSoftDeleteView(APIView):
+    """
+    Soft delete a single consumable by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+
+    def delete(self, request, public_id):
+
+        consumable = get_object_or_404(
+            Consumable,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        for permission in self.get_permissions():
+            if hasattr(permission, "has_object_permission"):
+                if not permission.has_object_permission(request, self, consumable):
+                    raise PermissionDenied()
+
+        notes = request.data.get("notes", "")
+
+        result = soft_delete_asset(
+            actor=request.user,
+            asset=consumable,
+            notes=notes,
+            batch=False,
+            now=timezone.now(),
+            use_atomic=True,
+            lock_asset=True,
+        )
+
+        if result == StatusChangeResult.SKIPPED:
+            return Response(
+                {"detail": "Consumable already deleted."},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class ConsumableRestoreViewSet(APIView):
+    """
+    Restore a soft-deleted Consumable by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+    lookup_field = "public_id"
+
+    def get(self, request, public_id=None):
+
+        consumable = get_object_or_404(
+            Consumable,
+            public_id=public_id,
+            is_deleted=True,
+        )
+
+        try:
+            restore_asset(
+                actor=request.user,
+                asset=consumable,
+                batch=False,
+            )
+        except PermissionError:
+            raise PermissionDenied("Not allowed to restore consumable.")
+
+        return Response(status=status.HTTP_200_OK)
+    
+class BatchConsumableSoftDeleteView(APIView):
+
+    permission_classes = [AssetPermission]
+
+    def post(self, request):
+        serializer = BatchConsumableSoftDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        consumable_public_ids = serializer.validated_data["consumable_public_ids"]
+        notes = serializer.validated_data["notes"]
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            consumable_qs = (
+                Consumable.objects
+                .select_for_update()
+                .filter(public_id__in=consumable_public_ids)
+                .order_by("id")
+            )
+
+            consumable_map = {c.public_id: c for c in consumable_qs}
+
+            for public_id in consumable_public_ids:
+
+                con = consumable_map.get(public_id)
+                if not con:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, con)
+
+                    result = soft_delete_asset(
+                        actor=actor,
+                        asset=con,
+                        notes=notes,
+                        batch=True,
+                        now=now,
+                        use_atomic=False,
+                        lock_asset=False,
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except PermissionError:
+                    failed += 1
+
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
+        )
+class BatchConsumableHardDeleteView(APIView):
+
+    permission_classes = [AssetPermission]
+
+    def post(self, request):
+        serializer = BatchConsumableHardDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        consumable_public_ids = serializer.validated_data["consumable_public_ids"]
+        notes = serializer.validated_data["notes"]
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            consumable_qs = (
+                Consumable.objects
+                .select_for_update()
+                .filter(public_id__in=consumable_public_ids)
+                .order_by("id")
+            )
+
+            consumable_map = {c.public_id: c for c in consumable_qs}
+
+            for public_id in consumable_public_ids:
+
+                con = consumable_map.get(public_id)
+                if not con:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, con)
+
+                    result = hard_delete_asset(
+                        actor=actor,
+                        asset=con,
+                        notes=notes,
+                        batch=True,
+                        now=now,
+                        use_atomic=False,
+                        lock_asset=False,
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except PermissionError:
+                    failed += 1
+
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
         )

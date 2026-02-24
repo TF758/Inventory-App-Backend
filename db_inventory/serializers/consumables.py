@@ -81,6 +81,8 @@ class ConsumableAreaReaSerializer(serializers.ModelSerializer):
             "low_stock_threshold",
             "is_low_stock",
             'description',
+            'is_deleted',
+            'deleted_at',
             'room_id',
             'room_name',
             'location_id',
@@ -158,6 +160,57 @@ class ConsumableBatchWriteSerializer(serializers.ModelSerializer):
             instance.save(update_fields=["room"])
         return instance
 
+class BatchConsumableSoftDeleteSerializer(serializers.Serializer):
+    consumable_public_ids = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+
+    notes = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_consumable_public_ids(self, value):
+        seen = set()
+        cleaned = []
+
+        for pid in value:
+            pid = pid.strip()
+            if not pid:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                cleaned.append(pid)
+
+        if not cleaned:
+            raise serializers.ValidationError("No valid consumable IDs provided.")
+
+        return cleaned
+
+class BatchConsumableHardDeleteSerializer(serializers.Serializer):
+    consumable_public_ids = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+
+    notes = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_consumable_public_ids(self, value):
+        seen = set()
+        cleaned = []
+
+        for pid in value:
+            pid = pid.strip()
+            if not pid:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                cleaned.append(pid)
+
+        if not cleaned:
+            raise serializers.ValidationError(
+                "No valid consumable IDs provided."
+            )
+
+        return cleaned
 
 
 __all__ = [
