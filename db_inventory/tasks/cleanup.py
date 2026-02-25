@@ -124,16 +124,17 @@ def auto_soft_delete_notifications(self):
     try:
         info_cutoff = now - retention_delta(
             minutes_setting="NOTIF_INFO_DELETE_MINUTES",
-            days_setting="NOTIF_INFO_DELETE_DAYS",
+            days_setting="NOTIF_INFO_LIFETIME_DAYS",
         )
 
         warning_cutoff = now - retention_delta(
             minutes_setting="NOTIF_WARNING_DELETE_MINUTES",
-            days_setting="NOTIF_WARNING_DELETE_DAYS",
+            days_setting="NOTIF_WARNING_LIFETIME_DAYS",
         )
+
         critical_cutoff = now - retention_delta(
             minutes_setting="NOTIF_CRITICAL_DELETE_MINUTES",
-            days_setting="NOTIF_CRITICAL_DELETE_DAYS",
+            days_setting="NOTIF_CRITICAL_LIFETIME_DAYS",
         )
 
         updated = {}
@@ -142,25 +143,30 @@ def auto_soft_delete_notifications(self):
             level=Notification.Level.INFO,
             is_read=True,
             is_deleted=False,
-            read_at__lt=info_cutoff,
+            created_at__lte=info_cutoff,
         ).update(is_deleted=True, deleted_at=now)
 
         updated["warning"] = Notification.objects.filter(
             level=Notification.Level.WARNING,
             is_read=True,
             is_deleted=False,
-            read_at__lt=warning_cutoff,
+            created_at__lte=warning_cutoff,
         ).update(is_deleted=True, deleted_at=now)
 
         updated["critical"] = Notification.objects.filter(
             level=Notification.Level.CRITICAL,
             is_read=True,
             is_deleted=False,
-            read_at__lt=critical_cutoff,
+            created_at__lte=critical_cutoff,
         ).update(is_deleted=True, deleted_at=now)
 
         run.status = ScheduledTaskRun.Status.SUCCESS
-        run.message = f"info={updated['info']}, warning={updated['warning']}, critical={updated['critical']}"
+        run.message = (
+            f"info={updated['info']}, "
+            f"warning={updated['warning']}, "
+            f"critical={updated['critical']}"
+        )
+
         return updated
 
     except Exception as exc:
@@ -192,13 +198,15 @@ def cleanup_notifications(self):
         # -------------------------------
         # Soft-deleted notifications ONLY
         # -------------------------------
+
         deleted["soft_info"] = batched_notification_delete(
             Notification.objects.filter(
                 is_deleted=True,
+                deleted_at__isnull=False,
                 level=Notification.Level.INFO,
-                deleted_at__lt=now - retention_delta(
+                deleted_at__lte=now - retention_delta(
                     minutes_setting="NOTIF_INFO_SOFT_DELETE_MINUTES",
-                    days_setting="NOTIF_INFO_SOFT_DELETE_DAYS",
+                    days_setting="NOTIF_INFO_PURGE_DAYS",  
                 ),
             )
         )
@@ -206,10 +214,11 @@ def cleanup_notifications(self):
         deleted["soft_warning"] = batched_notification_delete(
             Notification.objects.filter(
                 is_deleted=True,
+                deleted_at__isnull=False,
                 level=Notification.Level.WARNING,
-                deleted_at__lt=now - retention_delta(
+                deleted_at__lte=now - retention_delta(
                     minutes_setting="NOTIF_WARNING_SOFT_DELETE_MINUTES",
-                    days_setting="NOTIF_WARNING_SOFT_DELETE_DAYS",
+                    days_setting="NOTIF_WARNING_PURGE_DAYS",  
                 ),
             )
         )
@@ -217,10 +226,11 @@ def cleanup_notifications(self):
         deleted["soft_critical"] = batched_notification_delete(
             Notification.objects.filter(
                 is_deleted=True,
+                deleted_at__isnull=False,
                 level=Notification.Level.CRITICAL,
-                deleted_at__lt=now - retention_delta(
+                deleted_at__lte=now - retention_delta(
                     minutes_setting="NOTIF_CRITICAL_SOFT_DELETE_MINUTES",
-                    days_setting="NOTIF_CRITICAL_SOFT_DELETE_DAYS",
+                    days_setting="NOTIF_CRITICAL_PURGE_DAYS",  
                 ),
             )
         )

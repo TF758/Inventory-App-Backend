@@ -371,16 +371,16 @@ NOTIF_CRITICAL_AUTO_READ_DAYS = env.int("NOTIF_CRITICAL_AUTO_READ_DAYS", default
 # -------------------------------
 # Soft delete after read
 # -------------------------------
-NOTIF_INFO_DELETE_DAYS = env.int("NOTIF_INFO_DELETE_DAYS", default=7)
-NOTIF_WARNING_DELETE_DAYS = env.int("NOTIF_WARNING_DELETE_DAYS", default=14)
-NOTIF_CRITICAL_DELETE_DAYS = env.int("NOTIF_CRITICAL_DELETE_DAYS", default=90)
+NOTIF_INFO_LIFETIME_DAYS = env.int("NOTIF_INFO_LIFETIME_DAYS", default=7)
+NOTIF_WARNING_LIFETIME_DAYS  = env.int("NOTIF_WARNING_LIFETIME_DAYS", default=14)
+NOTIF_CRITICAL_LIFETIME_DAYS  = env.int("NOTIF_CRITICAL_LIFETIME_DAYS", default=90)
 
 # -------------------------------
 # Hard delete after soft delete
 # -------------------------------
-NOTIF_INFO_SOFT_DELETE_DAYS = env.int("NOTIF_INFO_SOFT_DELETE_DAYS", default=3)
-NOTIF_WARNING_SOFT_DELETE_DAYS = env.int("NOTIF_WARNING_SOFT_DELETE_DAYS", default=7)
-NOTIF_CRITICAL_SOFT_DELETE_DAYS = env.int("NOTIF_CRITICAL_SOFT_DELETE_DAYS", default=30)
+NOTIF_INFO_PURGE_DAYS = env.int("NOTIF_INFO_PURGE_DAYS", default=3)
+NOTIF_WARNING_PURGE_DAYS = env.int("NOTIF_WARNING_PURGE_DAYS", default=7)
+NOTIF_CRITICAL_PURGE_DAYS = env.int("NOTIF_CRITICAL_PURGE_DAYS", default=30)
 
 try:
     SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
