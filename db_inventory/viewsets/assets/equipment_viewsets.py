@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from db_inventory.serializers.equipment import (
+EquipmentCondemnSerializer,
 EquipmentStatusChangeSerializer,
 EquipmentWriteSerializer
 ,EquipmentSerializer
@@ -20,8 +21,13 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from db_inventory.utils.asset_helpers import equipment_event_from_status
 from db_inventory.utils.audit import create_audit_log
-from db_inventory.permissions.helpers import can_change_equipment_status
-from db_inventory.permissions.assets import CanUpdateEquipmentStatus
+from django.utils import timezone
+from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
+from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
+from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
+from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment,  unassign_equipment
+from db_inventory.models.assets import EquipmentStatus
+from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -82,7 +88,28 @@ def perform_create(self, serializer):
             raise PermissionDenied("You do not have permission to create equipment in this room.")
 
         serializer.save(room=room)
-    
+
+class EquipmentDeleteViewSet(viewsets.ViewSet):
+    """
+    Soft delete Equipment by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+    lookup_field = "public_id"
+
+    def destroy(self, request, public_id=None):
+        equipment = get_object_or_404(
+            Equipment,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        equipment.is_deleted = True
+        equipment.deleted_at = timezone.now()
+        equipment.save(update_fields=["is_deleted", "deleted_at"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+      
 class EquipmentBatchValidateView(EquipmentBatchMixin, APIView):
     """
     Validate a batch of equipment rows without saving.
@@ -197,3 +224,514 @@ class EquipmentStatusChangeView(APIView):
             )
 
         return Response( status=status.HTTP_200_OK, )
+
+class EquipmentCondemnView(APIView):
+    permission_classes = [CanUpdateEquipmentStatus]
+
+    def patch(self, request, public_id):
+        equipment = get_object_or_404(
+            Equipment.objects.select_related("active_assignment"),
+            public_id=public_id,
+        )
+
+        self.check_object_permissions(request, equipment)
+
+        if equipment.status == EquipmentStatus.CONDEMNED:
+            return Response(
+                {"detail": "Equipment is already condemned."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if equipment.is_assigned:
+            return Response(
+                {"detail": "Equipment must be unassigned before condemnation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = EquipmentCondemnSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        notes = serializer.validated_data["notes"]
+
+        old_status = equipment.status
+        new_status = EquipmentStatus.CONDEMNED
+
+        with transaction.atomic():
+            equipment.status = new_status
+            equipment.save(update_fields=["status"])
+
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=request.user,
+                reported_by=request.user,
+                event_type=EquipmentEvent.Event_Choices.CONDEMNED,
+                notes=notes,
+            )
+
+            create_audit_log(
+                request=request,
+                event_type=AuditLog.Events.EQUIPMENT_STATUS_CHANGED,
+                target=equipment,
+                description=f"Equipment condemned (previous status: {old_status})",
+                metadata={
+                    "change_type": "equipment_condemned",
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "notes": notes,
+                },
+            )
+
+        return Response(status=status.HTTP_200_OK)
+    
+    
+class BatchUnassignEquipmentView(APIView):
+
+    permission_classes = [CanManageAssetCustody]
+
+    def post(self, request):
+
+        serializer = BatchEquipmentPublicIDsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        notes = serializer.validated_data.get("notes", "")
+        actor = request.user
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+                Equipment.objects
+                .select_for_update()
+                .filter(public_id__in=equipment_public_ids)
+                .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+            now = timezone.now()
+
+            for public_id in equipment_public_ids:
+
+                equipment = equipment_map.get(public_id)
+
+                if not equipment:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, equipment)
+
+                    result = unassign_equipment(
+                        actor=actor,
+                        equipment=equipment,
+                        notes=notes,
+                        now=now,
+                        use_atomic=False,
+                        lock_equipment=False,
+                    )
+
+                    if result == UnassignResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except ValidationError:
+                    skipped += 1
+                except Exception:
+                    failed += 1
+
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
+        )
+    
+
+class BatchAssignEquipmentView(APIView):
+
+    permission_classes = [CanManageAssetCustody]
+
+    def post(self, request):
+
+        serializer = BatchAssignEquipmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        to_user = serializer.validated_data["user_public_id"]
+        notes = serializer.validated_data.get("notes", "")
+        actor = request.user
+
+        # --- Jurisdiction check ---
+        active_role = get_active_role(actor)
+        if not can_assign_asset_to_user(active_role, to_user):
+            raise ValidationError(
+                "You may only assign equipment to users within your jurisdiction."
+            )
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+                Equipment.objects
+                .select_for_update()
+                .filter(public_id__in=equipment_public_ids)
+                .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+            now = timezone.now()
+
+            for public_id in equipment_public_ids:
+
+                equipment = equipment_map.get(public_id)
+
+                if not equipment:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, equipment)
+
+                    result = assign_equipment(
+                        actor=actor,
+                        equipment=equipment,
+                        to_user=to_user,
+                        notes=notes,
+                        now=now,
+                        use_atomic=False,
+                        lock_equipment=False,
+                    )
+
+                    if result == AssignResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except ValidationError:
+                    skipped += 1
+                except Exception:
+                    failed += 1
+
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
+        )
+    
+
+
+class BatchEquipmentStatusChangeView(APIView):
+
+    permission_classes = [CanUpdateEquipmentStatus]
+
+    def post(self, request):
+        serializer = BatchEquipmentStatusChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        new_status = serializer.validated_data["status"]
+        notes = serializer.validated_data.get("notes", "")
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+            Equipment.objects
+            .select_for_update()
+            .filter(public_id__in=equipment_public_ids)
+            .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+
+            for public_id in equipment_public_ids:
+
+                eq = equipment_map.get(public_id)
+                if not eq:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, eq)
+
+                    result = change_equipment_status(
+                        actor=actor,
+                        equipment=eq,
+                        new_status=new_status,
+                        notes=notes,
+                        now=now,
+                        use_atomic=False,
+                        lock_equipment=False,
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except Exception:
+                    failed += 1
+
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
+        )
+
+class BatchEquipmentCondemnView(APIView):
+
+    permission_classes = [CanUpdateEquipmentStatus]
+
+    def post(self, request):
+        serializer = BatchEquipmentCondemnSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        notes = serializer.validated_data["notes"]
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+                Equipment.objects
+                .select_for_update()
+                .filter(public_id__in=equipment_public_ids)
+                .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+
+            for public_id in equipment_public_ids:
+
+                eq = equipment_map.get(public_id)
+                if not eq:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, eq)
+
+                    result = condemn_equipment(
+                        actor=actor,
+                        equipment=eq,
+                        notes=notes,
+                        now=now,
+                        use_atomic=False,  
+                        lock_equipment=False,
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except PermissionError:
+                    failed += 1
+
+               
+        return Response(
+            {"success": success, "skipped": skipped, "failed": failed},
+            status=status.HTTP_200_OK,
+        )
+    
+class BatchEquipmentHardDeleteView(APIView):
+
+    permission_classes = [AssetPermission]
+
+    def post(self, request):
+        serializer = BatchEquipmentHardDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        notes = serializer.validated_data["notes"]
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+                Equipment.objects
+                .select_for_update()
+                .filter(public_id__in=equipment_public_ids)
+                .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+
+            for public_id in equipment_public_ids:
+
+                eq = equipment_map.get(public_id)
+                if not eq:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, eq)
+
+                    result = hard_delete_asset(
+                        actor=actor,
+                        asset=eq,         
+                        notes=notes,
+                        batch=True,          
+                        now=now,
+                        use_atomic=False,
+                        lock_asset=False,   
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except PermissionError:
+                    failed += 1
+
+        return Response(
+            {
+                "success": success,
+                "skipped": skipped,
+                "failed": failed,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class EquipmentRestoreViewSet(APIView):
+    """
+    Restore a soft-deleted Equipment by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+    lookup_field = "public_id"
+
+    def get(self, request, public_id=None):
+        equipment = get_object_or_404(
+            Equipment,
+            public_id=public_id,
+            is_deleted=True,
+        )
+
+        try:
+            restore_asset(
+                actor=request.user,
+                asset=equipment,  
+                batch=False,      
+            )
+        except PermissionError:
+            raise PermissionDenied("Not allowed to restore equipment.")
+
+        return Response(status=status.HTTP_200_OK)
+
+class EquipmentSoftDeleteView(APIView):
+    """
+    Soft delete a single equipment item by public_id.
+    """
+
+    permission_classes = [AssetPermission]
+
+    def delete(self, request, public_id):
+
+        equipment = get_object_or_404(
+            Equipment,
+            public_id=public_id,
+            is_deleted=False,
+        )
+
+        for permission in self.get_permissions():
+            if hasattr(permission, "has_object_permission"):
+                if not permission.has_object_permission(request, self, equipment):
+                    raise PermissionDenied()
+
+        # ⭐ Optional notes support
+        notes = request.data.get("notes", "")
+
+        result = soft_delete_asset(
+            actor=request.user,
+            asset=equipment,
+            notes=notes,         
+            batch=False,
+            now=timezone.now(),
+            use_atomic=True,
+            lock_asset=True,
+        )
+
+        if result == StatusChangeResult.SKIPPED:
+            return Response(
+                {"detail": "Equipment already deleted."},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class BatchEquipmentSoftDeleteView(APIView):
+
+    permission_classes = [AssetPermission]
+
+    def post(self, request):
+        serializer = BatchEquipmentSoftDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment_public_ids = serializer.validated_data["equipment_public_ids"]
+        notes = serializer.validated_data["notes"]
+
+        actor = request.user
+        now = timezone.now()
+
+        success = skipped = failed = 0
+
+        with transaction.atomic():
+
+            equipment_qs = (
+                Equipment.objects
+                .select_for_update()
+                .filter(public_id__in=equipment_public_ids)
+                .order_by("id")
+            )
+
+            equipment_map = {e.public_id: e for e in equipment_qs}
+
+            for public_id in equipment_public_ids:
+
+                eq = equipment_map.get(public_id)
+                if not eq:
+                    failed += 1
+                    continue
+
+                try:
+                    self.check_object_permissions(request, eq)
+
+                    result = soft_delete_asset(
+                        actor=actor,
+                        asset=eq,           
+                        notes=notes,
+                        batch=True,        
+                        now=now,
+                        use_atomic=False,   
+                        lock_asset=False,  
+                    )
+
+                    if result == StatusChangeResult.SUCCESS:
+                        success += 1
+                    else:
+                        skipped += 1
+
+                except PermissionError:
+                    failed += 1
+
+        return Response(
+            {
+                "success": success,
+                "skipped": skipped,
+                "failed": failed,
+            },
+            status=status.HTTP_200_OK,
+        )

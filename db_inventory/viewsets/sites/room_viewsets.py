@@ -125,7 +125,8 @@ class RoomEquipmentViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
 
         qs = (
             Equipment.objects
-            .filter(room__public_id=room_id)
+            .filter(room__public_id=room_id,
+                is_deleted=False)
             .order_by("-id")
         )
 

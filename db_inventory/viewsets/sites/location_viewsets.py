@@ -157,7 +157,7 @@ class LocationEquipmentView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
 
         qs = (
             Equipment.objects
-            .filter(room__location__public_id=location_id)
+            .filter(room__location__public_id=location_id, is_deleted=False)
             .order_by("-id")
         )
 
@@ -178,7 +178,7 @@ class LocationEquipmentDashboardView(APIView):
     def get(self, request, public_id):
 
         equipment_qs = Equipment.objects.filter(
-            room__location__public_id=public_id
+            room__location__public_id=public_id,is_deleted=False
         ).select_related(
             "room__location"
         )
@@ -244,7 +244,7 @@ class LocationConsumablesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.M
 
         qs = (
             Consumable.objects
-            .filter(room__location__public_id=location_id)
+            .filter(room__location__public_id=location_id,is_deleted=False)
             .order_by("-id")
         )
 
@@ -293,7 +293,7 @@ class LocationAccessoriesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.M
 
         qs = (
             Accessory.objects
-            .filter(room__location__public_id=location_id)
+            .filter(room__location__public_id=location_id,is_deleted=False)
             .order_by("-id")
         )
 

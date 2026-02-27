@@ -59,17 +59,28 @@ urlpatterns = [
 
 
     path('equipments/', equipment_viewsets.EquipmentModelViewSet.as_view({'get': 'list', 'post':'create'}), name='equipments'),
-    path('equipments/<str:public_id>/', equipment_viewsets.EquipmentModelViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
-        }), name='equipment-detail'),
+
+    # --- batch routes FIRST ---
+    path('equipment/batch-unassign/', BatchUnassignEquipmentView.as_view(), name='batch-unassign-equipment'),
+    path('equipment/batch-assign/', BatchAssignEquipmentView.as_view(), name='batch-assign-equipment'),
+    path('equipment/batch-condemn/', BatchEquipmentCondemnView.as_view(), name='batch-condemn-equipment'),
+    path('equipment/batch-status-change/', BatchEquipmentStatusChangeView.as_view(), name='batch-equipment-status-change'),
+    path('equipment/batch-soft-delete/', BatchEquipmentSoftDeleteView.as_view(), name='batch-equipment-soft-delete'),
+
+    path('equipments-import/', equipment_viewsets.EquipmentBatchImportView.as_view(), name='equipment-batch-import'),
 
     path('equipments/<str:public_id>/status/', equipment_viewsets.EquipmentStatusChangeView.as_view(), name='update-equipment-status'),
-    path('equipments-import/', equipment_viewsets.EquipmentBatchImportView.as_view(), name='equipment-batch-import'),
-    path('equipments-validate-import/', equipment_viewsets.EquipmentBatchValidateView.as_view(), name='equipment-batch-validate'),
-    
+    path('equipments/<str:public_id>/condemn/', equipment_viewsets.EquipmentCondemnView.as_view(), name='condemn-equipment'),
+    path('equipments/<str:public_id>/restore/', equipment_viewsets.EquipmentRestoreViewSet.as_view(), name='restore-equipment'),
+    path('equipments/<str:public_id>/soft-delete/', equipment_viewsets.EquipmentSoftDeleteView.as_view(), name='soft-delete-equipment'),
+
+    path('equipments/<str:public_id>/', equipment_viewsets.EquipmentModelViewSet.as_view({
+        'get': 'retrieve',
+        'put': 'update',
+        'patch': 'partial_update',
+        'delete': 'destroy'
+    }), name='equipment-detail'),
+        
 
     path('components/', component_viewsets.ComponentModelViewSet.as_view({'get': 'list', 'post':'create'}),name='components'), 
     path('components/<str:public_id>/', component_viewsets.ComponentModelViewSet.as_view({
@@ -81,17 +92,34 @@ urlpatterns = [
 
 
     path('accessories/', accessory_viewsets.AccessoryModelViewSet.as_view({'get': 'list', 'post':'create'}), name='accessories'),
+
+    # --- Accessory batch routes  ---
+    path('accessory/batch-soft-delete/', accessory_viewsets.BatchAccessorySoftDeleteView.as_view(), name='batch-soft-delete-accessory'),
+    path('accessory/batch-hard-delete/', accessory_viewsets.BatchAccessoryHardDeleteView.as_view(), name='batch-hard-delete-accessory'),
+
+
+    path('accessories/<str:public_id>/restore/', accessory_viewsets.AccessoryRestoreViewSet.as_view(), name='restore-accessory'),
+    path('accessories/<str:public_id>/soft-delete/', accessory_viewsets.AccessorySoftDeleteView.as_view(), name='soft-delete-accessory'),
+
     path('accessories/<str:public_id>/', accessory_viewsets.AccessoryModelViewSet.as_view({
             'get': 'retrieve',
             'put': 'update',
             'patch': 'partial_update',
             'delete': 'destroy'
         }), name='accessory-detail'),
-
+   
     path("accessories-validate-import/",  accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
     path("accessories-import/",  accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
 
     path('consumables/', consumable_viewsets.ConsumableModelViewSet.as_view({'get': 'list', 'post':'create'}), name="consumables"),
+
+    # --- Consumable batch routes ---
+    path('consumable/batch-soft-delete/', consumable_viewsets.BatchConsumableSoftDeleteView.as_view(), name='batch-soft-delete-consumable'),
+    path('consumable/batch-hard-delete/', consumable_viewsets.BatchConsumableHardDeleteView.as_view(), name='batch-hard-delete-consumable'),
+
+    path('consumables/<str:public_id>/restore/', consumable_viewsets.ConsumableRestoreViewSet.as_view(), name='restore-consumable'),
+    path('consumables/<str:public_id>/soft-delete/', consumable_viewsets.ConsumableSoftDeleteView.as_view(), name='soft-delete-consumable'),
+
     path('consumables/<str:public_id>/', consumable_viewsets.ConsumableModelViewSet.as_view({
     'get': 'retrieve',
     'put': 'update',

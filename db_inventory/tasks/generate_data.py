@@ -35,7 +35,7 @@ def generate_notifications(self):
         # ----------------------------------
         # Random synthetic notifications
         # ----------------------------------
-        for _ in range(20):  # ← rate knob
+        for _ in range(10):  # ← rate knob
             notifications.append(
                 Notification(
                     recipient=random.choice(users),

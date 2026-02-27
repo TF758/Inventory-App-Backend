@@ -55,6 +55,7 @@ class UserSession(models.Model):
     
 class Notification(PublicIDModel):
     PUBLIC_ID_PREFIX = "NTF"
+    PUBLIC_ID_PERMANENT = False
 
     class Level(models.TextChoices):
         INFO = "info", "Info"

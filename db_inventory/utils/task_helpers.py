@@ -4,24 +4,30 @@ from db_inventory.models.security import Notification
 
 def batched_notification_delete(qs, batch_size=1000):
     """
-    Deletes notifications in small batches to avoid long locks.
-    Returns total number of deleted rows.
+    Stable cursor-based batch delete.
+    Prevents row skipping and avoids large locks.
     """
     total_deleted = 0
+    last_id = 0
 
     while True:
-        ids = list(
-            qs.values_list("id", flat=True)[:batch_size]
+        batch_ids = list(
+            qs.filter(id__gt=last_id)
+              .order_by("id")
+              .values_list("id", flat=True)[:batch_size]
         )
-        if not ids:
+
+        if not batch_ids:
             break
 
         deleted, _ = (
             Notification.objects
-            .filter(id__in=ids)
+            .filter(id__in=batch_ids)
             .delete()
         )
+
         total_deleted += deleted
+        last_id = batch_ids[-1]
 
     return total_deleted
 

@@ -2,8 +2,12 @@ import secrets
 import uuid
 from typing import Iterable
 from django.db import models
+from django.apps import apps
+
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+from django.db import IntegrityError, transaction
 
 
 def int_to_base62(num: int) -> str:
@@ -33,17 +37,53 @@ def generate_prefixed_id(prefix: str, length: int = 10) -> str:
     u = uuid.uuid4().int >> 64
     return f"{prefix}{int_to_base62(u)[:length]}"
 
-
 def generate_public_ids(objs: Iterable[models.Model]):
     """
     Assign public_id to any object that looks like a PublicIDModel.
 
     IMPORTANT:
-    - Does NOT import models to avoid circular imports.
-    - Uses duck-typing instead.
+    - Still duck-typed (no model imports)
+    - Now reserves IDs in PublicIDRegistry
+
+    used for data generation function
     """
+
     for obj in objs:
         if hasattr(obj, "PUBLIC_ID_PREFIX") and not getattr(obj, "public_id", None):
-            obj.public_id = generate_prefixed_id(obj.PUBLIC_ID_PREFIX)
+
+            obj.public_id = reserve_public_id(
+                prefix=obj.PUBLIC_ID_PREFIX,
+                model_label=obj._meta.label,
+            )
 
     return objs
+
+
+def reserve_public_id(prefix: str, model_label: str) -> str:
+    """
+    Reserve a globally unique public_id via PublicIDRegistry.
+
+    Concurrency-safe:
+    - DB unique constraint enforces uniqueness
+    - Retries on collision
+    """
+
+    PublicIDRegistry = apps.get_model("db_inventory", "PublicIDRegistry")
+
+    for _ in range(20):
+        candidate = generate_prefixed_id(prefix)
+
+        try:
+            with transaction.atomic():
+                PublicIDRegistry.objects.create(
+                    public_id=candidate,
+                    model_label=model_label,
+                )
+            return candidate
+
+        except IntegrityError:
+            # collision or concurrent reservation
+            continue
+
+    raise RuntimeError("Failed to reserve unique public_id")
+

@@ -81,6 +81,8 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'serial_number',
             'quantity',
             'available_quantity',
+            'is_deleted',
+            'deleted_at',
             'room_id',
             'room_name',
             'location_id',
@@ -194,6 +196,58 @@ class UseAccessorySerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True)
 
+class BatchAccessorySoftDeleteSerializer(serializers.Serializer):
+    accessory_public_ids = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+
+    notes = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_accessory_public_ids(self, value):
+        seen = set()
+        cleaned = []
+
+        for pid in value:
+            pid = pid.strip()
+            if not pid:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                cleaned.append(pid)
+
+        if not cleaned:
+            raise serializers.ValidationError("No valid accessory IDs provided.")
+
+        return cleaned
+
+class BatchAccessoryHardDeleteSerializer(serializers.Serializer):
+    accessory_public_ids = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+
+    notes = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_accessory_public_ids(self, value):
+        seen = set()
+        cleaned = []
+
+        for pid in value:
+            pid = pid.strip()
+            if not pid:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                cleaned.append(pid)
+
+        if not cleaned:
+            raise serializers.ValidationError(
+                "No valid accessory IDs provided."
+            )
+
+        return cleaned
+
 __all__ = [
     'AccessoryWriteSerializer',
     'AccessoryFullSerializer',
@@ -201,4 +255,6 @@ __all__ = [
     'AccessoryDistributionSerializer',
     'RestockAccessorySerializer',
     'UseAccessorySerializer',
+    'BatchAccessoryHardDeleteSerializer',
+    'BatchAccessorySoftDeleteSerializer',
 ]

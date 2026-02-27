@@ -1,5 +1,6 @@
 from django.contrib import admin
 from db_inventory.models.site import *
+from db_inventory.models.base import *
 from db_inventory.models.assets import *
 from db_inventory.models.users import *
 from db_inventory.models.security import *
@@ -11,7 +12,109 @@ from django.utils.translation import gettext_lazy as _
 
 # Simple models
 
-admin.site.register(Notification)
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "public_id",
+        "recipient",
+        "type",
+        "level",
+        "entity_type",
+        "entity_id",
+        "is_read",
+        "is_deleted",
+        "created_at",
+    )
+
+    list_filter = (
+        "type",
+        "level",
+        "is_read",
+        "is_deleted",
+        "created_at",
+    )
+
+    search_fields = (
+        "public_id",
+        "title",
+        "message",
+        "recipient__email",
+        "recipient__username",
+        "entity_id",
+    )
+
+    list_select_related = ("recipient",)
+
+    ordering = ("-created_at", "-id")
+
+    readonly_fields = (
+        "public_id",
+        "created_at",
+        "read_at",
+        "deleted_at",
+    )
+
+    fieldsets = (
+        ("Identity", {
+            "fields": ("public_id", "recipient")
+        }),
+        ("Content", {
+            "fields": ("type", "level", "title", "message")
+        }),
+        ("Entity Context", {
+            "fields": ("entity_type", "entity_id", "meta"),
+            "classes": ("collapse",),
+        }),
+        ("Status", {
+            "fields": ("is_read", "read_at", "is_deleted", "deleted_at"),
+        }),
+        ("Timestamps", {
+            "fields": ("created_at",),
+        }),
+    )
+
+
+
+
+@admin.register(PublicIDRegistry)
+class PublicIDRegistryAdmin(admin.ModelAdmin):
+    list_display = (
+        "public_id",
+        "model_label",
+        "created_at",
+    )
+
+    search_fields = (
+        "public_id",
+        "model_label",
+    )
+
+    list_filter = (
+        "model_label",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    readonly_fields = (
+        "public_id",
+        "model_label",
+        "created_at",
+    )
+
+    # --------------------
+    # Safety: make registry immutable in admin
+    # --------------------
+
+    def has_add_permission(self, request):
+        return False  # IDs must only be created via code
+
+    def has_change_permission(self, request, obj=None):
+        return False  # prevent edits
+
+    def has_delete_permission(self, request, obj=None):
+        return False  # never allow deletion
 
 @admin.register(ScheduledTaskRun)
 class ScheduledTaskRunAdmin(admin.ModelAdmin):
@@ -71,6 +174,7 @@ class UserLocationAdmin(admin.ModelAdmin):
     def room_public_id(self, obj):
         return obj.room.public_id if obj.room else "-"
     room_public_id.short_description = "Room Public ID"
+    
 admin.site.register(Accessory)
 
 
@@ -122,7 +226,7 @@ class RoomAdmin(admin.ModelAdmin):
 class EquipmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'serial_number', 'public_id')  
     readonly_fields = ('public_id',) 
-    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room', 'status')
+    fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room', 'status', 'is_deleted', 'deleted_at')
 
 
 @admin.register(Component)
@@ -181,7 +285,6 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     list_filter = (
         "event_type",
-        "user",
         "department",
         "location",
         "room",
