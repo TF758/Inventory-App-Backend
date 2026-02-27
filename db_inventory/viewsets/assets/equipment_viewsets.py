@@ -623,8 +623,8 @@ class EquipmentRestoreViewSet(APIView):
         try:
             restore_asset(
                 actor=request.user,
-                asset=equipment,   # ✅ updated to generic param
-                batch=False,       # ✅ single operation
+                asset=equipment,  
+                batch=False,      
             )
         except PermissionError:
             raise PermissionDenied("Not allowed to restore equipment.")
@@ -657,7 +657,7 @@ class EquipmentSoftDeleteView(APIView):
         result = soft_delete_asset(
             actor=request.user,
             asset=equipment,
-            notes=notes,          # ✅ added
+            notes=notes,         
             batch=False,
             now=timezone.now(),
             use_atomic=True,

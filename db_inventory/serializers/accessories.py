@@ -81,6 +81,8 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'serial_number',
             'quantity',
             'available_quantity',
+            'is_deleted',
+            'deleted_at',
             'room_id',
             'room_name',
             'location_id',
