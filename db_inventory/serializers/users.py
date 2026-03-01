@@ -4,6 +4,7 @@ from db_inventory.models.site import Room, UserLocation
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 class UserReadSerializerFull(serializers.ModelSerializer):
     """Serilziers known information about a user"""
@@ -83,7 +84,6 @@ class UserAreaSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
     fname = serializers.CharField(source='user.fname')
     lname = serializers.CharField(source='user.lname')
-    job_title = serializers.CharField(source ='user.job_title')
 
     is_active = serializers.BooleanField(source='user.is_active')
     is_locked = serializers.BooleanField(source='user.is_locked')
@@ -102,7 +102,7 @@ class UserAreaSerializer(serializers.ModelSerializer):
         model = UserLocation
         fields = [
             'public_id',
-            'user_id', 'email', 'fname', 'lname', 'job_title', 'is_active', 'is_locked',
+            'user_id', 'email', 'fname', 'lname', 'is_current', 'is_active', 'is_locked',
             'room_id', 'room_name',
             'location_id', 'location_name',
             'department_id', 'department_name',
@@ -139,45 +139,35 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
         fields = ['public_id', 'user_id', 'room_id', 'date_joined']
 
     def validate(self, attrs):
-        # -------------------------
-        # Resolve user
-        # -------------------------
         user_id = attrs.get("user_id")
 
+        # Resolve user
         if self.instance:
-            # Update → keep existing user
             user = self.instance.user
         else:
-            # Create → user_id required
             if not user_id:
                 raise serializers.ValidationError(
                     {"user_id": "This field is required."}
                 )
             try:
-                user = User.objects.get(public_id=user_id)
+                user = User.objects.only("id").get(public_id=user_id)
             except User.DoesNotExist:
                 raise serializers.ValidationError(
                     {"user_id": "Invalid user public_id."}
                 )
 
-        # -------------------------
-        # Resolve room (optional on update)
-        # -------------------------
-        room = None
+        # Resolve room
         room_id = attrs.get("room_id")
+        room = None
 
         if room_id is not None:
-            if room_id == "":
-                room = None
-            else:
-                try:
-                    room = Room.objects.get(public_id=room_id)
-                except Room.DoesNotExist:
-                    raise serializers.ValidationError(
-                        {"room_id": "Invalid room public_id."}
-                    )
+            try:
+                room = Room.objects.only("id").get(public_id=room_id)
+            except Room.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"room_id": "Invalid room public_id."}
+                )
         elif self.instance:
-            # On update, if not provided, keep existing room
             room = self.instance.room
 
         attrs["user"] = user
@@ -212,7 +202,7 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
 
 class UserTransferSerializer(serializers.Serializer):
     user_id = serializers.CharField()
-    new_room_id = serializers.CharField()
+    room_id  = serializers.CharField()
 
     def validate(self, attrs):
         try:
@@ -221,9 +211,9 @@ class UserTransferSerializer(serializers.Serializer):
             raise serializers.ValidationError({"user_id": "Invalid user public_id."})
 
         try:
-            room = Room.objects.get(public_id=attrs['new_room_id'])
+            room = Room.objects.get(public_id=attrs['room_id'])
         except Room.DoesNotExist:
-            raise serializers.ValidationError({"new_room_id": "Invalid room public_id."})
+            raise serializers.ValidationError({"room_id": "Invalid room public_id."})
 
         attrs['user'] = user
         attrs['room'] = room
@@ -259,8 +249,120 @@ class UserProfileSerializer(serializers.ModelSerializer):
         )
     def get_current_role(self, obj):
         return obj.get_active_role_public_id()
+    
+class UserAccessoryAssignmentSerializer(serializers.ModelSerializer):
+    public_id = serializers.CharField(source="accessory.public_id", read_only=True)
+    name = serializers.CharField(source="accessory.name", read_only=True)
+    serial_number = serializers.CharField(source="accessory.serial_number", read_only=True)
 
+    room_id = serializers.CharField(source="accessory.room.public_id", read_only=True)
+    room_name = serializers.CharField(source="accessory.room.name", read_only=True)
 
+    location_id = serializers.CharField(
+        source="accessory.room.location.public_id",
+        read_only=True
+    )
+    location_name = serializers.CharField(
+        source="accessory.room.location.name",
+        read_only=True
+    )
+
+    department_id = serializers.CharField(
+        source="accessory.room.location.department.public_id",
+        read_only=True
+    )
+    department_name = serializers.CharField(
+        source="accessory.room.location.department.name",
+        read_only=True
+    )
+
+    assigned_by_id = serializers.CharField(
+        source="assigned_by.public_id",
+        read_only=True
+    )
+
+    assigned_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccessoryAssignment
+        fields = [
+            "public_id",
+            "name",
+            "serial_number",
+            "quantity",          # quantity held by user
+            "assigned_at",
+            "assigned_by_id",
+            "assigned_by_name",
+            "room_id",
+            "room_name",
+            "location_id",
+            "location_name",
+            "department_id",
+            "department_name",
+        ]
+
+    def get_assigned_by_name(self, obj):
+        if obj.assigned_by:
+            return f"{obj.assigned_by.fname} {obj.assigned_by.lname}"
+        return None
+class UserConsumableIssueSerializer(serializers.ModelSerializer):
+    public_id = serializers.CharField(source="consumable.public_id", read_only=True)
+    name = serializers.CharField(source="consumable.name", read_only=True)
+    description = serializers.CharField(source="consumable.description", read_only=True)
+
+    room_id = serializers.CharField(source="consumable.room.public_id", read_only=True)
+    room_name = serializers.CharField(source="consumable.room.name", read_only=True)
+
+    location_id = serializers.CharField(
+        source="consumable.room.location.public_id",
+        read_only=True
+    )
+    location_name = serializers.CharField(
+        source="consumable.room.location.name",
+        read_only=True
+    )
+
+    department_id = serializers.CharField(
+        source="consumable.room.location.department.public_id",
+        read_only=True
+    )
+    department_name = serializers.CharField(
+        source="consumable.room.location.department.name",
+        read_only=True
+    )
+
+    assigned_by_id = serializers.CharField(
+        source="assigned_by.public_id",
+        read_only=True
+    )
+
+    assigned_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsumableIssue
+        fields = [
+            "public_id",
+            "name",
+            "description",
+            "quantity",          # remaining quantity
+            "issued_quantity",   # original issued
+            "purpose",
+            "assigned_at",
+            "assigned_by_id",
+            "assigned_by_name",
+            "room_id",
+            "room_name",
+            "location_id",
+            "location_name",
+            "department_id",
+            "department_name",
+        ]
+
+    def get_assigned_by_name(self, obj):
+        if obj.assigned_by:
+            return f"{obj.assigned_by.fname} {obj.assigned_by.lname}"
+        return None
+    
 __all__ = [
     "UserWriteSerializer",
     "UserReadSerializerFull",
@@ -268,4 +370,6 @@ __all__ = [
     "UserLocationWriteSerializer",
     'UserProfileSerializer',
     'UserTransferSerializer',
+    'UserAccessoryAssignmentSerializer',
+    'UserConsumableIssueSerializer'
 ]

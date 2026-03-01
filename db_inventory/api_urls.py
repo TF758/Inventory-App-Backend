@@ -22,7 +22,7 @@ urlpatterns = [
     path("departments/", include("db_inventory.urls.department_urls")),
     path("locations/", include("db_inventory.urls.location_urls")),
     path("rooms/", include("db_inventory.urls.room_urls")),
-    path("users/", include("db_inventory.urls.user_urls")), 
+    path("users/", include("db_inventory.urls.users_urls")), 
 
     path("", include("db_inventory.notifications.urls")),
 
@@ -163,6 +163,6 @@ urlpatterns = [
     # ----------------------------
     path("password-reset/request/", general_viewsets.PasswordResetRequestView.as_view(), name="password-reset-request"),
     path("password-reset/confirm/", general_viewsets.PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
-    path("change-password/", general_viewsets.ChangePasswordView.as_view(), name="password_change"),
+    path("change-password/", auth_viewsets.ChangePasswordView.as_view(), name="password_change"),
     path("reset-password/validate-token/", general_viewsets.PasswordResetValidateView.as_view(), name="password-reset-validate"),
 ]

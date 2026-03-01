@@ -103,3 +103,18 @@ def get_users_affected_by_site(site):
         )
 
     return User.objects.none()
+
+from django.db.models import Exists, OuterRef
+
+def unallocated_users_queryset():
+    current_location_exists = UserLocation.objects.filter(
+        user=OuterRef("pk"),
+        is_current=True,
+    )
+
+    return User.objects.annotate(
+        has_current_location=Exists(current_location_exists)
+    ).filter(
+        has_current_location=False,
+        is_system_user=False,
+    )

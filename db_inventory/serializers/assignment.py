@@ -336,3 +336,4 @@ class RestockConsumableSerializer(serializers.Serializer):
     consumable = serializers.SlugRelatedField( slug_field="public_id", queryset=Consumable.objects.all(), )
     quantity = serializers.IntegerField(min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True)
+    

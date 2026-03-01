@@ -2,14 +2,16 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
-from db_inventory.models.site import Department, Location, Room
+from db_inventory.models.site import Department, Location, Room, UserLocation
 from datetime import timedelta
 from django.utils import timezone
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.security import UserSession
 from db_inventory.models.users import PasswordResetEvent
 from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
-from django.db.models import Sum, F
+from django.db.models import Exists, OuterRef, Sum, F
+
+from db_inventory.utils.viewset_helpers import unallocated_users_queryset
 User = get_user_model()
 
 
@@ -114,11 +116,8 @@ class UserHealthView(APIView):
             is_system_user=False
         ).count()
 
-        floating_users = User.objects.exclude(
-            user_locations__is_current=True
-        ).filter(
-            is_system_user=False
-        ).distinct().count()
+
+        floating_users = unallocated_users_queryset().count()
 
         return Response({
             "total_users": total_users,

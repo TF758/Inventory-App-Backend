@@ -1,5 +1,7 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
-from db_inventory.serializers.users import  UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
+from rest_framework import mixins
+from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
 from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
@@ -13,7 +15,7 @@ from db_inventory.filters import  UserFilter, UserLocationFilter
 from db_inventory.mixins import NotificationMixin, ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -24,11 +26,19 @@ from django.db.models import Count, Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.exceptions import MethodNotAllowed
-
+from django.utils import timezone
 from db_inventory.permissions.users import CanViewUserProfile
-from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 from db_inventory.models.security import Notification
+from db_inventory.utils.viewset_helpers import unallocated_users_queryset
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from db_inventory.models.assets import Equipment
+from db_inventory.serializers.equipment import EquipmentSerializer
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
@@ -172,6 +182,16 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
                 date_joined=timezone.now()
             )
 
+            if not old_location:
+                raise serializers.ValidationError(
+                    {"user_id": "User has no active location to transfer from."}
+                )
+
+            if old_room and old_room == new_room:
+                raise serializers.ValidationError(
+                    {"room_id": "User is already assigned to this room."}
+                )
+
             # -------------------
             # AUDIT
             # -------------------
@@ -197,7 +217,7 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
             # -------------------
             self.notify(
                 recipient=user,
-                notif_type=Notification.NotificationType.ASSET_ASSIGNED,  # or define USER_MOVED
+                notif_type=Notification.NotificationType.SYSTEM,  # or define USER_MOVED
                 title="Room Transfer",
                 message=f"You have been moved to {new_room.name}",
                 entity=new_location,
@@ -218,36 +238,54 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
 
 class UserLocationByUserView(APIView):
     """
-    Retrieves a user's location by using the user's public_id
+    Retrieve the current location assignment of a user
+    by the user's public_id.
     """
 
-    def get(self, request, user_id: str):
-        try:
-            assignment = UserLocation.objects.select_related(
-                "user", "room", "room__location", "room__location__department"
-            ).get(user__public_id=user_id)
-            serializer = UserAreaSerializer(assignment)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except UserLocation.DoesNotExist:
-            return Response({"detail": "User has no location assignment"}, status=status.HTTP_404_NOT_FOUND)
+    permission_classes = [UserLocationPermission]
+
+    def get(self, request, user_public_id: str):
+        assignment = (
+            UserLocation.objects.select_related(
+                "user",
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .filter(user__public_id=user_public_id, is_current=True)
+            .first()
+        )
+
+        if not assignment:
+            return Response(
+                {"detail": "User has no current location assignment"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        self.check_object_permissions(request, assignment)
+
+        serializer = UserAreaSerializer(
+            assignment,
+            context={"request": request},
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
         
 
 
-class UnallocatedUserViewSet(ScopeFilterMixin, viewsets.ReadOnlyModelViewSet):
-    """
-    Retrieve users not assigned to any room.
-    """
-
-    queryset = User.objects.filter(user_locations__isnull=True) 
+class UnallocatedUserViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = UserReadSerializerFull
-    model_class = User
-
+    permission_classes = [UserPermission]
+    pagination_class = FlexiblePagination
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ['^email', 'email']
     filterset_class = UserFilter
-    pagination_class = FlexiblePagination
-    permission_classes = [UserPermission]
 
+    def get_queryset(self):
+            active_role = getattr(self.request.user, "active_role", None)
+
+            if not active_role or active_role.role != "SITE_ADMIN":
+                return User.objects.none()
+
+            return unallocated_users_queryset()
 
 
 class FullUserCreateView(AuditMixin,views.APIView):
@@ -409,3 +447,75 @@ class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
             ),
         )
     )
+
+class UserEquipmentViewSet(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = EquipmentSerializer
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        user = get_object_or_404(User, public_id=self.kwargs["user_public_id"])
+
+        return (
+            Equipment.objects.filter(
+                active_assignment__returned_at__isnull=True,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+        )
+
+class UserAccessoryAssignmentViewSet(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = UserAccessoryAssignmentSerializer
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        user = get_object_or_404(User, public_id=self.kwargs["user_public_id"])
+
+        return (
+            AccessoryAssignment.objects.filter(
+                user=user,
+                returned_at__isnull=True,
+                accessory__is_deleted=False,
+            )
+            .select_related(
+                "accessory",
+                "accessory__room",
+                "accessory__room__location",
+                "accessory__room__location__department",
+                "assigned_by",
+            )
+        )
+    
+class UserConsumableIssueViewSet(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = UserConsumableIssueSerializer
+    pagination_class = FlexiblePagination
+
+    def get_queryset(self):
+        user = get_object_or_404(User, public_id=self.kwargs["user_public_id"])
+
+        return (
+            ConsumableIssue.objects.filter(
+                user=user,
+                returned_at__isnull=True,
+                consumable__is_deleted=False,
+            )
+            .select_related(
+                "consumable",
+                "consumable__room",
+                "consumable__room__location",
+                "consumable__room__location__department",
+                "assigned_by",
+            )
+        )
