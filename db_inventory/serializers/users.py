@@ -3,7 +3,7 @@ from db_inventory.models.users import User
 from db_inventory.models.site import Room, UserLocation
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
-
+from django.db import transaction
 
 class UserReadSerializerFull(serializers.ModelSerializer):
     """Serilziers known information about a user"""
@@ -127,7 +127,6 @@ class UserAreaSerializer(serializers.ModelSerializer):
             self.fields.pop('department_name', None)
 
 
-
 class UserLocationWriteSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(write_only=True)
     room_id = serializers.CharField(write_only=True, allow_null=True, required=False)
@@ -140,53 +139,96 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
         fields = ['public_id', 'user_id', 'room_id', 'date_joined']
 
     def validate(self, attrs):
-        # On update, 'user_id' may not be in attrs, use instance.user if missing
-        user_id = attrs.get('user_id')
-        if not user_id and self.instance:
+        # -------------------------
+        # Resolve user
+        # -------------------------
+        user_id = attrs.get("user_id")
+
+        if self.instance:
+            # Update → keep existing user
             user = self.instance.user
-        elif user_id:
+        else:
+            # Create → user_id required
+            if not user_id:
+                raise serializers.ValidationError(
+                    {"user_id": "This field is required."}
+                )
             try:
                 user = User.objects.get(public_id=user_id)
             except User.DoesNotExist:
-                raise serializers.ValidationError({"user_id": "Invalid user public_id."})
-        else:
-            raise serializers.ValidationError({"user_id": "This field is required."})
+                raise serializers.ValidationError(
+                    {"user_id": "Invalid user public_id."}
+                )
 
-        # room validation
-        room_id = attrs.get('room_id', None)
+        # -------------------------
+        # Resolve room (optional on update)
+        # -------------------------
         room = None
-        if room_id:
-            try:
-                room = Room.objects.get(public_id=room_id)
-            except Room.DoesNotExist:
-                raise serializers.ValidationError({"room_id": "Invalid room public_id."})
+        room_id = attrs.get("room_id")
+
+        if room_id is not None:
+            if room_id == "":
+                room = None
+            else:
+                try:
+                    room = Room.objects.get(public_id=room_id)
+                except Room.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"room_id": "Invalid room public_id."}
+                    )
         elif self.instance:
+            # On update, if not provided, keep existing room
             room = self.instance.room
 
-        # unique user-room check
-        if room:
-            existing = UserLocation.objects.filter(user=user, room=room)
-            if self.instance:
-                existing = existing.exclude(pk=self.instance.pk)
-            if existing.exists():
-                raise serializers.ValidationError({
-                    "room_id": "This user is already assigned to this room."
-                })
+        attrs["user"] = user
+        attrs["room"] = room
 
-        attrs['user'] = user
-        attrs['room'] = room
         return attrs
 
     def create(self, validated_data):
         validated_data.pop('user_id', None)
         validated_data.pop('room_id', None)
-        validated_data.setdefault('date_joined', timezone.now())
-        return super().create(validated_data)
 
+        user = validated_data['user']
+
+        with transaction.atomic():
+            # Clear previous current
+            UserLocation.objects.filter(
+                user=user,
+                is_current=True
+            ).update(is_current=False)
+
+            # Create new current
+            return UserLocation.objects.create(
+                **validated_data,
+                is_current=True,
+                date_joined=timezone.now()
+            )
+        
     def update(self, instance, validated_data):
         validated_data.pop('user_id', None)
         validated_data.pop('room_id', None)
         return super().update(instance, validated_data)
+
+class UserTransferSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    new_room_id = serializers.CharField()
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(public_id=attrs['user_id'])
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"user_id": "Invalid user public_id."})
+
+        try:
+            room = Room.objects.get(public_id=attrs['new_room_id'])
+        except Room.DoesNotExist:
+            raise serializers.ValidationError({"new_room_id": "Invalid room public_id."})
+
+        attrs['user'] = user
+        attrs['room'] = room
+        return attrs
+    
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -225,4 +267,5 @@ __all__ = [
     "UserAreaSerializer",
     "UserLocationWriteSerializer",
     'UserProfileSerializer',
+    'UserTransferSerializer',
 ]

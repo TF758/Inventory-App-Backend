@@ -194,20 +194,37 @@ class UserLocationPermission(BasePermission):
         if not active_role:
             return False
 
-        # Site admin can always do anything
+        # Site admin bypass
         if active_role.role == "SITE_ADMIN":
             return True
-
-        # Block viewers from any write operations
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
+        
+        # room admins cant affect user location as they're scope to one area
+        if active_role.role == "ROOM_ADMIN" and request.method in ("POST","PUT","PATCH","DELETE"):
             return False
 
-        # Check role hierarchy
         required_role = self.method_role_map.get(request.method)
         if not required_role:
             return False
 
-        return ROLE_HIERARCHY.get(active_role.role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
+        if ROLE_HIERARCHY.get(active_role.role, 0) < ROLE_HIERARCHY.get(required_role, 0):
+            return False
+
+        # ---- CREATE scope enforcement ----
+        if request.method == "POST":
+            room_id = request.data.get("room_id")
+            if not room_id:
+                return False
+
+            try:
+                room = Room.objects.select_related(
+                    "location__department"
+                ).get(public_id=room_id)
+            except Room.DoesNotExist:
+                return False
+
+            return is_in_scope(active_role, room=room)
+
+        return True
 
     def has_object_permission(self, request, view, obj):
         active_role = getattr(request.user, "active_role", None)

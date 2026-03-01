@@ -66,6 +66,7 @@ class Notification(PublicIDModel):
         REPORT_READY = "report_ready", "Report Ready"
         ASSET_ASSIGNED = "asset_assigned", "Asset Assigned"
         PASSWORD_RESET = "password_reset", "Password Reset"
+        SYSTEM = "system", "System"
 
     recipient = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications", )
 

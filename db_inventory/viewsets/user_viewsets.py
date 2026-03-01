@@ -1,15 +1,16 @@
 from rest_framework import viewsets
-from db_inventory.serializers.users import  UserProfileSerializer, UserReadSerializerFull, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
+from db_inventory.serializers.users import  UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
 from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
 from db_inventory.models import User, UserLocation, RoleAssignment, Room, Department, Location
 from db_inventory.models.roles import RoleAssignment
+from db_inventory.models.audit import AuditLog
 from db_inventory.models.site import UserLocation, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import  UserFilter, UserLocationFilter
-from db_inventory.mixins import ScopeFilterMixin
+from db_inventory.mixins import NotificationMixin, ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
 from django.db.models import Q
@@ -22,11 +23,12 @@ from db_inventory.permissions.helpers import ensure_permission
 from django.db.models import Count, Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
-
+from rest_framework.exceptions import MethodNotAllowed
 
 from db_inventory.permissions.users import CanViewUserProfile
 from db_inventory.models.asset_assignment import EquipmentAssignment
 from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
+from db_inventory.models.security import Notification
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
@@ -67,60 +69,152 @@ class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
 
 
+class UserLocationViewSet(AuditMixin, NotificationMixin,viewsets.ModelViewSet):
 
-class UserLocationViewSet(viewsets.ModelViewSet):
     queryset = UserLocation.objects.select_related(
         "user", "room", "room__location", "room__location__department"
     ).order_by("-date_joined", "-id")
 
-    serializer_class = UserAreaSerializer
     lookup_field = "public_id"
     permission_classes = [UserLocationPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserLocationFilter
 
-    def get_object(self):
-        obj = super().get_object()  # fetch object ignoring scope
-        self.check_object_permissions(self.request, obj)
-        return obj
-
     def get_queryset(self):
         if self.action == "list":
-            # Only list objects within scope
-            return filter_queryset_by_scope(self.request.user, super().get_queryset(), UserLocation)
-        # For detail actions, return all objects (permission check will handle scope)
+            return filter_queryset_by_scope(
+                self.request.user,
+                super().get_queryset(),
+                UserLocation
+            )
         return super().get_queryset()
-    
+
     def get_serializer_class(self):
-        if self.action in ["update", "partial_update", "create"]:
+        if self.action in ["create", "update", "partial_update"]:
             return UserLocationWriteSerializer
         return UserAreaSerializer
-
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        read_serializer = UserAreaSerializer(serializer.instance, context=self.get_serializer_context())
+
+        user = serializer.validated_data["user"]
+        room = serializer.validated_data.get("room")
+
+        with transaction.atomic():
+            new_location = serializer.save()
+
+            self.audit(
+                event_type=AuditLog.Events.USER_ASSIGNED,
+                target=new_location,
+                description=f"User assigned to room {room.name if room else 'None'}",
+                metadata={
+                    "user_id": user.public_id,
+                    "room_id": room.public_id if room else None,
+                    "room_name": room.name if room else None,
+                },
+            )
+
+            self.notify(
+                recipient=user,
+                notif_type=Notification.NotificationType.SYSTEM,
+                level=Notification.Level.INFO,
+                title="Room Assignment",
+                message=(
+                    f"You have been assigned to {room.name}"
+                    if room
+                    else "You have been unassigned from a room"
+                ),
+                entity=new_location,
+                actor=request.user,
+                meta={
+                    "room_id": room.public_id if room else None,
+                    "room_name": room.name if room else None,
+                },
+            )
+
+        read_serializer = UserAreaSerializer(
+            new_location,
+            context=self.get_serializer_context()
+        )
+
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+
+class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
+
+    serializer_class = UserTransferSerializer
+    permission_classes = [UserLocationPermission]
+
+    def create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+        new_room = serializer.validated_data["room"]
+
+        with transaction.atomic():
+
+            old_location = UserLocation.objects.filter(
+                user=user,
+                is_current=True
+            ).select_related("room").first()
+
+            old_room = old_location.room if old_location else None
+
+            if old_location:
+                old_location.is_current = False
+                old_location.save(update_fields=["is_current"])
+
+            new_location = UserLocation.objects.create(
+                user=user,
+                room=new_room,
+                is_current=True,
+                date_joined=timezone.now()
+            )
+
+            # -------------------
+            # AUDIT
+            # -------------------
+            self.audit(
+                event_type=AuditLog.Events.USER_MOVED,
+                target=new_location,
+                description=(
+                    f"User transferred from "
+                    f"{old_room.name if old_room else 'None'} "
+                    f"to {new_room.name}"
+                ),
+                metadata={
+                    "user_id": user.public_id,
+                    "from_room_id": old_room.public_id if old_room else None,
+                    "from_room_name": old_room.name if old_room else None,
+                    "to_room_id": new_room.public_id,
+                    "to_room_name": new_room.name,
+                },
+            )
+
+            # -------------------
+            # NOTIFY USER
+            # -------------------
+            self.notify(
+                recipient=user,
+                notif_type=Notification.NotificationType.ASSET_ASSIGNED,  # or define USER_MOVED
+                title="Room Transfer",
+                message=f"You have been moved to {new_room.name}",
+                entity=new_location,
+                actor=request.user,
+                meta={
+                    "from_room": old_room.name if old_room else None,
+                    "to_room": new_room.name,
+                },
+            )
+
+        read_serializer = UserAreaSerializer(
+            new_location,
+            context={"request": request}
+        )
+
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
     
-    def perform_create(self, serializer):
-        room = serializer.validated_data.get("room")
-        if not self.request.user.has_perm("add_userlocation") and \
-        not is_in_scope(self.request.user.active_role, room=room):
-            raise PermissionDenied("Cannot assign user to a room outside your scope.")
-
-        serializer.save()
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        read_serializer = UserAreaSerializer(instance, context=self.get_serializer_context())
-        return Response(read_serializer.data)
-
 
 class UserLocationByUserView(APIView):
     """
