@@ -14,150 +14,155 @@ API URL structure:
 
 urlpatterns = [
 
+    # ----------------------------
+    # Core Modules
+    # ----------------------------
     path("auth/", include("db_inventory.urls.auth_urls")),
     path("inventory/", include("db_inventory.urls.inventory_urls")),
+    path("departments/", include("db_inventory.urls.department_urls")),
+    path("locations/", include("db_inventory.urls.location_urls")),
+    path("rooms/", include("db_inventory.urls.room_urls")),
+    path("users/", include("db_inventory.urls.user_urls")), 
 
     path("", include("db_inventory.notifications.urls")),
 
- 
-    path('login/', general_viewsets.SessionTokenLoginView.as_view(), name='login'),
-    path('logout/', general_viewsets.LogoutAPIView.as_view(), name='logout'),
-    path('refresh/', general_viewsets.RefreshAPIView.as_view(), name='session_refresh'),
+    # ----------------------------
+    # Auth / Session
+    # ----------------------------
+    path("login/", general_viewsets.SessionTokenLoginView.as_view(), name="login"),
+    path("logout/", general_viewsets.LogoutAPIView.as_view(), name="logout"),
+    path("refresh/", general_viewsets.RefreshAPIView.as_view(), name="session_refresh"),
 
-    path('users/create-full/', user_viewsets.FullUserCreateView.as_view(), name='create-full-user'),
-    path('users/', user_viewsets.UserModelViewSet.as_view({'get': 'list', 'post':'create'}), name='users'),
-    path('users/<str:public_id>/',user_viewsets.UserModelViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
-        }), name='user-detail'),
-
-    path('user-locations/', user_viewsets.UserLocationViewSet.as_view({'get': 'list', 'post':'create'}), name='userlocation-list-create'),
-    path('user-locations/<str:public_id>/', user_viewsets.UserLocationViewSet.as_view({  
-        'get': 'retrieve',
-        'put': 'update',
-        'patch': 'partial_update',
-        'delete': 'destroy'
-    }), name='userlocation-detail'),
-    path('user-locations/users/<str:public_id>/', user_viewsets.UserLocationByUserView.as_view(), name='userlocation-by-user'),
-    path('unallocated-users/', user_viewsets.UnallocatedUserViewSet.as_view({'get': 'list'}), name='unallocated-user-list'),
-    path( "profiles/me/", SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile", ),
-    path( "profiles/me/equipment/", SelfAssignedEquipmentViewSet.as_view({"get": "list"}), name="self-user-equipment", ),
-    path( "profiles/me/accessories/", SelfAccessoryViewSet.as_view({"get": "list"}), name="self-user-accessories", ),
-    path( "profiles/me/consumables/", SelfConsumableViewSet.as_view({"get": "list"}), name="self-user-consumables", ),
-    path( "profiles/me/consumables/use/", UseConsumableView.as_view(), name="use-consumable", ),
-    path( "profiles/me/consumables/<str:public_id>/", SelfConsumableAssignmentDetailView.as_view(), name="assign-consumable-detail", ),
-    path('users/profile/<str:public_id>/',UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
-
-
-    path("departments/", include("db_inventory.urls.department_urls")),
-
-    path("locations/", include("db_inventory.urls.location_urls")),
-
-    path("rooms/", include("db_inventory.urls.room_urls")),
-
-
-    path('equipments/', equipment_viewsets.EquipmentModelViewSet.as_view({'get': 'list', 'post':'create'}), name='equipments'),
+    # ----------------------------
+    # Equipment
+    # ----------------------------
+    path("equipments/", equipment_viewsets.EquipmentModelViewSet.as_view({
+        "get": "list",
+        "post": "create"
+    }), name="equipments"),
 
     # --- batch routes FIRST ---
-    path('equipment/batch-unassign/', BatchUnassignEquipmentView.as_view(), name='batch-unassign-equipment'),
-    path('equipment/batch-assign/', BatchAssignEquipmentView.as_view(), name='batch-assign-equipment'),
-    path('equipment/batch-condemn/', BatchEquipmentCondemnView.as_view(), name='batch-condemn-equipment'),
-    path('equipment/batch-status-change/', BatchEquipmentStatusChangeView.as_view(), name='batch-equipment-status-change'),
-    path('equipment/batch-soft-delete/', BatchEquipmentSoftDeleteView.as_view(), name='batch-equipment-soft-delete'),
+    path("equipment/batch-unassign/", BatchUnassignEquipmentView.as_view(), name="batch-unassign-equipment"),
+    path("equipment/batch-assign/", BatchAssignEquipmentView.as_view(), name="batch-assign-equipment"),
+    path("equipment/batch-condemn/", BatchEquipmentCondemnView.as_view(), name="batch-condemn-equipment"),
+    path("equipment/batch-status-change/", BatchEquipmentStatusChangeView.as_view(), name="batch-equipment-status-change"),
+    path("equipment/batch-soft-delete/", BatchEquipmentSoftDeleteView.as_view(), name="batch-equipment-soft-delete"),
 
-    path('equipments-import/', equipment_viewsets.EquipmentBatchImportView.as_view(), name='equipment-batch-import'),
+    path("equipments-import/", equipment_viewsets.EquipmentBatchImportView.as_view(), name="equipment-batch-import"),
 
-    path('equipments/<str:public_id>/status/', equipment_viewsets.EquipmentStatusChangeView.as_view(), name='update-equipment-status'),
-    path('equipments/<str:public_id>/condemn/', equipment_viewsets.EquipmentCondemnView.as_view(), name='condemn-equipment'),
-    path('equipments/<str:public_id>/restore/', equipment_viewsets.EquipmentRestoreViewSet.as_view(), name='restore-equipment'),
-    path('equipments/<str:public_id>/soft-delete/', equipment_viewsets.EquipmentSoftDeleteView.as_view(), name='soft-delete-equipment'),
+    path("equipments/<str:public_id>/status/", equipment_viewsets.EquipmentStatusChangeView.as_view(), name="update-equipment-status"),
+    path("equipments/<str:public_id>/condemn/", equipment_viewsets.EquipmentCondemnView.as_view(), name="condemn-equipment"),
+    path("equipments/<str:public_id>/restore/", equipment_viewsets.EquipmentRestoreViewSet.as_view(), name="restore-equipment"),
+    path("equipments/<str:public_id>/soft-delete/", equipment_viewsets.EquipmentSoftDeleteView.as_view(), name="soft-delete-equipment"),
 
-    path('equipments/<str:public_id>/', equipment_viewsets.EquipmentModelViewSet.as_view({
-        'get': 'retrieve',
-        'put': 'update',
-        'patch': 'partial_update',
-        'delete': 'destroy'
-    }), name='equipment-detail'),
-        
+    path("equipments/<str:public_id>/", equipment_viewsets.EquipmentModelViewSet.as_view({
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy"
+    }), name="equipment-detail"),
 
-    path('components/', component_viewsets.ComponentModelViewSet.as_view({'get': 'list', 'post':'create'}),name='components'), 
-    path('components/<str:public_id>/', component_viewsets.ComponentModelViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
-        }), name='component-detail'),
+    # ----------------------------
+    # Components
+    # ----------------------------
+    path("components/", component_viewsets.ComponentModelViewSet.as_view({
+        "get": "list",
+        "post": "create"
+    }), name="components"),
 
+    path("components/<str:public_id>/", component_viewsets.ComponentModelViewSet.as_view({
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy"
+    }), name="component-detail"),
 
-    path('accessories/', accessory_viewsets.AccessoryModelViewSet.as_view({'get': 'list', 'post':'create'}), name='accessories'),
+    # ----------------------------
+    # Accessories
+    # ----------------------------
+    path("accessories/", accessory_viewsets.AccessoryModelViewSet.as_view({
+        "get": "list",
+        "post": "create"
+    }), name="accessories"),
 
-    # --- Accessory batch routes  ---
-    path('accessory/batch-soft-delete/', accessory_viewsets.BatchAccessorySoftDeleteView.as_view(), name='batch-soft-delete-accessory'),
-    path('accessory/batch-hard-delete/', accessory_viewsets.BatchAccessoryHardDeleteView.as_view(), name='batch-hard-delete-accessory'),
+    path("accessory/batch-soft-delete/", accessory_viewsets.BatchAccessorySoftDeleteView.as_view(), name="batch-soft-delete-accessory"),
+    path("accessory/batch-hard-delete/", accessory_viewsets.BatchAccessoryHardDeleteView.as_view(), name="batch-hard-delete-accessory"),
 
+    path("accessories/<str:public_id>/restore/", accessory_viewsets.AccessoryRestoreViewSet.as_view(), name="restore-accessory"),
+    path("accessories/<str:public_id>/soft-delete/", accessory_viewsets.AccessorySoftDeleteView.as_view(), name="soft-delete-accessory"),
 
-    path('accessories/<str:public_id>/restore/', accessory_viewsets.AccessoryRestoreViewSet.as_view(), name='restore-accessory'),
-    path('accessories/<str:public_id>/soft-delete/', accessory_viewsets.AccessorySoftDeleteView.as_view(), name='soft-delete-accessory'),
+    path("accessories/<str:public_id>/", accessory_viewsets.AccessoryModelViewSet.as_view({
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy"
+    }), name="accessory-detail"),
 
-    path('accessories/<str:public_id>/', accessory_viewsets.AccessoryModelViewSet.as_view({
-            'get': 'retrieve',
-            'put': 'update',
-            'patch': 'partial_update',
-            'delete': 'destroy'
-        }), name='accessory-detail'),
-   
-    path("accessories-validate-import/",  accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
-    path("accessories-import/",  accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
+    path("accessories-validate-import/", accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
+    path("accessories-import/", accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
 
-    path('consumables/', consumable_viewsets.ConsumableModelViewSet.as_view({'get': 'list', 'post':'create'}), name="consumables"),
+    # ----------------------------
+    # Consumables
+    # ----------------------------
+    path("consumables/", consumable_viewsets.ConsumableModelViewSet.as_view({
+        "get": "list",
+        "post": "create"
+    }), name="consumables"),
 
-    # --- Consumable batch routes ---
-    path('consumable/batch-soft-delete/', consumable_viewsets.BatchConsumableSoftDeleteView.as_view(), name='batch-soft-delete-consumable'),
-    path('consumable/batch-hard-delete/', consumable_viewsets.BatchConsumableHardDeleteView.as_view(), name='batch-hard-delete-consumable'),
+    path("consumable/batch-soft-delete/", consumable_viewsets.BatchConsumableSoftDeleteView.as_view(), name="batch-soft-delete-consumable"),
+    path("consumable/batch-hard-delete/", consumable_viewsets.BatchConsumableHardDeleteView.as_view(), name="batch-hard-delete-consumable"),
 
-    path('consumables/<str:public_id>/restore/', consumable_viewsets.ConsumableRestoreViewSet.as_view(), name='restore-consumable'),
-    path('consumables/<str:public_id>/soft-delete/', consumable_viewsets.ConsumableSoftDeleteView.as_view(), name='soft-delete-consumable'),
+    path("consumables/<str:public_id>/restore/", consumable_viewsets.ConsumableRestoreViewSet.as_view(), name="restore-consumable"),
+    path("consumables/<str:public_id>/soft-delete/", consumable_viewsets.ConsumableSoftDeleteView.as_view(), name="soft-delete-consumable"),
 
-    path('consumables/<str:public_id>/', consumable_viewsets.ConsumableModelViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
-    }), name='consumable-detail'),
+    path("consumables/<str:public_id>/", consumable_viewsets.ConsumableModelViewSet.as_view({
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy"
+    }), name="consumable-detail"),
 
-    path('consumables-import/', consumable_viewsets.ConsumableBatchImportView.as_view(), name='consumables-batch-import'),
-    path('consumables-validate-import/', consumable_viewsets.ConsumableBatchValidateView.as_view(), name='consumables-batch-validate'),
+    path("consumables-import/", consumable_viewsets.ConsumableBatchImportView.as_view(), name="consumables-batch-import"),
+    path("consumables-validate-import/", consumable_viewsets.ConsumableBatchValidateView.as_view(), name="consumables-batch-validate"),
 
+    # ----------------------------
+    # Roles
+    # ----------------------------
+    path("roles/", role_viewsets.RoleAssignmentViewSet.as_view({
+        "get": "list",
+        "post": "create"
+    }), name="role-assignment-list-create"),
 
-    path('roles/', role_viewsets.RoleAssignmentViewSet.as_view({ 'get': 'list', 'post': 'create' }), name='role-assignment-list-create'),
-    path('roles/<str:public_id>/',  role_viewsets.RoleAssignmentViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
-        })
-    , name='role-detail'),
-    # User-specific roles
-    path('my-roles/', role_viewsets.UserRoleList.as_view(), name='my-role-list'),
-    path('roles/users/<str:public_id>/', role_viewsets.UserRoleList.as_view()  , name='user-role-list'),
+    path("roles/<str:public_id>/", role_viewsets.RoleAssignmentViewSet.as_view({
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy"
+    }), name="role-detail"),
 
-    # Active role
-    path('roles/me/active-role/',role_viewsets.ActiveRoleViewSet.as_view({ 'get': 'retrieve', 'put': 'update' }), name='my-active-role'),
-    path('roles/me/active-role/<str:role_id>/',role_viewsets.ActiveRoleViewSet.as_view({ 'get': 'retrieve', 'put': 'update' }), name='my-active-role-update'),
+    path("my-roles/", role_viewsets.UserRoleList.as_view(), name="my-role-list"),
+    path("roles/users/<str:public_id>/", role_viewsets.UserRoleList.as_view(), name="user-role-list"),
 
+    path("roles/me/active-role/", role_viewsets.ActiveRoleViewSet.as_view({
+        "get": "retrieve",
+        "put": "update"
+    }), name="my-active-role"),
 
-    path('serializer-fields/',general_viewsets.SerializerFieldsView.as_view() , name='get-serializer-fields'),
+    path("roles/me/active-role/<str:role_id>/", role_viewsets.ActiveRoleViewSet.as_view({
+        "get": "retrieve",
+        "put": "update"
+    }), name="my-active-role-update"),
 
-    # User submits temp password + new password to complete reset
+    # ----------------------------
+    # Utility
+    # ----------------------------
+    path("serializer-fields/", general_viewsets.SerializerFieldsView.as_view(), name="get-serializer-fields"),
 
-    path('password-reset/request/',  general_viewsets.PasswordResetRequestView.as_view(), name='password-reset-request'),
-    path('password-reset/confirm/', general_viewsets.PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
-    path('change-password/', auth_viewsets.ChangePasswordView.as_view(), name='password_change'),
-
-    # used to confirm validity of password reset token
+    # ----------------------------
+    # Password Reset
+    # ----------------------------
+    path("password-reset/request/", general_viewsets.PasswordResetRequestView.as_view(), name="password-reset-request"),
+    path("password-reset/confirm/", general_viewsets.PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    path("change-password/", general_viewsets.ChangePasswordView.as_view(), name="password_change"),
     path("reset-password/validate-token/", general_viewsets.PasswordResetValidateView.as_view(), name="password-reset-validate"),
-
-
 ]
