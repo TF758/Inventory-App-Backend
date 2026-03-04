@@ -4,7 +4,7 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from db_inventory.models.base import PublicIDModel
-
+from django.core.cache import cache
 
 
 class UserSession(models.Model):
@@ -137,3 +137,61 @@ class ScheduledTaskRun(models.Model):
             f"{self.run_at:%Y-%m-%d %H:%M} | "
             f"{duration}"
         )
+
+class SecuritySettings(models.Model):
+    """
+    Global security policy configuration (singleton).
+    """
+
+    session_idle_minutes = models.PositiveIntegerField(default=30)
+    session_absolute_hours = models.PositiveIntegerField(default=12)
+    access_token_minutes = models.PositiveIntegerField(default=5)
+
+    max_concurrent_sessions = models.PositiveIntegerField(default=5)
+
+    lockout_attempts = models.PositiveIntegerField(default=5)
+    lockout_duration_minutes = models.PositiveIntegerField(default=15)
+
+    revoke_sessions_on_password_change = models.BooleanField(default=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    CACHE_KEY = "security_settings_singleton"
+
+    class Meta:
+        verbose_name = "Security Settings"
+        verbose_name_plural = "Security Settings"
+
+    def save(self, *args, **kwargs):
+        """
+        Enforce singleton behavior.
+        """
+        self.pk = 1  # force primary key
+        super().save(*args, **kwargs)
+
+        # invalidate cache
+        cache.delete(self.CACHE_KEY)
+
+    def delete(self, *args, **kwargs):
+        """
+        Prevent deletion of settings.
+        """
+        pass
+
+    @classmethod
+    def load(cls):
+        """
+        Load settings from cache or DB.
+        """
+        settings_obj = cache.get(cls.CACHE_KEY)
+
+        if settings_obj:
+            return settings_obj
+
+        obj, created = cls.objects.get_or_create(pk=1)
+        cache.set(cls.CACHE_KEY, obj, 300)
+
+        return obj
+
+    def __str__(self):
+        return "System Security Settings"

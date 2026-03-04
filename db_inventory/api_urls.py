@@ -23,6 +23,7 @@ urlpatterns = [
     path("locations/", include("db_inventory.urls.location_urls")),
     path("rooms/", include("db_inventory.urls.room_urls")),
     path("users/", include("db_inventory.urls.users_urls")), 
+    path("profiles/", include("db_inventory.urls.profile_urls")),
 
     path("", include("db_inventory.notifications.urls")),
 

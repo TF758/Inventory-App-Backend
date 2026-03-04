@@ -9,7 +9,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.models.security import UserSession
 from django.utils import timezone
-from datetime import timedelta
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
 from db_inventory.utils.serializers import get_serializer_field_info
@@ -26,6 +25,7 @@ from db_inventory.mixins import AuditMixin
 from db_inventory.models.audit import AuditLog
 from django.db.models import Q
 from django.conf import settings
+from db_inventory.security_policy import *
 
 
 logger = logging.getLogger(__name__) 
@@ -36,7 +36,11 @@ class SessionTokenLoginView(TokenObtainPairView):
     throttle_classes = [LoginThrottle]
 
     def post(self, request, *args, **kwargs):
+
         serializer = self.get_serializer(data=request.data)
+
+        ip = request.META.get("REMOTE_ADDR")
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
 
         # -------------------------
         # Authenticate user
@@ -44,15 +48,12 @@ class SessionTokenLoginView(TokenObtainPairView):
         try:
             serializer.is_valid(raise_exception=True)
         except Exception as exc:
-            # Log failed login attempt
             AuditLog.objects.create(
                 event_type=AuditLog.Events.LOGIN_FAILED,
                 description="Login failed",
-                metadata={
-                    "reason": str(exc),
-                },
-                ip_address=request.META.get("REMOTE_ADDR"),
-                user_agent=request.META.get("HTTP_USER_AGENT"),
+                metadata={"reason": str(exc)},
+                ip_address=ip,
+                user_agent=user_agent,
             )
             raise
 
@@ -63,6 +64,7 @@ class SessionTokenLoginView(TokenObtainPairView):
         # Generate refresh token
         # -------------------------
         raw_refresh = secrets.token_urlsafe(64)
+
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
@@ -77,18 +79,19 @@ class SessionTokenLoginView(TokenObtainPairView):
         # -------------------------
         try:
             with transaction.atomic():
-                ua_hash = UserSession.hash_user_agent(
-                    request.META.get("HTTP_USER_AGENT", "")
-                )
+
+                ua_hash = UserSession.hash_user_agent(user_agent)
 
                 session = UserSession.objects.create(
                     user=user,
                     refresh_token_hash=hashed_refresh,
-                    expires_at=now + settings.SESSION_IDLE_TIMEOUT,
-                    absolute_expires_at=now + settings.SESSION_ABSOLUTE_LIFETIME,
+                    expires_at=now + get_session_idle_timeout(),
+                    absolute_expires_at=now + get_session_absolute_lifetime(),
+                    user_agent=user_agent,
                     user_agent_hash=ua_hash,
-                    ip_address=request.META.get("REMOTE_ADDR"),
+                    ip_address=ip,
                 )
+
         except Exception:
             logger.exception(
                 "Session creation failed",
@@ -101,10 +104,18 @@ class SessionTokenLoginView(TokenObtainPairView):
         # -------------------------
         try:
             access_token_obj = AccessToken.for_user(user)
+
+            # apply policy-based expiration
+            access_token_obj.set_exp(
+                lifetime=get_access_token_lifetime()
+            )
+
             access_token_obj["session_id"] = str(session.id)
             access_token_obj["abs_exp"] = int(session.absolute_expires_at.timestamp())
             access_token_obj["idle_exp"] = int(session.expires_at.timestamp())
+
             access_token = str(access_token_obj)
+
         except Exception:
             session.delete()
             logger.exception(
@@ -113,8 +124,12 @@ class SessionTokenLoginView(TokenObtainPairView):
             )
             raise APIException("Authentication failed.")
 
-        user.last_login = timezone.now()
+        # -------------------------
+        # Update last login
+        # -------------------------
+        user.last_login = now
         user.save(update_fields=["last_login"])
+
         # -------------------------
         # Successful login audit
         # -------------------------
@@ -123,10 +138,9 @@ class SessionTokenLoginView(TokenObtainPairView):
             user=user,
             user_public_id=str(user.public_id),
             user_email=user.email,
-            ip_address=request.META.get("REMOTE_ADDR"),
-            user_agent=request.META.get("HTTP_USER_AGENT"),
+            ip_address=ip,
+            user_agent=user_agent,
         )
-
 
         # -------------------------
         # Response
@@ -135,10 +149,11 @@ class SessionTokenLoginView(TokenObtainPairView):
             "access": access_token,
             "public_id": str(user.public_id),
             "role_id": user.active_role.public_id if user.active_role else None,
-            "force_password_change": user.force_password_change, 
+            "force_password_change": user.force_password_change,
         }
 
         response = Response(response_data, status=200)
+
         response.set_cookie(
             key="refresh",
             value=raw_refresh,
@@ -146,7 +161,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE,
             path="/",
-            max_age=int(settings.SESSION_ABSOLUTE_LIFETIME.total_seconds()),
+            max_age=int(get_session_absolute_lifetime().total_seconds()),
         )
 
         return response
@@ -157,9 +172,10 @@ class RefreshAPIView(APIView):
     throttle_classes = [RefreshTokenThrottle]
 
     def post(self, request):
+
         try:
-            # --- Get refresh token from cookie ---
             raw_refresh = request.COOKIES.get("refresh")
+
             if not raw_refresh:
                 return Response(
                     {"detail": "Invalid or expired session."},
@@ -168,7 +184,12 @@ class RefreshAPIView(APIView):
 
             hashed_refresh = UserSession.hash_token(raw_refresh)
 
-            # --- Lookup session (supports reuse detection) ---
+            ip = request.META.get("REMOTE_ADDR")
+            user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
+
+            # ----------------------------------------
+            # Locate session
+            # ----------------------------------------
             try:
                 session = UserSession.objects.get(
                     Q(refresh_token_hash=hashed_refresh)
@@ -181,7 +202,9 @@ class RefreshAPIView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
 
-            # --- Refresh token reuse detection ---
+            # ----------------------------------------
+            # Refresh token reuse detection
+            # ----------------------------------------
             if session.previous_refresh_token_hash == hashed_refresh:
                 session.status = UserSession.Status.REVOKED
                 session.save(update_fields=["status"])
@@ -195,7 +218,9 @@ class RefreshAPIView(APIView):
 
             now = timezone.now()
 
-            # --- Absolute + idle expiration ---
+            # ----------------------------------------
+            # Expiration checks
+            # ----------------------------------------
             if session.absolute_expires_at <= now or session.expires_at <= now:
                 session.status = UserSession.Status.EXPIRED
                 session.save(update_fields=["status"])
@@ -207,10 +232,11 @@ class RefreshAPIView(APIView):
                 resp.delete_cookie("refresh", path="/")
                 return resp
 
-            # --- User-agent binding ---
-            req_ua_hash = UserSession.hash_user_agent(
-                request.META.get("HTTP_USER_AGENT", "")
-            )
+            # ----------------------------------------
+            # User-agent binding
+            # ----------------------------------------
+            req_ua_hash = UserSession.hash_user_agent(user_agent)
+
             if session.user_agent_hash and session.user_agent_hash != req_ua_hash:
                 session.status = UserSession.Status.REVOKED
                 session.save(update_fields=["status"])
@@ -224,8 +250,11 @@ class RefreshAPIView(APIView):
 
             user = session.user
 
-            # --- Locked account handling ---
+            # ----------------------------------------
+            # Locked account handling
+            # ----------------------------------------
             if user.is_locked:
+
                 UserSession.objects.filter(
                     user=user,
                     status=UserSession.Status.ACTIVE,
@@ -237,18 +266,25 @@ class RefreshAPIView(APIView):
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
+
                 resp.delete_cookie("refresh", path="/")
                 return resp
 
-            # --- Rotate refresh token ---
+            # ----------------------------------------
+            # Rotate refresh token
+            # ----------------------------------------
             new_raw_refresh = secrets.token_urlsafe(64)
             new_hash = UserSession.hash_token(new_raw_refresh)
 
             try:
                 with transaction.atomic():
+
                     session.previous_refresh_token_hash = session.refresh_token_hash
                     session.refresh_token_hash = new_hash
-                    session.expires_at = now + settings.SESSION_IDLE_TIMEOUT
+
+                    # 🔐 policy-driven idle refresh
+                    session.expires_at = now + get_session_idle_timeout()
+
                     session.save(
                         update_fields=[
                             "previous_refresh_token_hash",
@@ -256,6 +292,7 @@ class RefreshAPIView(APIView):
                             "expires_at",
                         ]
                     )
+
             except Exception:
                 logger.exception(
                     "Refresh token rotation failed",
@@ -266,9 +303,16 @@ class RefreshAPIView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-            # --- Generate access token ---
+            # ----------------------------------------
+            # Generate access token
+            # ----------------------------------------
             try:
                 access_token = AccessToken.for_user(user)
+
+                access_token.set_exp(
+                    lifetime=get_access_token_lifetime()
+                )
+
             except Exception:
                 logger.exception(
                     "Access token generation failed",
@@ -287,7 +331,9 @@ class RefreshAPIView(APIView):
                 user.active_role.public_id if user.active_role else None
             )
 
-            # --- Success response ---
+            # ----------------------------------------
+            # Response
+            # ----------------------------------------
             response = Response(
                 {
                     "access": str(access_token),
@@ -306,18 +352,19 @@ class RefreshAPIView(APIView):
                 secure=settings.COOKIE_SECURE,
                 samesite=settings.COOKIE_SAMESITE,
                 path="/",
-                max_age=int(settings.SESSION_ABSOLUTE_LIFETIME.total_seconds()),
+                max_age=int(get_session_absolute_lifetime().total_seconds()),
             )
 
             return response
 
         except Exception:
             logger.exception("Refresh flow failed")
+
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
+        
 class LogoutAPIView(APIView):
     permission_classes = []
     authentication_classes = []

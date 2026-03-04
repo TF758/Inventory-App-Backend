@@ -7,11 +7,13 @@ from rest_framework import status
 from django.urls import reverse
 from django.db import IntegrityError
 from unittest import mock
-
+from django.core.cache import cache
 from rest_framework_simplejwt.tokens import AccessToken
 
 from db_inventory.models import UserSession, User
 from db_inventory.factories import UserFactory
+from db_inventory.security_policy import get_session_absolute_lifetime, get_session_idle_timeout
+from db_inventory.models.security import SecuritySettings
 
 
 TEST_UA = "unittest-agent"
@@ -142,7 +144,7 @@ class RefreshTokenViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         session.refresh_from_db()
-        expected = timezone.now() + settings.SESSION_IDLE_TIMEOUT
+        expected = timezone.now() + get_session_idle_timeout()
         self.assertAlmostEqual(
             session.expires_at.timestamp(),
             expected.timestamp(),
@@ -310,3 +312,71 @@ class RefreshTokenViewTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+class SecurityPolicyTests(TestCase):
+
+    def setUp(self):
+        cache.clear()
+        SecuritySettings.objects.all().delete()
+
+    def test_policy_overrides_idle_timeout(self):
+        SecuritySettings.objects.create(
+            session_idle_minutes=5
+        )
+
+        timeout = get_session_idle_timeout()
+
+        self.assertEqual(timeout, timedelta(minutes=5))
+
+    def test_policy_overrides_absolute_lifetime(self):
+        SecuritySettings.objects.create(
+            session_absolute_hours=2
+        )
+
+        lifetime = get_session_absolute_lifetime()
+
+        self.assertEqual(lifetime, timedelta(hours=2))
+
+    def test_policy_falls_back_to_settings_when_missing(self):
+        from django.conf import settings
+
+        timeout = get_session_idle_timeout()
+        lifetime = get_session_absolute_lifetime()
+
+        self.assertEqual(timeout, settings.SESSION_IDLE_TIMEOUT)
+        self.assertEqual(lifetime, settings.SESSION_ABSOLUTE_LIFETIME)
+
+class SecurityPolicyLoginIntegrationTests(TestCase):
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.login_url = reverse("login")
+
+    def test_login_uses_security_policy_idle_timeout(self):
+        SecuritySettings.objects.create(
+            session_idle_minutes=5
+        )
+
+        user = UserFactory(is_active=True)
+        user.set_password("StrongPass123!")
+        user.save()
+
+        response = self.client.post(
+            self.login_url,
+            {"email": user.email, "password": "StrongPass123!"},
+            format="json",
+            HTTP_USER_AGENT=TEST_UA,
+            REMOTE_ADDR="127.0.0.1",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        session = UserSession.objects.get(user=user)
+
+        expected = timezone.now() + timedelta(minutes=5)
+
+        self.assertAlmostEqual(
+            session.expires_at.timestamp(),
+            expected.timestamp(),
+            delta=5,
+        )

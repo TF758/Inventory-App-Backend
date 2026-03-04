@@ -10,26 +10,26 @@ urlpatterns = [
     # ----------------------------
     # Static Routes FIRST
     # ----------------------------
-    path("create-full/", user_viewsets.FullUserCreateView.as_view()),
-    path("unallocated/", user_viewsets.UnallocatedUserViewSet.as_view({"get": "list"})),
+    path("create-full/", user_viewsets.FullUserCreateView.as_view(), name='create-full-user'),
+    path("unallocated/", user_viewsets.UnallocatedUserViewSet.as_view({"get": "list"}), name="unassigned-users"),
 
     # Placement
     path("placement/", user_viewsets.UserLocationViewSet.as_view({
         "get": "list",
         "post": "create",
-    })),
+    }), name='userlocation-list-create' ),
     path("placement/<str:public_id>/", user_viewsets.UserLocationViewSet.as_view({
         "get": "retrieve",
         "put": "update",
         "patch": "partial_update",
         "delete": "destroy",
-    })),
+    }), name='userlocation-detail'),
 
     # Transfers
     path("transfers/", user_viewsets.UserTransferViewSet.as_view({"post": "create"})),
 
     # Profile
-    path("profile/<str:public_id>/", user_viewsets.UserProfileViewSet.as_view({"get": "retrieve"})),
+    path("profile/<str:public_id>/", user_viewsets.UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
 
     # Assets
     path("<str:user_public_id>/equipment/", user_viewsets.UserEquipmentViewSet.as_view({"get": "list"})),
@@ -45,11 +45,11 @@ urlpatterns = [
     path("", user_viewsets.UserModelViewSet.as_view({
         "get": "list",
         "post": "create",
-    })),
+    }), name='users'),
     path("<str:public_id>/", user_viewsets.UserModelViewSet.as_view({
         "get": "retrieve",
         "put": "update",
         "patch": "partial_update",
         "delete": "destroy",
-    })),
+    }),  name='user-detail'),
 ]
