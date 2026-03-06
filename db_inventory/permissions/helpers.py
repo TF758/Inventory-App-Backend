@@ -3,7 +3,7 @@ from typing import Optional
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
 from db_inventory.models import *
-from db_inventory.models.assets import EquipmentStatus
+from db_inventory.models.assets import AssetAgreement, AssetAgreementItem, EquipmentStatus
 from .constants import OWNER_ALLOWED_STATUSES, ROLE_HIERARCHY
 
 
@@ -313,6 +313,31 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
                 | Q(location__department=active_role.department)
                 | Q(room__location__department=active_role.department)
             )
+    elif model_class == AssetAgreement:
+        if active_role.room:
+            q |= Q(
+                covered_assets__asset__room=active_role.room
+            )
+
+        elif active_role.location:
+            q |= Q(
+                covered_assets__asset__room__location=active_role.location
+            )
+
+        elif active_role.department:
+            q |= Q(
+                covered_assets__asset__room__location__department=active_role.department
+            )
+            
+    elif model_class == AssetAgreementItem:
+        if active_role.room:
+            q |= Q(asset__room=active_role.room)
+
+        elif active_role.location:
+            q |= Q(asset__room__location=active_role.location)
+
+        elif active_role.department:
+            q |= Q(asset__room__location__department=active_role.department)
 
     elif model_class == UserLocation:
         if active_role.department:

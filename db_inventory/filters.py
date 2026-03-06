@@ -208,27 +208,34 @@ class EquipmentFilter(django_filters.FilterSet):
 
         return queryset
         
+import django_filters
+from django.db.models import Q
+
 class LocationFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(lookup_expr='icontains', field_name="name")
-    department = django_filters.CharFilter(lookup_expr='exact', field_name="department__public_id")
-    location = django_filters.CharFilter(field_name='public_id', lookup_expr='exact')  
+    name = django_filters.CharFilter( lookup_expr="icontains", field_name="name" )
+    department = django_filters.CharFilter( lookup_expr="exact", field_name="department__public_id" )
+    location = django_filters.CharFilter( field_name="public_id", lookup_expr="exact" )
+
     q = django_filters.CharFilter(method="filter_q")
 
+    unassigned = django_filters.BooleanFilter( field_name="department", lookup_expr="isnull" )
 
     class Meta:
         model = Location
         fields = [
-            'name',
-            'department',
-            'location',
-            "q"
+            "name",
+            "department",
+            "location",
+            "unassigned",
+            "q",
         ]
 
     def filter_q(self, queryset, name, value):
         """
-        Live search for locations 
+        Live search for locations
         """
         value = value.strip().lower()
+
         if len(value) < 2:
             return queryset.none()
 
@@ -236,28 +243,49 @@ class LocationFilter(django_filters.FilterSet):
             queryset.filter(
                 Q(name__istartswith=value) |
                 Q(public_id__istartswith=value)
-            ).order_by("name")[:20])
+            )
+            .order_by("name")[:20]
+        )
 
 class RoomFilter(django_filters.FilterSet):
     q = django_filters.CharFilter(method="filter_q")
-    name = django_filters.CharFilter(lookup_expr='icontains')
-    location = django_filters.CharFilter(field_name='location__public_id', lookup_expr='exact')
-    department = django_filters.CharFilter(field_name='location__department__public_id', lookup_expr='exact')
-    room = django_filters.CharFilter(field_name='public_id', lookup_expr='exact')  
+    name = django_filters.CharFilter(lookup_expr="icontains")
 
+    location = django_filters.CharFilter(
+        field_name="location__public_id", lookup_expr="exact"
+    )
+
+    department = django_filters.CharFilter(
+        field_name="location__department__public_id", lookup_expr="exact"
+    )
+
+    room = django_filters.CharFilter(
+        field_name="public_id", lookup_expr="exact"
+    )
+
+    unassigned = django_filters.BooleanFilter(method="filter_unassigned")
 
     class Meta:
         model = Room
         fields = [
-            'name',
-            'location',
-            'department',
-            'room',
+            "name",
+            "location",
+            "department",
+            "room",
+            "unassigned",
         ]
+
+    def filter_unassigned(self, queryset, name, value):
+        """
+        Return rooms without a location (orphans)
+        """
+        if value:
+            return queryset.filter(location__isnull=True)
+        return queryset
 
     def filter_q(self, queryset, name, value):
         """
-        Live search for rooms 
+        Live search for rooms
         """
         value = value.strip().lower()
         if len(value) < 2:
@@ -267,7 +295,9 @@ class RoomFilter(django_filters.FilterSet):
             queryset.filter(
                 Q(name__istartswith=value) |
                 Q(public_id__istartswith=value)
-            ).order_by("name")[:20] )
+            )
+            .order_by("name")[:20]
+        )
 
 class ComponentFilter(django_filters.FilterSet):
     name= django_filters.CharFilter(lookup_expr='icontains')

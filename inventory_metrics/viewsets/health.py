@@ -92,10 +92,15 @@ class SiteStructureHealthView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        locations = Location.objects.all()
+        rooms = Room.objects.all()
+
         return Response({
             "departments": Department.objects.count(),
-            "locations": Location.objects.count(),
-            "rooms": Room.objects.count(),
+            "locations": locations.count(),
+            "rooms": rooms.count(),
+            "unassigned_locations": locations.filter(department__isnull=True).count(),
+            "unassigned_rooms": rooms.filter(location__isnull=True).count(),
         })
 
 class UserHealthView(APIView):
