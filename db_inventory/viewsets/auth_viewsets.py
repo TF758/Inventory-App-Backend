@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, User, AuditLog, Department, Location, Room, SiteNameChangeHistory, SiteRelocationHistory
-from db_inventory.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
+from db_inventory.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SecuritySettingsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import AuditLogFilter, SiteNameChangeHistoryFilter
@@ -16,7 +16,7 @@ from django.db import transaction
 from db_inventory.permissions.users import AdminUpdateUserPermission
 from db_inventory.utils.audit import create_audit_log
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from db_inventory.models.security import Notification
+from db_inventory.models.security import Notification, SecuritySettings
 from db_inventory.utils.viewset_helpers import get_users_affected_by_site
 from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
@@ -24,6 +24,44 @@ from db_inventory.authentication import SessionJWTAuthentication
 from django.utils import timezone
 from datetime import timedelta
 
+from db_inventory.security_policy import invalidate_security_policy_cache
+
+class SecuritySettingsAPIView(APIView):
+    """
+    Manage runtime security policy.
+
+    GET   -> retrieve current policy
+    PATCH -> update policy
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        obj, _ = SecuritySettings.objects.get_or_create()
+        return obj
+
+    def get(self, request):
+        policy = self.get_object()
+        serializer = SecuritySettingsSerializer(policy)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        policy = self.get_object()
+
+        serializer = SecuritySettingsSerializer(
+            policy,
+            data=request.data,
+            partial=True,
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+
+            invalidate_security_policy_cache()
+
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RevokeUserSessionsViewset(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]

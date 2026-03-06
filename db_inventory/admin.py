@@ -10,7 +10,95 @@ from db_inventory.models.asset_assignment import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
+from db_inventory.security_policy import invalidate_security_policy_cache
+
 # Simple models
+
+@admin.register(SecuritySettings)
+class SecuritySettingsAdmin(admin.ModelAdmin):
+    """
+    Admin interface for runtime security policy configuration.
+    Only one instance should exist.
+    """
+
+    list_display = (
+        "session_idle_minutes",
+        "session_absolute_hours",
+        "access_token_minutes",
+        "max_concurrent_sessions",
+        "lockout_attempts",
+        "lockout_duration_minutes",
+    )
+
+    fieldsets = (
+        (
+            "Session Policy",
+            {
+                "fields": (
+                    "session_idle_minutes",
+                    "session_absolute_hours",
+                    "max_concurrent_sessions",
+                )
+            },
+        ),
+        (
+            "Token Policy",
+            {
+                "fields": (
+                    "access_token_minutes",
+                )
+            },
+        ),
+        (
+            "Account Security",
+            {
+                "fields": (
+                    "lockout_attempts",
+                    "lockout_duration_minutes",
+                )
+            },
+        ),
+    )
+
+    # -----------------------------------------------------
+    # Enforce singleton
+    # -----------------------------------------------------
+
+    def has_add_permission(self, request):
+        """
+        Prevent creating more than one policy row.
+        """
+        if SecuritySettings.objects.exists():
+            return False
+        return super().has_add_permission(request)
+
+    # -----------------------------------------------------
+    # Cache invalidation
+    # -----------------------------------------------------
+
+    def save_model(self, request, obj, form, change):
+        """
+        Clear policy cache when settings are updated.
+        """
+        super().save_model(request, obj, form, change)
+        invalidate_security_policy_cache()
+
+    def delete_model(self, request, obj):
+        """
+        Clear policy cache if deleted.
+        """
+        super().delete_model(request, obj)
+        invalidate_security_policy_cache()
+
+    # -----------------------------------------------------
+    # UI improvements
+    # -----------------------------------------------------
+
+    def has_delete_permission(self, request, obj=None):
+        """
+        Optional: prevent deletion to guarantee policy always exists.
+        """
+        return True
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):

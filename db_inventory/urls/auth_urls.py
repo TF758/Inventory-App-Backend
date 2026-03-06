@@ -4,6 +4,7 @@ from db_inventory.viewsets import audit_viewsets
 from db_inventory.viewsets import auth_viewsets
 
 urlpatterns = [
+    path( "security/settings/", auth_viewsets.SecuritySettingsAPIView.as_view(), name="security_settings", ),
     # --- Audit Logs ---
     path( "audit-logs/", audit_viewsets.AuditLogViewSet.as_view({"get": "list"}), name="audit-log-list", ),
     path( "audit-logs/<str:public_id>/", audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve"}), name="audit-log-detail", ),

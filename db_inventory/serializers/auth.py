@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from db_inventory.models.users import User, PasswordResetEvent
-from db_inventory.models.security import Notification, UserSession
+from db_inventory.models.security import Notification, SecuritySettings, UserSession
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory
 from django.contrib.auth import password_validation
 from django.conf import settings
@@ -349,3 +349,15 @@ class NotificationSerializer(serializers.ModelSerializer):
             "type": obj.entity_type,
             "id": obj.entity_id,
         }
+
+class SecuritySettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SecuritySettings
+        fields = [
+            "session_idle_minutes",
+            "session_absolute_hours",
+            "access_token_minutes",
+            "max_concurrent_sessions",
+            "lockout_attempts",
+            "lockout_duration_minutes",
+        ]
