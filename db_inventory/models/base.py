@@ -1,5 +1,5 @@
 from django.db import models
-from db_inventory.utils.ids import reserve_public_id
+from db_inventory.utils.ids import generate_prefixed_id, reserve_public_id
 from ulid import ULID
 
 def generate_public_id(prefix: str) -> str:
@@ -45,6 +45,7 @@ class PublicIDModel(models.Model):
         abstract = True
 
     def save(self, *args, **kwargs):
+
         if not self.public_id:
 
             if self.PUBLIC_ID_PERMANENT:
@@ -53,7 +54,7 @@ class PublicIDModel(models.Model):
                     model_label=self._meta.label,
                 )
             else:
-                self.public_id = generate_public_id(
+                self.public_id = generate_prefixed_id(
                     prefix=self.PUBLIC_ID_PREFIX,
                 )
 

@@ -8,6 +8,8 @@ from db_inventory.models.security import UserSession
 import secrets
 
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
+from db_inventory.models.assets import AssetAgreement, AssetAgreementItem
+from django.contrib.contenttypes.models import ContentType
 
 fake = Faker()
 
@@ -230,3 +232,79 @@ class SiteRelocationHistoryFactory(factory.django.DjangoModelFactory):
     user_email = factory.LazyAttribute(lambda o: o.user.email if o.user else None)
 
     reason = factory.Faker("sentence", nb_words=8)
+
+class AssetAgreementFactory(factory.django.DjangoModelFactory):
+
+    class Meta:
+        model = AssetAgreement
+
+    name = factory.Sequence(lambda n: f"Agreement {n}")
+
+    agreement_type = AssetAgreement.AgreementType.CONTRACT
+
+    vendor = factory.LazyFunction(fake.company)
+
+    reference_number = factory.Sequence(lambda n: f"AGR-REF-{n:05d}")
+
+    start_date = factory.LazyFunction(lambda: timezone.now().date())
+
+    expiry_date = factory.LazyFunction(
+        lambda: timezone.now().date() + timedelta(days=365)
+    )
+
+    cost = factory.LazyFunction(
+        lambda: fake.pydecimal(left_digits=4, right_digits=2, positive=True)
+    )
+
+    expiry_notice_days = 30
+    auto_renew = False
+    notes = factory.LazyFunction(lambda: fake.sentence(nb_words=12))
+
+    # Default scope
+    department = factory.SubFactory(DepartmentFactory)
+    location = None
+    room = None
+
+
+class AssetAgreementItemFactory(factory.django.DjangoModelFactory):
+
+    class Meta:
+        model = AssetAgreementItem
+
+    agreement = factory.SubFactory(AssetAgreementFactory)
+
+    # Default asset type
+    equipment = factory.SubFactory(EquipmentFactory)
+
+    consumable = None
+    accessory = None
+
+    quantity = 1
+
+    class Params:
+
+        consumable_asset = factory.Trait(
+            equipment=None,
+            consumable=factory.SubFactory(ConsumableFactory),
+            accessory=None,
+        )
+
+        accessory_asset = factory.Trait(
+            equipment=None,
+            consumable=None,
+            accessory=factory.SubFactory(AccessoryFactory),
+        )
+
+    @factory.post_generation
+    def ensure_single_asset(obj, create, extracted, **kwargs):
+        """
+        Ensures only one asset field is set.
+        Prevents accidental invalid objects in tests.
+        """
+        assets = [obj.equipment, obj.consumable, obj.accessory]
+        populated = [a for a in assets if a is not None]
+
+        if len(populated) != 1:
+            raise ValueError(
+                "AssetAgreementItemFactory must have exactly one asset type set."
+            )

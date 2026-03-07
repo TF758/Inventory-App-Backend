@@ -41,20 +41,27 @@ def generate_public_ids(objs: Iterable[models.Model]):
     """
     Assign public_id to any object that looks like a PublicIDModel.
 
-    IMPORTANT:
-    - Still duck-typed (no model imports)
-    - Now reserves IDs in PublicIDRegistry
+    Behavior:
+    - Permanent IDs → reserved in PublicIDRegistry
+    - Ephemeral IDs → generated locally (no registry)
 
-    used for data generation function
+    Still duck-typed to avoid model imports.
     """
 
     for obj in objs:
         if hasattr(obj, "PUBLIC_ID_PREFIX") and not getattr(obj, "public_id", None):
 
-            obj.public_id = reserve_public_id(
-                prefix=obj.PUBLIC_ID_PREFIX,
-                model_label=obj._meta.label,
-            )
+            permanent = getattr(obj, "PUBLIC_ID_PERMANENT", True)
+
+            if permanent:
+                obj.public_id = reserve_public_id(
+                    prefix=obj.PUBLIC_ID_PREFIX,
+                    model_label=obj._meta.label,
+                )
+            else:
+                obj.public_id = generate_prefixed_id(
+                    prefix=obj.PUBLIC_ID_PREFIX,
+                )
 
     return objs
 

@@ -9,7 +9,7 @@ from db_inventory.models.audit import *
 from db_inventory.models.asset_assignment import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-
+from django.contrib.contenttypes.admin import GenericTabularInline
 from db_inventory.security_policy import invalidate_security_policy_cache
 
 # Simple models
@@ -263,7 +263,10 @@ class UserLocationAdmin(admin.ModelAdmin):
         return obj.room.public_id if obj.room else "-"
     room_public_id.short_description = "Room Public ID"
     
-admin.site.register(Accessory)
+@admin.register(Accessory)
+class AccessoryAdmin(admin.ModelAdmin):
+    list_display = ("public_id", "name", "serial", "quantity", "room", "is_deleted", "deleted_at")
+    search_fields = ("public_id", "name")
 
 
 @admin.register(UserSession)
@@ -314,6 +317,12 @@ class RoomAdmin(admin.ModelAdmin):
 class EquipmentAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'serial_number', 'public_id')  
     readonly_fields = ('public_id',) 
+    search_fields = (
+        "public_id",
+        "name",
+        "brand",
+        "model",
+    )
     fields = ('name', 'brand', 'serial_number', 'model', 'public_id', 'room', 'status', 'is_deleted', 'deleted_at')
 
 
@@ -335,6 +344,7 @@ class LocationAdmin(admin.ModelAdmin):
 class ConsumableAdmin(admin.ModelAdmin):
     list_display = ('name',  'quantity', 'public_id')  # adjust fields as per model
     readonly_fields = ('public_id',)
+    search_fields = ( "public_id", "name", )
     fields = ('name','quantity', 'description', 'public_id')
 
 
@@ -475,3 +485,65 @@ class AuditLogAdmin(admin.ModelAdmin):
     #
     #     # No department → restrict 
 
+    # -----------------------------
+# Agreement Items Inline
+# -----------------------------
+
+class AssetAgreementItemInline(admin.TabularInline):
+
+    model = AssetAgreementItem
+    extra = 1
+
+    autocomplete_fields = [
+        "equipment",
+        "consumable",
+        "accessory",
+    ]
+
+    fields = (
+        "equipment",
+        "consumable",
+        "accessory",
+        "quantity",
+    )
+
+
+# -----------------------------
+# Agreement Admin
+# -----------------------------
+
+@admin.register(AssetAgreement)
+class AssetAgreementAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "public_id",
+        "name",
+        "agreement_type",
+        "vendor",
+        "expiry_date",
+        "department",
+        "location",
+        "room",
+    )
+
+    list_filter = (
+        "agreement_type",
+      
+    )
+
+    search_fields = (
+        "public_id",
+        "name",
+        "vendor",
+        "reference_number",
+    )
+
+    readonly_fields = (
+        "public_id",
+    )
+
+    inlines = [
+        AssetAgreementItemInline
+    ]
+
+    ordering = ("-start_date",)
