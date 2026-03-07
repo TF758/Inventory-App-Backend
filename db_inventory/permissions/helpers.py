@@ -314,30 +314,30 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
                 | Q(room__location__department=active_role.department)
             )
     elif model_class == AssetAgreement:
+
         if active_role.room:
-            q |= Q(
-                covered_assets__asset__room=active_role.room
-            )
+            q |= Q(room=active_role.room)
 
         elif active_role.location:
-            q |= Q(
-                covered_assets__asset__room__location=active_role.location
-            )
+            q |= Q(location=active_role.location) | Q(room__location=active_role.location)
 
         elif active_role.department:
-            q |= Q(
-                covered_assets__asset__room__location__department=active_role.department
+            q |= (
+                Q(department=active_role.department)
+                | Q(location__department=active_role.department)
+                | Q(room__location__department=active_role.department)
             )
-            
+
     elif model_class == AssetAgreementItem:
+
         if active_role.room:
-            q |= Q(asset__room=active_role.room)
+            q |= Q(agreement__room=active_role.room)
 
         elif active_role.location:
-            q |= Q(asset__room__location=active_role.location)
+            q |= Q(agreement__location=active_role.location)
 
         elif active_role.department:
-            q |= Q(asset__room__location__department=active_role.department)
+            q |= Q(agreement__department=active_role.department)
 
     elif model_class == UserLocation:
         if active_role.department:
