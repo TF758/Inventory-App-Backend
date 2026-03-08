@@ -354,9 +354,15 @@ class AccessoryFilter(django_filters.FilterSet):
         ]
 
     def with_available_quantity(self, queryset):
+        if "available_qty" in queryset.query.annotations:
+            return queryset
+
         return queryset.annotate(
             assigned_qty=Coalesce(
-                Sum("assignments__quantity", filter=models.Q(assignments__returned_at__isnull=True)),
+                Sum(
+                    "assignments__quantity",
+                    filter=models.Q(assignments__returned_at__isnull=True),
+                ),
                 Value(0),
             ),
             available_qty=F("quantity") - F("assigned_qty"),
@@ -371,9 +377,12 @@ class AccessoryFilter(django_filters.FilterSet):
         return queryset.filter(available_qty__lte=value)
 
     def filter_out_of_stock(self, queryset, name, value):
-        if value:
-            return queryset.filter(available_qty__lte=0)
-        return queryset
+        if not value:
+            return queryset
+
+        queryset = self.with_available_quantity(queryset)
+        return queryset.filter(available_qty__lte=0)
+
 class ConsumableFilter(django_filters.FilterSet):
 
     name = django_filters.CharFilter(lookup_expr='icontains')

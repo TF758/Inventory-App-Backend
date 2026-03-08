@@ -12,7 +12,7 @@ from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
-from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
@@ -73,7 +73,7 @@ class LocationViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
         return qs
 
-class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class LocationRoomsView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of rooms in a given location"""
     serializer_class = LocationRoomSerializer
     lookup_field = "public_id"
@@ -92,15 +92,12 @@ class LocationRoomsView(ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
 
         qs = Room.objects.filter(location__public_id=location_id)
 
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
 
 
-class LocationUsersView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class LocationUsersView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of users in a given location"""
     serializer_class = UserAreaSerializer
 
@@ -128,17 +125,14 @@ class LocationUsersView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVi
             )
         )
 
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
-
         return qs
 
     def get_serializer(self, *args, **kwargs):
         kwargs["exclude_department"] = True
         kwargs["exclude_location"] = True
         return super().get_serializer(*args, **kwargs)
-class LocationEquipmentView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+    
+class LocationEquipmentView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of equipment in a given location"""
     serializer_class = EquipmentSerializer
     lookup_field = "public_id"
@@ -160,10 +154,6 @@ class LocationEquipmentView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mod
             .filter(room__location__public_id=location_id, is_deleted=False)
             .order_by("-id")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
@@ -225,7 +215,7 @@ class LocationEquipmentDashboardView(APIView):
         })
 
 
-class LocationConsumablesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class LocationConsumablesView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of consumables in a given location"""
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = "public_id"
@@ -247,10 +237,6 @@ class LocationConsumablesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.M
             .filter(room__location__public_id=location_id,is_deleted=False)
             .order_by("-id")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
@@ -274,7 +260,7 @@ class LocationConsumableDashboardView( ConsumableDashboardMixin, APIView):
         return Response(data)
 
     
-class LocationAccessoriesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class LocationAccessoriesView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of accessories in a given location"""
     serializer_class = AccessoryFullSerializer
     lookup_field = "public_id"
@@ -296,10 +282,6 @@ class LocationAccessoriesView( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.M
             .filter(room__location__public_id=location_id,is_deleted=False)
             .order_by("-id")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 

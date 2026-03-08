@@ -828,3 +828,29 @@ class AreaDashboardMixin:
                 "low_stock_consumables": low_stock,
             },
         }
+
+class LightEndpointMixin:
+    """
+    Allows a ViewSet to support a 'light' endpoint by disabling pagination
+    and returning a capped queryset after filters are applied.
+    """
+
+    light_limit = 20  # default cap
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Light endpoint → no pagination + capped
+        if self.pagination_class is None:
+            queryset = queryset[: self.light_limit]
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        # Normal paginated endpoint
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

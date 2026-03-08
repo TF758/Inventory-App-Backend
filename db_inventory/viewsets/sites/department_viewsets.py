@@ -6,7 +6,7 @@ from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
-from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
 from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
 from db_inventory.pagination import  FlexiblePagination
 from django.db.models import Q
@@ -62,7 +62,7 @@ class DepartmentViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         return Department.objects.all().order_by("-id")
 
-class DepartmentUsersViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
+class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = UserAreaSerializer
     permission_classes = [UserPermission]
 
@@ -96,17 +96,13 @@ class DepartmentUsersViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Re
             .order_by("-id")
         )
 
-        # Light endpoint → no pagination → hard cap
-        if self.pagination_class is None:
-            qs = qs[:20]
-
         return qs
 
     def get_serializer(self, *args, **kwargs):
         kwargs["exclude_department"] = True
         return super().get_serializer(*args, **kwargs)
 
-class DepartmentLocationsViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
+class DepartmentLocationsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = DepartmentLocationsLightSerializer
     permission_classes = [LocationPermission]
 
@@ -128,13 +124,9 @@ class DepartmentLocationsViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewset
             .order_by("-id")
         )
 
-        # Light endpoint (dashboard)
-        if self.pagination_class is None:
-            qs = qs[:20]
-
         return qs
 
-class DepartmentEquipmentViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
+class DepartmentEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     """Retrieves a list of equipment in a given department"""
     serializer_class = EquipmentSerializer
     lookup_field = "public_id"
@@ -157,9 +149,6 @@ class DepartmentEquipmentViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewset
             .order_by("-id")
         )
 
-        # Light endpoint (dashboard / small lists)
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
@@ -223,7 +212,7 @@ class DepartmentEquipmentDashboardView(APIView):
         })
 
 
-class DepartmentConsumablesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
+class DepartmentConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     """Retrieves a list of consumables in a given department"""
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = "public_id"
@@ -247,10 +236,6 @@ class DepartmentConsumablesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, views
             .order_by("-id")
         )
 
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
-
         return qs
 
     def get_serializer(self, *args, **kwargs):
@@ -273,8 +258,7 @@ class DepartmentConsumableDashboardView( ConsumableDashboardMixin, APIView):
         return Response(data)
 
 
-class DepartmentAccessoriesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
-    """Retrieves a list of accessories in a given department"""
+class DepartmentAccessoriesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = AccessoryFullSerializer
     lookup_field = "public_id"
 
@@ -290,29 +274,23 @@ class DepartmentAccessoriesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, views
     def get_queryset(self):
         department_id = self.kwargs["public_id"]
 
-        qs = (
+        return (
             Accessory.objects
-            .filter(room__location__department__public_id=department_id,
-                is_deleted=False)
+            .filter(
+                room__location__department__public_id=department_id,
+                is_deleted=False,
+            )
+            .select_related("room", "room__location", "room__location__department")
+            .prefetch_related("assignments")
             .order_by("-id")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
-
-        return qs
 
     def get_serializer(self, *args, **kwargs):
         kwargs["exclude_department"] = True
         return super().get_serializer(*args, **kwargs)
     
 
-
-class DepartmentAccessoryDashboardView(
-    AccessoryDashboardMixin,
-    APIView
-):
+class DepartmentAccessoryDashboardView( AccessoryDashboardMixin, APIView ):
     permission_classes = [IsAuthenticated]
 
     def get_rooms(self, public_id):
@@ -392,7 +370,7 @@ class DepartmentRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadO
         return qs.order_by("-id")
     
 
-class DepartmentRoomsViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
+class DepartmentRoomsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = RoomSerializer
     lookup_field = "public_id"
 
@@ -414,10 +392,6 @@ class DepartmentRoomsViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Re
             .select_related("location", "location__department")
             .order_by("location__name", "name")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
