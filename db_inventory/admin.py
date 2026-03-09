@@ -265,7 +265,7 @@ class UserLocationAdmin(admin.ModelAdmin):
     
 @admin.register(Accessory)
 class AccessoryAdmin(admin.ModelAdmin):
-    list_display = ("public_id", "name", "serial", "quantity", "room", "is_deleted", "deleted_at")
+    list_display = ("public_id", "name", "quantity", "room", "is_deleted", "deleted_at")
     search_fields = ("public_id", "name")
 
 
