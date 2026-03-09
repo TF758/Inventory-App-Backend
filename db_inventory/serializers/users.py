@@ -305,6 +305,8 @@ class UserAccessoryAssignmentSerializer(serializers.ModelSerializer):
         if obj.assigned_by:
             return f"{obj.assigned_by.fname} {obj.assigned_by.lname}"
         return None
+    
+    
 class UserConsumableIssueSerializer(serializers.ModelSerializer):
     public_id = serializers.CharField(source="consumable.public_id", read_only=True)
     name = serializers.CharField(source="consumable.name", read_only=True)

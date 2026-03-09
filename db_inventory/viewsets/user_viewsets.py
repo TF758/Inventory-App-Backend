@@ -1,4 +1,4 @@
-from django.shortcuts import get_object_or_404
+
 from rest_framework import viewsets
 from rest_framework import mixins
 from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
@@ -15,7 +15,7 @@ from db_inventory.filters import  UserFilter, UserLocationFilter
 from db_inventory.mixins import NotificationMixin, ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -25,20 +25,16 @@ from db_inventory.permissions.helpers import ensure_permission
 from django.db.models import Count, Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
-from rest_framework.exceptions import MethodNotAllowed
 from django.utils import timezone
 from db_inventory.permissions.users import CanViewUserProfile
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
-from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
 from db_inventory.models.security import Notification
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset
 from rest_framework import viewsets
-from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
 
 from db_inventory.models.assets import Equipment
 from db_inventory.serializers.equipment import EquipmentSerializer
+from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
@@ -409,10 +405,8 @@ class FullUserCreateView(AuditMixin,views.APIView):
         )
 
 
+
 class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
-    """
-    Retrieve a single user profile by public_id.
-    """
 
     permission_classes = [CanViewUserProfile]
     serializer_class = UserProfileSerializer
@@ -422,100 +416,68 @@ class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
         User.objects
         .filter(is_active=True)
         .annotate(
+
             equipment_count=Count(
-                "equipment_assignments",
-                filter=Q(
-                    equipment_assignments__returned_at__isnull=True
-                ),
+                "equipment_assignments__equipment",
+                filter=equipment_active_q(),
                 distinct=True,
             ),
+
             accessory_count=Count(
                 "accessory_assignments__accessory",
-                filter=Q(
-                    accessory_assignments__returned_at__isnull=True,
-                    accessory_assignments__quantity__gt=0,
-                ),
+                filter=accessory_active_q(),
                 distinct=True,
             ),
+
             consumable_count=Count(
                 "consumable_assignments__consumable",
-                filter=Q(
-                    consumable_assignments__returned_at__isnull=True,
-                    consumable_assignments__quantity__gt=0,
-                ),
+                filter=consumable_active_q(),
                 distinct=True,
             ),
         )
     )
 
-class UserEquipmentViewSet(
-    mixins.ListModelMixin,
-    viewsets.GenericViewSet,
-):
+    
+class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = EquipmentSerializer
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        user = get_object_or_404(User, public_id=self.kwargs["user_public_id"])
+        user = get_user(self.kwargs["user_public_id"])
 
-        return (
-            Equipment.objects.filter(
-                active_assignment__returned_at__isnull=True,
-                is_deleted=False,
-            )
-            .select_related(
-                "room",
-                "room__location",
-                "room__location__department",
-            )
+        return get_user_equipment(user).select_related(
+            "room",
+            "room__location",
+            "room__location__department",
         )
 
-class UserAccessoryAssignmentViewSet(
-    mixins.ListModelMixin,
-    viewsets.GenericViewSet,
-):
+class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserAccessoryAssignmentSerializer
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        user = get_object_or_404(User, public_id=self.kwargs["user_public_id"])
+        user = get_user(self.kwargs["user_public_id"])
 
-        return (
-            AccessoryAssignment.objects.filter(
-                user=user,
-                returned_at__isnull=True,
-                accessory__is_deleted=False,
-            )
-            .select_related(
-                "accessory",
-                "accessory__room",
-                "accessory__room__location",
-                "accessory__room__location__department",
-                "assigned_by",
-            )
+        return get_user_accessories(user).select_related(
+            "accessory",
+            "accessory__room",
+            "accessory__room__location",
+            "accessory__room__location__department",
+            "assigned_by",
         )
     
-class UserConsumableIssueViewSet(
-    mixins.ListModelMixin,
-    viewsets.GenericViewSet,
-):
+
+class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserConsumableIssueSerializer
     pagination_class = FlexiblePagination
 
     def get_queryset(self):
-        user = get_object_or_404(User, public_id=self.kwargs["user_public_id"])
+        user = get_user(self.kwargs["user_public_id"])
 
-        return (
-            ConsumableIssue.objects.filter(
-                user=user,
-                returned_at__isnull=True,
-                consumable__is_deleted=False,
-            )
-            .select_related(
-                "consumable",
-                "consumable__room",
-                "consumable__room__location",
-                "consumable__room__location__department",
-                "assigned_by",
-            )
-        )
+        return get_user_consumables(user).select_related(
+            "consumable",
+            "consumable__room",
+            "consumable__room__location",
+            "consumable__room__location__department",
+            "assigned_by",
+        ).order_by("-assigned_at")

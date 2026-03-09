@@ -367,21 +367,14 @@ class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnl
     def get_queryset(self):
         location_id = self.kwargs.get("public_id")
 
-        # Base queryset for this endpoint (location + its rooms)
-        base_qs = RoleAssignment.objects.filter(
+        queryset = super().get_queryset().filter(
             Q(location__public_id=location_id) |
             Q(room__location__public_id=location_id)
         )
 
-        # Apply ScopeFilterMixin
-        scoped_qs = super().get_queryset().filter(
-            pk__in=base_qs.values("pk")
-        )
+        queryset = self.filter_visibility(queryset)
 
-        # Apply RoleVisibilityMixin
-        visible_qs = self.filter_visibility(scoped_qs)
-
-        return visible_qs.order_by("-id")
+        return queryset.order_by("-assigned_date")
 
 class LocationEquipmentAssignmentViewSet(
     mixins.ListModelMixin,
