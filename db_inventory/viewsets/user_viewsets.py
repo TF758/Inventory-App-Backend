@@ -21,7 +21,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from db_inventory.mixins import AuditMixin
-from db_inventory.permissions.helpers import ensure_permission
+from db_inventory.permissions.helpers import ensure_permission, filter_user_assets_by_scope
 from django.db.models import Count, Q
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
@@ -31,10 +31,9 @@ from db_inventory.models.security import Notification
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset
 from rest_framework import viewsets
 from rest_framework.response import Response
-
-from db_inventory.models.assets import Equipment
 from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
+
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
@@ -412,31 +411,34 @@ class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
     serializer_class = UserProfileSerializer
     lookup_field = "public_id"
 
-    queryset = (
-        User.objects
-        .filter(is_active=True)
-        .annotate(
+    def get_queryset(self):
 
-            equipment_count=Count(
-                "equipment_assignments__equipment",
-                filter=equipment_active_q(),
-                distinct=True,
-            ),
+        queryset = (
+            User.objects
+            .filter(is_active=True)
+            .annotate(
 
-            accessory_count=Count(
-                "accessory_assignments__accessory",
-                filter=accessory_active_q(),
-                distinct=True,
-            ),
+                equipment_count=Count(
+                    "equipment_assignments__equipment",
+                    filter=equipment_active_q(self.request.user),
+                    distinct=True,
+                ),
 
-            consumable_count=Count(
-                "consumable_assignments__consumable",
-                filter=consumable_active_q(),
-                distinct=True,
-            ),
+                accessory_count=Count(
+                    "accessory_assignments__accessory",
+                    filter=accessory_active_q(self.request.user),
+                    distinct=True,
+                ),
+
+                consumable_count=Count(
+                    "consumable_assignments__consumable",
+                    filter=consumable_active_q(self.request.user),
+                    distinct=True,
+                ),
+            )
         )
-    )
 
+        return queryset
     
 class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = EquipmentSerializer
@@ -445,11 +447,15 @@ class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
 
-        return get_user_equipment(user).select_related(
-            "room",
-            "room__location",
-            "room__location__department",
+        queryset = get_user_equipment(user)
+
+        queryset = filter_user_assets_by_scope(
+            self.request.user,
+            queryset,
+            "room"
         )
+
+        return queryset
 
 class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserAccessoryAssignmentSerializer
@@ -458,14 +464,22 @@ class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericView
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
 
-        return get_user_accessories(user).select_related(
+        queryset = get_user_accessories(user).select_related(
             "accessory",
             "accessory__room",
             "accessory__room__location",
             "accessory__room__location__department",
             "assigned_by",
         )
-    
+
+        queryset = filter_user_assets_by_scope(
+            self.request.user,
+            queryset,
+            "accessory__room"
+        )
+
+        return queryset
+
 
 class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserConsumableIssueSerializer
@@ -474,10 +488,18 @@ class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet)
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
 
-        return get_user_consumables(user).select_related(
+        queryset = get_user_consumables(user).select_related(
             "consumable",
             "consumable__room",
             "consumable__room__location",
             "consumable__room__location__department",
             "assigned_by",
         ).order_by("-assigned_at")
+
+        queryset = filter_user_assets_by_scope(
+            self.request.user,
+            queryset,
+            "consumable__room"
+        )
+
+        return queryset

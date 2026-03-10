@@ -40,24 +40,93 @@ def get_user_consumables(user):
         consumable__is_deleted=False,
     )
 
-def equipment_active_q():
-    return Q(
+def equipment_active_q(viewer=None):
+
+    q = Q(
         equipment_assignments__returned_at__isnull=True,
         equipment_assignments__equipment__is_deleted=False,
     )
 
+    if viewer is None:
+        return q
 
-def accessory_active_q():
-    return Q(
+    role = getattr(viewer, "active_role", None)
+
+    if not role:
+        return q & Q(pk=None)
+
+    if role.role == "SITE_ADMIN":
+        return q
+
+    if role.room:
+        return q & Q(equipment_assignments__equipment__room=role.room)
+
+    if role.location:
+        return q & Q(equipment_assignments__equipment__room__location=role.location)
+
+    if role.department:
+        return q & Q(equipment_assignments__equipment__room__location__department=role.department)
+
+    return q
+    
+
+def accessory_active_q(viewer=None):
+
+    q = Q(
         accessory_assignments__returned_at__isnull=True,
         accessory_assignments__quantity__gt=0,
         accessory_assignments__accessory__is_deleted=False,
     )
 
+    if viewer is None:
+        return q
 
-def consumable_active_q():
-    return Q(
+    role = getattr(viewer, "active_role", None)
+
+    if not role:
+        return q & Q(pk=None)
+
+    if role.role == "SITE_ADMIN":
+        return q
+
+    if role.room:
+        return q & Q(accessory_assignments__accessory__room=role.room)
+
+    if role.location:
+        return q & Q(accessory_assignments__accessory__room__location=role.location)
+
+    if role.department:
+        return q & Q(accessory_assignments__accessory__room__location__department=role.department)
+
+    return q
+
+
+def consumable_active_q(viewer=None):
+
+    q = Q(
         consumable_assignments__returned_at__isnull=True,
         consumable_assignments__quantity__gt=0,
         consumable_assignments__consumable__is_deleted=False,
     )
+
+    if viewer is None:
+        return q
+
+    role = getattr(viewer, "active_role", None)
+
+    if not role:
+        return q & Q(pk=None)
+
+    if role.role == "SITE_ADMIN":
+        return q
+
+    if role.room:
+        return q & Q(consumable_assignments__consumable__room=role.room)
+
+    if role.location:
+        return q & Q(consumable_assignments__consumable__room__location=role.location)
+
+    if role.department:
+        return q & Q(consumable_assignments__consumable__room__location__department=role.department)
+
+    return q
