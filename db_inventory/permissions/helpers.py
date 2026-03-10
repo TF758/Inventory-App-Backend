@@ -573,3 +573,24 @@ def can_hard_delete_asset(user: User, asset=None) -> bool:
         return False
 
     return active_role.role == "SITE_ADMIN"
+
+
+def filter_user_assets_by_scope(viewer, queryset, asset_path="room"):
+    role = getattr(viewer, "active_role", None)
+
+    if not role:
+        return queryset.none()
+
+    if role.role == "SITE_ADMIN":
+        return queryset
+
+    if role.room:
+        return queryset.filter(**{asset_path: role.room})
+
+    if role.location:
+        return queryset.filter(**{f"{asset_path}__location": role.location})
+
+    if role.department:
+        return queryset.filter(**{f"{asset_path}__location__department": role.department})
+
+    return queryset.none()
