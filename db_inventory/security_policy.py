@@ -82,10 +82,7 @@ def get_session_absolute_lifetime():
 # ---------------------------------------------------------
 
 def get_access_token_lifetime():
-    """
-    Access token lifetime (security baseline).
-    Controlled by application settings, not admin UI.
-    """
+    
     return settings.SIMPLE_JWT.get("ACCESS_TOKEN_LIFETIME")
 
 

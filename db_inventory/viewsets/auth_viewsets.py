@@ -24,7 +24,7 @@ from db_inventory.authentication import SessionJWTAuthentication
 from django.utils import timezone
 from datetime import timedelta
 
-from db_inventory.security_policy import invalidate_security_policy_cache
+from db_inventory.security_policy import get_session_idle_timeout, invalidate_security_policy_cache
 
 class SecuritySettingsAPIView(APIView):
     """
@@ -546,31 +546,60 @@ class SessionActivityAPIView(APIView):
         session = getattr(auth, "session", None)
 
         if not session:
-            return Response({"detail": "No active session."}, status=401)
+            return Response(
+                {"detail": "No active session."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         now = timezone.now()
 
-        # --- Absolute expiry protection ---
-        # Never extend beyond absolute lifetime
+        # ------------------------------------------------
+        # Ensure session is still active
+        # ------------------------------------------------
+        if session.status != UserSession.Status.ACTIVE:
+            return Response(
+                {"detail": "Session invalid."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # ------------------------------------------------
+        # Absolute expiry enforcement
+        # ------------------------------------------------
         if session.absolute_expires_at <= now:
             session.status = UserSession.Status.EXPIRED
             session.save(update_fields=["status"])
-            return Response({"detail": "Session expired."}, status=401)
 
-        # --- Extend idle timeout ---
-        new_expiry = now + settings.SESSION_IDLE_TIMEOUT
+            return Response(
+                {"detail": "Session expired."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
-        # Clamp to absolute expiry
+        # ------------------------------------------------
+        # Extend idle timeout using policy helper
+        # ------------------------------------------------
+        idle_timeout = get_session_idle_timeout()
+        new_expiry = now + idle_timeout
+
+        # Clamp to absolute lifetime
         if new_expiry > session.absolute_expires_at:
             new_expiry = session.absolute_expires_at
 
-        # Prevent DB write spam
+        # ------------------------------------------------
+        # Prevent unnecessary DB writes
+        # ------------------------------------------------
         if new_expiry - session.expires_at > timedelta(seconds=30):
             session.expires_at = new_expiry
             session.last_used_at = now
             session.save(update_fields=["expires_at", "last_used_at"])
 
-        return Response({
-            "ok": True,
-            "idle_exp": int(session.expires_at.timestamp())
-        })
+        # ------------------------------------------------
+        # Response for frontend timers
+        # ------------------------------------------------
+        return Response(
+            {
+                "ok": True,
+                "idle_exp": int(session.expires_at.timestamp()),
+                "abs_exp": int(session.absolute_expires_at.timestamp()),
+            },
+            status=status.HTTP_200_OK,
+        )

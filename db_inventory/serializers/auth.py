@@ -356,7 +356,6 @@ class SecuritySettingsSerializer(serializers.ModelSerializer):
         fields = [
             "session_idle_minutes",
             "session_absolute_hours",
-            "access_token_minutes",
             "max_concurrent_sessions",
             "lockout_attempts",
             "lockout_duration_minutes",

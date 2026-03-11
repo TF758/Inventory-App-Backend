@@ -24,7 +24,6 @@ class SecuritySettingsAdmin(admin.ModelAdmin):
     list_display = (
         "session_idle_minutes",
         "session_absolute_hours",
-        "access_token_minutes",
         "max_concurrent_sessions",
         "lockout_attempts",
         "lockout_duration_minutes",
@@ -41,14 +40,7 @@ class SecuritySettingsAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        (
-            "Token Policy",
-            {
-                "fields": (
-                    "access_token_minutes",
-                )
-            },
-        ),
+       
         (
             "Account Security",
             {
