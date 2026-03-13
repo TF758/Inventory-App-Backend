@@ -7,6 +7,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+
 def create_asset_audit_log(
     *,
     actor,
@@ -223,3 +225,40 @@ def restore_asset(
             return _execute()
 
     return _execute()
+
+
+def get_user_active_assets(user):
+
+    equipment = EquipmentAssignment.objects.filter(
+        user=user,
+        returned_at__isnull=True,
+        equipment__is_deleted=False,
+    )
+
+    accessories = AccessoryAssignment.objects.filter(
+        user=user,
+        returned_at__isnull=True,
+        accessory__is_deleted=False,
+    )
+
+    consumables = ConsumableIssue.objects.filter(
+        user=user,
+        returned_at__isnull=True,
+        consumable__is_deleted=False,
+    )
+
+    return {
+        "equipment": equipment,
+        "accessories": accessories,
+        "consumables": consumables,
+    }
+
+
+def user_has_active_assets(user):
+    assets = get_user_active_assets(user)
+
+    return (
+        assets["equipment"].exists()
+        or assets["accessories"].exists()
+        or assets["consumables"].exists()
+    )

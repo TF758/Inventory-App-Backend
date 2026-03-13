@@ -122,7 +122,7 @@ class LocationUsersView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixi
             .select_related(
                 "user",
                 "room",
-            )
+            ).order_by("-id")
         )
 
         return qs

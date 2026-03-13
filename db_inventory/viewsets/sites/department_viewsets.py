@@ -77,14 +77,9 @@ class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
         department_id = self.kwargs["public_id"]
 
         qs = (
-            UserLocation.objects.filter(is_current=True)
-            .filter(
-                Q(room__location__department__public_id=department_id)
-                | Q(
-                    user__created_by__user_locations__is_current=True,
-                    user__created_by__user_locations__room__location__department__public_id=department_id
-                )
-                | Q(user__role_assignments__department__public_id=department_id)
+            UserLocation.objects.filter(
+                is_current=True,
+                room__location__department__public_id=department_id
             )
             .select_related(
                 "user",
@@ -92,7 +87,6 @@ class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
                 "room__location",
                 "room__location__department",
             )
-            .distinct()
             .order_by("-id")
         )
 

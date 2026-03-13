@@ -1,4 +1,5 @@
 
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
 from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
@@ -33,7 +34,8 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
-
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from rest_framework.decorators import action
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """
@@ -186,6 +188,14 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
                 raise serializers.ValidationError(
                     {"room_id": "User is already assigned to this room."}
                 )
+            
+            if user_has_active_assets(user):
+                raise serializers.ValidationError({
+                    "detail": (
+                        "User has assigned assets. "
+                        "Please return or unassign assets before transferring."
+                    )
+                })
 
             # -------------------
             # AUDIT
@@ -503,3 +513,35 @@ class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet)
         )
 
         return queryset
+
+class UserAssetStatusView(APIView):
+    permission_classes = [UserPermission]
+
+    def get(self, request, user_public_id):
+
+        user = get_object_or_404(User, public_id=user_public_id)
+
+        equipment = EquipmentAssignment.objects.filter(
+            user=user,
+            returned_at__isnull=True,
+            equipment__is_deleted=False,
+        ).count()
+
+        accessories = AccessoryAssignment.objects.filter(
+            user=user,
+            returned_at__isnull=True,
+            accessory__is_deleted=False,
+        ).count()
+
+        consumables = ConsumableIssue.objects.filter(
+            user=user,
+            returned_at__isnull=True,
+            consumable__is_deleted=False,
+        ).count()
+
+        return Response({
+            "has_assets": (equipment + accessories + consumables) > 0,
+            "equipment": equipment,
+            "accessories": accessories,
+            "consumables": consumables,
+        })
