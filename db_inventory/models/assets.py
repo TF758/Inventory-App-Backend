@@ -1,12 +1,12 @@
 from db_inventory.models.base import PublicIDModel
 from django.db import models
-from db_inventory.models.site import Room
+from db_inventory.models.site import Department, Location, Room
 from django.apps import apps
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db.models import Sum
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
-from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+from django.db.models import Q
+from django.core.exceptions import ValidationError
 
 serial_validator = RegexValidator(
     regex=r"^[A-Z0-9\-]+$",
@@ -33,10 +33,6 @@ class Equipment(PublicIDModel):
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-    agreements = GenericRelation(
-        "AssetAgreementItem",
-        related_query_name="equipment"
-    )
 
     class Meta:
         indexes = [
@@ -126,10 +122,6 @@ class Consumable(PublicIDModel):
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="consumables")
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-    agreements = GenericRelation(
-        "AssetAgreementItem",
-        related_query_name="equipment"
-    )
 
     class Meta:
         indexes = [
@@ -156,10 +148,7 @@ class Accessory(PublicIDModel):
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="accessories")
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-    agreements = GenericRelation(
-        "AssetAgreementItem",
-        related_query_name="equipment"
-    )
+
 
     class Meta:
         indexes = [
@@ -219,62 +208,237 @@ class AssetAgreement(PublicIDModel):
     start_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
 
-    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
 
     expiry_notice_days = models.PositiveIntegerField(default=30)
     auto_renew = models.BooleanField(default=False)
 
     notes = models.TextField(blank=True)
 
+    # Agreement Scope (exactly ONE must be set)
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agreements"
+    )
+
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agreements"
+    )
+
+    room = models.ForeignKey(
+        Room,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agreements"
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["agreement_type"]),
+            models.Index(fields=["expiry_date"]),
+        ]
+
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    Q(department__isnull=False, location__isnull=True, room__isnull=True) |
+                    Q(department__isnull=True, location__isnull=False, room__isnull=True) |
+                    Q(department__isnull=True, location__isnull=True, room__isnull=False)
+                ),
+                name="agreement_single_scope"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_agreement_type_display()})"
+
+    @property
+    def scope(self):
+        """
+        Returns the scope object (department/location/room)
+        """
+        return self.room or self.location or self.department
+
+    @property
+    def scope_type(self):
+        if self.room:
+            return "room"
+        if self.location:
+            return "location"
+        if self.department:
+            return "department"
+        return None
+
+    @property
+    def is_expired(self):
+        if self.expiry_date:
+            return self.expiry_date < timezone.now().date()
+        return False
+
 class AssetAgreementItem(models.Model):
 
     agreement = models.ForeignKey(
-        AssetAgreement,
+        "AssetAgreement",
         on_delete=models.CASCADE,
-        related_name="covered_assets"
+        related_name="items"
     )
 
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
+    equipment = models.ForeignKey(
+        "Equipment",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agreement_items"
+    )
 
-    asset = GenericForeignKey("content_type", "object_id")
+    consumable = models.ForeignKey(
+        "Consumable",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agreement_items"
+    )
+
+    accessory = models.ForeignKey(
+        "Accessory",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agreement_items"
+    )
 
     quantity = models.PositiveIntegerField(default=1)
 
     class Meta:
         indexes = [
             models.Index(fields=["agreement"]),
-            models.Index(fields=["content_type", "object_id"]),
         ]
+
         constraints = [
+
+            # Ensure only ONE asset field is set
+            models.CheckConstraint(
+                check=(
+                    Q(equipment__isnull=False, consumable__isnull=True, accessory__isnull=True) |
+                    Q(equipment__isnull=True, consumable__isnull=False, accessory__isnull=True) |
+                    Q(equipment__isnull=True, consumable__isnull=True, accessory__isnull=False)
+                ),
+                name="agreement_item_single_asset"
+            ),
+
+            # Prevent duplicate equipment per agreement
             models.UniqueConstraint(
-                fields=["agreement", "content_type", "object_id"],
-                name="unique_asset_per_agreement"
-            )
+                fields=["agreement", "equipment"],
+                condition=Q(equipment__isnull=False),
+                name="unique_equipment_per_agreement"
+            ),
+
+            # Prevent duplicate consumable per agreement
+            models.UniqueConstraint(
+                fields=["agreement", "consumable"],
+                condition=Q(consumable__isnull=False),
+                name="unique_consumable_per_agreement"
+            ),
+
+            # Prevent duplicate accessory per agreement
+            models.UniqueConstraint(
+                fields=["agreement", "accessory"],
+                condition=Q(accessory__isnull=False),
+                name="unique_accessory_per_agreement"
+            ),
         ]
+
+    def __str__(self):
+        return f"{self.agreement} → {self.asset}"
+
+    # -----------------------------
+    # Asset Resolver
+    # -----------------------------
+
+    @property
+    def asset(self):
+        return (
+            self.equipment
+            or self.consumable
+            or self.accessory
+        )
+
+    @property
+    def asset_type(self):
+        if self.equipment:
+            return "equipment"
+        if self.consumable:
+            return "consumable"
+        if self.accessory:
+            return "accessory"
+        return None
+
+    @property
+    def asset_public_id(self):
+        asset = self.asset
+        return getattr(asset, "public_id", None) if asset else None
+
+    # -----------------------------
+    # Location Helpers
+    # -----------------------------
 
     @property
     def room(self):
-        if hasattr(self.asset, "room"):
-            return self.asset.room
-        return None
-    
+        asset = self.asset
+        return asset.room if asset else None
 
-    @property
-    def location(self):
-        if self.room:
-            return self.room.location
-        return None
-    
+    # -----------------------------
+    # Validation
+    # -----------------------------
 
-    @property
-    def department(self):
-        if self.location:
-            return self.location.department
-        return None
-    
-    @property
-    def asset_public_id(self):
-        if self.asset:
-            return getattr(self.asset, "public_id", None)
-        return None
+    def clean(self):
+        super().clean()
+
+        asset = self.asset
+        agreement = self.agreement
+
+        if not asset:
+            raise ValidationError("Agreement item must reference an asset.")
+
+        asset_room = asset.room
+        if not asset_room:
+            raise ValidationError("Asset must belong to a room.")
+
+        # Room scoped agreement
+        if agreement.room and asset_room != agreement.room:
+            raise ValidationError(
+                "Asset is outside the agreement room scope."
+            )
+
+        # Location scoped agreement
+        if agreement.location and asset_room.location != agreement.location:
+            raise ValidationError(
+                "Asset is outside the agreement location scope."
+            )
+
+        # Department scoped agreement
+        if (
+            agreement.department
+            and asset_room.location.department != agreement.department
+        ):
+            raise ValidationError(
+                "Asset is outside the agreement department scope."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

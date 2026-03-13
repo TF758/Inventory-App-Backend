@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
 from db_inventory.permissions import RoomPermission, AssetPermission, UserPermission
-from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers import *
@@ -66,7 +66,7 @@ class RoomViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
 
     
-class RoomUsersViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of users in a given room"""
     serializer_class = UserAreaSerializer
     lookup_field = "public_id"
@@ -94,9 +94,6 @@ class RoomUsersViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
             )
         )
 
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
@@ -106,7 +103,7 @@ class RoomUsersViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelVie
         kwargs["exclude_room"] = True
         return super().get_serializer(*args, **kwargs)
     
-class RoomEquipmentViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of equipment in a given room"""
     serializer_class = EquipmentSerializer
     lookup_field = "public_id"
@@ -129,10 +126,6 @@ class RoomEquipmentViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mode
                 is_deleted=False)
             .order_by("-id")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
@@ -211,7 +204,7 @@ class RoomEquipmentDashboardView(APIView):
         })
     
 
-class RoomConsumablesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of consumables in a given room"""
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = "public_id"
@@ -234,9 +227,6 @@ class RoomConsumablesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mo
             .order_by("-id")
         )
 
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 
@@ -260,7 +250,7 @@ class RoomConsumableDashboardView( ConsumableDashboardMixin, APIView, ):
         data = self.build_dashboard_response(rooms, period)
         return Response(data)   
 
-class RoomAccessoriesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomAccessoriesViewSet(LightEndpointMixin,ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of accessories in a given room"""
     serializer_class = AccessoryFullSerializer
     lookup_field = "public_id"
@@ -282,10 +272,6 @@ class RoomAccessoriesViewSet( ScopeFilterMixin, ExcludeFiltersMixin, viewsets.Mo
             .filter(room__public_id=room_id)
             .order_by("-id")
         )
-
-        # Light endpoint → unpaginated + capped
-        if self.pagination_class is None:
-            qs = qs[:20]
 
         return qs
 

@@ -82,14 +82,7 @@ def get_session_absolute_lifetime():
 # ---------------------------------------------------------
 
 def get_access_token_lifetime():
-    """
-    Access token lifetime.
-    """
-    sec = _get_security_settings()
-
-    if sec and sec.access_token_minutes:
-        return timedelta(minutes=sec.access_token_minutes)
-
+    
     return settings.SIMPLE_JWT.get("ACCESS_TOKEN_LIFETIME")
 
 

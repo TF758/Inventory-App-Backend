@@ -1,6 +1,7 @@
 import django_filters
 from db_inventory.models import *
-from django.db.models import Case, When, Value, IntegerField, Q
+from django.db.models import Case, When, Value, IntegerField, Q, Sum, F, Value
+from django.db.models.functions import Coalesce
 from db_inventory.utils.filters import BaseAssetNameFilter
 
 class UserFilter(django_filters.FilterSet):
@@ -323,40 +324,107 @@ class ComponentFilter(django_filters.FilterSet):
 
 
 class AccessoryFilter(django_filters.FilterSet):
-    name= django_filters.CharFilter(lookup_expr='icontains')
-    serial_number=django_filters.CharFilter(lookup_expr='icontains')
-    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
+    name = django_filters.CharFilter(lookup_expr="icontains")
+    serial_number = django_filters.CharFilter(lookup_expr="icontains")
 
+    room = django_filters.CharFilter(field_name="room__public_id", lookup_expr="icontains")
+    location = django_filters.CharFilter(field_name="room__location__public_id", lookup_expr="icontains")
+    department = django_filters.CharFilter(field_name="room__location__department__public_id", lookup_expr="icontains")
 
+    quantity = django_filters.NumberFilter(field_name="quantity")
+    quantity_min = django_filters.NumberFilter(field_name="quantity", lookup_expr="gte")
+    quantity_max = django_filters.NumberFilter(field_name="quantity", lookup_expr="lte")
+
+    available_quantity_min = django_filters.NumberFilter(method="filter_available_min")
+    available_quantity_max = django_filters.NumberFilter(method="filter_available_max")
+
+    out_of_stock = django_filters.BooleanFilter(method="filter_out_of_stock")
 
     class Meta:
         model = Accessory
         fields = [
-            'name',
-            'room',
-            'location',
-            'department',
+            "name",
+            "serial_number",
+            "room",
+            "location",
+            "department",
+            "quantity",
+            "quantity_min",
+            "quantity_max",
         ]
 
+    def with_available_quantity(self, queryset):
+        if "available_qty" in queryset.query.annotations:
+            return queryset
+
+        return queryset.annotate(
+            assigned_qty=Coalesce(
+                Sum(
+                    "assignments__quantity",
+                    filter=models.Q(assignments__returned_at__isnull=True),
+                ),
+                Value(0),
+            ),
+            available_qty=F("quantity") - F("assigned_qty"),
+        )
+
+    def filter_available_min(self, queryset, name, value):
+        queryset = self.with_available_quantity(queryset)
+        return queryset.filter(available_qty__gte=value)
+
+    def filter_available_max(self, queryset, name, value):
+        queryset = self.with_available_quantity(queryset)
+        return queryset.filter(available_qty__lte=value)
+
+    def filter_out_of_stock(self, queryset, name, value):
+        if not value:
+            return queryset
+
+        queryset = self.with_available_quantity(queryset)
+        return queryset.filter(available_qty__lte=0)
 
 class ConsumableFilter(django_filters.FilterSet):
-    name= django_filters.CharFilter(lookup_expr='icontains')
-    room = django_filters.CharFilter(lookup_expr='icontains', field_name='room__public_id')
-    location = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__public_id')
-    department = django_filters.CharFilter(lookup_expr='icontains', field_name='room__location__department__public_id')
 
+    name = django_filters.CharFilter(lookup_expr='icontains')
 
+    room = django_filters.CharFilter(field_name='room__public_id', lookup_expr='icontains')
+    location = django_filters.CharFilter(field_name='room__location__public_id', lookup_expr='icontains')
+    department = django_filters.CharFilter(field_name='room__location__department__public_id', lookup_expr='icontains')
+
+    quantity = django_filters.NumberFilter(field_name="quantity")
+    quantity_min = django_filters.NumberFilter(field_name="quantity", lookup_expr="gte")
+    quantity_max = django_filters.NumberFilter(field_name="quantity", lookup_expr="lte")
+
+    low_stock = django_filters.BooleanFilter(method="filter_low_stock")
+    out_of_stock = django_filters.BooleanFilter(method="filter_out_of_stock")
 
     class Meta:
         model = Consumable
         fields = [
-            'name',
-            'room',
-            'location',
-            'department',
+            "name",
+            "room",
+            "location",
+            "department",
+            "quantity",
+            "quantity_min",
+            "quantity_max",
+            "low_stock",
+            "out_of_stock",
         ]
+
+    def filter_low_stock(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                low_stock_threshold__gt=0,
+                quantity__gt=0,
+                quantity__lte=F("low_stock_threshold"),
+            )
+        return queryset
+
+    def filter_out_of_stock(self, queryset, name, value):
+        if value:
+            return queryset.filter(quantity=0)
+        return queryset
 
 
 class UserLocationFilter(django_filters.FilterSet):
@@ -390,9 +458,37 @@ class UserLocationFilter(django_filters.FilterSet):
 
 class RoleAssignmentFilter(django_filters.FilterSet):
     search = django_filters.CharFilter(method="filter_user_search")
+
     role = django_filters.CharFilter(field_name="role", lookup_expr="iexact")
+    role_group = django_filters.CharFilter(method="filter_role_group")
+
     area_type = django_filters.CharFilter(method="filter_area_type")
 
+    department = django_filters.CharFilter(field_name="department__public_id")
+    location = django_filters.CharFilter(field_name="location__public_id")
+    room = django_filters.CharFilter(field_name="room__public_id")
+
+    assigned_by = django_filters.CharFilter(field_name="assigned_by__public_id")
+
+    assigned_after = django_filters.DateTimeFilter(field_name="assigned_date", lookup_expr="gte")
+    assigned_before = django_filters.DateTimeFilter(field_name="assigned_date", lookup_expr="lte")
+
+    class Meta:
+        model = RoleAssignment
+        fields = [
+            "search",
+            "role",
+            "role_group",
+            "area_type",
+            "department",
+            "location",
+            "room",
+            "assigned_by",
+        ]
+
+    # -----------------------------
+    # User Search
+    # -----------------------------
     def filter_user_search(self, queryset, name, value):
         if not value:
             return queryset
@@ -403,19 +499,45 @@ class RoleAssignmentFilter(django_filters.FilterSet):
             | Q(user__email__icontains=value)
         )
 
+    # -----------------------------
+    # Area Type Filter
+    # -----------------------------
     def filter_area_type(self, queryset, name, value):
         value = value.lower()
+
         if value == "department":
             return queryset.filter(department__isnull=False)
-        elif value == "location":
-            return queryset.filter(location__isnull=False)
-        elif value == "room":
-            return queryset.filter(room__isnull=False)
-        return queryset.none()  # if invalid area_type
 
-    class Meta:
-        model = RoleAssignment
-        fields = ["role", "area_type", "search"]
+        if value == "location":
+            return queryset.filter(location__isnull=False)
+
+        if value == "room":
+            return queryset.filter(room__isnull=False)
+
+        if value == "site":
+            return queryset.filter(role="SITE_ADMIN")
+
+        return queryset
+
+    # -----------------------------
+    # Role Group Filter
+    # -----------------------------
+    def filter_role_group(self, queryset, name, value):
+        value = value.upper()
+
+        if value == "ROOM":
+            return queryset.filter(role__startswith="ROOM")
+
+        if value == "LOCATION":
+            return queryset.filter(role__startswith="LOCATION")
+
+        if value == "DEPARTMENT":
+            return queryset.filter(role__startswith="DEPARTMENT")
+
+        if value == "SITE":
+            return queryset.filter(role="SITE_ADMIN")
+
+        return queryset
 
 class AuditLogFilter(django_filters.FilterSet):
 

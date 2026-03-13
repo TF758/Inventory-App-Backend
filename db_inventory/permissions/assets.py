@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
 from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from db_inventory.models.assets import AssetAgreement, AssetAgreementItem
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from db_inventory.models.site import Department, Location, Room
@@ -295,3 +296,71 @@ class CanUpdateEquipmentStatus(BasePermission):
             return assignment.user_id == request.user.id
 
         return False
+    
+def get_agreement_action(request, view):
+
+    if request.method in ["GET", "HEAD", "OPTIONS"]:
+        return "view"
+
+    if request.method == "POST":
+        if view.basename == "assetagreementitem":
+            return "attach"
+        return "create"
+
+    if request.method in ["PUT", "PATCH"]:
+        return "edit"
+
+    if request.method == "DELETE":
+        return "delete"
+
+    return None
+
+
+AGREEMENT_PERMISSIONS = {
+    "view": "ROOM_VIEWER",
+    "create": "LOCATION_ADMIN",
+    "edit": "LOCATION_ADMIN",
+    "delete": "DEPARTMENT_ADMIN",
+    "attach": "LOCATION_ADMIN",
+}
+
+
+class AssetAgreementPermission(BasePermission):
+
+    def has_permission(self, request, view):
+
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        action = get_agreement_action(request, view)
+        required_role = AGREEMENT_PERMISSIONS.get(action)
+
+        if not required_role:
+            return False
+
+        return has_hierarchy_permission(role.role, required_role)
+
+    def has_object_permission(self, request, view, obj):
+
+        role = get_active_role(request.user)
+        if not role:
+            return False
+
+        # Determine agreement instance
+        if isinstance(obj, AssetAgreement):
+            agreement = obj
+        elif isinstance(obj, AssetAgreementItem):
+            agreement = obj.agreement
+        else:
+            agreement = getattr(obj, "agreement", None)
+
+        if not agreement:
+            return False
+
+        return is_in_scope(
+            role,
+            room=agreement.room,
+            location=agreement.location,
+            department=agreement.department,
+        )

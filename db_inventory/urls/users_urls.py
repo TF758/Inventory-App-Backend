@@ -39,6 +39,8 @@ urlpatterns = [
     # Current placement
     path("<str:user_public_id>/current-placement/", user_viewsets.UserLocationByUserView.as_view()),
 
+    path("<str:user_public_id>/asset-status/", user_viewsets.UserAssetStatusView.as_view(), name="user-asset-status"),
+
     # ----------------------------
     # Generic user routes LAST
     # ----------------------------

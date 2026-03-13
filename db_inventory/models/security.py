@@ -145,7 +145,6 @@ class SecuritySettings(models.Model):
 
     session_idle_minutes = models.PositiveIntegerField(default=30)
     session_absolute_hours = models.PositiveIntegerField(default=12)
-    access_token_minutes = models.PositiveIntegerField(default=5)
 
     max_concurrent_sessions = models.PositiveIntegerField(default=5)
 
@@ -155,6 +154,8 @@ class SecuritySettings(models.Model):
     revoke_sessions_on_password_change = models.BooleanField(default=True)
 
     updated_at = models.DateTimeField(auto_now=True)
+
+    CACHE_KEY = "security_settings_singleton"
 
     CACHE_KEY = "security_settings_singleton"
 
