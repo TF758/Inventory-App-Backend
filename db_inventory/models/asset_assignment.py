@@ -212,6 +212,7 @@ class ReturnRequest(PublicIDModel):
 
 class ReturnRequestItem(PublicIDModel):
     PUBLIC_ID_PREFIX = "RRI"
+    PUBLIC_ID_PERMANENT = False
 
     class ItemType(models.TextChoices):
         EQUIPMENT = "equipment"

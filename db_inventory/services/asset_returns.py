@@ -2,6 +2,7 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from db_inventory.models.assets import Accessory, Consumable, EquipmentStatus
 
 @transaction.atomic
 def create_equipment_return_request(user, equipment_public_ids, notes=""):
@@ -231,43 +232,56 @@ def create_consumable_return_request(user, consumable_payload, notes=""):
     return request
 
 @transaction.atomic
-def approve_return_request(request, admin_user):
+def approve_return_request(return_request, admin_user):
 
-    if request.status != ReturnRequest.Status.PENDING:
+    rr = (
+        ReturnRequest.objects
+        .select_for_update()
+        .prefetch_related("items")
+        .get(pk=return_request.pk)
+    )
+
+    if rr.status != ReturnRequest.Status.PENDING:
         raise ValueError("Request already processed")
 
     now = timezone.now()
 
-    for item in request.items.select_related(
+    assignments_to_update = []
+    accessories_to_update = []
+    consumables_to_update = []
+    items_to_update = []
+
+    equipment_events = []
+    accessory_events = []
+    consumable_events = []
+
+    items = rr.items.select_related(
         "equipment_assignment__equipment",
         "accessory_assignment__accessory",
         "consumable_issue__consumable"
-    ):
+    )
 
-        # -----------------------------
+    for item in items:
+
         # Equipment
-        # -----------------------------
         if item.item_type == "equipment":
 
             assignment = item.equipment_assignment
             equipment = assignment.equipment
 
             assignment.returned_at = now
-            assignment.save(update_fields=["returned_at"])
+            assignments_to_update.append(assignment)
 
-            equipment.status = "AVAILABLE"
-            equipment.save(update_fields=["status"])
-
-            EquipmentEvent.objects.create(
-                equipment=equipment,
-                user=assignment.user,
-                event_type=EquipmentEvent.Event_Choices.RETURNED,
-                reported_by=admin_user,
+            equipment_events.append(
+                EquipmentEvent(
+                    equipment=equipment,
+                    user=assignment.user,
+                    event_type=EquipmentEvent.Event_Choices.RETURNED,
+                    reported_by=admin_user,
+                )
             )
 
-        # -----------------------------
-        # Accessories
-        # -----------------------------
+        # Accessory
         elif item.item_type == "accessory":
 
             assignment = item.accessory_assignment
@@ -275,23 +289,23 @@ def approve_return_request(request, admin_user):
             returned_qty = item.quantity
 
             assignment.quantity -= returned_qty
-            assignment.save(update_fields=["quantity"])
-
             accessory.quantity += returned_qty
-            accessory.save(update_fields=["quantity"])
 
-            AccessoryEvent.objects.create(
-                accessory=accessory,
-                user=assignment.user,
-                quantity=returned_qty,
-                quantity_change=returned_qty,
-                event_type=AccessoryEvent.EventType.RETURNED,
-                reported_by=admin_user,
+            assignments_to_update.append(assignment)
+            accessories_to_update.append(accessory)
+
+            accessory_events.append(
+                AccessoryEvent(
+                    accessory=accessory,
+                    user=assignment.user,
+                    quantity=returned_qty,
+                    quantity_change=returned_qty,
+                    event_type=AccessoryEvent.EventType.RETURNED,
+                    reported_by=admin_user,
+                )
             )
 
-        # -----------------------------
-        # Consumables
-        # -----------------------------
+        # Consumable
         elif item.item_type == "consumable":
 
             issue = item.consumable_issue
@@ -299,53 +313,68 @@ def approve_return_request(request, admin_user):
             returned_qty = item.quantity
 
             issue.quantity -= returned_qty
-            issue.save(update_fields=["quantity"])
-
             consumable.quantity += returned_qty
-            consumable.save(update_fields=["quantity"])
 
-            ConsumableEvent.objects.create(
-                consumable=consumable,
-                issue=issue,
-                user=issue.user,
-                quantity=returned_qty,
-                quantity_change=returned_qty,
-                event_type=ConsumableEvent.EventType.RETURNED,
-                reported_by=admin_user,
+            assignments_to_update.append(issue)
+            consumables_to_update.append(consumable)
+
+            consumable_events.append(
+                ConsumableEvent(
+                    consumable=consumable,
+                    issue=issue,
+                    user=issue.user,
+                    quantity=returned_qty,
+                    quantity_change=returned_qty,
+                    event_type=ConsumableEvent.EventType.RETURNED,
+                    reported_by=admin_user,
+                )
             )
 
-        # -----------------------------
-        # Verification metadata
-        # -----------------------------
         item.verified_by = admin_user
         item.verified_at = now
-        item.save(update_fields=["verified_by", "verified_at"])
+        items_to_update.append(item)
 
-    request.status = ReturnRequest.Status.APPROVED
-    request.processed_by = admin_user
-    request.processed_at = now
+    # Batch updates
+    EquipmentAssignment.objects.bulk_update(assignments_to_update, ["returned_at", "quantity"])
+    Accessory.objects.bulk_update(accessories_to_update, ["quantity"])
+    Consumable.objects.bulk_update(consumables_to_update, ["quantity"])
+    ReturnRequestItem.objects.bulk_update(items_to_update, ["verified_by", "verified_at"])
 
-    request.save(update_fields=[
-        "status",
-        "processed_by",
-        "processed_at"
-    ])
+    # Batch event creation
+    EquipmentEvent.objects.bulk_create(equipment_events)
+    AccessoryEvent.objects.bulk_create(accessory_events)
+    ConsumableEvent.objects.bulk_create(consumable_events)
 
-def deny_return_request(request, admin_user, reason=""):
+    rr.status = ReturnRequest.Status.APPROVED
+    rr.processed_by = admin_user
+    rr.processed_at = now
+    rr.save(update_fields=["status", "processed_by", "processed_at"])
 
-    if request.status != ReturnRequest.Status.PENDING:
+
+@transaction.atomic
+def deny_return_request(return_request, admin_user, reason=""):
+
+    rr = (
+        ReturnRequest.objects
+        .select_for_update()
+        .get(pk=return_request.pk)
+    )
+
+    if rr.status != ReturnRequest.Status.PENDING:
         raise ValueError("Request already processed")
 
     now = timezone.now()
 
-    request.status = ReturnRequest.Status.DENIED
-    request.processed_by = admin_user
-    request.processed_at = now
-    request.notes = reason
+    rr.status = ReturnRequest.Status.DENIED
+    rr.processed_by = admin_user
+    rr.processed_at = now
+    rr.notes = reason
 
-    request.save(update_fields=[
+    rr.save(update_fields=[
         "status",
         "processed_by",
         "processed_at",
-        "notes"
+        "notes",
     ])
+
+    return rr

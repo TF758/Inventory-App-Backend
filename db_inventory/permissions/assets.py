@@ -436,3 +436,37 @@ class CanRequestAssetReturn(BasePermission):
             return issues.count() == len(ids)
 
         return False
+
+class CanProcessReturnRequest(BasePermission):
+    """
+    Allows an admin to approve or deny a return request only if the
+    request falls within their asset custody scope.
+    """
+
+    message = "You do not have permission to process this return request."
+
+    def has_object_permission(self, request, view, obj):
+
+        user = request.user
+        role = getattr(user, "active_role", None)
+
+        if not role:
+            return False
+
+        # must be admin role
+        if not is_admin_role(role.role):
+            return False
+
+        # SITE_ADMIN shortcut
+        if role.role == "SITE_ADMIN":
+            return True
+
+        # check jurisdiction via room snapshot
+        for item in obj.items.all():
+
+            if not has_asset_custody_scope(role, item.room):
+                raise PermissionDenied(
+                    "Return request contains assets outside your jurisdiction."
+                )
+
+        return True

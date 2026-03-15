@@ -1,5 +1,5 @@
 
-from db_inventory.mixins import AuditMixin, ScopeFilterMixin
+from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
 from db_inventory.models.audit import AuditLog
 from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer, ReturnRequestSerializer
 from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request
@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend, OrderingFilter
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
-from db_inventory.permissions.assets import CanRequestAssetReturn
+from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
 from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from db_inventory.models.asset_assignment import ReturnRequest
 from db_inventory.pagination import FlexiblePagination
@@ -244,3 +244,91 @@ class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+
+class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
+
+    permission_classes = [IsAuthenticated, CanProcessReturnRequest]
+    queryset = ReturnRequest.objects.all()
+
+    # ------------------------------------------------
+    # Approve return request
+    # ------------------------------------------------
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+
+        rr = self.get_object()
+
+        if rr.status != ReturnRequest.Status.PENDING:
+            return Response(
+                {"detail": "Return request already processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        approve_return_request(rr, request.user)
+
+        # audit log
+        self.audit(
+            AuditLog.Events.ASSET_RETURNED,
+            target=rr,
+            description=f"Return request {rr.public_id} approved",
+        )
+
+        # notify requester
+        self.notify(
+            recipient=rr.requester,
+            notif_type=Notification.NotificationType.SYSTEM,
+            title="Return Request Approved",
+            message="Your asset return request has been approved.",
+            entity=rr,
+            meta={
+                "request_id": rr.public_id,
+                "status": "approved",
+            },
+        )
+
+        return Response({"status": "approved"})
+
+    # ------------------------------------------------
+    # Deny return request
+    # ------------------------------------------------
+
+    @action(detail=True, methods=["post"], url_path="deny")
+    def deny(self, request, pk=None):
+
+        rr = self.get_object()
+
+        if rr.status != ReturnRequest.Status.PENDING:
+            return Response(
+                {"detail": "Return request already processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reason = request.data.get("reason", "")
+
+        deny_return_request(rr, request.user, reason)
+
+        # audit log
+        self.audit(
+            AuditLog.Events.ASSET_RETURN_REQUESTED,
+            target=rr,
+            description=f"Return request {rr.public_id} denied",
+        )
+
+        # notify requester
+        self.notify(
+            recipient=rr.requester,
+            notif_type=Notification.NotificationType.SYSTEM,
+            level=Notification.Level.WARNING,
+            title="Return Request Denied",
+            message=f"Your return request was denied. {reason}",
+            entity=rr,
+            meta={
+                "request_id": rr.public_id,
+                "status": "denied",
+                "reason": reason,
+            },
+        )
+
+        return Response({"status": "denied"})
