@@ -8,11 +8,14 @@ class UserFilter(django_filters.FilterSet):
     email = django_filters.CharFilter(lookup_expr="istartswith")
     fname = django_filters.CharFilter(method="filter_fname")
     lname = django_filters.CharFilter(method="filter_lname")
+
     is_active = django_filters.BooleanFilter()
+    is_system_user = django_filters.BooleanFilter()
+    is_locked = django_filters.BooleanFilter()
+
     last_login = django_filters.DateFromToRangeFilter()
     date_joined = django_filters.DateFromToRangeFilter()
 
-    # for autho complete querying
     q = django_filters.CharFilter(method="filter_q")
 
     class Meta:
@@ -22,6 +25,8 @@ class UserFilter(django_filters.FilterSet):
             "fname",
             "lname",
             "is_active",
+            "is_system_user",
+            "is_locked",
             "date_joined",
             "last_login",
             "q",
