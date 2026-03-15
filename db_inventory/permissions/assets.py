@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
-from db_inventory.models.assets import AssetAgreement, AssetAgreementItem
+from db_inventory.models.assets import AssetAgreement, AssetAgreementItem, Equipment
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from db_inventory.models.site import Department, Location, Room
@@ -364,3 +364,75 @@ class AssetAgreementPermission(BasePermission):
             location=agreement.location,
             department=agreement.department,
         )
+
+class CanRequestAssetReturn(BasePermission):
+    """
+    Ensures a user may only request returns
+    for assets currently assigned/issued to them.
+    """
+
+    message = "You may only return assets currently assigned to you."
+
+    def has_permission(self, request, view):
+
+        user = request.user
+        data = request.data
+
+
+        # ensure only 1 type of asset is allowed
+        asset_types = ["equipment", "accessories", "consumables"]
+
+        present = [k for k in asset_types if k in data]
+
+        if len(present) != 1:
+            return False
+
+        # ---------------------
+        # Equipment
+        # ---------------------
+        if "equipment" in data:
+
+            equipment_ids = data.get("equipment", [])
+
+            equipment = Equipment.objects.filter(
+                public_id__in=equipment_ids,
+                active_assignment__user=user,
+                active_assignment__returned_at__isnull=True,
+            )
+
+            return equipment.count() == len(equipment_ids)
+
+        # ---------------------
+        # Accessories
+        # ---------------------
+        if "accessories" in data:
+
+            accessories = data.get("accessories", [])
+            ids = [item.get("accessory_public_id") for item in accessories]
+
+            assignments = AccessoryAssignment.objects.filter(
+                accessory__public_id__in=ids,
+                user=user,
+                quantity__gt=0,
+            )
+
+            return assignments.count() == len(ids)
+
+        # ---------------------
+        # Consumables
+        # ---------------------
+        if "consumables" in data:
+
+            consumables = data.get("consumables", [])
+            ids = [item.get("consumable_public_id") for item in consumables]
+
+            issues = ConsumableIssue.objects.filter(
+                consumable__public_id__in=ids,
+                user=user,
+                returned_at__isnull=True,
+                quantity__gt=0,
+            )
+
+            return issues.count() == len(ids)
+
+        return False
