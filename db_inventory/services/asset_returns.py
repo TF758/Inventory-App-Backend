@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
 
 @transaction.atomic
 def create_equipment_return_request(user, equipment_public_ids, notes=""):
@@ -151,6 +151,11 @@ def create_accessory_return_request(user, accessory_payload, notes=""):
 @transaction.atomic
 def create_consumable_return_request(user, consumable_payload, notes=""):
 
+    if len(consumable_payload) > 20:
+        raise ValidationError(
+            "Maximum 20 consumables can be returned per request."
+        )
+
     request = ReturnRequest.objects.create(
         requester=user,
         notes=notes
@@ -163,17 +168,37 @@ def create_consumable_return_request(user, consumable_payload, notes=""):
         consumable_id = entry["id"]
         quantity = entry["quantity"]
 
-        issue = ConsumableIssue.objects.select_related(
-            "consumable"
-        ).get(
-            consumable__public_id=consumable_id,
-            user=user
-        )
+        try:
+            issue = (
+                ConsumableIssue.objects
+                .select_related("consumable")
+                .get(
+                    consumable__public_id=consumable_id,
+                    user=user
+                )
+            )
+        except ConsumableIssue.DoesNotExist:
+            raise ValidationError(
+                f"{consumable_id} is not issued to this user."
+            )
 
         if quantity > issue.quantity:
             raise ValidationError(
                 f"Cannot return more than remaining quantity for {consumable_id}"
             )
+
+        # Prevent duplicate pending return
+        exists = ReturnRequestItem.objects.filter(
+            consumable_issue=issue,
+            return_request__status=ReturnRequest.Status.PENDING
+        ).exists()
+
+        if exists:
+            raise ValidationError(
+                f"{consumable_id} already has a pending return request"
+            )
+
+        consumable = issue.consumable
 
         items.append(
             ReturnRequestItem(
@@ -182,6 +207,18 @@ def create_consumable_return_request(user, consumable_payload, notes=""):
                 consumable_issue=issue,
                 quantity=quantity
             )
+        )
+
+        # Timeline event
+        ConsumableEvent.objects.create(
+            consumable=consumable,
+            issue=issue,
+            user=user,
+            quantity=quantity,
+            quantity_change=0,  # inventory unchanged yet
+            event_type="return_requested",
+            reported_by=user,
+            notes=notes
         )
 
     ReturnRequestItem.objects.bulk_create(items)
@@ -194,56 +231,94 @@ def approve_return_request(request, admin_user):
     if request.status != ReturnRequest.Status.PENDING:
         raise ValueError("Request already processed")
 
+    now = timezone.now()
+
     for item in request.items.select_related(
-        "equipment_assignment",
-        "accessory_assignment",
-        "consumable_issue"
+        "equipment_assignment__equipment",
+        "accessory_assignment__accessory",
+        "consumable_issue__consumable"
     ):
 
+        # -----------------------------
+        # Equipment
+        # -----------------------------
         if item.item_type == "equipment":
 
             assignment = item.equipment_assignment
             equipment = assignment.equipment
 
-            assignment.returned_at = timezone.now()
+            assignment.returned_at = now
             assignment.save(update_fields=["returned_at"])
 
             equipment.status = "AVAILABLE"
             equipment.save(update_fields=["status"])
 
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=assignment.user,
+                event_type=EquipmentEvent.Event_Choices.RETURNED,
+                reported_by=admin_user,
+            )
 
+        # -----------------------------
+        # Accessories
+        # -----------------------------
         elif item.item_type == "accessory":
 
             assignment = item.accessory_assignment
             accessory = assignment.accessory
+            returned_qty = item.quantity
 
-            assignment.quantity -= item.quantity
+            assignment.quantity -= returned_qty
             assignment.save(update_fields=["quantity"])
 
-            accessory.quantity += item.quantity
+            accessory.quantity += returned_qty
             accessory.save(update_fields=["quantity"])
 
+            AccessoryEvent.objects.create(
+                accessory=accessory,
+                user=assignment.user,
+                quantity=returned_qty,
+                quantity_change=returned_qty,
+                event_type=AccessoryEvent.EventType.RETURNED,
+                reported_by=admin_user,
+            )
 
+        # -----------------------------
+        # Consumables
+        # -----------------------------
         elif item.item_type == "consumable":
 
             issue = item.consumable_issue
             consumable = issue.consumable
+            returned_qty = item.quantity
 
-            issue.quantity -= item.quantity
+            issue.quantity -= returned_qty
             issue.save(update_fields=["quantity"])
 
-            consumable.quantity += item.quantity
+            consumable.quantity += returned_qty
             consumable.save(update_fields=["quantity"])
 
+            ConsumableEvent.objects.create(
+                consumable=consumable,
+                issue=issue,
+                user=issue.user,
+                quantity=returned_qty,
+                quantity_change=returned_qty,
+                event_type=ConsumableEvent.EventType.RETURNED,
+                reported_by=admin_user,
+            )
 
+        # -----------------------------
+        # Verification metadata
+        # -----------------------------
         item.verified_by = admin_user
-        item.verified_at = timezone.now()
+        item.verified_at = now
         item.save(update_fields=["verified_by", "verified_at"])
-
 
     request.status = ReturnRequest.Status.APPROVED
     request.processed_by = admin_user
-    request.processed_at = timezone.now()
+    request.processed_at = now
 
     request.save(update_fields=[
         "status",
@@ -256,9 +331,11 @@ def deny_return_request(request, admin_user, reason=""):
     if request.status != ReturnRequest.Status.PENDING:
         raise ValueError("Request already processed")
 
+    now = timezone.now()
+
     request.status = ReturnRequest.Status.DENIED
     request.processed_by = admin_user
-    request.processed_at = timezone.now()
+    request.processed_at = now
     request.notes = reason
 
     request.save(update_fields=[

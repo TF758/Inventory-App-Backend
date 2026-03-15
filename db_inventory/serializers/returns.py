@@ -4,11 +4,12 @@ from rest_framework import serializers
 
 
 class EquipmentReturnRequestSerializer(serializers.Serializer):
+
     MAX_EQUIPMENT_PER_REQUEST = 20
 
     equipment = serializers.ListField( child=serializers.CharField(), allow_empty=False )
 
-    notes = serializers.CharField( required=False, allow_blank=True )
+    notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate_equipment(self, value):
 
@@ -24,11 +25,17 @@ class EquipmentReturnRequestSerializer(serializers.Serializer):
 
         return value
     
+class AccessoryReturnItemSerializer(serializers.Serializer):
+
+    accessory_public_id = serializers.CharField()  # public_id
+    quantity = serializers.IntegerField(min_value=1)
+
 
 class AccessoryReturnSerializer(serializers.Serializer):
+
     MAX_ASSETS_PER_REQUEST = 20
 
-    accessories = serializers.ListField( child=serializers.DictField(), allow_empty=False )
+    accessories = AccessoryReturnItemSerializer( many=True )
 
     notes = serializers.CharField(required=False, allow_blank=True)
 
@@ -39,11 +46,43 @@ class AccessoryReturnSerializer(serializers.Serializer):
                 f"You can return at most {self.MAX_ASSETS_PER_REQUEST} items per request."
             )
 
-        ids = [item["id"] for item in value]
+        ids = [item["accessory_public_id"] for item in value]
 
         if len(ids) != len(set(ids)):
             raise serializers.ValidationError(
                 "Duplicate accessory IDs detected."
+            )
+
+        return value
+
+class ConsumableReturnItemSerializer(serializers.Serializer):
+
+    consumable_public_id = serializers.CharField()  # public_id
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class ConsumableReturnSerializer(serializers.Serializer):
+
+    MAX_ASSETS_PER_REQUEST = 20
+
+    consumables = ConsumableReturnItemSerializer(
+        many=True
+    )
+
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_consumables(self, value):
+
+        if len(value) > self.MAX_ASSETS_PER_REQUEST:
+            raise serializers.ValidationError(
+                f"You can return at most {self.MAX_ASSETS_PER_REQUEST} items per request."
+            )
+
+        ids = [item["consumable_public_id"] for item in value]
+
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError(
+                "Duplicate consumable IDs detected."
             )
 
         return value

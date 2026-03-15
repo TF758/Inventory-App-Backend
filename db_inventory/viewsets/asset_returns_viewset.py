@@ -1,19 +1,21 @@
 
 from db_inventory.mixins import AuditMixin
 from db_inventory.models.audit import AuditLog
-from db_inventory.serializers.returns import AccessoryReturnSerializer, EquipmentReturnRequestSerializer
-from db_inventory.services.asset_returns import create_accessory_return_request, create_equipment_return_request
+from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer
+from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
+
+from inventory.db_inventory.permissions.assets import CanRequestAssetReturn
 
 class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
     """
     Allows users to request returns for equipment currently assigned to them.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
 
     def create(self, request):
 
@@ -55,7 +57,7 @@ class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
 
 class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
 
     def create(self, request):
 
@@ -86,6 +88,59 @@ class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
                 "return_request": rr.public_id,
                 "status": rr.status,
                 "items_created": rr.items.count()
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class ConsumableReturnViewSet(AuditMixin, viewsets.ViewSet):
+    """
+    Allows users to request the return of consumables
+    currently issued to them.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+        CanRequestAssetReturn
+    ]
+
+    def create(self, request):
+
+        serializer = ConsumableReturnSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        consumables = serializer.validated_data["consumables"]
+        notes = serializer.validated_data.get("notes", "")
+
+        try:
+            return_request = create_consumable_return_request(
+                user=request.user,
+                consumable_payload=consumables,
+                notes=notes
+            )
+
+        except DjangoValidationError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Audit log
+        self.audit(
+            AuditLog.Events.ASSET_RETURN_REQUESTED,
+            target=return_request,
+            description="User submitted consumable return request",
+            metadata={
+                "request_id": return_request.public_id,
+                "consumables": consumables
+            }
+        )
+
+        return Response(
+            {
+                "return_request": return_request.public_id,
+                "status": return_request.status,
+                "items_created": return_request.items.count(),
             },
             status=status.HTTP_201_CREATED
         )
