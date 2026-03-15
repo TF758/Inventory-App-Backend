@@ -53,7 +53,8 @@ def create_equipment_return_request(user, equipment_public_ids, notes=""):
             ReturnRequestItem(
                 return_request=request,
                 item_type="equipment",
-                equipment_assignment=assignment
+                equipment_assignment=assignment,
+                room = assignment.equipment.room
             )
         )
 
@@ -69,6 +70,8 @@ def create_equipment_return_request(user, equipment_public_ids, notes=""):
     ReturnRequestItem.objects.bulk_create(items)
 
     return request
+
+
 @transaction.atomic
 def create_accessory_return_request(user, accessory_payload, notes=""):
 
@@ -129,7 +132,8 @@ def create_accessory_return_request(user, accessory_payload, notes=""):
                 return_request=request,
                 item_type="accessory",
                 accessory_assignment=assignment,
-                quantity=quantity
+                quantity=quantity,
+                room = assignment.accessory.room
             )
         )
 
@@ -205,7 +209,8 @@ def create_consumable_return_request(user, consumable_payload, notes=""):
                 return_request=request,
                 item_type="consumable",
                 consumable_issue=issue,
-                quantity=quantity
+                quantity=quantity,
+                room = issue.consumable.room
             )
         )
 

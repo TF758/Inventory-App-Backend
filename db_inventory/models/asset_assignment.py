@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q, F
 
 from db_inventory.models.base import PublicIDModel
+from db_inventory.models.site import Room
 
 
 class EquipmentAssignment(models.Model):
@@ -223,6 +224,7 @@ class ReturnRequestItem(PublicIDModel):
     accessory_assignment = models.ForeignKey(AccessoryAssignment, null=True, blank=True, on_delete=models.CASCADE )
     consumable_issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.CASCADE )
     quantity = models.PositiveIntegerField(null=True, blank=True)
+    room = models.ForeignKey( Room, on_delete=models.CASCADE, db_index=True )
     verified_by = models.ForeignKey( User, null=True, blank=True, on_delete=models.SET_NULL )
     verified_at = models.DateTimeField(null=True, blank=True)
 

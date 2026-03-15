@@ -644,3 +644,40 @@ class ReturnRequestFilter(django_filters.FilterSet):
             "status",
             "asset_type",
         ]
+
+class AdminReturnRequestFilter(django_filters.FilterSet):
+
+    status = django_filters.ChoiceFilter( field_name="status", choices=ReturnRequest.Status.choices )
+    asset_type = django_filters.CharFilter( field_name="items__item_type" )
+    requester = django_filters.CharFilter( field_name="requester__public_id" )
+    department = django_filters.CharFilter( method="filter_department" )
+    location = django_filters.CharFilter( method="filter_location" )
+    room = django_filters.CharFilter( method="filter_room" )
+    requested_after = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="gte" )
+    requested_before = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="lte" )
+
+    class Meta:
+        model = ReturnRequest
+        fields = [
+            "status",
+            "asset_type",
+            "requester",
+            "department",
+            "location",
+            "room",
+        ]
+
+    def filter_department(self, queryset, name, value):
+        return queryset.filter(
+            items__room__location__department__public_id=value
+        ).distinct()
+
+    def filter_location(self, queryset, name, value):
+        return queryset.filter(
+            items__room__location__public_id=value
+        ).distinct()
+
+    def filter_room(self, queryset, name, value):
+        return queryset.filter(
+            items__room__public_id=value
+        ).distinct()

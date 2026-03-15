@@ -1,16 +1,16 @@
 
-from db_inventory.mixins import AuditMixin
+from db_inventory.mixins import AuditMixin, ScopeFilterMixin
 from db_inventory.models.audit import AuditLog
 from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer, ReturnRequestSerializer
 from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
+from django_filters.rest_framework import DjangoFilterBackend, OrderingFilter
 from django.core.exceptions import ValidationError
 
 from db_inventory.permissions.assets import CanRequestAssetReturn
-from db_inventory.filters import ReturnRequestFilter
+from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from db_inventory.models.asset_assignment import ReturnRequest
 
 class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
@@ -178,3 +178,45 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
             )
             .distinct()
         )
+    
+class AdminReturnRequestViewSet(
+    ScopeFilterMixin,
+    viewsets.ReadOnlyModelViewSet
+):
+
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    model_class = ReturnRequest
+
+    filter_backends = [
+        DjangoFilterBackend,
+        OrderingFilter,
+    ]
+
+    filterset_class = AdminReturnRequestFilter
+
+    ordering_fields = [
+        "requested_at",
+        "processed_at",
+        "status",
+    ]
+
+    ordering = ["-requested_at"]
+
+    queryset = (
+        ReturnRequest.objects
+        .select_related(
+            "requester",
+            "processed_by"
+        )
+        .prefetch_related(
+            "items",
+            "items__room",
+            "items__room__location",
+            "items__room__location__department",
+            "items__equipment_assignment__equipment",
+            "items__accessory_assignment__accessory",
+            "items__consumable_issue__consumable",
+        )
+    )
