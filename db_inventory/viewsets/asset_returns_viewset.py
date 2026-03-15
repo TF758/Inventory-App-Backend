@@ -1,8 +1,9 @@
 
 from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
+from db_inventory.models.security import Notification
 from db_inventory.models.audit import AuditLog
 from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer, ReturnRequestSerializer
-from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request
+from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request, approve_return_item, approve_return_request, deny_return_item
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,7 +12,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
 from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
-from db_inventory.models.asset_assignment import ReturnRequest
+from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from db_inventory.pagination import FlexiblePagination
 
 class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
@@ -32,9 +33,9 @@ class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
         try:
             return_request = create_equipment_return_request( user=request.user, equipment_public_ids=equipment_ids, notes=notes, )
 
-        except ValidationError as e:
+        except ValidationError as exc:
             return Response(
-                {"detail": str(e)},
+                {"detail": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -53,7 +54,7 @@ class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
             {
                 "return_request": return_request.public_id,
                 "status": return_request.status,
-                "items_created": return_request.items.count(),
+                "items_created": len(equipment_ids),
             },
             status=status.HTTP_201_CREATED,
         )
@@ -80,7 +81,7 @@ class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
 
         except ValidationError as exc:
             return Response(
-                {"detail": exc.messages},
+                {"detail": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -98,7 +99,7 @@ class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
             {
                 "return_request": rr.public_id,
                 "status": rr.status,
-                "items_created": rr.items.count()
+                "items_created": len(accessories)
             },
             status=status.HTTP_201_CREATED
         )
@@ -151,7 +152,7 @@ class ConsumableReturnViewSet(AuditMixin, viewsets.ViewSet):
             {
                 "return_request": return_request.public_id,
                 "status": return_request.status,
-                "items_created": return_request.items.count(),
+                "items_created": len(consumables),
             },
             status=status.HTTP_201_CREATED
         )
@@ -250,13 +251,15 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
 
     permission_classes = [IsAuthenticated, CanProcessReturnRequest]
     queryset = ReturnRequest.objects.all()
+    lookup_field = "public_id"
+    lookup_url_kwarg = "public_id"
 
     # ------------------------------------------------
     # Approve return request
     # ------------------------------------------------
 
     @action(detail=True, methods=["post"], url_path="approve")
-    def approve(self, request, pk=None):
+    def approve(self, request, public_id=None):
 
         rr = self.get_object()
 
@@ -266,7 +269,7 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        approve_return_request(rr, request.user)
+        rr = approve_return_request(rr, request.user)
 
         # audit log
         self.audit(
@@ -287,15 +290,17 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
                 "status": "approved",
             },
         )
-
-        return Response({"status": "approved"})
+        return Response({
+            "request_id": rr.public_id,
+            "status": rr.status
+        })
 
     # ------------------------------------------------
     # Deny return request
     # ------------------------------------------------
 
     @action(detail=True, methods=["post"], url_path="deny")
-    def deny(self, request, pk=None):
+    def deny(self, request, public_id=None):
 
         rr = self.get_object()
 
@@ -307,11 +312,11 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
 
         reason = request.data.get("reason", "")
 
-        deny_return_request(rr, request.user, reason)
+        rr = deny_return_request(rr, request.user, reason)
 
         # audit log
         self.audit(
-            AuditLog.Events.ASSET_RETURN_REQUESTED,
+            AuditLog.Events.ASSET_RETURN_DENIED,
             target=rr,
             description=f"Return request {rr.public_id} denied",
         )
@@ -322,7 +327,11 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
             notif_type=Notification.NotificationType.SYSTEM,
             level=Notification.Level.WARNING,
             title="Return Request Denied",
-            message=f"Your return request was denied. {reason}",
+            message = (
+                f"Your return request was denied. {reason}"
+                if reason
+                else "Your return request was denied."
+            ),
             entity=rr,
             meta={
                 "request_id": rr.public_id,
@@ -331,4 +340,209 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
             },
         )
 
-        return Response({"status": "denied"})
+        return Response({
+            "request_id": rr.public_id,
+            "status": rr.status
+        })
+    
+
+    @action(detail=True, methods=["post"], url_path="resolve")
+    def resolve(self, request, public_id=None):
+
+        rr = self.get_object()
+
+        if rr.status != ReturnRequest.Status.PENDING:
+            return Response(
+                {"detail": "Return request already processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items_data = request.data.get("items", [])
+
+        if not items_data:
+            return Response(
+                {"detail": "No items provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items_map = {
+            item.public_id: item
+            for item in rr.items.all()
+        }
+
+        processed = []
+
+        for entry in items_data:
+
+            item_id = entry.get("id")
+            action = entry.get("action")
+            reason = entry.get("reason", "")
+
+            item = items_map.get(item_id)
+
+            if not item:
+                return Response(
+                    {"detail": f"Item {item_id} not part of this request"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if item.status != ReturnRequestItem.Status.PENDING:
+                continue
+
+            if action == "approve":
+                approve_return_item(item, request.user)
+
+            elif action == "deny":
+                deny_return_item(item, request.user, reason)
+
+            else:
+                return Response(
+                    {"detail": f"Invalid action for item {item_id}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            processed.append(item_id)
+
+        rr.refresh_from_db()
+
+        self.audit(
+            AuditLog.Events.ASSET_RETURNED,
+            target=rr,
+            description=f"Return request {rr.public_id} resolved via batch",
+            metadata={"processed_items": processed},
+        )
+
+        self.notify(
+            recipient=rr.requester,
+            notif_type=Notification.NotificationType.SYSTEM,
+            title="Return Request Updated",
+            message="Your return request has been processed.",
+            entity=rr,
+            meta={
+                "request_id": rr.public_id,
+                "status": rr.status,
+            },
+        )
+
+        return Response(
+            {
+                "request_id": rr.public_id,
+                "processed_items": processed,
+                "status": rr.status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class AdminReturnRequestItemWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
+
+    permission_classes = [IsAuthenticated, CanProcessReturnRequest]
+    lookup_field = "public_id"
+    lookup_url_kwarg = "public_id"
+
+    queryset = (
+        ReturnRequestItem.objects
+        .select_related(
+            "return_request",
+            "equipment_assignment__equipment",
+            "accessory_assignment__accessory",
+            "consumable_issue__consumable",
+        )
+    )
+
+    # -------------------------------
+    # Approve single return item
+    # -------------------------------
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, *args, **kwargs):
+
+        item = self.get_object()
+
+        if item.status != ReturnRequestItem.Status.PENDING:
+            return Response(
+                {"detail": "Return item already processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        approve_return_item(item, request.user)
+
+        rr = item.return_request
+
+        self.audit(
+            AuditLog.Events.ASSET_RETURNED,
+            target=item,
+            description=f"Return item {item.public_id} approved",
+        )
+
+        self.notify(
+            recipient=rr.requester,
+            notif_type=Notification.NotificationType.SYSTEM,
+            title="Return Item Approved",
+            message="One of your return items has been approved.",
+            entity=rr,
+            meta={
+                "request_id": rr.public_id,
+                "item_id": item.public_id,
+                "status": "approved",
+            },
+        )
+
+        return Response(
+            {
+                "item_id": item.public_id,
+                "status": item.status,
+                "request_status": rr.status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # -------------------------------
+    # Deny single return item
+    # -------------------------------
+
+    @action(detail=True, methods=["post"], url_path="deny")
+    def deny(self, request, *args, **kwargs):
+
+        item = self.get_object()
+
+        if item.status != ReturnRequestItem.Status.PENDING:
+            return Response(
+                {"detail": "Return item already processed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reason = request.data.get("reason", "")
+
+        deny_return_item(item, request.user, reason)
+
+        rr = item.return_request
+
+        self.audit(
+            AuditLog.Events.ASSET_RETURN_DENIED,
+            target=item,
+            description=f"Return item {item.public_id} denied",
+        )
+
+        self.notify(
+            recipient=rr.requester,
+            notif_type=Notification.NotificationType.SYSTEM,
+            level=Notification.Level.WARNING,
+            title="Return Item Denied",
+            message="One of your return items was denied.",
+            entity=rr,
+            meta={
+                "request_id": rr.public_id,
+                "item_id": item.public_id,
+                "status": "denied",
+                "reason": reason,
+            },
+        )
+
+        return Response(
+            {
+                "item_id": item.public_id,
+                "status": item.status,
+                "request_status": rr.status,
+            },
+            status=status.HTTP_200_OK,
+        )

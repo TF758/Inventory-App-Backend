@@ -106,6 +106,7 @@ class AuditLog(PublicIDModel):
         ASSET_RESTOCKED = "asset_restocked"
         ASSET_ASSIGNED = "asset_assigned"
         ADMIN_RETURNED_ASSET = "admin_returned_asset"
+        ASSET_RETURN_DENIED = "asset_return_denied"
         ASSET_RETURN_REQUESTED = "asset_return_requested"
         ASSET_RETURNED = "asset_returned"
         ASSET_UNASSIGNED = "asset_unassigned"
