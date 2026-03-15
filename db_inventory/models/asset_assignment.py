@@ -175,3 +175,105 @@ class ConsumableEvent(models.Model):
 
     reported_by = models.ForeignKey( User, null=True, on_delete=models.SET_NULL, related_name="reported_consumable_events" )
     notes = models.TextField(blank=True)
+
+class ReturnRequest(PublicIDModel):
+    PUBLIC_ID_PREFIX = "RR"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        DENIED = "denied", "Denied"
+        COMPLETED = "completed", "Completed"
+
+    requester = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="return_requests"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True
+    )
+
+    requested_at = models.DateTimeField(auto_now_add=True)
+
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    processed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processed_return_requests"
+    )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["requested_at"]),
+        ]
+
+class ReturnRequestItem(models.Model):
+
+    class ItemType(models.TextChoices):
+        EQUIPMENT = "equipment"
+        ACCESSORY = "accessory"
+        CONSUMABLE = "consumable"
+
+    return_request = models.ForeignKey(
+        ReturnRequest,
+        related_name="items",
+        on_delete=models.CASCADE
+    )
+
+    item_type = models.CharField(
+        max_length=20,
+        choices=ItemType.choices,
+        db_index=True
+    )
+
+    equipment_assignment = models.ForeignKey(
+        EquipmentAssignment,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE
+    )
+
+    accessory_assignment = models.ForeignKey(
+        AccessoryAssignment,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE
+    )
+
+    consumable_issue = models.ForeignKey(
+        ConsumableIssue,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE
+    )
+
+    quantity = models.PositiveIntegerField(null=True, blank=True)
+
+    verified_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["item_type"]),
+            models.Index(fields=["equipment_assignment"]),
+            models.Index(fields=["accessory_assignment"]),
+            models.Index(fields=["consumable_issue"]),
+        ]
