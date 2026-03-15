@@ -8,10 +8,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend, OrderingFilter
 from django.core.exceptions import ValidationError
-
+from rest_framework.decorators import action
 from db_inventory.permissions.assets import CanRequestAssetReturn
 from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from db_inventory.models.asset_assignment import ReturnRequest
+from db_inventory.pagination import FlexiblePagination
 
 class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
     """
@@ -163,6 +164,8 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ReturnRequestSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
+    pagination_class = FlexiblePagination
+
     filterset_class = ReturnRequestFilter
 
     def get_queryset(self):
@@ -179,14 +182,11 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
             .distinct()
         )
     
-class AdminReturnRequestViewSet(
-    ScopeFilterMixin,
-    viewsets.ReadOnlyModelViewSet
-):
+class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet ):
 
     serializer_class = ReturnRequestSerializer
     permission_classes = [IsAuthenticated]
-
+    pagination_class = FlexiblePagination
     model_class = ReturnRequest
 
     filter_backends = [
@@ -220,3 +220,27 @@ class AdminReturnRequestViewSet(
             "items__consumable_issue__consumable",
         )
     )
+    # --------------------------------------------------
+    #  pending return requests
+    # --------------------------------------------------
+
+    @action(detail=False, methods=["get"], url_path="pending")
+    def pending(self, request):
+        """
+        Admin work queue for pending return requests.
+        """
+
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(
+                status=ReturnRequest.Status.PENDING
+            )
+        )
+
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
