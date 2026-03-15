@@ -88,7 +88,7 @@ def create_accessory_return_request(user, accessory_payload, notes=""):
 
     for entry in accessory_payload:
 
-        accessory_id = entry["id"]
+        accessory_id = entry["accessory_public_id"]
         quantity = entry["quantity"]
 
         try:
@@ -165,7 +165,7 @@ def create_consumable_return_request(user, consumable_payload, notes=""):
 
     for entry in consumable_payload:
 
-        consumable_id = entry["id"]
+        consumable_id = entry["consumable_public_id"]
         quantity = entry["quantity"]
 
         try:
