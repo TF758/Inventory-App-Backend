@@ -25,7 +25,6 @@ urlpatterns = [
 
     path( "me/consumables/use/", UseConsumableView.as_view(), name="use-consumable" ),
 
-    path( "me/consumables/<str:public_id>/", self_viewsets.SelfConsumableAssignmentDetailView.as_view(), name="assign-consumable-detail" ),
 
     # -------------------------
     # Returns
@@ -37,6 +36,17 @@ urlpatterns = [
 
     path( "me/consumables/return/", asset_returns_viewset.ConsumableReturnViewSet.as_view({"post": "create"}), name="self-return-consumables" ),
 
+
+    # -------------------------
+    # Return Requests
+    # -------------------------
+
+    path( "me/returns/", asset_returns_viewset.SelfReturnRequestViewSet.as_view({"get": "list"}), name="self-return-requests", ),
+
+    path( "me/returns/<str:public_id>/", asset_returns_viewset.SelfReturnRequestViewSet.as_view({"get": "retrieve"}), name="self-return-request-detail", ),
+    
+
+    path( "me/consumables/<str:public_id>/", self_viewsets.SelfConsumableAssignmentDetailView.as_view(), name="assign-consumable-detail" ),
     # -------------------------
     # Admin Profile
     # -------------------------
