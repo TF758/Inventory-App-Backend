@@ -16,6 +16,7 @@ from datetime import timedelta
 from django.db.models import Count, Sum, Q, F
 from django.utils import timezone
 from rest_framework.response import Response
+from django.conf import settings
 
 class ScopeFilterMixin:
     """
@@ -314,53 +315,43 @@ class AuditMixin:
     # -------------------------------------------------
 
     def _log_audit(self, event_type, *, target=None, description="", metadata=None):
-        """
-        Schedule an immutable audit log entry after transaction commit.
-        """
 
         request = getattr(self, "request", None)
         user = getattr(request, "user", None) if request else None
 
         if user and user.is_anonymous:
             user = None
-            
+
         scope = self._resolve_scope(target)
 
         def _create_log():
             AuditLog.objects.create(
-                # Actor
                 user=user,
                 user_public_id=getattr(user, "public_id", None),
                 user_email=getattr(user, "email", None),
-
-                # Event
                 event_type=event_type,
                 description=description,
                 metadata=metadata or {},
-
-                # Target snapshot
                 target_model=self._get_target_model(target),
                 target_id=getattr(target, "public_id", None),
                 target_name=self._get_target_label(target),
-
-                # Scope snapshot
                 department=scope["department"],
                 department_name=scope["department_name"],
                 location=scope["location"],
                 location_name=scope["location_name"],
                 room=scope["room"],
                 room_name=scope["room_name"],
-
-                # Request context
                 ip_address=request.META.get("REMOTE_ADDR") if request else None,
                 user_agent=request.META.get("HTTP_USER_AGENT", "") if request else "",
             )
 
-        transaction.on_commit(_create_log)
-
-    # -------------------------------------------------
-    # Public helper for domain actions
-    # -------------------------------------------------
+        if getattr(settings, "IS_TESTING", False):
+            _create_log()
+        else:
+            transaction.on_commit(_create_log)
+        # -------------------------------------------------
+        # Public helper for domain actions
+        # -------------------------------------------------
 
     def audit(self, event_type, *, target=None, description="", metadata=None):
         """
@@ -436,6 +427,7 @@ class ListDetailSerializerMixin:
         return super().get_serializer_class()
 
 
+
 class NotificationMixin:
     """
     Mixin to create user-facing notifications after successful DB commits.
@@ -445,22 +437,20 @@ class NotificationMixin:
         self,
         *,
         recipient,
-        notif_type: Notification.NotificationType,
-        title: str,
-        message: str,
-        level: Notification.Level = Notification.Level.INFO,
+        notif_type,
+        title,
+        message,
+        level=Notification.Level.INFO,
         entity=None,
         actor=None,
-        meta=None, 
+        meta=None,
     ):
         if not recipient or recipient.is_anonymous:
             return
 
-        channel_layer = get_channel_layer()
-
-        def _create_and_send(user):
+        def _create_notification():
             notification = Notification.objects.create(
-                recipient=user,
+                recipient=recipient,
                 type=notif_type,
                 level=level,
                 title=title,
@@ -470,7 +460,14 @@ class NotificationMixin:
                 meta=meta,
             )
 
-            # 🔔 Payload sent over WebSocket
+            # Skip websocket during tests
+            if getattr(settings, "IS_TESTING", False):
+                return
+
+            channel_layer = get_channel_layer()
+            if not channel_layer:
+                return
+
             payload = {
                 "public_id": notification.public_id,
                 "type": notification.type,
@@ -478,27 +475,25 @@ class NotificationMixin:
                 "title": notification.title,
                 "message": notification.message,
                 "created_at": notification.created_at.isoformat(),
-                "entity": (
-                    {
-                        "type": notification.entity_type,
-                        "id": notification.entity_id,
-                    }
-                    if notification.entity_id
-                    else None
-                ),
-                "meta": notification.meta, 
+                "entity": {
+                    "type": notification.entity_type,
+                    "id": notification.entity_id,
+                } if notification.entity_id else None,
+                "meta": notification.meta,
             }
 
-            group_name = f"user_{user.public_id}"
-
             async_to_sync(channel_layer.group_send)(
-                group_name,
+                f"user_{recipient.public_id}",
                 {
                     "type": "notification",
                     "payload": payload,
                 },
             )
-        transaction.on_commit(lambda: _create_and_send(recipient))
+
+        if getattr(settings, "IS_TESTING", False):
+            _create_notification()
+        else:
+            transaction.on_commit(_create_notification)
 
 
 

@@ -8,11 +8,14 @@ class UserFilter(django_filters.FilterSet):
     email = django_filters.CharFilter(lookup_expr="istartswith")
     fname = django_filters.CharFilter(method="filter_fname")
     lname = django_filters.CharFilter(method="filter_lname")
+
     is_active = django_filters.BooleanFilter()
+    is_system_user = django_filters.BooleanFilter()
+    is_locked = django_filters.BooleanFilter()
+
     last_login = django_filters.DateFromToRangeFilter()
     date_joined = django_filters.DateFromToRangeFilter()
 
-    # for autho complete querying
     q = django_filters.CharFilter(method="filter_q")
 
     class Meta:
@@ -22,6 +25,8 @@ class UserFilter(django_filters.FilterSet):
             "fname",
             "lname",
             "is_active",
+            "is_system_user",
+            "is_locked",
             "date_joined",
             "last_login",
             "q",
@@ -623,3 +628,56 @@ class SelfConsumableFilter(BaseAssetNameFilter):
     class Meta:
         model = ConsumableIssue
         fields = ["name"]
+
+class ReturnRequestFilter(django_filters.FilterSet):
+
+    status = django_filters.CharFilter(field_name="status")
+    asset_type = django_filters.CharFilter( field_name="items__item_type", lookup_expr="exact" )
+    requested_after = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="gte" )
+    requested_before = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="lte" )
+    processed_after = django_filters.DateTimeFilter( field_name="processed_at", lookup_expr="gte" )
+    processed_before = django_filters.DateTimeFilter( field_name="processed_at", lookup_expr="lte" )
+
+    class Meta:
+        model = ReturnRequest
+        fields = [
+            "status",
+            "asset_type",
+        ]
+
+class AdminReturnRequestFilter(django_filters.FilterSet):
+
+    status = django_filters.ChoiceFilter( field_name="status", choices=ReturnRequest.Status.choices )
+    asset_type = django_filters.CharFilter( field_name="items__item_type" )
+    requester = django_filters.CharFilter( field_name="requester__public_id" )
+    department = django_filters.CharFilter( method="filter_department" )
+    location = django_filters.CharFilter( method="filter_location" )
+    room = django_filters.CharFilter( method="filter_room" )
+    requested_after = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="gte" )
+    requested_before = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="lte" )
+
+    class Meta:
+        model = ReturnRequest
+        fields = [
+            "status",
+            "asset_type",
+            "requester",
+            "department",
+            "location",
+            "room",
+        ]
+
+    def filter_department(self, queryset, name, value):
+        return queryset.filter(
+            items__room__location__department__public_id=value
+        ).distinct()
+
+    def filter_location(self, queryset, name, value):
+        return queryset.filter(
+            items__room__location__public_id=value
+        ).distinct()
+
+    def filter_room(self, queryset, name, value):
+        return queryset.filter(
+            items__room__public_id=value
+        ).distinct()

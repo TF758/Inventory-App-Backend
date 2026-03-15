@@ -106,6 +106,8 @@ class AuditLog(PublicIDModel):
         ASSET_RESTOCKED = "asset_restocked"
         ASSET_ASSIGNED = "asset_assigned"
         ADMIN_RETURNED_ASSET = "admin_returned_asset"
+        ASSET_RETURN_DENIED = "asset_return_denied"
+        ASSET_RETURN_REQUESTED = "asset_return_requested"
         ASSET_RETURNED = "asset_returned"
         ASSET_UNASSIGNED = "asset_unassigned"
         ASSET_REASSIGNED = "asset_reassigned"
@@ -114,6 +116,7 @@ class AuditLog(PublicIDModel):
         SITE_RELOCATED = "site_relocated"
         SITE_RENAMED = "site_renamed"
         STOCK_USED = "stock_used"
+        RETURN_REQUESTED = "return_requested", "Return Requested"
 
 
 class SiteNameChangeHistory(models.Model):

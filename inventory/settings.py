@@ -18,6 +18,8 @@ import environ
 import os
 import sys
 
+IS_TESTING = "test" in sys.argv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -113,14 +115,26 @@ REDIS_REPORTS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_REPORTS}"
 REPORT_CACHE_TTL_SECONDS = env.int("REPORT_CACHE_TTL_SECONDS", default=900)
 ASGI_APPLICATION = "inventory.asgi.application"
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-           "hosts": [REDIS_CHANNELS_URL],
+# -------------------------------------------------
+# Channel layers (WebSockets)
+# -------------------------------------------------
+
+if IS_TESTING:
+    # Use in-memory layer during tests (no Redis needed)
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_CHANNELS_URL],
+            },
         },
-    },
-}
+    }
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

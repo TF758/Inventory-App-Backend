@@ -4,6 +4,9 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q, F
 
+from db_inventory.models.base import PublicIDModel
+from db_inventory.models.site import Room
+
 
 class EquipmentAssignment(models.Model):
     equipment = models.OneToOneField(Equipment,on_delete=models.CASCADE,related_name="active_assignment")
@@ -96,6 +99,7 @@ class EquipmentEvent(models.Model):
         RETIRED = "retired", "Retired"
         UNDER_REPAIR = "under_repair", "Under repair"
         CONDEMNED = "condemned", "Condemned"
+        RETURN_REQUESTED = "return_requested", "Return Requested"
     
 
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="events" )
@@ -126,6 +130,7 @@ class AccessoryEvent(models.Model):
         CONDEMNED = "condemned", "Condemned"
         RESTOCKED = "restocked", "Restocked"
         ADJUSTED = "adjusted", "Adjusted"
+        RETURN_REQUESTED = "return_requested", "Return Requested"
 
     accessory = models.ForeignKey(Accessory,on_delete=models.CASCADE,related_name="events")
 
@@ -161,6 +166,7 @@ class ConsumableEvent(models.Model):
         CONDEMNED = "condemned"
         RESTOCKED = "restocked"
         ADJUSTED = "adjusted"
+        RETURN_REQUESTED = "return_requested"
 
     consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name="events")
     issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.SET_NULL, related_name="events" )
@@ -175,3 +181,68 @@ class ConsumableEvent(models.Model):
 
     reported_by = models.ForeignKey( User, null=True, on_delete=models.SET_NULL, related_name="reported_consumable_events" )
     notes = models.TextField(blank=True)
+
+class ReturnRequest(PublicIDModel):
+    PUBLIC_ID_PREFIX = "RR"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        DENIED = "denied", "Denied"
+        PARTIAL = "partial", "Partial"
+        COMPLETED = "completed", "Completed"
+
+    requester = models.ForeignKey( User, on_delete=models.PROTECT, related_name="return_requests" )
+    status = models.CharField( max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True )
+    requested_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    processed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processed_return_requests"
+    )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["requested_at"]),
+        ]
+
+class ReturnRequestItem(PublicIDModel):
+    PUBLIC_ID_PREFIX = "RRI"
+    PUBLIC_ID_PERMANENT = False
+
+    class ItemType(models.TextChoices):
+        EQUIPMENT = "equipment"
+        ACCESSORY = "accessory"
+        CONSUMABLE = "consumable"
+    
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        DENIED = "denied", "Denied"
+
+    return_request = models.ForeignKey( ReturnRequest, related_name="items", on_delete=models.CASCADE )
+    item_type = models.CharField( max_length=20, choices=ItemType.choices, db_index=True )
+    equipment_assignment = models.ForeignKey(EquipmentAssignment, null=True, blank=True, on_delete=models.CASCADE)
+    accessory_assignment = models.ForeignKey(AccessoryAssignment, null=True, blank=True, on_delete=models.CASCADE )
+    consumable_issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.CASCADE )
+    quantity = models.PositiveIntegerField(null=True, blank=True)
+    room = models.ForeignKey( Room, on_delete=models.CASCADE, db_index=True )
+    status = models.CharField( max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True )
+    verified_by = models.ForeignKey( User, null=True, blank=True, on_delete=models.SET_NULL )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["item_type"]),
+            models.Index(fields=["equipment_assignment"]),
+            models.Index(fields=["accessory_assignment"]),
+            models.Index(fields=["consumable_issue"]),
+        ]
