@@ -128,6 +128,7 @@ class AccessoryEvent(models.Model):
         CONDEMNED = "condemned", "Condemned"
         RESTOCKED = "restocked", "Restocked"
         ADJUSTED = "adjusted", "Adjusted"
+        RETURN_REQUESTED = "return_requested", "Return Requested"
 
     accessory = models.ForeignKey(Accessory,on_delete=models.CASCADE,related_name="events")
 

@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
 
 @transaction.atomic
 def create_equipment_return_request(user, equipment_public_ids, notes=""):
@@ -69,9 +69,15 @@ def create_equipment_return_request(user, equipment_public_ids, notes=""):
     ReturnRequestItem.objects.bulk_create(items)
 
     return request
-
 @transaction.atomic
 def create_accessory_return_request(user, accessory_payload, notes=""):
+
+    MAX_ASSET_PAYLOAD = 20
+
+    if len(accessory_payload) > MAX_ASSET_PAYLOAD:
+        raise ValidationError(
+            f"Maximum {MAX_ASSET_PAYLOAD} Accessories allowed per return request."
+        )
 
     request = ReturnRequest.objects.create(
         requester=user,
@@ -85,17 +91,38 @@ def create_accessory_return_request(user, accessory_payload, notes=""):
         accessory_id = entry["id"]
         quantity = entry["quantity"]
 
-        assignment = AccessoryAssignment.objects.select_related(
-            "accessory"
-        ).get(
-            accessory__public_id=accessory_id,
-            user=user
-        )
+        try:
+            assignment = (
+                AccessoryAssignment.objects
+                .select_related("accessory")
+                .get(
+                    accessory__public_id=accessory_id,
+                    user=user
+                )
+            )
+
+        except AccessoryAssignment.DoesNotExist:
+            raise ValidationError(
+                f"{accessory_id} is not assigned to this user."
+            )
 
         if quantity > assignment.quantity:
             raise ValidationError(
                 f"Cannot return more than assigned quantity for {accessory_id}"
             )
+
+
+        exists = ReturnRequestItem.objects.filter(
+            accessory_assignment=assignment,
+            return_request__status=ReturnRequest.Status.PENDING
+        ).exists()
+
+        if exists:
+            raise ValidationError(
+                f"{accessory_id} already has a pending return request"
+            )
+
+        accessory = assignment.accessory
 
         items.append(
             ReturnRequestItem(
@@ -106,10 +133,20 @@ def create_accessory_return_request(user, accessory_payload, notes=""):
             )
         )
 
+        # Timeline event
+        AccessoryEvent.objects.create(
+            accessory=accessory,
+            user=user,
+            quantity=quantity,
+            quantity_change=0,  # inventory not changed yet
+            event_type="return_requested",
+            reported_by=user,
+            notes=notes,
+        )
+
     ReturnRequestItem.objects.bulk_create(items)
 
     return request
-
 
 @transaction.atomic
 def create_consumable_return_request(user, consumable_payload, notes=""):
