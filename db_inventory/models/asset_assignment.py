@@ -4,6 +4,8 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q, F
 
+from db_inventory.models.base import PublicIDModel
+
 
 class EquipmentAssignment(models.Model):
     equipment = models.OneToOneField(Equipment,on_delete=models.CASCADE,related_name="active_assignment")
@@ -185,23 +187,10 @@ class ReturnRequest(PublicIDModel):
         DENIED = "denied", "Denied"
         COMPLETED = "completed", "Completed"
 
-    requester = models.ForeignKey(
-        User,
-        on_delete=models.PROTECT,
-        related_name="return_requests"
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.PENDING,
-        db_index=True
-    )
-
+    requester = models.ForeignKey( User, on_delete=models.PROTECT, related_name="return_requests" )
+    status = models.CharField( max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True )
     requested_at = models.DateTimeField(auto_now_add=True)
-
     processed_at = models.DateTimeField(null=True, blank=True)
-
     processed_by = models.ForeignKey(
         User,
         null=True,
@@ -218,55 +207,21 @@ class ReturnRequest(PublicIDModel):
             models.Index(fields=["requested_at"]),
         ]
 
-class ReturnRequestItem(models.Model):
+class ReturnRequestItem(PublicIDModel):
+    PUBLIC_ID_PREFIX = "RRI"
 
     class ItemType(models.TextChoices):
         EQUIPMENT = "equipment"
         ACCESSORY = "accessory"
         CONSUMABLE = "consumable"
 
-    return_request = models.ForeignKey(
-        ReturnRequest,
-        related_name="items",
-        on_delete=models.CASCADE
-    )
-
-    item_type = models.CharField(
-        max_length=20,
-        choices=ItemType.choices,
-        db_index=True
-    )
-
-    equipment_assignment = models.ForeignKey(
-        EquipmentAssignment,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE
-    )
-
-    accessory_assignment = models.ForeignKey(
-        AccessoryAssignment,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE
-    )
-
-    consumable_issue = models.ForeignKey(
-        ConsumableIssue,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE
-    )
-
+    return_request = models.ForeignKey( ReturnRequest, related_name="items", on_delete=models.CASCADE )
+    item_type = models.CharField( max_length=20, choices=ItemType.choices, db_index=True )
+    equipment_assignment = models.ForeignKey(EquipmentAssignment, null=True, blank=True, on_delete=models.CASCADE)
+    accessory_assignment = models.ForeignKey(AccessoryAssignment, null=True, blank=True, on_delete=models.CASCADE )
+    consumable_issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.CASCADE )
     quantity = models.PositiveIntegerField(null=True, blank=True)
-
-    verified_by = models.ForeignKey(
-        User,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL
-    )
-
+    verified_by = models.ForeignKey( User, null=True, blank=True, on_delete=models.SET_NULL )
     verified_at = models.DateTimeField(null=True, blank=True)
 
 
