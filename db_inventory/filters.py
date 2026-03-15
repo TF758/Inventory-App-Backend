@@ -628,3 +628,19 @@ class SelfConsumableFilter(BaseAssetNameFilter):
     class Meta:
         model = ConsumableIssue
         fields = ["name"]
+
+class ReturnRequestFilter(django_filters.FilterSet):
+
+    status = django_filters.CharFilter(field_name="status")
+    asset_type = django_filters.CharFilter( field_name="items__item_type", lookup_expr="exact" )
+    requested_after = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="gte" )
+    requested_before = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="lte" )
+    processed_after = django_filters.DateTimeFilter( field_name="processed_at", lookup_expr="gte" )
+    processed_before = django_filters.DateTimeFilter( field_name="processed_at", lookup_expr="lte" )
+
+    class Meta:
+        model = ReturnRequest
+        fields = [
+            "status",
+            "asset_type",
+        ]

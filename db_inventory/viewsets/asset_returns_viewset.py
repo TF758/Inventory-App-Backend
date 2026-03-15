@@ -1,14 +1,17 @@
 
 from db_inventory.mixins import AuditMixin
 from db_inventory.models.audit import AuditLog
-from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer
+from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer, ReturnRequestSerializer
 from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django_filters.rest_framework import DjangoFilterBackend
+from django.core.exceptions import ValidationError
 
-from inventory.db_inventory.permissions.assets import CanRequestAssetReturn
+from db_inventory.permissions.assets import CanRequestAssetReturn
+from db_inventory.filters import ReturnRequestFilter
+from db_inventory.models.asset_assignment import ReturnRequest
 
 class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
     """
@@ -28,7 +31,7 @@ class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
         try:
             return_request = create_equipment_return_request( user=request.user, equipment_public_ids=equipment_ids, notes=notes, )
 
-        except DjangoValidationError as e:
+        except ValidationError as e:
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
@@ -67,11 +70,18 @@ class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
         accessories = serializer.validated_data["accessories"]
         notes = serializer.validated_data.get("notes", "")
 
-        rr = create_accessory_return_request(
-            user=request.user,
-            accessory_payload=accessories,
-            notes=notes
-        )
+        try:
+            rr = create_accessory_return_request(
+                user=request.user,
+                accessory_payload=accessories,
+                notes=notes
+            )
+
+        except ValidationError as exc:
+            return Response(
+                {"detail": exc.messages},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         self.audit(
             AuditLog.Events.ASSET_RETURN_REQUESTED,
@@ -119,7 +129,7 @@ class ConsumableReturnViewSet(AuditMixin, viewsets.ViewSet):
                 notes=notes
             )
 
-        except DjangoValidationError as exc:
+        except ValidationError as exc:
             return Response(
                 {"detail": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST
@@ -143,4 +153,28 @@ class ConsumableReturnViewSet(AuditMixin, viewsets.ViewSet):
                 "items_created": return_request.items.count(),
             },
             status=status.HTTP_201_CREATED
+        )
+
+class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Allows users to view their own return requests.
+    """
+
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ReturnRequestFilter
+
+    def get_queryset(self):
+
+        return (
+            ReturnRequest.objects
+            .filter(requester=self.request.user)
+            .prefetch_related(
+                "items",
+                "items__equipment_assignment__equipment",
+                "items__accessory_assignment__accessory",
+                "items__consumable_issue__consumable",
+            )
+            .distinct()
         )
