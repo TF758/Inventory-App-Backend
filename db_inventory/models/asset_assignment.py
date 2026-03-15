@@ -99,6 +99,7 @@ class EquipmentEvent(models.Model):
         RETIRED = "retired", "Retired"
         UNDER_REPAIR = "under_repair", "Under repair"
         CONDEMNED = "condemned", "Condemned"
+        RETURN_REQUESTED = "return_requested", "Return Requested"
     
 
     equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE, related_name="events" )
@@ -188,6 +189,7 @@ class ReturnRequest(PublicIDModel):
         PENDING = "pending", "Pending"
         APPROVED = "approved", "Approved"
         DENIED = "denied", "Denied"
+        PARTIAL = "partial", "Partial"
         COMPLETED = "completed", "Completed"
 
     requester = models.ForeignKey( User, on_delete=models.PROTECT, related_name="return_requests" )
@@ -218,6 +220,11 @@ class ReturnRequestItem(PublicIDModel):
         EQUIPMENT = "equipment"
         ACCESSORY = "accessory"
         CONSUMABLE = "consumable"
+    
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        DENIED = "denied", "Denied"
 
     return_request = models.ForeignKey( ReturnRequest, related_name="items", on_delete=models.CASCADE )
     item_type = models.CharField( max_length=20, choices=ItemType.choices, db_index=True )
@@ -226,8 +233,10 @@ class ReturnRequestItem(PublicIDModel):
     consumable_issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.CASCADE )
     quantity = models.PositiveIntegerField(null=True, blank=True)
     room = models.ForeignKey( Room, on_delete=models.CASCADE, db_index=True )
+    status = models.CharField( max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True )
     verified_by = models.ForeignKey( User, null=True, blank=True, on_delete=models.SET_NULL )
     verified_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
 
 
     class Meta:
