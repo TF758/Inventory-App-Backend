@@ -164,6 +164,7 @@ class ConsumableEvent(models.Model):
         CONDEMNED = "condemned"
         RESTOCKED = "restocked"
         ADJUSTED = "adjusted"
+        RETURN_REQUESTED = "return_requested"
 
     consumable = models.ForeignKey(Consumable, on_delete=models.CASCADE, related_name="events")
     issue = models.ForeignKey( ConsumableIssue, null=True, blank=True, on_delete=models.SET_NULL, related_name="events" )
