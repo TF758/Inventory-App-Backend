@@ -681,3 +681,71 @@ class AdminReturnRequestFilter(django_filters.FilterSet):
         return queryset.filter(
             items__room__public_id=value
         ).distinct()
+
+class MixAssetFilter:
+    """
+    Filter class for unified asset list (list of dicts).
+    Mimics django_filters style but works on in-memory data.
+    """
+
+    def __init__(self, params, queryset):
+        self.params = params
+        self.queryset = queryset
+
+    def filter(self):
+        data = self.queryset
+
+        data = self.filter_type(data)
+        data = self.filter_search(data)
+        data = self.filter_room(data)
+        data = self.filter_can_return(data)
+        data = self.filter_pending(data)
+
+        return data
+
+    def filter_type(self, data):
+        types = self.params.getlist("asset_type")
+
+        if not types:
+            return data
+
+        return [x for x in data if x["asset_type"] in types]
+        
+    def filter_search(self, data):
+        value = self.params.get("search")
+        if value:
+            value = value.lower()
+            data = [
+                x for x in data
+                if value in x["name"].lower()
+            ]
+        return data
+
+    def filter_room(self, data):
+        value = self.params.get("room")
+        if value:
+            data = [
+                x for x in data
+                if x["room"] and value.lower() in x["room"].lower()
+            ]
+        return data
+
+    def filter_can_return(self, data):
+        value = self.params.get("can_return")
+        if value is not None:
+            value = value.lower() == "true"
+            data = [
+                x for x in data
+                if x["can_return"] == value
+            ]
+        return data
+
+    def filter_pending(self, data):
+        value = self.params.get("has_pending")
+        if value is not None:
+            value = value.lower() == "true"
+            data = [
+                x for x in data
+                if x["has_pending_return_request"] == value
+            ]
+        return data

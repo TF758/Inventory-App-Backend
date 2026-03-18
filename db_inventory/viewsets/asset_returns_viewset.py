@@ -3,7 +3,7 @@ from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
 from db_inventory.models.security import Notification
 from db_inventory.models.audit import AuditLog
 from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer, ReturnRequestSerializer
-from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request, approve_return_item, approve_return_request, deny_return_item
+from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request, approve_return_item, approve_return_request, create_mixed_return_request, deny_return_item
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +14,7 @@ from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestA
 from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from db_inventory.pagination import FlexiblePagination
+from db_inventory.serializers.self import MixedAssetReturnSerializer
 
 class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
     """
@@ -545,4 +546,50 @@ class AdminReturnRequestItemWorkflowViewSet( AuditMixin, NotificationMixin, view
                 "request_status": rr.status,
             },
             status=status.HTTP_200_OK,
+        )
+
+class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):
+
+    
+
+    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
+
+    def create(self, request):
+
+        serializer = MixedAssetReturnSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        items = serializer.validated_data["items"]
+        notes = serializer.validated_data.get("notes", "")
+
+        try:
+            rr = create_mixed_return_request(
+                user=request.user,
+                items_payload=items,
+                notes=notes
+            )
+
+        except ValidationError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        self.audit(
+            AuditLog.Events.ASSET_RETURN_REQUESTED,
+            target=rr,
+            description="User submitted mixed asset return request",
+            metadata={
+                "request_id": rr.public_id,
+                "items": items,
+            }
+        )
+
+        return Response(
+            {
+                "return_request": rr.public_id,
+                "status": rr.status,
+                "items_created": len(items),
+            },
+            status=status.HTTP_201_CREATED
         )
