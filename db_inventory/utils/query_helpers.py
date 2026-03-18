@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
-
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from django.db.models import Exists, OuterRef,  Subquery, Sum,  F, IntegerField, Value
+from django.db.models.functions import Coalesce, Greatest
+from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
 from db_inventory.models.assets import Equipment
 from db_inventory.models.users import User
 from django.db.models import Q
@@ -23,6 +24,92 @@ def get_user_equipment_assignments(user):
         equipment__is_deleted=False,
     )
 
+def get_user_equipment_with_meta(user):
+    pending_return_requests = ReturnRequestItem.objects.filter(
+        equipment_assignment=OuterRef("pk"),
+        return_request__status=ReturnRequest.Status.PENDING
+    )
+
+    return (
+        get_user_equipment_assignments(user)
+        .select_related(
+            "equipment",
+            "equipment__room",
+            "equipment__room__location",
+            "equipment__room__location__department",
+        )
+        .annotate(
+            has_pending_return_request=Exists(pending_return_requests)
+        )
+    )
+
+def get_user_accessories_with_meta(user):
+    pending_items = ReturnRequestItem.objects.filter(
+        accessory_assignment=OuterRef("pk"),
+        return_request__status=ReturnRequest.Status.PENDING,
+    )
+
+    pending_qty_subquery = (
+        pending_items
+        .values("accessory_assignment")
+        .annotate(total=Sum("quantity"))
+        .values("total")
+    )
+
+    return (
+        get_user_accessories(user)
+        .select_related(
+            "accessory",
+            "accessory__room",
+            "accessory__room__location",
+        )
+        .annotate(
+            pending_return_quantity=Coalesce(
+                Subquery(pending_qty_subquery[:1], output_field=IntegerField()),
+                Value(0),
+            ),
+            has_pending_return_request=Exists(pending_items),
+            available_return_quantity=Greatest(
+                F("quantity") - F("pending_return_quantity"),
+                Value(0),
+            ),
+        )
+    )
+
+def get_user_consumables_with_meta(user):
+    pending_items = ReturnRequestItem.objects.filter(
+        consumable_issue=OuterRef("pk"),
+        return_request__status=ReturnRequest.Status.PENDING,
+    )
+
+    pending_qty_subquery = (
+        pending_items
+        .values("consumable_issue")
+        .annotate(total=Sum("quantity"))
+        .values("total")
+    )
+
+    return (
+        get_user_consumables(user)
+        .select_related(
+            "consumable",
+            "consumable__room",
+            "consumable__room__location",
+        )
+        .annotate(
+            pending_return_quantity=Coalesce(
+                Subquery(pending_qty_subquery[:1], output_field=IntegerField()),
+                Value(0),
+            ),
+        )
+        .annotate(
+            has_pending_return_request=Exists(pending_items),
+            available_return_quantity=Greatest(
+                F("quantity") - F("pending_return_quantity"),
+                Value(0),
+            ),
+        )
+    )
 def get_user_accessories(user):
     return AccessoryAssignment.objects.filter(
         user=user,

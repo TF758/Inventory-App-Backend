@@ -347,7 +347,7 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
         })
     
 
-    @action(detail=True, methods=["post"], url_path="resolve")
+    @action(detail=True, methods=["post"], url_path="process")
     def resolve(self, request, public_id=None):
 
         rr = self.get_object()

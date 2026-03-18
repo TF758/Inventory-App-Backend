@@ -8,22 +8,19 @@ urlpatterns = [
     # -------------------------
     # Item workflow (specific first)
     # -------------------------
+    path( "return-request-items/<str:public_id>/approve/", asset_returns_viewset.AdminReturnRequestItemWorkflowViewSet.as_view({"post": "approve"}), name="admin-return-request-item-approve", ),
+    path( "return-request-items/<str:public_id>/deny/", asset_returns_viewset.AdminReturnRequestItemWorkflowViewSet.as_view({"post": "deny"}), name="admin-return-request-item-deny", ),
 
-    path( "returns/items/<str:public_id>/approve/", asset_returns_viewset.AdminReturnRequestItemWorkflowViewSet.as_view({"post": "approve"}), name="admin-return-item-approve", ),
-    path( "returns/items/<str:public_id>/deny/", asset_returns_viewset.AdminReturnRequestItemWorkflowViewSet.as_view({"post": "deny"}), name="admin-return-item-deny", ),
     # -------------------------
     # Return Requests (Admin)
     # -------------------------
+    path( "admin/return-requests/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "list"}), name="admin-return-request-list", ),
 
-    path( "returns/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "list"}), name="admin-return-request-list", ),
-
-    path( "returns/pending/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "pending"}), name="admin-return-request-pending", ),
+    path( "return-requests/pending/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "pending"}), name="admin-return-request-pending", ),
 
     # Request workflow
-    path( "returns/<str:public_id>/approve/",  asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "approve"}),  name="admin-return-request-approve", ),
-    path( "returns/<str:public_id>/deny/", asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "deny"}), name="admin-return-request-deny", ),
-
-    path( "returns/<str:public_id>/resolve/", asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "resolve"}), name="admin-return-request-resolve", ),
-
-    path( "returns/<str:public_id>/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "retrieve"}), name="admin-return-request-detail", ),
+    path( "return-requests/<str:public_id>/approve/", asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "approve"}), name="admin-return-request-approve", ),
+    path( "return-requests/<str:public_id>/deny/", asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "deny"}), name="admin-return-request-deny", ),
+    path( "return-requests/<str:public_id>/process/", asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "process"}), name="admin-return-request-process", ),
+    path( "return-requests/<str:public_id>/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "retrieve"}), name="admin-return-request-detail", ),
 ]
