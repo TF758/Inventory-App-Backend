@@ -11,103 +11,24 @@ from db_inventory.models import (
 from db_inventory.factories import AccessoryFactory, ConsumableFactory, EquipmentFactory, UserFactory
 from rest_framework.views import APIView
 from rest_framework.test import force_authenticate
+from django.utils import timezone
+from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 
+class MixedAssetReturnViewSetTests(TestCase):
 
-class AssetReturnPermissionTests(TestCase):
-    def setUp(self):
-        self.factory = APIRequestFactory()
-        self.permission = CanRequestAssetReturn()
-        self.user = UserFactory()
-        self.equipment = EquipmentFactory()
-
-        EquipmentAssignment.objects.create(
-            equipment=self.equipment,
-            user=self.user
-        )
-
-    def _make_drf_request(self, user, data):
-        request = self.factory.post(
-            "/me/equipment/return/",
-            data,
-            format="json"
-        )
-        force_authenticate(request, user=user)
-        return APIView().initialize_request(request)
-
-    def test_user_can_return_owned_equipment(self):
-        request = self._make_drf_request(
-            self.user,
-            {"equipment": [self.equipment.public_id]},
-        )
-        allowed = self.permission.has_permission(request, None)
-        self.assertTrue(allowed)
-
-    def test_user_cannot_return_other_users_equipment(self):
-        other_user = UserFactory()
-        request = self._make_drf_request(
-            other_user,
-            {"equipment": [self.equipment.public_id]},
-        )
-        allowed = self.permission.has_permission(request, None)
-        self.assertFalse(allowed)
-
-
-class EquipmentReturnViewSetTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = UserFactory()
         self.client.force_authenticate(self.user)
 
+        # Equipment
         self.equipment = EquipmentFactory()
         EquipmentAssignment.objects.create(
             equipment=self.equipment,
             user=self.user
         )
 
-    def test_user_can_submit_return_request(self):
-        payload = {
-            "equipment": [self.equipment.public_id]
-        }
-        url = reverse("self-return-equipment")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, 201)
-
-    def test_limit_of_20_equipment(self):
-        equipments = [EquipmentFactory() for _ in range(21)]
-
-        for eq in equipments:
-            EquipmentAssignment.objects.create(
-                equipment=eq,
-                user=self.user
-            )
-
-        payload = {
-            "equipment": [eq.public_id for eq in equipments]
-        }
-
-        url = reverse("self-return-equipment")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, 400)
-
-    def test_duplicate_equipment_ids(self):
-        payload = {
-            "equipment": [
-                self.equipment.public_id,
-                self.equipment.public_id
-            ]
-        }
-
-        url = reverse("self-return-equipment")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, 403)
-
-
-class AccessoryReturnViewSetTests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user = UserFactory()
-        self.client.force_authenticate(self.user)
-
+        # Accessory
         self.accessory = AccessoryFactory()
         AccessoryAssignment.objects.create(
             accessory=self.accessory,
@@ -115,41 +36,7 @@ class AccessoryReturnViewSetTests(TestCase):
             quantity=5
         )
 
-    def test_accessory_return_success(self):
-        payload = {
-            "accessories": [
-                {
-                    "accessory_public_id": self.accessory.public_id,
-                    "quantity": 2
-                }
-            ]
-        }
-
-        url = reverse("self-return-accessories")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, 201)
-
-    def test_accessory_quantity_validation(self):
-        payload = {
-            "accessories": [
-                {
-                    "accessory_public_id": self.accessory.public_id,
-                    "quantity": 999
-                }
-            ]
-        }
-
-        url = reverse("self-return-accessories")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, 400)
-
-
-class ConsumableReturnViewSetTests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user = UserFactory()
-        self.client.force_authenticate(self.user)
-
+        # Consumable
         self.consumable = ConsumableFactory()
         ConsumableIssue.objects.create(
             consumable=self.consumable,
@@ -158,30 +45,274 @@ class ConsumableReturnViewSetTests(TestCase):
             issued_quantity=10
         )
 
-    def test_consumable_return_success(self):
+    def test_user_can_submit_mixed_return_request(self):
+
         payload = {
-            "consumables": [
+            "items": [
                 {
-                    "consumable_public_id": self.consumable.public_id,
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                },
+                {
+                    "asset_type": "accessory",
+                    "public_id": self.accessory.public_id,
+                    "quantity": 2
+                },
+                {
+                    "asset_type": "consumable",
+                    "public_id": self.consumable.public_id,
                     "quantity": 3
                 }
             ]
         }
 
-        url = reverse("self-return-consumables")
+        url = reverse("self-return-assets")
+
         response = self.client.post(url, payload, format="json")
+
         self.assertEqual(response.status_code, 201)
 
-    def test_invalid_quantity(self):
+    def test_missing_quantity_fails(self):
+
         payload = {
-            "consumables": [
+            "items": [
                 {
-                    "consumable_public_id": self.consumable.public_id,
-                    "quantity": 999
+                    "asset_type": "accessory",
+                    "public_id": self.accessory.public_id
                 }
             ]
         }
 
-        url = reverse("self-return-consumables")
+        url = reverse("self-return-assets")
+
         response = self.client.post(url, payload, format="json")
+
         self.assertEqual(response.status_code, 400)
+
+    def test_duplicate_items_fail(self):
+
+        payload = {
+            "items": [
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                },
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                }
+            ]
+        }
+
+        url = reverse("self-return-assets")
+
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_user_cannot_return_unowned_asset(self):
+
+        other_equipment = EquipmentFactory()
+
+        payload = {
+            "items": [
+                {
+                    "asset_type": "equipment",
+                    "public_id": other_equipment.public_id
+                }
+            ]
+        }
+
+        url = reverse("self-return-assets")
+
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_limit_of_20_items(self):
+
+        items = []
+
+        for _ in range(21):
+            eq = EquipmentFactory()
+            EquipmentAssignment.objects.create(
+                equipment=eq,
+                user=self.user
+            )
+            items.append({
+                "asset_type": "equipment",
+                "public_id": eq.public_id
+            })
+
+        payload = {"items": items}
+
+        url = reverse("self-return-assets")
+
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+
+
+    def test_mixed_ownership_fails_entire_request(self):
+        other_equipment = EquipmentFactory()  # not assigned
+
+        payload = {
+            "items": [
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                },
+                {
+                    "asset_type": "equipment",
+                    "public_id": other_equipment.public_id
+                }
+            ]
+        }
+
+        response = self.client.post(
+            reverse("self-return-assets"),
+            payload,
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_cannot_return_already_returned_asset(self):
+        assignment = EquipmentAssignment.objects.get(
+            equipment=self.equipment,
+            user=self.user
+        )
+        assignment.returned_at = timezone.now()
+        assignment.save()
+
+        payload = {
+            "items": [
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                }
+            ]
+        }
+
+        response = self.client.post(
+            reverse("self-return-assets"),
+            payload,
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_quantity_edge_cases(self):
+
+        url = reverse("self-return-assets")
+
+        # quantity = 0
+        response = self.client.post(
+            url,
+            {
+                "items": [
+                    {
+                        "asset_type": "accessory",
+                        "public_id": self.accessory.public_id,
+                        "quantity": 0
+                    }
+                ]
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # negative quantity
+        response = self.client.post(
+            url,
+            {
+                "items": [
+                    {
+                        "asset_type": "consumable",
+                        "public_id": self.consumable.public_id,
+                        "quantity": -1
+                    }
+                ]
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # exceeds available
+        response = self.client.post(
+            url,
+            {
+                "items": [
+                    {
+                        "asset_type": "accessory",
+                        "public_id": self.accessory.public_id,
+                        "quantity": 999
+                    }
+                ]
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+        #  exact limit (should pass)
+        response = self.client.post(
+            url,
+            {
+                "items": [
+                    {
+                        "asset_type": "accessory",
+                        "public_id": self.accessory.public_id,
+                        "quantity": 5
+                    }
+                ]
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_atomicity_when_one_item_fails(self):
+
+        payload = {
+            "items": [
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                },
+                {
+                    "asset_type": "accessory",
+                    "public_id": self.accessory.public_id,
+                    "quantity": 999  # invalid
+                }
+            ]
+        }
+
+        response = self.client.post(
+            reverse("self-return-assets"),
+            payload,
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        # Ensure NOTHING was created
+        self.assertEqual(ReturnRequest.objects.count(), 0)
+        self.assertEqual(ReturnRequestItem.objects.count(), 0)
+
+    def test_same_payload_cannot_be_submitted_twice(self):
+
+        payload = {
+            "items": [
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                }
+            ]
+        }
+
+        url = reverse("self-return-assets")
+
+        response1 = self.client.post(url, payload, format="json")
+        response2 = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response1.status_code, 201)
+        self.assertEqual(response2.status_code, 400)

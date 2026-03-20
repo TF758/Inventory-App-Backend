@@ -2,12 +2,13 @@
 from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
 from db_inventory.models.security import Notification
 from db_inventory.models.audit import AuditLog
-from db_inventory.serializers.returns import AccessoryReturnSerializer, ConsumableReturnSerializer, EquipmentReturnRequestSerializer, ReturnRequestSerializer
-from db_inventory.services.asset_returns import create_accessory_return_request, create_consumable_return_request, create_equipment_return_request, approve_return_item, approve_return_request, create_mixed_return_request, deny_return_item
+from db_inventory.serializers.returns import  ReturnRequestSerializer
+from db_inventory.services.asset_returns import approve_return_item, approve_return_request, create_mixed_return_request, deny_return_item
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
@@ -16,67 +17,24 @@ from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestIte
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers.self import MixedAssetReturnSerializer
 
-class EquipmentReturnViewSet(AuditMixin, viewsets.ViewSet):
-    """
-    Allows users to request returns for equipment currently assigned to them.
-    """
+class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):
+
+    """Send a return request of assets of various types"""
 
     permission_classes = [IsAuthenticated, CanRequestAssetReturn]
 
     def create(self, request):
 
-        serializer = EquipmentReturnRequestSerializer(data=request.data)
+        serializer = MixedAssetReturnSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        equipment_ids = serializer.validated_data["equipment"]
+        items = serializer.validated_data["items"]
         notes = serializer.validated_data.get("notes", "")
 
         try:
-            return_request = create_equipment_return_request( user=request.user, equipment_public_ids=equipment_ids, notes=notes, )
-
-        except ValidationError as exc:
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Audit the action
-        self.audit(
-            AuditLog.Events.ASSET_RETURN_REQUESTED,
-            target=return_request,
-            description="User submitted equipment return request",
-            metadata={
-                "equipment_ids": equipment_ids,
-                "request_id": return_request.public_id,
-            },
-        )
-
-        return Response(
-            {
-                "return_request": return_request.public_id,
-                "status": return_request.status,
-                "items_created": len(equipment_ids),
-            },
-            status=status.HTTP_201_CREATED,
-        )
-    
-
-class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
-
-    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
-
-    def create(self, request):
-
-        serializer = AccessoryReturnSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        accessories = serializer.validated_data["accessories"]
-        notes = serializer.validated_data.get("notes", "")
-
-        try:
-            rr = create_accessory_return_request(
+            rr = create_mixed_return_request(
                 user=request.user,
-                accessory_payload=accessories,
+                items_payload=items,
                 notes=notes
             )
 
@@ -89,10 +47,10 @@ class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
         self.audit(
             AuditLog.Events.ASSET_RETURN_REQUESTED,
             target=rr,
-            description="User submitted accessory return request",
+            description="User submitted mixed asset return request",
             metadata={
-                "items": accessories,
                 "request_id": rr.public_id,
+                "items": items,
             }
         )
 
@@ -100,63 +58,10 @@ class AccessoryReturnViewSet(AuditMixin, viewsets.ViewSet):
             {
                 "return_request": rr.public_id,
                 "status": rr.status,
-                "items_created": len(accessories)
+                "items_created": len(items),
             },
             status=status.HTTP_201_CREATED
-        )
-
-
-class ConsumableReturnViewSet(AuditMixin, viewsets.ViewSet):
-    """
-    Allows users to request the return of consumables
-    currently issued to them.
-    """
-
-    permission_classes = [
-        IsAuthenticated,
-        CanRequestAssetReturn
-    ]
-
-    def create(self, request):
-
-        serializer = ConsumableReturnSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        consumables = serializer.validated_data["consumables"]
-        notes = serializer.validated_data.get("notes", "")
-
-        try:
-            return_request = create_consumable_return_request(
-                user=request.user,
-                consumable_payload=consumables,
-                notes=notes
-            )
-
-        except ValidationError as exc:
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Audit log
-        self.audit(
-            AuditLog.Events.ASSET_RETURN_REQUESTED,
-            target=return_request,
-            description="User submitted consumable return request",
-            metadata={
-                "request_id": return_request.public_id,
-                "consumables": consumables
-            }
-        )
-
-        return Response(
-            {
-                "return_request": return_request.public_id,
-                "status": return_request.status,
-                "items_created": len(consumables),
-            },
-            status=status.HTTP_201_CREATED
-        )
+        )   
 
 class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -190,6 +95,9 @@ class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
     permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
     model_class = ReturnRequest
+    lookup_field = "public_id"
+    lookup_url_kwarg = "public_id"
+
 
     filter_backends = [
         DjangoFilterBackend,
@@ -348,7 +256,7 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
     
 
     @action(detail=True, methods=["post"], url_path="process")
-    def resolve(self, request, public_id=None):
+    def process(self, request, public_id=None):
 
         rr = self.get_object()
 
@@ -375,7 +283,7 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
 
         for entry in items_data:
 
-            item_id = entry.get("id")
+            item_id = entry.get("public_id")
             action = entry.get("action")
             reason = entry.get("reason", "")
 
@@ -546,50 +454,4 @@ class AdminReturnRequestItemWorkflowViewSet( AuditMixin, NotificationMixin, view
                 "request_status": rr.status,
             },
             status=status.HTTP_200_OK,
-        )
-
-class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):
-
-    
-
-    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
-
-    def create(self, request):
-
-        serializer = MixedAssetReturnSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        items = serializer.validated_data["items"]
-        notes = serializer.validated_data.get("notes", "")
-
-        try:
-            rr = create_mixed_return_request(
-                user=request.user,
-                items_payload=items,
-                notes=notes
-            )
-
-        except ValidationError as exc:
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        self.audit(
-            AuditLog.Events.ASSET_RETURN_REQUESTED,
-            target=rr,
-            description="User submitted mixed asset return request",
-            metadata={
-                "request_id": rr.public_id,
-                "items": items,
-            }
-        )
-
-        return Response(
-            {
-                "return_request": rr.public_id,
-                "status": rr.status,
-                "items_created": len(items),
-            },
-            status=status.HTTP_201_CREATED
         )

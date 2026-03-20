@@ -6,7 +6,8 @@ from db_inventory.models.asset_assignment import EquipmentAssignment, ReturnRequ
 from db_inventory.permissions.assets import CanProcessReturnRequest
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.security import Notification
-from db_inventory.services.asset_returns import create_equipment_return_request
+from db_inventory.services.asset_returns import  create_mixed_return_request
+from django.contrib.auth.models import AnonymousUser
 
 class CanProcessReturnRequestTests(TestCase):
     """
@@ -14,7 +15,6 @@ class CanProcessReturnRequestTests(TestCase):
     """
 
     def setUp(self):
-
         self.factory = APIRequestFactory()
         self.permission = CanProcessReturnRequest()
 
@@ -41,12 +41,7 @@ class CanProcessReturnRequestTests(TestCase):
             requester=self.user
         )
 
-    # -----------------------------------------------------
-    # Site admin should always be allowed
-    # -----------------------------------------------------
-
     def test_site_admin_can_process_request(self):
-
         request = self.factory.post("/")
         request.user = self.admin
 
@@ -58,12 +53,7 @@ class CanProcessReturnRequestTests(TestCase):
 
         self.assertTrue(allowed)
 
-    # -----------------------------------------------------
-    # Regular users cannot process requests
-    # -----------------------------------------------------
-
     def test_regular_user_cannot_process_request(self):
-
         request = self.factory.post("/")
         request.user = self.user
 
@@ -75,14 +65,9 @@ class CanProcessReturnRequestTests(TestCase):
 
         self.assertFalse(allowed)
 
-    # -----------------------------------------------------
-    # Anonymous users cannot process requests
-    # -----------------------------------------------------
-
     def test_anonymous_user_denied(self):
-
         request = self.factory.post("/")
-        request.user = None
+        request.user = AnonymousUser()
 
         allowed = self.permission.has_object_permission(
             request,
@@ -92,10 +77,10 @@ class CanProcessReturnRequestTests(TestCase):
 
         self.assertFalse(allowed)
 
+
 class AdminReturnRequestWorkflowTests(TestCase):
 
     def setUp(self):
-
         self.client = APIClient()
 
         # users
@@ -123,31 +108,22 @@ class AdminReturnRequestWorkflowTests(TestCase):
             user=self.user
         )
 
-        # create return request
-        self.return_request = create_equipment_return_request(
+
+        self.return_request = create_mixed_return_request(
             user=self.user,
-            equipment_public_ids=[self.equipment.public_id],
+            items_payload=[
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                }
+            ],
         )
 
         self.client.force_authenticate(self.admin)
 
-    def test_admin_can_approve_return_request(self):
-
-        url = reverse(
-            "admin-return-request-approve",
-            args=[self.return_request.public_id]
-        )
-
-        response = self.client.post(url)
-
-        self.assertEqual(response.status_code, 200)
-
-        self.return_request.refresh_from_db()
-
-        self.assertEqual(
-            self.return_request.status,
-            "approved"
-        )
+    # -----------------------------------------------------
+    # Approve request
+    # -----------------------------------------------------
 
     def test_admin_can_approve_return_request(self):
 
@@ -166,6 +142,10 @@ class AdminReturnRequestWorkflowTests(TestCase):
             self.return_request.status,
             "approved"
         )
+
+    # -----------------------------------------------------
+    # Cannot process twice
+    # -----------------------------------------------------
 
     def test_cannot_process_request_twice(self):
 
@@ -175,11 +155,13 @@ class AdminReturnRequestWorkflowTests(TestCase):
         )
 
         self.client.post(url)
-
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 400)
 
+    # -----------------------------------------------------
+    # Notification created
+    # -----------------------------------------------------
 
     def test_notification_created_on_approval(self):
 
@@ -199,14 +181,18 @@ class AdminReturnRequestWorkflowTests(TestCase):
         self.assertEqual(
             notification.title,
             "Return Request Approved"
-    )
-        
-    def test_admin_can_resolve_partial_request(self):
+        )
 
-        item = self.return_request.items.first()
+    # -----------------------------------------------------
+    # Process via batch (partial / full)
+    # -----------------------------------------------------
+
+    def test_admin_can_resolve_request(self):
+
+        items = list(self.return_request.items.all())
 
         url = reverse(
-            "admin-return-request-resolve",
+            "admin-return-request-process",
             args=[self.return_request.public_id]
         )
 
@@ -215,9 +201,10 @@ class AdminReturnRequestWorkflowTests(TestCase):
             {
                 "items": [
                     {
-                        "id": item.public_id,
+                        "public_id": item.public_id,
                         "action": "approve"
                     }
+                    for item in items
                 ]
             },
             format="json"
@@ -231,3 +218,140 @@ class AdminReturnRequestWorkflowTests(TestCase):
             self.return_request.status,
             "approved"
         )
+
+class AdminReturnRequestWorkflowTests(TestCase):
+
+    """
+    Tests admin workflows for processing return requests.
+
+    Validates approval, duplicate processing prevention, batch item processing,
+    status transitions, and notification side effects.
+    """
+
+    def setUp(self):
+
+        self.client = APIClient()
+
+        # users
+        self.admin = UserFactory()
+        self.user = UserFactory()
+
+        # admin role
+        self.admin_role = RoleAssignment.objects.create(
+            user=self.admin,
+            role="SITE_ADMIN"
+        )
+
+        self.admin.active_role = self.admin_role
+        self.admin.save()
+
+        # location
+        self.room = RoomFactory()
+
+        self.equipment = EquipmentFactory(room=self.room)
+
+        self.assignment = EquipmentAssignment.objects.create(
+            equipment=self.equipment,
+            user=self.user
+        )
+
+        self.return_request = create_mixed_return_request(
+            user=self.user,
+            items_payload=[
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                }
+            ],
+        )
+
+        self.client.force_authenticate(self.admin)
+
+    # -----------------------------------------------------
+    # Approve request
+    # -----------------------------------------------------
+
+    def test_admin_can_approve_return_request(self):
+
+        url = reverse(
+            "admin-return-request-approve",
+            args=[self.return_request.public_id]
+        )
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+
+        self.return_request.refresh_from_db()
+
+        self.assertEqual(self.return_request.status, "approved")
+
+    # -----------------------------------------------------
+    # Cannot process twice
+    # -----------------------------------------------------
+
+    def test_cannot_process_request_twice(self):
+
+        url = reverse(
+            "admin-return-request-approve",
+            args=[self.return_request.public_id]
+        )
+
+        self.client.post(url)
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 400)
+
+    # -----------------------------------------------------
+    # Notification created
+    # -----------------------------------------------------
+
+    def test_notification_created_on_approval(self):
+
+        url = reverse(
+            "admin-return-request-approve",
+            args=[self.return_request.public_id]
+        )
+
+        self.client.post(url)
+
+        notification = Notification.objects.filter(
+            recipient=self.user
+        ).first()
+
+        self.assertIsNotNone(notification)
+
+        self.assertEqual(notification.title, "Return Request Approved")
+
+    # -----------------------------------------------------
+    # Process request (batch)
+    # -----------------------------------------------------
+
+    def test_admin_can_process_request(self):
+
+        items = list(self.return_request.items.all())
+
+        url = reverse(
+            "admin-return-request-process",
+            args=[self.return_request.public_id]
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "items": [
+                    {
+                        "public_id": item.public_id,
+                        "action": "approve"
+                    }
+                    for item in items
+                ]
+            },
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.return_request.refresh_from_db()
+
+        self.assertEqual(self.return_request.status, "approved")

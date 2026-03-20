@@ -30,16 +30,6 @@ urlpatterns = [
     path( "me/consumables/use/", UseConsumableView.as_view(), name="use-consumable" ),
 
 
-    # -------------------------
-    # Returns
-    # -------------------------
-
-    path( "me/equipment/return/", asset_returns_viewset.EquipmentReturnViewSet.as_view({"post": "create"}), name="self-return-equipment" ),
-
-    path( "me/accessories/return/", asset_returns_viewset.AccessoryReturnViewSet.as_view({"post": "create"}), name="self-return-accessories" ),
-
-    path( "me/consumables/return/", asset_returns_viewset.ConsumableReturnViewSet.as_view({"post": "create"}), name="self-return-consumables" ),
-
 
     # -------------------------
     # Return Requests
