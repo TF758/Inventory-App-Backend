@@ -447,7 +447,7 @@ def create_mixed_return_request(user, items_payload, notes=""):
     # -----------------------------
     for item in items_payload:
 
-        item_type = item.getlist("asset_type")
+        item_type = item.get("asset_type")
 
         if item_type == "equipment":
             equipment_ids.append(item["public_id"])

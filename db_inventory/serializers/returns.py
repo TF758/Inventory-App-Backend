@@ -96,9 +96,11 @@ class ReturnRequestItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReturnRequestItem
         fields = [
+            "public_id",
             "item_type",
             "quantity",
             "asset_public_id",
+            "status",   
             "verified_at",
         ]
 

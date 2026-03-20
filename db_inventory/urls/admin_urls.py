@@ -14,9 +14,9 @@ urlpatterns = [
     # -------------------------
     # Return Requests (Admin)
     # -------------------------
-    path( "admin/return-requests/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "list"}), name="admin-return-request-list", ),
-
+    path( "return-requests/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "list"}), name="admin-return-request-list", ),
     path( "return-requests/pending/", asset_returns_viewset.AdminReturnRequestViewSet.as_view({"get": "pending"}), name="admin-return-request-pending", ),
+
 
     # Request workflow
     path( "return-requests/<str:public_id>/approve/", asset_returns_viewset.AdminReturnRequestWorkflowViewSet.as_view({"post": "approve"}), name="admin-return-request-approve", ),
