@@ -192,7 +192,7 @@ class ReturnRequest(PublicIDModel):
         PARTIAL = "partial", "Partial"
         COMPLETED = "completed", "Completed"
 
-    requester = models.ForeignKey( User, on_delete=models.PROTECT, related_name="return_requests" )
+    requester = models.ForeignKey( User, on_delete=models.CASCADE, related_name="return_requests" )
     status = models.CharField( max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True )
     requested_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
@@ -200,7 +200,7 @@ class ReturnRequest(PublicIDModel):
         User,
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="processed_return_requests"
     )
 

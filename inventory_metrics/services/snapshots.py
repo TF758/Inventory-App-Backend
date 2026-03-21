@@ -104,6 +104,22 @@ def generate_daily_department_snapshot(
     accessories_qs = Accessory.objects.filter( room__in=rooms_qs)
 
     # -------------------------------------------------
+    # Returns (scoped via items → room)
+    # -------------------------------------------------
+    return_items_qs = ReturnRequestItem.objects.filter(
+        room__in=rooms_qs
+    )
+
+    request_ids = return_items_qs.values_list(
+        "return_request_id",
+        flat=True
+    ).distinct()
+
+    return_requests_qs = ReturnRequest.objects.filter(
+        id__in=request_ids
+    )
+
+    # -------------------------------------------------
     # Users (current assignments only)
     # -------------------------------------------------
     users_qs = User.objects.filter(
@@ -130,7 +146,19 @@ def generate_daily_department_snapshot(
     ).distinct().count()
 
     total_equipment = equipment_qs.count()
+    
+    total_return_requests = return_requests_qs.count()
+    pending_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.PENDING ).count()
+    approved_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.APPROVED ).count()
+    denied_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.DENIED ).count()
+    partial_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.PARTIAL ).count()
 
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+
+    returns_created_last_24h = return_requests_qs.filter( requested_at__gte=last_24h ).count()
+
+    returns_processed_last_24h = return_requests_qs.filter( processed_at__gte=last_24h ).count()
     # -------------------------------------------------
     # Atomic get_or_create
     # -------------------------------------------------
@@ -176,6 +204,17 @@ def generate_daily_department_snapshot(
                 "total_accessories_quantity": accessories_qs.aggregate(
                     total=Sum("quantity")
                 )["total"] or 0,
+                # -------------------------
+                # Return metrics
+                # -------------------------
+                "total_return_requests": total_return_requests,
+                "pending_return_requests": pending_return_requests,
+                "approved_return_requests": approved_return_requests,
+                "denied_return_requests": denied_return_requests,
+                "partial_return_requests": partial_return_requests,
+
+                "returns_created_last_24h": returns_created_last_24h,
+                "returns_processed_last_24h": returns_processed_last_24h,
             },
         )
 

@@ -83,6 +83,9 @@ class Command(BaseCommand):
 
         baseline_failed_logins = max(10, baseline_users // 20)
 
+        # 🔥 NEW: Return baseline
+        baseline_return_requests = max(5, baseline_users // 10)
+
         departments = list(Department.objects.all())
 
         system_rows = []
@@ -97,6 +100,7 @@ class Command(BaseCommand):
 
             # === SYSTEM METRICS ===
             total_users = trend(baseline_users, days_ago, DAYS, growth=0.8)
+
             active_users = weekly_seasonality(
                 noise(int(total_users * 0.75), 0.1),
                 date,
@@ -178,8 +182,37 @@ class Command(BaseCommand):
             )
 
             # === DEPARTMENT METRICS ===
-            for dept in departments:
-                dept_users = User.objects.filter(active_role__department=dept).count()
+            for dept in tqdm( departments, desc="🏢 Departments", leave=False, unit="dept" ):
+                dept_users = User.objects.filter(
+                    active_role__department=dept
+                ).count()
+
+                # 🔥 RETURN METRICS
+                dept_total_returns = clamp(
+                    weekly_seasonality(
+                        trend(baseline_return_requests, days_ago, DAYS, growth=0.7),
+                        date,
+                    )
+                )
+
+                dept_pending = int(dept_total_returns * random.uniform(0.2, 0.4))
+                dept_approved = int(dept_total_returns * random.uniform(0.4, 0.6))
+                dept_denied = int(dept_total_returns * random.uniform(0.05, 0.15))
+                dept_partial = max(
+                    0,
+                    dept_total_returns - (
+                        dept_pending + dept_approved + dept_denied
+                    )
+                )
+
+                returns_created_24h = clamp(
+                    noise(int(dept_total_returns * 0.15), 0.3)
+                )
+
+                returns_processed_24h = clamp(
+                    noise(int(dept_total_returns * 0.12), 0.3)
+                )
+
                 dept_rows.append(
                     DailyDepartmentSnapshot(
                         department=dept,
@@ -190,12 +223,17 @@ class Command(BaseCommand):
                         total_users=noise(dept_users, 0.05),
                         total_admins=random.randint(1, max(1, dept_users // 20)),
 
-                        total_locations=Location.objects.filter(department=dept).count(),
-                        total_rooms=Room.objects.filter(location__department=dept).count(),
+                        total_locations=Location.objects.filter(
+                            department=dept
+                        ).count(),
+                        total_rooms=Room.objects.filter(
+                            location__department=dept
+                        ).count(),
 
                         total_equipment=Equipment.objects.filter(
                             room__location__department=dept
                         ).count(),
+
                         equipment_ok=random.randint(10, 100),
                         equipment_under_repair=random.randint(0, 20),
                         equipment_damaged=random.randint(0, 10),
@@ -206,6 +244,16 @@ class Command(BaseCommand):
                         total_consumables_quantity=random.randint(500, 4000),
                         total_accessories=random.randint(30, 150),
                         total_accessories_quantity=random.randint(200, 3000),
+
+                        # 🔥 RETURNS
+                        total_return_requests=dept_total_returns,
+                        pending_return_requests=dept_pending,
+                        approved_return_requests=dept_approved,
+                        denied_return_requests=dept_denied,
+                        partial_return_requests=dept_partial,
+
+                        returns_created_last_24h=returns_created_24h,
+                        returns_processed_last_24h=returns_processed_24h,
                     )
                 )
 

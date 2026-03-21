@@ -1,6 +1,6 @@
 import factory
 from django.utils import timezone
-from inventory.db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
+from db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
 
 class AuditLogFactory(factory.Factory):
     """
