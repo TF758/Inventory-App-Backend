@@ -40,6 +40,18 @@ class DailyDepartmentSnapshot(models.Model):
     total_accessories = models.PositiveIntegerField(default=0)
     total_accessories_quantity = models.PositiveIntegerField(default=0)
 
+
+    total_return_requests = models.PositiveIntegerField(default=0)
+
+    pending_return_requests = models.PositiveIntegerField(default=0)
+    approved_return_requests = models.PositiveIntegerField(default=0)
+    denied_return_requests = models.PositiveIntegerField(default=0)
+    partial_return_requests = models.PositiveIntegerField(default=0)
+
+    # Optional (activity)
+    returns_created_last_24h = models.PositiveIntegerField(default=0)
+    returns_processed_last_24h = models.PositiveIntegerField(default=0)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

@@ -1,8 +1,8 @@
 from datetime import timedelta
 from django.utils import timezone
-from django.db.models import Max, OuterRef, Subquery, DateField
+from django.db.models import Max, OuterRef, Subquery, Avg
 from inventory_metrics.utils.viewset_helpers import get_snapshot_range_start
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailySystemMetrics
+from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from inventory_metrics.utils.analytics_helpers import percentage_delta, truncate_date
 from django.db.models import Sum
 
@@ -27,6 +27,14 @@ def build_system_kpis():
         if today else None
     )
 
+    return_today = DailyReturnMetrics.objects.filter(date=today.date).first() if today else None
+    return_yesterday = (
+        DailyReturnMetrics.objects
+        .filter(date=today.date - timedelta(days=1))
+        .first()
+        if today else None
+    )
+
     def safe_delta(current, previous):
         return percentage_delta(current, previous) if current is not None else None
 
@@ -35,7 +43,7 @@ def build_system_kpis():
 
     return {
         # -------------------------
-        # Snapshot totals
+        # Existing KPIs
         # -------------------------
         "total_users": {
             "value": today.total_users,
@@ -44,19 +52,19 @@ def build_system_kpis():
                 yesterday.total_users if yesterday else None,
             ),
         },
-       "human_users": {
-        "value": today.human_users,
-        "delta": safe_delta(
-            today.human_users,
-            yesterday.human_users if yesterday else None,
-        ),
+        "human_users": {
+            "value": today.human_users,
+            "delta": safe_delta(
+                today.human_users,
+                yesterday.human_users if yesterday else None,
+            ),
         },
         "system_users": {
-        "value": today.system_users,
-        "delta": safe_delta(
-            today.system_users,
-            yesterday.system_users if yesterday else None,
-        ),
+            "value": today.system_users,
+            "delta": safe_delta(
+                today.system_users,
+                yesterday.system_users if yesterday else None,
+            ),
         },
         "total_equipment": {
             "value": today.total_equipment,
@@ -74,45 +82,13 @@ def build_system_kpis():
         },
 
         # -------------------------
-        # Rolling user activity
+        # User activity
         # -------------------------
         "active_users_24h": {
             "value": today.active_users_last_24h,
             "delta": safe_delta(
                 today.active_users_last_24h,
                 yesterday.active_users_last_24h if yesterday else None,
-            ),
-        },
-        "active_users_7d": {
-            "value": today.active_users_last_7d,
-            "delta": safe_delta(
-                today.active_users_last_7d,
-                yesterday.active_users_last_7d if yesterday else None,
-            ),
-        },
-        "new_users_24h": {
-            "value": today.new_users_last_24h,
-            "delta": safe_delta(
-                today.new_users_last_24h,
-                yesterday.new_users_last_24h if yesterday else None,
-            ),
-        },
-
-        # -------------------------
-        # Rolling session health
-        # -------------------------
-        "unique_users_logged_in_24h": {
-            "value": today.unique_users_logged_in_last_24h,
-            "delta": safe_delta(
-                today.unique_users_logged_in_last_24h,
-                yesterday.unique_users_logged_in_last_24h if yesterday else None,
-            ),
-        },
-        "expired_sessions_24h": {
-            "value": today.expired_sessions_last_24h,
-            "delta": safe_delta(
-                today.expired_sessions_last_24h,
-                yesterday.expired_sessions_last_24h if yesterday else None,
             ),
         },
 
@@ -126,6 +102,50 @@ def build_system_kpis():
                 auth_yesterday.failed_logins if auth_yesterday else None,
             ),
         },
+
+        # =====================================================
+        # 🔥 RETURN KPIs
+        # =====================================================
+
+        "total_return_requests": {
+            "value": return_today.total_requests if return_today else 0,
+            "delta": safe_delta(
+                return_today.total_requests if return_today else None,
+                return_yesterday.total_requests if return_yesterday else None,
+            ),
+        },
+
+        "pending_return_requests": {
+            "value": return_today.pending_requests if return_today else 0,
+            "delta": safe_delta(
+                return_today.pending_requests if return_today else None,
+                return_yesterday.pending_requests if return_yesterday else None,
+            ),
+        },
+
+        "returns_created_24h": {
+            "value": return_today.requests_created_last_24h if return_today else 0,
+            "delta": safe_delta(
+                return_today.requests_created_last_24h if return_today else None,
+                return_yesterday.requests_created_last_24h if return_yesterday else None,
+            ),
+        },
+
+        "returns_processed_24h": {
+            "value": return_today.requests_processed_last_24h if return_today else 0,
+            "delta": safe_delta(
+                return_today.requests_processed_last_24h if return_today else None,
+                return_yesterday.requests_processed_last_24h if return_yesterday else None,
+            ),
+        },
+
+        "avg_return_processing_time": {
+            "value": return_today.avg_processing_time_ms if return_today else 0,
+            "delta": safe_delta(
+                return_today.avg_processing_time_ms if return_today else None,
+                return_yesterday.avg_processing_time_ms if return_yesterday else None,
+            ),
+        },
     }
 
 def build_user_trends(*, days: int, granularity: str):
@@ -137,17 +157,9 @@ def build_user_trends(*, days: int, granularity: str):
     if not start:
         return []
 
-    base = (
-        DailySystemMetrics.objects
-        .filter(date__gte=start)
-        .annotate(period=truncate_date("date", granularity))
-    )
+    base = ( DailySystemMetrics.objects .filter(date__gte=start) .annotate(period=truncate_date("date", granularity)) )
 
-    latest_per_period = (
-        base
-        .values("period")
-        .annotate(latest_date=Max("date"))
-    )
+    latest_per_period = ( base .values("period") .annotate(latest_date=Max("date")) )
 
     qs = (
         base
@@ -171,26 +183,15 @@ def build_user_trends(*, days: int, granularity: str):
     ]
 
 def build_session_trends(*, days: int, granularity: str):
-    start = get_snapshot_range_start(
-        model=DailySystemMetrics,
-        days=days,
-    )
+    start = get_snapshot_range_start( model=DailySystemMetrics, days=days, )
 
     if not start:
         return []
 
 
-    base = (
-        DailySystemMetrics.objects
-        .filter(date__gte=start)
-        .annotate(period=truncate_date("date", granularity))
-    )
+    base = ( DailySystemMetrics.objects .filter(date__gte=start) .annotate(period=truncate_date("date", granularity)) )
 
-    latest_per_period = (
-        base
-        .values("period")
-        .annotate(latest_date=Max("date"))
-    )
+    latest_per_period = ( base .values("period") .annotate(latest_date=Max("date")) )
 
     snapshot_qs = (
         base
@@ -271,8 +272,72 @@ def build_asset_trends(*, days: int, granularity: str):
         return []
 
 
+    base = ( DailySystemMetrics.objects .filter(date__gte=start) .annotate(period=truncate_date("date", granularity)) )
+
+    latest_per_period = ( base .values("period") .annotate(latest_date=Max("date")) )
+
+    qs = (
+        base
+        .filter(
+            date=Subquery(
+                latest_per_period
+                .filter(period=OuterRef("period"))
+                .values("latest_date")[:1]
+            )
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row.period.isoformat(),
+            "equipment_ok": row.equipment_ok,
+            "equipment_under_repair": row.equipment_under_repair,
+            "equipment_damaged": row.equipment_damaged,
+        }
+        for row in qs
+    ]
+def build_return_flow_trends(*, days: int, granularity: str):
+    start = get_snapshot_range_start(
+        model=DailyReturnMetrics,
+        days=days,
+    )
+
+    if not start:
+        return []
+
+    qs = (
+        DailyReturnMetrics.objects
+        .filter(date__gte=start)
+        .annotate(period=truncate_date("date", granularity))
+        .values("period")
+        .annotate(
+            requests_created=Sum("requests_created_last_24h"),
+            requests_processed=Sum("requests_processed_last_24h"),
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row["period"].isoformat(),
+            "requests_created": row["requests_created"],
+            "requests_processed": row["requests_processed"],
+        }
+        for row in qs
+    ]
+
+def build_return_state_trends(*, days: int, granularity: str):
+    start = get_snapshot_range_start(
+        model=DailyReturnMetrics,
+        days=days,
+    )
+
+    if not start:
+        return []
+
     base = (
-        DailySystemMetrics.objects
+        DailyReturnMetrics.objects
         .filter(date__gte=start)
         .annotate(period=truncate_date("date", granularity))
     )
@@ -298,9 +363,82 @@ def build_asset_trends(*, days: int, granularity: str):
     return [
         {
             "date": row.period.isoformat(),
-            "equipment_ok": row.equipment_ok,
-            "equipment_under_repair": row.equipment_under_repair,
-            "equipment_damaged": row.equipment_damaged,
+            "pending_requests": row.pending_requests,
+            "approved_requests": row.approved_requests,
+            "denied_requests": row.denied_requests,
+            "partial_requests": row.partial_requests,
+        }
+        for row in qs
+    ]
+def build_return_state_trends(*, days: int, granularity: str):
+    start = get_snapshot_range_start(
+        model=DailyReturnMetrics,
+        days=days,
+    )
+
+    if not start:
+        return []
+
+    base = (
+        DailyReturnMetrics.objects
+        .filter(date__gte=start)
+        .annotate(period=truncate_date("date", granularity))
+    )
+
+    latest_per_period = (
+        base
+        .values("period")
+        .annotate(latest_date=Max("date"))
+    )
+
+    qs = (
+        base
+        .filter(
+            date=Subquery(
+                latest_per_period
+                .filter(period=OuterRef("period"))
+                .values("latest_date")[:1]
+            )
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row.period.isoformat(),
+            "pending_requests": row.pending_requests,
+            "approved_requests": row.approved_requests,
+            "denied_requests": row.denied_requests,
+            "partial_requests": row.partial_requests,
+        }
+        for row in qs
+    ]
+def build_return_performance_trends(*, days: int, granularity: str):
+    start = get_snapshot_range_start(
+        model=DailyReturnMetrics,
+        days=days,
+    )
+
+    if not start:
+        return []
+
+    qs = (
+        DailyReturnMetrics.objects
+        .filter(date__gte=start)
+        .annotate(period=truncate_date("date", granularity))
+        .values("period")
+        .annotate(
+            avg_processing_time=Avg("avg_processing_time_ms"),
+            max_processing_time=Max("max_processing_time_ms"),
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row["period"].isoformat(),
+            "avg_processing_time_ms": int(row["avg_processing_time"] or 0),
+            "max_processing_time_ms": int(row["max_processing_time"] or 0),
         }
         for row in qs
     ]
@@ -319,6 +457,15 @@ def get_system_overview(*, days: int, granularity: str, sections: list[str]):
 
     if "assets" in sections:
         charts["assets"] = build_asset_trends(days=days, granularity=granularity)
+
+    if "return_flow" in sections:
+        charts["return_flow"] = build_return_flow_trends(days=days, granularity=granularity)
+
+    if "return_state" in sections:
+        charts["return_state"] = build_return_state_trends(days=days, granularity=granularity)
+
+    if "return_performance" in sections:
+        charts["return_performance"] = build_return_performance_trends(days=days, granularity=granularity)
 
     return {
         "kpis": build_system_kpis(),
