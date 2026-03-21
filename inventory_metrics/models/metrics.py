@@ -77,3 +77,35 @@ class DailyAuthMetrics(models.Model):
 
     def __str__(self):
         return f"DailyAuthMetrics - {self.date}"
+
+
+class DailyReturnMetrics(models.Model):
+    date = models.DateField(unique=True, db_index=True)
+
+    total_requests = models.PositiveIntegerField(default=0)
+    pending_requests = models.PositiveIntegerField(default=0)
+    approved_requests = models.PositiveIntegerField(default=0)
+    denied_requests = models.PositiveIntegerField(default=0)
+    partial_requests = models.PositiveIntegerField(default=0)
+    completed_requests = models.PositiveIntegerField(default=0)
+
+    requests_created_last_24h = models.PositiveIntegerField(default=0)
+    requests_processed_last_24h = models.PositiveIntegerField(default=0)
+
+    total_items = models.PositiveIntegerField(default=0)
+    pending_items = models.PositiveIntegerField(default=0)
+    approved_items = models.PositiveIntegerField(default=0)
+    denied_items = models.PositiveIntegerField(default=0)
+
+    equipment_items = models.PositiveIntegerField(default=0)
+    accessory_items = models.PositiveIntegerField(default=0)
+    consumable_items = models.PositiveIntegerField(default=0)
+
+    avg_processing_time_ms = models.PositiveIntegerField(default=0)
+    max_processing_time_ms = models.PositiveIntegerField(default=0)
+
+    schema_version = models.PositiveSmallIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date"]

@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from inventory_metrics.viewsets.health import AssetHealthView, HealthOverviewView, SecurityHealthView, SessionHealthView, SiteStructureHealthView, UserHealthView
+from inventory_metrics.viewsets.health import AssetHealthView, HealthOverviewView, SecurityHealthView, SessionHealthView, SiteStructureHealthView, UserHealthView, ReturnHealthOverviewView
 
 
 urlpatterns = [
@@ -15,4 +15,5 @@ urlpatterns = [
     path("sessions/", SessionHealthView.as_view(), name="admin_health_sessions"),
     path("security/", SecurityHealthView.as_view(), name="admin_health_security"),
     path("assets/", AssetHealthView.as_view(), name="admin_health_assets"),
+    path("returns/", ReturnHealthOverviewView.as_view(), name="admin_health_returns"),
 ]

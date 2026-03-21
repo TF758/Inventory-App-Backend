@@ -9,9 +9,11 @@ from db_inventory.models.security import UserSession
 from db_inventory.models.users import PasswordResetEvent, User
 from db_inventory.models.site import Department, Location, Room
 from db_inventory.models.audit import AuditLog
+from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from inventory_metrics.models.snapshots import DailyDepartmentSnapshot
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailySystemMetrics
+from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from django.contrib.auth import get_user_model
+from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max
 
 User = get_user_model()
 
@@ -273,6 +275,86 @@ def generate_daily_auth_metrics(for_date=None):
                     expires_at__lt=now,
                     expires_at__gte=last_24h,
                 ).count(),
+            },
+        )
+
+    return created
+
+def generate_daily_return_metrics(for_date=None):
+
+    if for_date is None:
+        for_date = timezone.localdate()
+
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+
+    with transaction.atomic():
+
+        requests = ReturnRequest.objects.all()
+        items = ReturnRequestItem.objects.all()
+
+
+        processed_today = requests.filter(
+            processed_at__date=for_date,
+            processed_at__isnull=False
+        ).annotate(
+            duration=ExpressionWrapper(
+                F("processed_at") - F("requested_at"),
+                output_field=DurationField()
+            )
+        )
+
+        duration_agg = processed_today.aggregate( avg_duration=Avg("duration"), max_duration=Max("duration"), )
+
+        def to_ms(value):
+            return int(value.total_seconds() * 1000) if value else 0
+
+        avg_ms = to_ms(duration_agg["avg_duration"])
+        max_ms = to_ms(duration_agg["max_duration"])
+
+        # -----------------------------------
+        # Create snapshot
+        # -----------------------------------
+        obj, created = DailyReturnMetrics.objects.get_or_create(
+            date=for_date,
+            defaults={
+
+                # -------------------------
+                # Request-level totals
+                # -------------------------
+                "total_requests": requests.count(),
+                "pending_requests": requests.filter( status=ReturnRequest.Status.PENDING ).count(),
+                "approved_requests": requests.filter( status=ReturnRequest.Status.APPROVED ).count(),
+                "denied_requests": requests.filter( status=ReturnRequest.Status.DENIED ).count(),
+                "partial_requests": requests.filter( status=ReturnRequest.Status.PARTIAL ).count(),
+                "completed_requests": requests.filter( status=ReturnRequest.Status.COMPLETED ).count(),
+
+                # -------------------------
+                # Activity (last 24h)
+                # -------------------------
+                "requests_created_last_24h": requests.filter( requested_at__gte=last_24h ).count(),
+
+                "requests_processed_last_24h": requests.filter( processed_at__gte=last_24h ).count(),
+
+                # -------------------------
+                # Item-level
+                # -------------------------
+                "total_items": items.count(),
+                "pending_items": items.filter( status=ReturnRequestItem.Status.PENDING ).count(),
+                "approved_items": items.filter( status=ReturnRequestItem.Status.APPROVED ).count(),
+                "denied_items": items.filter( status=ReturnRequestItem.Status.DENIED ).count(),
+                # -------------------------
+                # Type breakdown
+                # -------------------------
+                "equipment_items": items.filter( item_type=ReturnRequestItem.ItemType.EQUIPMENT ).count(),
+                "accessory_items": items.filter( item_type=ReturnRequestItem.ItemType.ACCESSORY ).count(),
+                "consumable_items": items.filter( item_type=ReturnRequestItem.ItemType.CONSUMABLE ).count(),
+
+
+                "avg_processing_time_ms": avg_ms,
+                "max_processing_time_ms": max_ms,
+
+                "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
             },
         )
 
