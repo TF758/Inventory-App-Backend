@@ -14,37 +14,48 @@ from db_inventory.security_policy import invalidate_security_policy_cache
 
 # Simple models
 
-
 class ReturnRequestItemInline(admin.TabularInline):
     model = ReturnRequestItem
     extra = 0
-    readonly_fields = ("asset_type", "asset_id", "quantity", "status")
+    readonly_fields = (
+        "item_type",
+        "equipment_assignment",
+        "accessory_assignment",
+        "consumable_issue",
+        "quantity",
+        "room",
+        "status",
+        "verified_by",
+        "verified_at",
+    )
 
 
 @admin.register(ReturnRequest)
 class ReturnRequestAdmin(admin.ModelAdmin):
+
     list_display = (
-        "id",
-        "user",
+        "public_id",
+        "requester",
         "status",
-        "created_at",
-        "updated_at",
+        "requested_at",
+        "processed_by",
+        "processed_at",
     )
 
     list_filter = (
         "status",
-        "created_at",
+        "requested_at",
     )
 
     search_fields = (
-        "id",
-        "user__email",
-        "user__username",
+        "public_id",
+        "requester__email",
+        "requester__username",
     )
 
     readonly_fields = (
-        "created_at",
-        "updated_at",
+        "requested_at",
+        "processed_at",
     )
 
     inlines = [ReturnRequestItemInline]
@@ -52,26 +63,30 @@ class ReturnRequestAdmin(admin.ModelAdmin):
 
 @admin.register(ReturnRequestItem)
 class ReturnRequestItemAdmin(admin.ModelAdmin):
+
     list_display = (
-        "id",
+        "public_id",
         "return_request",
-        "asset_type",
-        "asset_id",
-        "quantity",
+        "item_type",
         "status",
+        "room",
+        "quantity",
+        "verified_by",
     )
 
     list_filter = (
         "status",
-        "asset_type",
+        "item_type",
+        "room",
     )
 
     search_fields = (
-        "return_request__id",
+        "public_id",
+        "return_request__public_id",
     )
 
     readonly_fields = (
-        "return_request",
+        "verified_at",
     )
 
 @admin.register(SecuritySettings)
