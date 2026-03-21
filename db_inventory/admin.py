@@ -17,77 +17,23 @@ from db_inventory.security_policy import invalidate_security_policy_cache
 class ReturnRequestItemInline(admin.TabularInline):
     model = ReturnRequestItem
     extra = 0
-    readonly_fields = (
-        "item_type",
-        "equipment_assignment",
-        "accessory_assignment",
-        "consumable_issue",
-        "quantity",
-        "room",
-        "status",
-        "verified_by",
-        "verified_at",
-    )
+    readonly_fields = ("item_type", "quantity", "status")  
 
 
 @admin.register(ReturnRequest)
 class ReturnRequestAdmin(admin.ModelAdmin):
-
-    list_display = (
-        "public_id",
-        "requester",
-        "status",
-        "requested_at",
-        "processed_by",
-        "processed_at",
-    )
-
-    list_filter = (
-        "status",
-        "requested_at",
-    )
-
-    search_fields = (
-        "public_id",
-        "requester__email",
-        "requester__username",
-    )
-
-    readonly_fields = (
-        "requested_at",
-        "processed_at",
-    )
-
+    list_display = ( "id", "requester",    "status", "requested_at",   "processed_at", )
+    list_filter = ( "status", "requested_at",  )
+    search_fields = ( "id", "requester__email", )
+    readonly_fields = ( "requested_at",  "processed_at",  )
     inlines = [ReturnRequestItemInline]
-
 
 @admin.register(ReturnRequestItem)
 class ReturnRequestItemAdmin(admin.ModelAdmin):
-
-    list_display = (
-        "public_id",
-        "return_request",
-        "item_type",
-        "status",
-        "room",
-        "quantity",
-        "verified_by",
-    )
-
-    list_filter = (
-        "status",
-        "item_type",
-        "room",
-    )
-
-    search_fields = (
-        "public_id",
-        "return_request__public_id",
-    )
-
-    readonly_fields = (
-        "verified_at",
-    )
+    list_display = ( "id", "return_request", "item_type",   "quantity", "status", )
+    list_filter = ( "status", "item_type",  )
+    search_fields = ( "return_request__id", )
+    readonly_fields = ( "return_request", )
 
 @admin.register(SecuritySettings)
 class SecuritySettingsAdmin(admin.ModelAdmin):
