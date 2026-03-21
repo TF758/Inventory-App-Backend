@@ -10,7 +10,7 @@ from db_inventory.models import (
 from tqdm import tqdm
 
 from db_inventory.models.site import Room
-from inventory_metrics.models.metrics import DailyAuthMetrics
+from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics
 from inventory_metrics.models import (
     DailySystemMetrics,
     DailyDepartmentSnapshot,
@@ -91,6 +91,7 @@ class Command(BaseCommand):
         system_rows = []
         auth_rows = []
         dept_rows = []
+        return_rows = []
 
         # ------------------------------
         # Generate timeline
@@ -182,12 +183,12 @@ class Command(BaseCommand):
             )
 
             # === DEPARTMENT METRICS ===
-            for dept in tqdm( departments, desc="🏢 Departments", leave=False, unit="dept" ):
+            for dept in tqdm(departments, desc="🏢 Departments", leave=False, unit="dept"):
                 dept_users = User.objects.filter(
                     active_role__department=dept
                 ).count()
 
-                # 🔥 RETURN METRICS
+                # 🔥 RETURN METRICS (DEPT)
                 dept_total_returns = clamp(
                     weekly_seasonality(
                         trend(baseline_return_requests, days_ago, DAYS, growth=0.7),
@@ -205,14 +206,9 @@ class Command(BaseCommand):
                     )
                 )
 
-                returns_created_24h = clamp(
-                    noise(int(dept_total_returns * 0.15), 0.3)
-                )
+                returns_created_24h = clamp( noise(int(dept_total_returns * 0.15), 0.3) )
 
-                returns_processed_24h = clamp(
-                    noise(int(dept_total_returns * 0.12), 0.3)
-                )
-
+                returns_processed_24h = clamp( noise(int(dept_total_returns * 0.12), 0.3) )
                 dept_rows.append(
                     DailyDepartmentSnapshot(
                         department=dept,
@@ -245,7 +241,7 @@ class Command(BaseCommand):
                         total_accessories=random.randint(30, 150),
                         total_accessories_quantity=random.randint(200, 3000),
 
-                        # 🔥 RETURNS
+
                         total_return_requests=dept_total_returns,
                         pending_return_requests=dept_pending,
                         approved_return_requests=dept_approved,
@@ -257,6 +253,70 @@ class Command(BaseCommand):
                     )
                 )
 
+
+
+            total_requests = clamp(
+                weekly_seasonality(
+                    trend(baseline_return_requests, days_ago, DAYS, growth=0.7),
+                    date,
+                )
+            )
+
+            pending = int(total_requests * random.uniform(0.2, 0.4))
+            approved = int(total_requests * random.uniform(0.4, 0.6))
+            denied = int(total_requests * random.uniform(0.05, 0.15))
+            partial = max(0, total_requests - (pending + approved + denied))
+
+            completed = approved
+
+            created_24h = clamp(noise(int(total_requests * 0.15), 0.3))
+            processed_24h = clamp(noise(int(total_requests * 0.12), 0.3))
+
+            total_items = total_requests * random.randint(1, 4)
+
+            pending_items = int(total_items * random.uniform(0.2, 0.4))
+            approved_items = int(total_items * random.uniform(0.4, 0.6))
+            denied_items = max(0, total_items - (pending_items + approved_items))
+
+            equipment_items = int(total_items * random.uniform(0.4, 0.6))
+            accessory_items = int(total_items * random.uniform(0.2, 0.4))
+            consumable_items = max(
+                0,
+                total_items - (equipment_items + accessory_items)
+            )
+
+            avg_time = random.randint(500, 5000)
+            max_time = avg_time + random.randint(1000, 10000)
+
+            return_rows.append(
+                DailyReturnMetrics(
+                    date=date,
+
+                    total_requests=total_requests,
+                    pending_requests=pending,
+                    approved_requests=approved,
+                    denied_requests=denied,
+                    partial_requests=partial,
+                    completed_requests=completed,
+
+                    requests_created_last_24h=created_24h,
+                    requests_processed_last_24h=processed_24h,
+
+                    total_items=total_items,
+                    pending_items=pending_items,
+                    approved_items=approved_items,
+                    denied_items=denied_items,
+
+                    equipment_items=equipment_items,
+                    accessory_items=accessory_items,
+                    consumable_items=consumable_items,
+
+                    avg_processing_time_ms=avg_time,
+                    max_processing_time_ms=max_time,
+
+                    schema_version=1,
+                )
+            )
         # ------------------------------
         # Bulk insert
         # ------------------------------
@@ -266,5 +326,5 @@ class Command(BaseCommand):
             DailySystemMetrics.objects.bulk_create(system_rows, batch_size=BATCH_SIZE)
             DailyAuthMetrics.objects.bulk_create(auth_rows, batch_size=BATCH_SIZE)
             DailyDepartmentSnapshot.objects.bulk_create(dept_rows, batch_size=BATCH_SIZE)
-
+            DailyReturnMetrics.objects.bulk_create(return_rows, batch_size=BATCH_SIZE)
         self.stdout.write(self.style.SUCCESS("✓ Backfill complete with realistic variation"))

@@ -55,6 +55,13 @@ class Command(BaseCommand):
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
+        upsert_task(
+            name="Generate daily return metrics snapshot",
+            task="inventory_metrics.tasks.snapshots.run_daily_return_metrics_snapshot",
+            cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
+        )
+
+
         self.stdout.write(
             self.style.SUCCESS("Periodic data Celery Beat tasks configured.")
         )
