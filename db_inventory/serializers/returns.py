@@ -35,8 +35,11 @@ class ReturnRequestItemSerializer(serializers.ModelSerializer):
 
 
 class ReturnRequestSerializer(serializers.ModelSerializer):
-
     items = ReturnRequestItemSerializer(many=True)
+
+    requester_public_id = serializers.CharField( source="requester.public_id", read_only=True )
+    requester_email = serializers.EmailField( source="requester.email", read_only=True )
+    requester_full_name = serializers.CharField( source="requester.get_full_name", read_only=True )
 
     class Meta:
         model = ReturnRequest
@@ -46,5 +49,11 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
             "notes",
             "requested_at",
             "processed_at",
+
+
+            "requester_public_id",
+            "requester_email",
+            "requester_full_name",
+
             "items",
         ]

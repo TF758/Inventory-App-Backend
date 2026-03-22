@@ -647,14 +647,29 @@ class ReturnRequestFilter(django_filters.FilterSet):
 
 class AdminReturnRequestFilter(django_filters.FilterSet):
 
-    status = django_filters.ChoiceFilter( field_name="status", choices=ReturnRequest.Status.choices )
+    # ------------------------
+    # Core filters
+    # ------------------------
+    status = django_filters.ChoiceFilter(
+        field_name="status", choices=ReturnRequest.Status.choices )
     asset_type = django_filters.CharFilter( field_name="items__item_type" )
     requester = django_filters.CharFilter( field_name="requester__public_id" )
-    department = django_filters.CharFilter( method="filter_department" )
-    location = django_filters.CharFilter( method="filter_location" )
-    room = django_filters.CharFilter( method="filter_room" )
     requested_after = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="gte" )
     requested_before = django_filters.DateTimeFilter( field_name="requested_at", lookup_expr="lte" )
+
+    # ------------------------
+    # Item location filters
+    # ------------------------
+    department = django_filters.CharFilter(method="filter_department")
+    location = django_filters.CharFilter(method="filter_location")
+    room = django_filters.CharFilter(method="filter_room")
+
+    # ------------------------
+    # Requester location filters (NEW)
+    # ------------------------
+    requester_department = django_filters.CharFilter( method="filter_requester_department" )
+    requester_location = django_filters.CharFilter( method="filter_requester_location" )
+    requester_room = django_filters.CharFilter( method="filter_requester_room" )
 
     class Meta:
         model = ReturnRequest
@@ -665,22 +680,44 @@ class AdminReturnRequestFilter(django_filters.FilterSet):
             "department",
             "location",
             "room",
+            "requester_department",
+            "requester_location",
+            "requester_room",
         ]
 
+    # ------------------------
+    # Item-based filters
+    # ------------------------
     def filter_department(self, queryset, name, value):
-        return queryset.filter(
-            items__room__location__department__public_id=value
-        ).distinct()
+        return queryset.filter( items__room__location__department__public_id=value ).distinct()
 
     def filter_location(self, queryset, name, value):
-        return queryset.filter(
-            items__room__location__public_id=value
-        ).distinct()
+        return queryset.filter( items__room__location__public_id=value ).distinct()
 
     def filter_room(self, queryset, name, value):
+        return queryset.filter( items__room__public_id=value ).distinct()
+
+    # ------------------------
+    # Requester-based filters (IMPORTANT)
+    # ------------------------
+    def filter_requester_department(self, queryset, name, value):
         return queryset.filter(
-            items__room__public_id=value
+            requester__user_locations__is_current=True,
+            requester__user_locations__room__location__department__public_id=value
         ).distinct()
+
+    def filter_requester_location(self, queryset, name, value):
+        return queryset.filter(
+            requester__user_locations__is_current=True,
+            requester__user_locations__room__location__public_id=value
+        ).distinct()
+
+    def filter_requester_room(self, queryset, name, value):
+        return queryset.filter(
+            requester__user_locations__is_current=True,
+            requester__user_locations__room__public_id=value
+        ).distinct()
+    
 
 class MixAssetFilter:
     """

@@ -90,14 +90,14 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
         )
     
 class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet ):
-
     serializer_class = ReturnRequestSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
+
     model_class = ReturnRequest
+
     lookup_field = "public_id"
     lookup_url_kwarg = "public_id"
-
 
     filter_backends = [
         DjangoFilterBackend,
@@ -130,21 +130,17 @@ class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
             "items__consumable_issue__consumable",
         )
     )
-    # --------------------------------------------------
-    #  pending return requests
-    # --------------------------------------------------
 
+    # ---------------------------------------
+    # Pending return requests
+    # ---------------------------------------
     @action(detail=False, methods=["get"], url_path="pending")
     def pending(self, request):
-        """
-        Admin work queue for pending return requests.
-        """
-
         queryset = self.filter_queryset(
             self.get_queryset().filter(
                 status=ReturnRequest.Status.PENDING
             )
-        )
+        ).distinct()
 
         page = self.paginate_queryset(queryset)
 
@@ -154,7 +150,6 @@ class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-    
 
 class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
 

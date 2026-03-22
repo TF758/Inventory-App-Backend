@@ -328,16 +328,25 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
                 | Q(room__location__department=active_role.department)
             )
 
-        elif model_class == ReturnRequest:
+    elif model_class == ReturnRequest:
 
-            if active_role.room:
-                q |= Q(items__room=active_role.room)
+        if active_role.room:
+            q |= Q(
+                requester__user_locations__is_current=True,
+                requester__user_locations__room=active_role.room
+            )
 
-            elif active_role.location:
-                q |= Q(items__room__location=active_role.location)
+        elif active_role.location:
+            q |= Q(
+                requester__user_locations__is_current=True,
+                requester__user_locations__room__location=active_role.location
+            )
 
-            elif active_role.department:
-                q |= Q(items__room__location__department=active_role.department)
+        elif active_role.department:
+            q |= Q(
+                requester__user_locations__is_current=True,
+                requester__user_locations__room__location__department=active_role.department
+            )
 
     elif model_class == AssetAgreementItem:
 
