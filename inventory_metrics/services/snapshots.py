@@ -345,11 +345,11 @@ def generate_daily_return_metrics(for_date=None):
 
         duration_agg = processed_today.aggregate( avg_duration=Avg("duration"), max_duration=Max("duration"), )
 
-        def to_ms(value):
-            return int(value.total_seconds() * 1000) if value else 0
+        def to_seconds(value):
+            return int(round(value.total_seconds())) if value else 0
 
-        avg_ms = to_ms(duration_agg["avg_duration"])
-        max_ms = to_ms(duration_agg["max_duration"])
+        avg_seconds = to_seconds(duration_agg["avg_duration"])
+        max_seconds = to_seconds(duration_agg["max_duration"])
 
         # -----------------------------------
         # Create snapshot
@@ -390,8 +390,8 @@ def generate_daily_return_metrics(for_date=None):
                 "consumable_items": items.filter( item_type=ReturnRequestItem.ItemType.CONSUMABLE ).count(),
 
 
-                "avg_processing_time_ms": avg_ms,
-                "max_processing_time_ms": max_ms,
+                "avg_processing_time_seconds": avg_seconds,
+                "max_processing_time_seconds": max_seconds,
 
                 "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
             },

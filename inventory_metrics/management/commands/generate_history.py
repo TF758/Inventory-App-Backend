@@ -311,8 +311,8 @@ class Command(BaseCommand):
                     accessory_items=accessory_items,
                     consumable_items=consumable_items,
 
-                    avg_processing_time_ms=avg_time,
-                    max_processing_time_ms=max_time,
+                    avg_processing_time_seconds=avg_time,
+                    max_processing_time_seconds=max_time,
 
                     schema_version=1,
                 )

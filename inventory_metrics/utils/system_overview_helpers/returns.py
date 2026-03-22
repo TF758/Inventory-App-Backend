@@ -92,8 +92,8 @@ def build_return_performance_trends(*, days: int, granularity: str):
         .annotate(period=truncate_date("date", granularity))
         .values("period")
         .annotate(
-            avg_processing_time=Avg("avg_processing_time_ms"),
-            max_processing_time=Max("max_processing_time_ms"),
+            avg_processing_time=Avg("avg_processing_time_seconds"),
+            max_processing_time=Max("max_processing_time_seconds"),
         )
         .order_by("period")
     )
@@ -101,8 +101,8 @@ def build_return_performance_trends(*, days: int, granularity: str):
     return [
         {
             "date": row["period"].isoformat(),
-            "avg_processing_time_ms": int(row["avg_processing_time"] or 0),
-            "max_processing_time_ms": int(row["max_processing_time"] or 0),
+            "avg_processing_time_seconds": int(row["avg_processing_time"] or 0),
+            "max_processing_time_seconds": int(row["max_processing_time"] or 0),
         }
         for row in qs
     ]

@@ -101,8 +101,8 @@ class DailyReturnMetrics(models.Model):
     accessory_items = models.PositiveIntegerField(default=0)
     consumable_items = models.PositiveIntegerField(default=0)
 
-    avg_processing_time_ms = models.PositiveIntegerField(default=0)
-    max_processing_time_ms = models.PositiveIntegerField(default=0)
+    avg_processing_time_seconds= models.PositiveIntegerField(default=0)
+    max_processing_time_seconds = models.PositiveIntegerField(default=0)
 
     schema_version = models.PositiveSmallIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
