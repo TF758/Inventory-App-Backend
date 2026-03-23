@@ -133,10 +133,10 @@ def build_system_kpis():
         },
 
         "avg_return_processing_time": {
-            "value": return_today.avg_processing_time_ms if return_today else 0,
+            "value": return_today.avg_processing_time_seconds if return_today else 0,
             "delta": safe_delta(
-                return_today.avg_processing_time_ms if return_today else None,
-                return_yesterday.avg_processing_time_ms if return_yesterday else None,
+                return_today.avg_processing_time_seconds if return_today else None,
+                return_yesterday.avg_processing_time_seconds if return_yesterday else None,
             ),
         },
     }
