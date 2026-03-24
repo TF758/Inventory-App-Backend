@@ -7,6 +7,8 @@ from openpyxl import Workbook
 from db_inventory.models import Equipment, Component, Consumable, Accessory
 from django.db.models import Q, Max
 
+from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+
 
 
 def get_latest_snapshot_date(model, *, date_field: str = "date"):
@@ -172,3 +174,72 @@ def generate_site_asset_excel(
     wb.save(output)
     output.seek(0)
     return output
+
+def get_return_health():
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+    last_3d = now - timedelta(days=3)
+    last_7d = now - timedelta(days=7)
+
+    pending_requests = ReturnRequest.objects.filter(
+        status=ReturnRequest.Status.PENDING
+    ).count()
+
+    pending_items = ReturnRequestItem.objects.filter(
+        status=ReturnRequestItem.Status.PENDING
+    ).count()
+
+    stale_requests_24h = ReturnRequest.objects.filter(
+        status=ReturnRequest.Status.PENDING,
+        requested_at__lt=last_24h
+    ).count()
+
+    stale_requests_3d = ReturnRequest.objects.filter(
+        status=ReturnRequest.Status.PENDING,
+        requested_at__lt=last_3d
+    ).count()
+
+    processed_last_24h = ReturnRequest.objects.filter(
+        processed_at__gte=last_24h
+    ).count()
+
+    created_last_24h = ReturnRequest.objects.filter(
+        requested_at__gte=last_24h
+    ).count()
+
+    denied_requests_last_7d = ReturnRequest.objects.filter(
+        status=ReturnRequest.Status.DENIED,
+        processed_at__gte=last_7d
+    ).count()
+
+    partial_requests_last_7d = ReturnRequest.objects.filter(
+        status=ReturnRequest.Status.PARTIAL,
+        processed_at__gte=last_7d
+    ).count()
+
+    backlog_ratio = (
+        pending_requests / (pending_requests + processed_last_24h)
+        if (pending_requests + processed_last_24h) > 0 else 0
+    )
+
+    return {
+        "backlog": {
+            "pending_requests": pending_requests,
+            "pending_items": pending_items,
+        },
+        "aging": {
+            "stale_requests_over_24h": stale_requests_24h,
+            "stale_requests_over_3d": stale_requests_3d,
+        },
+        "flow": {
+            "created_last_24h": created_last_24h,
+            "processed_last_24h": processed_last_24h,
+        },
+        "quality": {
+            "denied_requests_last_7d": denied_requests_last_7d,
+            "partial_requests_last_7d": partial_requests_last_7d,
+        },
+        "insights": {
+            "backlog_ratio": round(backlog_ratio, 2),
+        }
+    }

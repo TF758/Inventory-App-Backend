@@ -12,6 +12,7 @@ class Command(BaseCommand):
         parser.add_argument("--skip-history", action="store_true")
         parser.add_argument("--skip-periodic", action="store_true")
         parser.add_argument("--skip-cleaners", action="store_true")
+        parser.add_argument("--skip-return-requests", action="store_true")
         parser.add_argument("--dry-run", action="store_true")
 
     def handle(self, *args, **options):
@@ -36,6 +37,12 @@ class Command(BaseCommand):
                 "label": "📊 Generate historical analytics",
                 "command": "generate_history",
                 "skip": options["skip_history"],
+                "kwargs": {},
+            },
+            {
+                "label": "📊 Generate Return Request Data",
+                "command": "generate_asset_return_data",
+                "skip": options["skip_return_requests"],
                 "kwargs": {},
             },
             {
