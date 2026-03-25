@@ -13,6 +13,7 @@ from django.db.models import Exists, OuterRef, Sum, F
 
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from inventory_metrics.utils.viewset_helpers import get_return_health
 User = get_user_model()
 
 
@@ -86,6 +87,7 @@ class HealthOverviewView(APIView):
                     admin__isnull=False,
                     created_at__gte=last_24h,
                 ).count(),
+            "returns": get_return_health(),
             }
         })
 

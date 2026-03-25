@@ -8,35 +8,46 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
-from db_inventory.models.site import Room
+from db_inventory.models.site import Room, UserLocation
 from db_inventory.models.users import User
 
 
 
 
 class Command(BaseCommand):
-    help = "Generate realistic asset return data across departments"
+    help = "Generate realistic asset return data"
 
     def handle(self, *args, **options):
+        self.stdout.write(self.style.WARNING("🧹 Purging return history..."))
 
-        self.stdout.write(
-            self.style.WARNING("🧹 Purging return history...")
-        )
+        ReturnRequestItem.objects.all().delete()
+        ReturnRequest.objects.all().delete()
 
-        deleted_items, _ = ReturnRequestItem.objects.all().delete()
-        deleted_requests, _ = ReturnRequest.objects.all().delete()
+        self.stdout.write(self.style.SUCCESS("✔ Cleared existing data"))
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"✔ Deleted {deleted_requests} requests and {deleted_items} items"
-            )
-        )
         DAYS = 730
         today = timezone.now()
 
-        self.stdout.write(self.style.WARNING("Generating return data..."))
+        self.stdout.write(self.style.WARNING("Generating realistic return data..."))
 
-        users = list(User.objects.all())
+        # ----------------------------------
+        # Users with current locations ONLY
+        # ----------------------------------
+        user_locations = list(
+            UserLocation.objects.filter(is_current=True).select_related(
+                "user",
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+        )
+
+        if not user_locations:
+            self.stdout.write(self.style.ERROR("No users with current locations"))
+            return
+
+        rooms = list(Room.objects.all())
+
         equipment_assignments = list(
             EquipmentAssignment.objects.filter(returned_at__isnull=True)
         )
@@ -46,35 +57,43 @@ class Command(BaseCommand):
         consumable_issues = list(
             ConsumableIssue.objects.filter(returned_at__isnull=True)
         )
-        rooms = list(Room.objects.all())
-
-        if not users:
-            self.stdout.write(self.style.ERROR("No users found"))
-            return
 
         total_requests = 0
-
-        # ✅ Enable tqdm only in interactive terminals
         use_tqdm = sys.stdout.isatty()
 
-        pbar = tqdm(
-            range(DAYS, 0, -1),
-            desc="Generating return days",
-            disable=not use_tqdm,
-        )
+        pbar = tqdm(range(DAYS, 0, -1), disable=not use_tqdm)
 
         for day_offset in pbar:
             date = today - datetime.timedelta(days=day_offset)
 
-            # simulate daily load
-            num_requests = random.randint(5, 25)
+            # Simulate daily volume
+            num_requests = random.randint(5, 20)
 
             for _ in range(num_requests):
-                requester = random.choice(users)
+                # ----------------------------------
+                # Pick user with location
+                # ----------------------------------
+                user_loc = random.choice(user_locations)
+                requester = user_loc.user
+                user_room = user_loc.room
 
-                # -----------------------------
-                # Request status
-                # -----------------------------
+                requested_at = date + datetime.timedelta(
+                    hours=random.randint(8, 18),  # business hours bias
+                    minutes=random.randint(0, 59),
+                )
+
+                # ----------------------------------
+                # Status based on age
+                # ----------------------------------
+                days_ago = (today - requested_at).days
+
+                if days_ago > 30:
+                    weights = [0.05, 0.3, 0.1, 0.25, 0.3]
+                elif days_ago > 7:
+                    weights = [0.1, 0.35, 0.1, 0.25, 0.2]
+                else:
+                    weights = [0.6, 0.2, 0.05, 0.1, 0.05]
+
                 status = random.choices(
                     [
                         ReturnRequest.Status.PENDING,
@@ -83,35 +102,29 @@ class Command(BaseCommand):
                         ReturnRequest.Status.PARTIAL,
                         ReturnRequest.Status.COMPLETED,
                     ],
-                    weights=[0.2, 0.3, 0.1, 0.2, 0.2],
+                    weights=weights,
                 )[0]
-
-                requested_at = date + datetime.timedelta(
-                    hours=random.randint(0, 23),
-                    minutes=random.randint(0, 59),
-                )
 
                 processed_at = None
                 processed_by = None
 
                 if status != ReturnRequest.Status.PENDING:
-                    delay_hours = random.randint(1, 72)
+                    delay_hours = random.randint(2, 72)
                     processed_at = requested_at + datetime.timedelta(hours=delay_hours)
-                    processed_by = random.choice(users)
+                    processed_by = random.choice([ul.user for ul in user_locations])
 
-                request = ReturnRequest(
+                request = ReturnRequest.objects.create(
                     requester=requester,
                     status=status,
                     requested_at=requested_at,
                     processed_at=processed_at,
                     processed_by=processed_by,
-                    notes="Auto-generated",
+                    notes="Auto-generated realistic return",
                 )
-                request.save()
 
-                # -----------------------------
+                # ----------------------------------
                 # Items
-                # -----------------------------
+                # ----------------------------------
                 num_items = random.randint(1, 4)
 
                 for _ in range(num_items):
@@ -123,27 +136,48 @@ class Command(BaseCommand):
                         ]
                     )
 
-                    item_status = random.choices(
-                        [
-                            ReturnRequestItem.Status.PENDING,
-                            ReturnRequestItem.Status.APPROVED,
-                            ReturnRequestItem.Status.DENIED,
-                        ],
-                        weights=[0.3, 0.5, 0.2],
-                    )[0]
+                    # ----------------------------------
+                    # Room realism (80% same room)
+                    # ----------------------------------
+                    if random.random() < 0.8 and user_room:
+                        room = user_room
+                    else:
+                        room = random.choice(rooms)
 
-                    room = random.choice(rooms)
+                    # ----------------------------------
+                    # Item status aligned with request
+                    # ----------------------------------
+                    if status == ReturnRequest.Status.PENDING:
+                        item_status = ReturnRequestItem.Status.PENDING
+                    elif status == ReturnRequest.Status.COMPLETED:
+                        item_status = ReturnRequestItem.Status.APPROVED
+                    elif status == ReturnRequest.Status.DENIED:
+                        item_status = ReturnRequestItem.Status.DENIED
+                    else:
+                        item_status = random.choice(
+                            [
+                                ReturnRequestItem.Status.APPROVED,
+                                ReturnRequestItem.Status.DENIED,
+                            ]
+                        )
 
                     kwargs = {
                         "return_request": request,
                         "item_type": item_type,
                         "room": room,
                         "status": item_status,
-                        "verified_by": requester if item_status != "pending" else None,
-                        "verified_at": processed_at if item_status != "pending" else None,
-                        "notes": "Auto-generated",
+                        "verified_by": (
+                            processed_by if item_status != "pending" else None
+                        ),
+                        "verified_at": (
+                            processed_at if item_status != "pending" else None
+                        ),
+                        "notes": "Auto-generated item",
                     }
 
+                    # ----------------------------------
+                    # Assign assets realistically
+                    # ----------------------------------
                     if (
                         item_type == ReturnRequestItem.ItemType.EQUIPMENT
                         and equipment_assignments
@@ -168,18 +202,17 @@ class Command(BaseCommand):
                         kwargs["consumable_issue"] = con
                         kwargs["quantity"] = random.randint(1, con.quantity)
 
-                    item = ReturnRequestItem(**kwargs)
-                    item.save()
+                    ReturnRequestItem.objects.create(**kwargs)
 
                 total_requests += 1
 
             pbar.set_postfix(
                 {
-                    "today": num_requests,
-                    "total_requests": total_requests,
+                    "daily": num_requests,
+                    "total": total_requests,
                 }
             )
 
         self.stdout.write(
-            self.style.SUCCESS(f"Generated {total_requests} return requests")
+            self.style.SUCCESS(f"Generated {total_requests} realistic return requests")
         )
