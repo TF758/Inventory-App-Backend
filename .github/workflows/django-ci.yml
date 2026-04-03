@@ -1,0 +1,30 @@
+name: Django CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create env file
+        run: |
+          cp .env.dev .env
+
+      - name: Build containers
+        run: docker compose build
+
+      - name: Start database and redis
+        run: docker compose up -d db redis
+
+      - name: Run migrations
+        run: docker compose run api python manage.py migrate
+
+      - name: Run tests
+        run: docker compose run api python manage.py test
