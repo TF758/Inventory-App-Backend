@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
-from db_inventory.models.site import Room, UserLocation
+from db_inventory.models.site import Room, UserPlacement
 from db_inventory.models.users import User
 
 
@@ -33,8 +33,8 @@ class Command(BaseCommand):
         # ----------------------------------
         # Users with current locations ONLY
         # ----------------------------------
-        user_locations = list(
-            UserLocation.objects.filter(is_current=True).select_related(
+        user_placements = list(
+            UserPlacement.objects.filter(is_current=True).select_related(
                 "user",
                 "room",
                 "room__location",
@@ -42,7 +42,7 @@ class Command(BaseCommand):
             )
         )
 
-        if not user_locations:
+        if not user_placements:
             self.stdout.write(self.style.ERROR("No users with current locations"))
             return
 
@@ -73,7 +73,7 @@ class Command(BaseCommand):
                 # ----------------------------------
                 # Pick user with location
                 # ----------------------------------
-                user_loc = random.choice(user_locations)
+                user_loc = random.choice(user_placements)
                 requester = user_loc.user
                 user_room = user_loc.room
 
@@ -111,7 +111,7 @@ class Command(BaseCommand):
                 if status != ReturnRequest.Status.PENDING:
                     delay_hours = random.randint(2, 72)
                     processed_at = requested_at + datetime.timedelta(hours=delay_hours)
-                    processed_by = random.choice([ul.user for ul in user_locations])
+                    processed_by = random.choice([ul.user for ul in user_placements])
 
                 request = ReturnRequest.objects.create(
                     requester=requester,

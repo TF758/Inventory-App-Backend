@@ -10,7 +10,7 @@ django.setup()
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 
-from db_inventory.models.site import Department, Location, Room, UserLocation
+from db_inventory.models.site import Department, Location, Room, UserPlacement
 from db_inventory.models.users import User
 from db_inventory.models import RoleAssignment
 import itertools
@@ -250,7 +250,7 @@ class Command(BaseCommand):
         # -------------------------------
         self.stdout.write(self.style.MIGRATE_HEADING("Assigning users to locations"))
 
-        user_locations = []
+        user_placements = []
 
         # ✅ Step 1: guarantee every room has at least 1 user
         users_iter = iter(users)
@@ -261,12 +261,12 @@ class Command(BaseCommand):
             except StopIteration:
                 break
 
-            user_locations.append(
-                UserLocation(user=user, room=room, is_current=True)
+            user_placements.append(
+                UserPlacement(user=user, room=room, is_current=True)
             )
 
         # ✅ Step 2: distribute remaining users within ministry
-        remaining_users = users[len(user_locations):]
+        remaining_users = users[len(user_placements):]
 
         for user in tqdm(remaining_users, desc="Assigning locations"):
             if random.random() < 0.98:
@@ -285,21 +285,21 @@ class Command(BaseCommand):
 
                 room = random.choice(loc_rooms)
 
-                user_locations.append(
-                    UserLocation(
+                user_placements.append(
+                    UserPlacement(
                         user=user,
                         room=room,
                         is_current=True,
                     )
                 )
 
-        UserLocation.objects.bulk_create(
-            user_locations,
+        UserPlacement.objects.bulk_create(
+            user_placements,
             batch_size=BATCH_SIZE,
         )
 
         self.stdout.write(
-            self.style.SUCCESS(f"{len(user_locations):,} users assigned to rooms")
+            self.style.SUCCESS(f"{len(user_placements):,} users assigned to rooms")
         )
 
         # -------------------------------
@@ -312,7 +312,7 @@ class Command(BaseCommand):
             used = set()
 
             # 🔑 get user's assigned room (enforces ministry consistency)
-            user_loc = next((ul for ul in user_locations if ul.user_id == user.id), None)
+            user_loc = next((ul for ul in user_placements if ul.user_id == user.id), None)
             if not user_loc:
                 continue
 

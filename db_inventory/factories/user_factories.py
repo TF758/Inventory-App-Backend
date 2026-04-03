@@ -1,4 +1,4 @@
-from db_inventory.models import User, UserLocation
+from db_inventory.models import User, UserPlacement
 import factory
 from faker import Faker
 import random
@@ -31,9 +31,9 @@ class AdminUserFactory(UserFactory):
     is_superuser = True
 
 
-class UserLocationFactory(factory.django.DjangoModelFactory):
+class UserPlacementFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = UserLocation
+        model = UserPlacement
 
     user = factory.SubFactory(UserFactory)
     room = None

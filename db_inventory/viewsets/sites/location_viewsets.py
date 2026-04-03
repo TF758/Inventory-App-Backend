@@ -7,7 +7,7 @@ from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
-from db_inventory.models.site import Location, Room, UserLocation
+from db_inventory.models.site import Location, Room, UserPlacement
 from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -114,7 +114,7 @@ class LocationUsersView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixi
         location_id = self.kwargs["public_id"]
 
         qs = (
-            UserLocation.objects
+            UserPlacement.objects
             .filter(
                 is_current=True,
                 room__location__public_id=location_id,

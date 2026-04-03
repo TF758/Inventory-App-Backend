@@ -2,20 +2,20 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
-from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserLocationWriteSerializer
+from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserPlacementWriteSerializer
 from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
-from db_inventory.models import User, UserLocation, RoleAssignment, Room, Department, Location
+from db_inventory.models import User, UserPlacement, RoleAssignment, Room, Department, Location
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.site import UserLocation, Room, Department, Location
+from db_inventory.models.site import UserPlacement, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import  UserFilter, UserLocationFilter
+from db_inventory.filters import  UserFilter, UserPlacementFilter
 from db_inventory.mixins import NotificationMixin, ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
-from db_inventory.permissions import UserPermission, RolePermission, UserLocationPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
+from db_inventory.permissions import UserPermission, RolePermission, UserPlacementPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
 from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework import status
@@ -76,29 +76,29 @@ class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
 
 
-class UserLocationViewSet(AuditMixin, NotificationMixin,viewsets.ModelViewSet):
+class UserPlacementViewSet(AuditMixin, NotificationMixin,viewsets.ModelViewSet):
 
-    queryset = UserLocation.objects.select_related(
+    queryset = UserPlacement.objects.select_related(
         "user", "room", "room__location", "room__location__department"
     ).order_by("-date_joined", "-id")
 
     lookup_field = "public_id"
-    permission_classes = [UserLocationPermission]
+    permission_classes = [UserPlacementPermission]
     filter_backends = [DjangoFilterBackend]
-    filterset_class = UserLocationFilter
+    filterset_class = UserPlacementFilter
 
     def get_queryset(self):
         if self.action == "list":
             return filter_queryset_by_scope(
                 self.request.user,
                 super().get_queryset(),
-                UserLocation
+                UserPlacement
             )
         return super().get_queryset()
 
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update"]:
-            return UserLocationWriteSerializer
+            return UserPlacementWriteSerializer
         return UserAreaSerializer
 
     def create(self, request, *args, **kwargs):
@@ -150,7 +150,7 @@ class UserLocationViewSet(AuditMixin, NotificationMixin,viewsets.ModelViewSet):
 class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
 
     serializer_class = UserTransferSerializer
-    permission_classes = [UserLocationPermission]
+    permission_classes = [UserPlacementPermission]
 
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -161,7 +161,7 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
 
         with transaction.atomic():
 
-            old_location = UserLocation.objects.filter(
+            old_location = UserPlacement.objects.filter(
                 user=user,
                 is_current=True
             ).select_related("room").first()
@@ -172,7 +172,7 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
                 old_location.is_current = False
                 old_location.save(update_fields=["is_current"])
 
-            new_location = UserLocation.objects.create(
+            new_location = UserPlacement.objects.create(
                 user=user,
                 room=new_room,
                 is_current=True,
@@ -241,17 +241,17 @@ class UserTransferViewSet(AuditMixin,NotificationMixin,GenericViewSet):
         return Response(read_serializer.data, status=status.HTTP_201_CREATED)
     
 
-class UserLocationByUserView(APIView):
+class UserPlacementByUserView(APIView):
     """
     Retrieve the current location assignment of a user
     by the user's public_id.
     """
 
-    permission_classes = [UserLocationPermission]
+    permission_classes = [UserPlacementPermission]
 
     def get(self, request, user_public_id: str):
         assignment = (
-            UserLocation.objects.select_related(
+            UserPlacement.objects.select_related(
                 "user",
                 "room",
                 "room__location",
@@ -295,7 +295,7 @@ class UnallocatedUserViewSet(viewsets.ReadOnlyModelViewSet):
 
 class FullUserCreateView(AuditMixin,views.APIView):
     """
-    Create a User, assign a UserLocation, and assign a Role atomically.
+    Create a User, assign a UserPlacement, and assign a Role atomically.
     This endpoint enforces:
       - SITE_ADMIN: can create users anywhere
       - DEPARTMENT_ADMIN: can create users only inside their department
@@ -320,9 +320,9 @@ class FullUserCreateView(AuditMixin,views.APIView):
             user_serializer.is_valid(raise_exception=True)
             user = user_serializer.save()
 
-            # 2️⃣ Assign UserLocation (permission enforced here)
+            # 2️⃣ Assign UserPlacement (permission enforced here)
             if user_location_public_id:
-                ul_serializer = UserLocationWriteSerializer(
+                ul_serializer = UserPlacementWriteSerializer(
                     data={
                         "user_id": user.public_id,
                         "room_id": user_location_public_id,
@@ -331,12 +331,12 @@ class FullUserCreateView(AuditMixin,views.APIView):
                 )
                 ul_serializer.is_valid(raise_exception=True)
 
-                temp_ul = UserLocation(
+                temp_ul = UserPlacement(
                     user=user,
                     room=ul_serializer.validated_data["room"]
                 )
 
-                if not UserLocationPermission().has_object_permission(
+                if not UserPlacementPermission().has_object_permission(
                     request, self, temp_ul
                 ):
                     raise PermissionDenied(
@@ -405,7 +405,7 @@ class FullUserCreateView(AuditMixin,views.APIView):
             {
                 "user": UserWriteSerializer(user).data,
                 "user_location": (
-                    UserLocationWriteSerializer(user_location_instance).data
+                    UserPlacementWriteSerializer(user_location_instance).data
                     if user_location_instance else None
                 ),
                 "role_assignment": RoleWriteSerializer(role_assignment).data,

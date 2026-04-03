@@ -4,12 +4,12 @@ from django.urls import reverse
 from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserFactory
 from db_inventory.models.roles import RoleAssignment
 
-class UserLocationPermissionTestBase(APITestCase):
+class UserPlacementPermissionTestBase(APITestCase):
     """
-    Shared fixtures for UserLocation permission tests.
+    Shared fixtures for UserPlacement permission tests.
 
     - Uses setUpTestData for static hierarchy + role setup (fast).
-    - Subclasses should create per-test UserLocation rows in setUp(),
+    - Subclasses should create per-test UserPlacement rows in setUp(),
       and authenticate the correct user for the role being tested.
     """
     __test__ = False

@@ -6,7 +6,7 @@ from django.urls import reverse
 from db_inventory.factories import (
     RoomFactory,
     UserFactory,
-    UserLocationFactory,
+    UserPlacementFactory,
     AccessoryFactory,
 )
 from db_inventory.models import AccessoryAssignment
@@ -45,7 +45,7 @@ class TestCondemnAccessory(CondemnAccessoryTestBase):
         accessory = AccessoryFactory(room=self.room, quantity=5)
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         AccessoryAssignment.objects.create(
             accessory=accessory,
@@ -73,7 +73,7 @@ class TestCondemnAccessory(CondemnAccessoryTestBase):
         accessory = AccessoryFactory(room=self.room, quantity=10)
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         AccessoryAssignment.objects.create(
             accessory=accessory,
@@ -100,7 +100,7 @@ class TestCondemnAccessory(CondemnAccessoryTestBase):
         self.client.force_authenticate(user=None)
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=5)
 

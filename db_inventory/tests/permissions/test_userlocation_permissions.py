@@ -2,16 +2,16 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, APITestCase, APIClient
 from rest_framework import status
 from rest_framework.reverse import reverse
-from db_inventory.models import User, UserLocation, Room, Department, Location, RoleAssignment
-from db_inventory.factories import UserFactory, AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserLocationFactory
-from db_inventory.tests.utils.userlocation_test_base import UserLocationPermissionTestBase
-from db_inventory.permissions.users import UserLocationPermission
-from db_inventory.viewsets.user_viewsets import UserLocationViewSet
+from db_inventory.models import User, UserPlacement, Room, Department, Location, RoleAssignment
+from db_inventory.factories import UserFactory, AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserPlacementFactory
+from db_inventory.tests.utils.userlocation_test_base import UserPlacementPermissionTestBase
+from db_inventory.permissions.users import UserPlacementPermission
+from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
 from db_inventory.permissions.helpers import is_in_scope
 from rest_framework.request import Request
 
 
-class UserLocationPermissionMatrixTests(TestCase):
+class UserPlacementPermissionMatrixTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -27,12 +27,12 @@ class UserLocationPermissionMatrixTests(TestCase):
 
         cls.target_user = UserFactory()
 
-        cls.ul_inside = UserLocation.objects.create(
+        cls.ul_inside = UserPlacement.objects.create(
             user=cls.target_user,
             room=cls.room1,
         )
 
-        cls.ul_outside = UserLocation.objects.create(
+        cls.ul_outside = UserPlacement.objects.create(
             user=cls.target_user,
             room=cls.room2,
         )
@@ -60,10 +60,10 @@ class UserLocationPermissionMatrixTests(TestCase):
 
         request.user = user
 
-        view = UserLocationViewSet()
+        view = UserPlacementViewSet()
         view.action = method.lower()
 
-        permission = UserLocationPermission()
+        permission = UserPlacementPermission()
 
         if not permission.has_permission(request, view):
             self.assertFalse(expected)
@@ -111,7 +111,7 @@ class UserLocationPermissionMatrixTests(TestCase):
 
         self._assert_permission(user, "POST", self.ul_inside, False)
 
-class UserLocationIntegrationTests(APITestCase):
+class UserPlacementIntegrationTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -165,7 +165,7 @@ class UserLocationIntegrationTests(APITestCase):
 
         self.assertEqual(response.status_code, 403)
 
-class RoomAdminUserLocationIntegrationTests(APITestCase):
+class RoomAdminUserPlacementIntegrationTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -179,7 +179,7 @@ class RoomAdminUserLocationIntegrationTests(APITestCase):
 
         cls.target_user = UserFactory()
 
-        cls.user_location = UserLocation.objects.create(
+        cls.user_location = UserPlacement.objects.create(
             user=cls.target_user,
             room=cls.room,
         )
@@ -203,9 +203,9 @@ class RoomAdminUserLocationIntegrationTests(APITestCase):
         self.client.force_authenticate(user=self.room_admin)
 
         # Disable side effects
-        from db_inventory.viewsets.user_viewsets import UserLocationViewSet
-        UserLocationViewSet.audit = lambda *a, **k: None
-        UserLocationViewSet.notify = lambda *a, **k: None
+        from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
+        UserPlacementViewSet.audit = lambda *a, **k: None
+        UserPlacementViewSet.notify = lambda *a, **k: None
 
     # ✅ READ allowed
     def test_room_admin_can_retrieve_inside_scope(self):
@@ -238,7 +238,7 @@ class RoomAdminUserLocationIntegrationTests(APITestCase):
         response = self.client.delete(self.detail_url)
         self.assertEqual(response.status_code, 403)
 
-class UserLocationBoundaryIntegrationTests(APITestCase):
+class UserPlacementBoundaryIntegrationTests(APITestCase):
     """
     Integration-level edge case coverage:
     - Null room behavior
@@ -267,12 +267,12 @@ class UserLocationBoundaryIntegrationTests(APITestCase):
         cls.viewer.save()
 
         # Objects
-        cls.ul_valid = UserLocation.objects.create(
+        cls.ul_valid = UserPlacement.objects.create(
             user=cls.target_user,
             room=cls.room,
         )
 
-        cls.ul_null = UserLocation.objects.create(
+        cls.ul_null = UserPlacement.objects.create(
             user=cls.target_user,
             room=None,
         )
@@ -291,9 +291,9 @@ class UserLocationBoundaryIntegrationTests(APITestCase):
         self.client.force_authenticate(user=self.viewer)
 
         # Disable side effects
-        from db_inventory.viewsets.user_viewsets import UserLocationViewSet
-        UserLocationViewSet.audit = lambda *a, **k: None
-        UserLocationViewSet.notify = lambda *a, **k: None
+        from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
+        UserPlacementViewSet.audit = lambda *a, **k: None
+        UserPlacementViewSet.notify = lambda *a, **k: None
 
     # -------------------------
     # Null room blocked

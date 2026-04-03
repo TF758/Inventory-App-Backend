@@ -7,7 +7,7 @@ from db_inventory.factories import (
     LocationFactory,
     RoomFactory,
     UserFactory,
-    UserLocationFactory,
+    UserPlacementFactory,
     ConsumableFactory,
 )
 from db_inventory.models.asset_assignment import ConsumableIssue
@@ -23,7 +23,7 @@ class TestIssueConsumable(ConsumableAPITestBase):
 
     def test_room_admin_can_issue_consumable(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         consumable = ConsumableFactory(room=self.room, quantity=20)
 
@@ -170,7 +170,7 @@ class TestReturnConsumable(ConsumableAPITestBase):
 
     def test_admin_can_return_unused_consumable(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         consumable = ConsumableFactory(room=self.room, quantity=10)
 
@@ -224,7 +224,7 @@ class TestReturnConsumable(ConsumableAPITestBase):
 
     def test_admin_cannot_return_zero_quantity(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         consumable = ConsumableFactory(room=self.room, quantity=10)
 
@@ -327,7 +327,7 @@ class TestConsumableEdgeCases(APITestCase):
         admin.save()
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=room_a)
+        UserPlacementFactory(user=user, room=room_a)
 
         consumable = ConsumableFactory(room=room_a, quantity=10)
 

@@ -117,7 +117,7 @@ class AreaUserFilter(django_filters.FilterSet):
     q = django_filters.CharFilter(method="filter_q")
 
     class Meta:
-        model = UserLocation
+        model = UserPlacement
         fields = [
             "user",
             "email",
@@ -432,9 +432,9 @@ class ConsumableFilter(django_filters.FilterSet):
         return queryset
 
 
-class UserLocationFilter(django_filters.FilterSet):
+class UserPlacementFilter(django_filters.FilterSet):
     """
-    Filters for UserLocation based on related public_ids and user info.
+    Filters for UserPlacement based on related public_ids and user info.
     """
 
     user_id = django_filters.CharFilter(field_name="user__public_id", lookup_expr="iexact")
@@ -449,7 +449,7 @@ class UserLocationFilter(django_filters.FilterSet):
     job_title = django_filters.CharFilter(field_name="user__job_title", lookup_expr="icontains")
 
     class Meta:
-        model = UserLocation
+        model = UserPlacement
         fields = [
             "user_id",
             "room_id",
@@ -702,20 +702,20 @@ class AdminReturnRequestFilter(django_filters.FilterSet):
     # ------------------------
     def filter_requester_department(self, queryset, name, value):
         return queryset.filter(
-            requester__user_locations__is_current=True,
-            requester__user_locations__room__location__department__public_id=value
+            requester__user_placements__is_current=True,
+            requester__user_placements__room__location__department__public_id=value
         ).distinct()
 
     def filter_requester_location(self, queryset, name, value):
         return queryset.filter(
-            requester__user_locations__is_current=True,
-            requester__user_locations__room__location__public_id=value
+            requester__user_placements__is_current=True,
+            requester__user_placements__room__location__public_id=value
         ).distinct()
 
     def filter_requester_room(self, queryset, name, value):
         return queryset.filter(
-            requester__user_locations__is_current=True,
-            requester__user_locations__room__public_id=value
+            requester__user_placements__is_current=True,
+            requester__user_placements__room__public_id=value
         ).distinct()
     
 

@@ -8,7 +8,7 @@ from db_inventory.factories import (
     LocationFactory,
     RoomFactory,
     UserFactory,
-    UserLocationFactory,
+    UserPlacementFactory,
     AccessoryFactory,
 )
 from db_inventory.models import AccessoryAssignment
@@ -23,7 +23,7 @@ class TestAssignAccessory(AccessoryAssignmentTestBase):
 
     def test_room_admin_can_assign_accessory_to_user_in_same_room(self):
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=self.room)
+        UserPlacementFactory(user=assignee, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=10)
 
@@ -52,7 +52,7 @@ class TestAssignAccessory(AccessoryAssignmentTestBase):
 
     def test_assigning_again_to_same_user_aggregates_quantity(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=10)
 
@@ -91,7 +91,7 @@ class TestAssignAccessory(AccessoryAssignmentTestBase):
         other_room = RoomFactory(location=self.location)
 
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=other_room)
+        UserPlacementFactory(user=assignee, room=other_room)
 
         accessory = AccessoryFactory(room=self.room, quantity=5)
 
@@ -124,7 +124,7 @@ class TestAssignAccessory(AccessoryAssignmentTestBase):
         self.admin.save()
 
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=other_room)
+        UserPlacementFactory(user=assignee, room=other_room)
 
         accessory = AccessoryFactory(room=self.room, quantity=5)
 
@@ -142,7 +142,7 @@ class TestAssignAccessory(AccessoryAssignmentTestBase):
 
     def test_assign_fails_if_quantity_exceeds_available(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=5)
 
@@ -184,7 +184,7 @@ class TestAssignAccessory(AccessoryAssignmentTestBase):
         self.admin.save()
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=5)
 
@@ -211,7 +211,7 @@ class TestAdminReturnAccessory(AccessoryAssignmentTestBase):
 
     def test_admin_can_partially_return_accessory(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=10)
 
@@ -243,7 +243,7 @@ class TestAdminReturnAccessory(AccessoryAssignmentTestBase):
 
     def test_admin_can_fully_return_accessory(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=10)
 
@@ -274,7 +274,7 @@ class TestAdminReturnAccessory(AccessoryAssignmentTestBase):
 
     def test_admin_cannot_return_more_than_assigned(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=10)
 
@@ -301,7 +301,7 @@ class TestAdminReturnAccessory(AccessoryAssignmentTestBase):
 
     def test_admin_cannot_return_closed_assignment(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         accessory = AccessoryFactory(room=self.room, quantity=10)
 

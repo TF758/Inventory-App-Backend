@@ -18,33 +18,33 @@ from db_inventory.security_policy import invalidate_security_policy_cache
 class ReturnRequestItemInline(admin.TabularInline):
     model = ReturnRequestItem
     extra = 0
-    readonly_fields = ("asset_type", "asset_id", "quantity", "status")
+    readonly_fields = ("item_type", "quantity", "status")
 
 
 @admin.register(ReturnRequest)
 class ReturnRequestAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "user",
+        "requester",
         "status",
-        "created_at",
-        "updated_at",
+        "requested_at",
+        "processed_at",
     )
 
     list_filter = (
         "status",
-        "created_at",
+        "requested_at",
     )
 
     search_fields = (
         "id",
-        "user__email",
-        "user__username",
+        "requester__email",
+        "requester__username",
     )
 
     readonly_fields = (
-        "created_at",
-        "updated_at",
+        "requested_at",
+        "processed_at",
     )
 
     inlines = [ReturnRequestItemInline]
@@ -55,15 +55,14 @@ class ReturnRequestItemAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "return_request",
-        "asset_type",
-        "asset_id",
+        "item_type",
         "quantity",
         "status",
     )
 
     list_filter = (
         "status",
-        "asset_type",
+        "item_type",
     )
 
     search_fields = (
@@ -292,8 +291,8 @@ admin.site.register(SiteRelocationHistory)
 
 admin.site.register(Department)
 
-@admin.register(UserLocation)
-class UserLocationAdmin(admin.ModelAdmin):
+@admin.register(UserPlacement)
+class UserPlacementAdmin(admin.ModelAdmin):
     list_display = ("public_id", "user_full_name", "user_public_id", "room_public_id", "date_joined")
     search_fields = (
         "user__fname",

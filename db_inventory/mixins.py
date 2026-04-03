@@ -797,8 +797,8 @@ class AreaDashboardMixin:
         ).values("user").distinct().count()
 
         return_qs = ReturnRequest.objects.filter(
-            requester__user_locations__is_current=True,
-            requester__user_locations__room__in=rooms,
+            requester__user_placements__is_current=True,
+            requester__user_placements__room__in=rooms,
         ).distinct()
 
         pending_requests = return_qs.filter(

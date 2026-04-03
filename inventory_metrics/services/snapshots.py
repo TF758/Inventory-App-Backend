@@ -145,8 +145,8 @@ def generate_daily_department_snapshot(
     # Users (current assignments only)
     # -------------------------------------------------
     users_qs = User.objects.filter(
-        user_locations__is_current=True,
-        user_locations__room__in=rooms_qs,
+        user_placements__is_current=True,
+        user_placements__room__in=rooms_qs,
     ).distinct()
 
     total_users = users_qs.count()

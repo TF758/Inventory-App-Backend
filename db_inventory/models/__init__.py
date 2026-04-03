@@ -2,7 +2,7 @@ from .users import User, PasswordResetEvent, CustomUserManager
 from .base import PublicIDModel, PublicIDRegistry
 
 # import other models too
-from .site import Department, Location, Room, UserLocation
+from .site import Department, Location, Room, UserPlacement
 from .assets import Equipment, Component, Consumable, Accessory
 from .asset_assignment import *
 from .roles import RoleAssignment

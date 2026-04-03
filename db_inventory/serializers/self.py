@@ -32,7 +32,7 @@ class SelfUserProfileSerializer(serializers.ModelSerializer):
 
     def get_current_location(self, obj):
         ul = (
-            obj.user_locations
+            obj.user_placements
             .select_related("room__location__department")
             .filter(is_current=True)
             .first()

@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
-from db_inventory.models.site import Department, Location, Room, UserLocation
+from db_inventory.models.site import Department, Location, Room, UserPlacement
 from datetime import timedelta
 from django.utils import timezone
 from db_inventory.models.audit import AuditLog
@@ -40,7 +40,7 @@ class HealthOverviewView(APIView):
                     is_system_user=False
                 ).count(),
                 "floating_users": User.objects.exclude(
-                    user_locations__is_current=True
+                    user_placements__is_current=True
                 ).filter(is_system_user=False).distinct().count(),
             },
 
