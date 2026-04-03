@@ -15,7 +15,11 @@ jobs:
 
       - name: Create env file
         run: |
-          cp .env.dev .env
+          echo "DJANGO_ENV=ci" >> .env
+          echo "SECRET_KEY=ci-secret-key" >> .env
+          echo "DB_NAME=inventory" >> .env
+          echo "DB_USER=inventory" >> .env
+          echo "DB_PASSWORD=inventory" >> .env
 
       - name: Build containers
         run: docker compose build
