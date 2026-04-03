@@ -26,6 +26,18 @@ def generate_daily_system_metrics(for_date=None):
     last_24h = now - timedelta(hours=24)
     last_7d = now - timedelta(days=7)
 
+    base_equipment = Equipment.objects.filter(is_deleted=False)
+    base_consumables = Consumable.objects.filter(is_deleted=False)
+    base_accessories = Accessory.objects.filter(is_deleted=False)
+
+    active_equipment = base_equipment.filter(
+        status__in=[
+            EquipmentStatus.OK,
+            EquipmentStatus.UNDER_REPAIR,
+            EquipmentStatus.DAMAGED,
+        ]
+    )
+
     with transaction.atomic():
         obj, created = DailySystemMetrics.objects.get_or_create(
             date=for_date,
@@ -53,22 +65,24 @@ def generate_daily_system_metrics(for_date=None):
                     last_used_at__gte=last_24h
                 ).values("user_id").distinct().count(),
 
+                
+
                 # Inventory metrics
-                "total_equipment": Equipment.objects.count(),
-                "equipment_ok": Equipment.objects.filter(status="ok").count(),
-                "equipment_under_repair": Equipment.objects.filter(status="under_repair").count(),
-                "equipment_damaged": Equipment.objects.filter(status="damaged").count(),
+                "total_equipment": base_equipment.count(),
+                "equipment_ok": active_equipment.filter(status=EquipmentStatus.OK).count(),
+                "equipment_under_repair": active_equipment.filter(status=EquipmentStatus.UNDER_REPAIR).count(),
+                "equipment_damaged": active_equipment.filter(status=EquipmentStatus.DAMAGED).count(),
 
                 "total_components": Component.objects.count(),
                 "total_components_quantity": Component.objects.aggregate(total=Sum("quantity"))["total"] or 0,
 
-                "total_consumables": Consumable.objects.count(),
-                "total_consumables_quantity": Consumable.objects.aggregate(total=Sum("quantity"))["total"] or 0,
+               # Consumables
+                "total_consumables": base_consumables.count(),
+                "total_consumables_quantity": base_consumables.aggregate( total=Sum("quantity") )["total"] or 0,
 
-                "total_accessories": Accessory.objects.count(),
-                "total_accessories_quantity": Accessory.objects.aggregate(total=Sum("quantity"))["total"] or 0,
-            },
-        )
+                # Accessories
+                "total_accessories": base_accessories.count(),
+                "total_accessories_quantity": base_accessories.aggregate( total=Sum("quantity") )["total"] or 0, },)
 
     return created
 
@@ -96,7 +110,15 @@ def generate_daily_department_snapshot(
     # -------------------------------------------------
     rooms_qs = Room.objects.filter(location__department=department)
 
-    equipment_qs = Equipment.objects.filter(room__in=rooms_qs)
+    equipment_qs = Equipment.objects.filter(room__in=rooms_qs, is_deleted=False)
+    active_equipment_qs = equipment_qs.filter(
+    status__in=[
+        EquipmentStatus.OK,
+        EquipmentStatus.UNDER_REPAIR,
+        EquipmentStatus.DAMAGED,
+        ]   
+    )
+    total_equipment = active_equipment_qs.count()
     components_qs = Component.objects.filter(equipment__room__in=rooms_qs)
 
     consumables_qs = Consumable.objects.filter( room__in=rooms_qs)
@@ -145,8 +167,6 @@ def generate_daily_department_snapshot(
         Q(role_assignments__role="SITE_ADMIN")
     ).distinct().count()
 
-    total_equipment = equipment_qs.count()
-    
     total_return_requests = return_requests_qs.count()
     pending_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.PENDING ).count()
     approved_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.APPROVED ).count()
@@ -159,8 +179,21 @@ def generate_daily_department_snapshot(
     returns_created_last_24h = return_requests_qs.filter( requested_at__gte=last_24h ).count()
 
     returns_processed_last_24h = return_requests_qs.filter( processed_at__gte=last_24h ).count()
-    # -------------------------------------------------
-    # Atomic get_or_create
+
+    base_equipment = Equipment.objects.filter(is_deleted=False)
+
+    active_equipment = base_equipment.filter(
+        status__in=[
+            EquipmentStatus.OK,
+            EquipmentStatus.UNDER_REPAIR,
+            EquipmentStatus.DAMAGED,
+        ]
+    )
+
+    base_consumables = Consumable.objects.filter(is_deleted=False)
+    base_accessories = Accessory.objects.filter(is_deleted=False)
+        # -------------------------------------------------
+        # Atomic get_or_create
     # -------------------------------------------------
     with transaction.atomic():
         obj, created = DailyDepartmentSnapshot.objects.get_or_create(
@@ -179,31 +212,20 @@ def generate_daily_department_snapshot(
 
                 "total_rooms": rooms_qs.count(),
 
-                "total_equipment": total_equipment,
-                "equipment_ok": equipment_qs.filter(
-                    Q(status=EquipmentStatus.OK) | Q(status__isnull=True)
-                ).count(),
-                "equipment_under_repair": equipment_qs.filter(
-                    status=EquipmentStatus.UNDER_REPAIR
-                ).count(),
-                "equipment_damaged": equipment_qs.filter(
-                    status=EquipmentStatus.DAMAGED
-                ).count(),
+               # Inventory metrics
+                "total_equipment": base_equipment.count(),
+                "equipment_ok": active_equipment.filter(status=EquipmentStatus.OK).count(),
+                "equipment_under_repair": active_equipment.filter(status=EquipmentStatus.UNDER_REPAIR).count(),
+                "equipment_damaged": active_equipment.filter(status=EquipmentStatus.DAMAGED).count(),
 
-                "total_components": components_qs.count(),
-                "total_components_quantity": components_qs.aggregate(
-                    total=Sum("quantity")
-                )["total"] or 0,
+                "total_components": Component.objects.count(),
+                "total_components_quantity": Component.objects.aggregate( total=Sum("quantity") )["total"] or 0,
 
-                "total_consumables": consumables_qs.count(),
-                "total_consumables_quantity": consumables_qs.aggregate(
-                    total=Sum("quantity")
-                )["total"] or 0,
+                "total_consumables": base_consumables.count(),
+                "total_consumables_quantity": base_consumables.aggregate( total=Sum("quantity") )["total"] or 0,
 
-                "total_accessories": accessories_qs.count(),
-                "total_accessories_quantity": accessories_qs.aggregate(
-                    total=Sum("quantity")
-                )["total"] or 0,
+                "total_accessories": base_accessories.count(),
+                "total_accessories_quantity": base_accessories.aggregate( total=Sum("quantity") )["total"] or 0,
                 # -------------------------
                 # Return metrics
                 # -------------------------

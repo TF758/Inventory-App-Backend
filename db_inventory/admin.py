@@ -14,26 +14,65 @@ from db_inventory.security_policy import invalidate_security_policy_cache
 
 # Simple models
 
+
 class ReturnRequestItemInline(admin.TabularInline):
     model = ReturnRequestItem
     extra = 0
-    readonly_fields = ("item_type", "quantity", "status")  
+    readonly_fields = ("asset_type", "asset_id", "quantity", "status")
 
 
 @admin.register(ReturnRequest)
 class ReturnRequestAdmin(admin.ModelAdmin):
-    list_display = ( "id", "requester",    "status", "requested_at",   "processed_at", )
-    list_filter = ( "status", "requested_at",  )
-    search_fields = ( "id", "requester__email", )
-    readonly_fields = ( "requested_at",  "processed_at",  )
+    list_display = (
+        "id",
+        "user",
+        "status",
+        "created_at",
+        "updated_at",
+    )
+
+    list_filter = (
+        "status",
+        "created_at",
+    )
+
+    search_fields = (
+        "id",
+        "user__email",
+        "user__username",
+    )
+
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
     inlines = [ReturnRequestItemInline]
+
 
 @admin.register(ReturnRequestItem)
 class ReturnRequestItemAdmin(admin.ModelAdmin):
-    list_display = ( "id", "return_request", "item_type",   "quantity", "status", )
-    list_filter = ( "status", "item_type",  )
-    search_fields = ( "return_request__id", )
-    readonly_fields = ( "return_request", )
+    list_display = (
+        "id",
+        "return_request",
+        "asset_type",
+        "asset_id",
+        "quantity",
+        "status",
+    )
+
+    list_filter = (
+        "status",
+        "asset_type",
+    )
+
+    search_fields = (
+        "return_request__id",
+    )
+
+    readonly_fields = (
+        "return_request",
+    )
 
 @admin.register(SecuritySettings)
 class SecuritySettingsAdmin(admin.ModelAdmin):
