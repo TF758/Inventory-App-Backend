@@ -786,3 +786,25 @@ class MixAssetFilter:
                 if x["has_pending_return_request"] == value
             ]
         return data
+
+class UserSessionFilter(django_filters.FilterSet):
+
+    user_email = django_filters.CharFilter( field_name="user__email", lookup_expr="icontains", )
+
+    status = django_filters.ChoiceFilter( choices=UserSession.Status.choices )
+
+    device_name = django_filters.CharFilter( field_name="device_name", lookup_expr="icontains", )
+    ip_address = django_filters.CharFilter( field_name="ip_address", lookup_expr="icontains", )
+
+    created_after = django_filters.DateTimeFilter( field_name="created_at", lookup_expr="gte", )
+
+    created_before = django_filters.DateTimeFilter( field_name="created_at", lookup_expr="lte", )
+
+    class Meta:
+        model = UserSession
+        fields = [
+            "status",
+            "device_name",
+            "ip_address",
+            "user_email",
+        ]
