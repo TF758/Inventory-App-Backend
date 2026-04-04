@@ -15,11 +15,14 @@ jobs:
 
       - name: Create env file
         run: |
-          echo "DJANGO_ENV=ci" >> .env.dev
+          echo "DJANGO_ENV=dev" >> .env.dev
+          echo "DEBUG=True" >> .env.dev
           echo "SECRET_KEY=ci-secret-key" >> .env.dev
           echo "DB_NAME=inventory" >> .env.dev
           echo "DB_USER=inventory" >> .env.dev
           echo "DB_PASSWORD=inventory" >> .env.dev
+          echo "SESSION_IDLE_MINUTES=30" >> .env.dev
+          echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
 
       - name: Build containers
         run: docker compose build
