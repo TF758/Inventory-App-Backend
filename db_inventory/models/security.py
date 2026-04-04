@@ -162,8 +162,6 @@ class SecuritySettings(models.Model):
 
     CACHE_KEY = "security_settings_singleton"
 
-    CACHE_KEY = "security_settings_singleton"
-
     class Meta:
         verbose_name = "Security Settings"
         verbose_name_plural = "Security Settings"
