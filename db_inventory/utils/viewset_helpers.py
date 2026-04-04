@@ -1,12 +1,12 @@
 
-from db_inventory.models.site import Department, Location, Room, UserLocation
+from db_inventory.models.site import Department, Location, Room, UserPlacement
 from db_inventory.models.users import User
 from db_inventory.utils.constants import ADMIN_ROLES
 from django.db.models import Q
 
 def get_current_room_for_user(user):
     return (
-        UserLocation.objects
+        UserPlacement.objects
         .filter(user=user, is_current=True)
         .select_related("room__location__department")
         .first()
@@ -76,8 +76,8 @@ def get_users_affected_by_site(site):
         return (
             User.objects
             .filter(
-                user_locations__room=site,
-                user_locations__is_current=True,
+                user_placements__room=site,
+                user_placements__is_current=True,
             )
             .distinct()
         )
@@ -86,8 +86,8 @@ def get_users_affected_by_site(site):
         return (
             User.objects
             .filter(
-                user_locations__room__location=site,
-                user_locations__is_current=True,
+                user_placements__room__location=site,
+                user_placements__is_current=True,
             )
             .distinct()
         )
@@ -96,8 +96,8 @@ def get_users_affected_by_site(site):
         return (
             User.objects
             .filter(
-                user_locations__room__location__department=site,
-                user_locations__is_current=True,
+                user_placements__room__location__department=site,
+                user_placements__is_current=True,
             )
             .distinct()
         )
@@ -107,7 +107,7 @@ def get_users_affected_by_site(site):
 from django.db.models import Exists, OuterRef
 
 def unallocated_users_queryset():
-    current_location_exists = UserLocation.objects.filter(
+    current_location_exists = UserPlacement.objects.filter(
         user=OuterRef("pk"),
         is_current=True,
     )

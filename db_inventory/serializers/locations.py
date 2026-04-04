@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from db_inventory.serializers.departments import *
-from db_inventory.models.site import Location,Room,UserLocation, Department
+from db_inventory.models.site import Location,Room,UserPlacement, Department
 from db_inventory.models.assets import Component
 
 
@@ -42,7 +42,7 @@ class LocationUserSerializer(serializers.ModelSerializer):
     room_name = serializers.CharField(source='room.name')
 
     class Meta:
-        model = UserLocation
+        model = UserPlacement
         fields = [
            
             'user_id', 'user_email', 'user_fname', 'user_lname',

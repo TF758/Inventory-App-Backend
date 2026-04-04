@@ -83,7 +83,7 @@ class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin
         room_id = self.kwargs["public_id"]
 
         qs = (
-            UserLocation.objects
+            UserPlacement.objects
             .filter(
                 is_current=True,
                 room__public_id=room_id,

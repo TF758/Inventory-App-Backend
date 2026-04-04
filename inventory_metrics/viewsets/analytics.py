@@ -6,9 +6,9 @@ import json
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from db_inventory.models.site import Department
+from inventory_metrics.utils.system_overview_helpers.overview import get_system_overview
 from inventory_metrics.utils.department_analytic_helpers import get_department_overview
 from inventory_metrics.utils.analytics_helpers import parse_range_to_days
-from inventory_metrics.utils.system_overview_helpers import build_asset_trends, build_security_trends, build_session_trends, build_system_kpis, build_user_trends, get_system_overview
 from inventory_metrics.redis import redis_reports_client
 
 
@@ -24,11 +24,7 @@ class SystemOverviewAnalytics(APIView):
         raw_sections = request.GET.get("sections", "")
         sections = [s for s in raw_sections.split(",") if s]
 
-        cache_key = f"analytics:system:overview:{days}:{granularity}:{','.join(sections)}"
-
-        cached = redis_reports_client.get(cache_key)
-        if cached:
-            return Response(json.loads(cached))
+        sections = sorted(set(sections))
 
         overview = get_system_overview(
             days=days,
@@ -46,12 +42,6 @@ class SystemOverviewAnalytics(APIView):
             },
             "data": overview,
         }
-
-        redis_reports_client.setex(
-            cache_key,
-            600,
-            json.dumps(payload, default=str),
-        )
 
         return Response(payload)
 

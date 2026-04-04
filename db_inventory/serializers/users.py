@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from db_inventory.models.users import User
-from db_inventory.models.site import Room, UserLocation
+from db_inventory.models.site import Room, UserPlacement
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
@@ -99,7 +99,7 @@ class UserAreaSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='room.location.department.name')
 
     class Meta:
-        model = UserLocation
+        model = UserPlacement
         fields = [
             'public_id',
             'user_id', 'email', 'fname', 'lname', 'is_current', 'is_active', 'is_locked',
@@ -127,7 +127,7 @@ class UserAreaSerializer(serializers.ModelSerializer):
             self.fields.pop('department_name', None)
 
 
-class UserLocationWriteSerializer(serializers.ModelSerializer):
+class UserPlacementWriteSerializer(serializers.ModelSerializer):
     user_id = serializers.CharField(write_only=True)
     room_id = serializers.CharField(write_only=True, allow_null=True, required=False)
 
@@ -135,7 +135,7 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(read_only=True)
 
     class Meta:
-        model = UserLocation
+        model = UserPlacement
         fields = ['public_id', 'user_id', 'room_id', 'date_joined']
 
     def validate(self, attrs):
@@ -183,13 +183,13 @@ class UserLocationWriteSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             # Clear previous current
-            UserLocation.objects.filter(
+            UserPlacement.objects.filter(
                 user=user,
                 is_current=True
             ).update(is_current=False)
 
             # Create new current
-            return UserLocation.objects.create(
+            return UserPlacement.objects.create(
                 **validated_data,
                 is_current=True,
                 date_joined=timezone.now()
@@ -369,7 +369,7 @@ __all__ = [
     "UserWriteSerializer",
     "UserReadSerializerFull",
     "UserAreaSerializer",
-    "UserLocationWriteSerializer",
+    "UserPlacementWriteSerializer",
     'UserProfileSerializer',
     'UserTransferSerializer',
     'UserAccessoryAssignmentSerializer',

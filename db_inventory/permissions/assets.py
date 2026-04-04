@@ -374,69 +374,82 @@ class CanRequestAssetReturn(BasePermission):
     message = "You may only return assets currently assigned to you."
 
     def has_permission(self, request, view):
-
         user = request.user
         data = request.data
 
+        items = data.get("items", [])
 
-        # ensure only 1 type of asset is allowed
-        asset_types = ["equipment", "accessories", "consumables"]
-
-        present = [k for k in asset_types if k in data]
-
-        if len(present) != 1:
+        if not items:
             return False
 
-        # ---------------------
-        # Equipment
-        # ---------------------
-        if "equipment" in data:
+        equipment_ids = []
+        accessory_ids = []
+        consumable_ids = []
 
-            equipment_ids = data.get("equipment", [])
+        # ---------------------
+        # Split by type
+        # ---------------------
+        for item in items:
+            item_type = item.get("asset_type")
+            public_id = item.get("public_id")
 
+            if not item_type or not public_id:
+                return False
+
+            if item_type == "equipment":
+                equipment_ids.append(public_id)
+
+            elif item_type == "accessory":
+                accessory_ids.append(public_id)
+
+            elif item_type == "consumable":
+                consumable_ids.append(public_id)
+
+            else:
+                return False
+
+        # ---------------------
+        # Validate Equipment
+        # ---------------------
+        if equipment_ids:
             equipment = Equipment.objects.filter(
                 public_id__in=equipment_ids,
                 active_assignment__user=user,
                 active_assignment__returned_at__isnull=True,
             )
 
-            return equipment.count() == len(equipment_ids)
+            if equipment.count() != len(set(equipment_ids)):
+                return False
 
         # ---------------------
-        # Accessories
+        # Validate Accessories
         # ---------------------
-        if "accessories" in data:
-
-            accessories = data.get("accessories", [])
-            ids = [item.get("accessory_public_id") for item in accessories]
-
+        if accessory_ids:
             assignments = AccessoryAssignment.objects.filter(
-                accessory__public_id__in=ids,
+                accessory__public_id__in=accessory_ids,
                 user=user,
                 quantity__gt=0,
             )
 
-            return assignments.count() == len(ids)
+            if assignments.count() != len(set(accessory_ids)):
+                return False
 
         # ---------------------
-        # Consumables
+        # Validate Consumables
         # ---------------------
-        if "consumables" in data:
-
-            consumables = data.get("consumables", [])
-            ids = [item.get("consumable_public_id") for item in consumables]
-
+        if consumable_ids:
             issues = ConsumableIssue.objects.filter(
-                consumable__public_id__in=ids,
+                consumable__public_id__in=consumable_ids,
                 user=user,
                 returned_at__isnull=True,
                 quantity__gt=0,
             )
 
-            return issues.count() == len(ids)
+            if issues.count() != len(set(consumable_ids)):
+                return False
 
-        return False
-
+        return True
+    
 class CanProcessReturnRequest(BasePermission):
     """
     Allows an admin to approve or deny a return request only if the

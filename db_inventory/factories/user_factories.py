@@ -1,0 +1,41 @@
+from db_inventory.models import User, UserPlacement
+import factory
+from faker import Faker
+import random
+from django.utils import timezone
+
+fake = Faker()
+
+class UserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = User
+
+    email = factory.Sequence(lambda n: f"user{n}@example.com")
+    fname = factory.Faker('first_name')
+    lname = factory.Faker('last_name')
+    password = factory.PostGenerationMethodCall("set_password", "password")
+    job_title = factory.LazyFunction(lambda: fake.job()[:50])
+    force_password_change = False
+    is_active = factory.LazyFunction(
+        lambda: random.choices([True, False], weights=[0.85, 0.15])[0]
+    )
+    public_id = factory.Sequence(lambda n: f"UID{n:08d}")
+    is_staff = False
+    is_superuser = False
+
+
+class AdminUserFactory(UserFactory):
+    email = factory.Sequence(lambda n: f"admin{n}@gmail.com")
+    password = factory.PostGenerationMethodCall('set_password', 'admin')
+    is_staff = True
+    is_superuser = True
+
+
+class UserPlacementFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UserPlacement
+
+    user = factory.SubFactory(UserFactory)
+    room = None
+    is_current = True
+    date_joined = factory.LazyFunction(timezone.now)

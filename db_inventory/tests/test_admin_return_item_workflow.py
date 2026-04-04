@@ -6,19 +6,34 @@ from db_inventory.factories import EquipmentFactory, RoomFactory, UserFactory
 from db_inventory.models.asset_assignment import EquipmentAssignment
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.security import Notification
-from db_inventory.services.asset_returns import create_equipment_return_request
 from db_inventory.models.audit import AuditLog
+from db_inventory.services.asset_returns import create_mixed_return_request
 
 class AdminReturnItemWorkflowTests(TestCase):
+    """
+    Tests item-level admin processing for return requests.
+
+    Covers:
+    - approving and denying individual items
+    - request status propagation from item decisions
+    - prevention of double-processing
+    - audit logging
+    - mixed (partial) outcomes across multiple items
+    """
 
     def setUp(self):
 
         self.client = APIClient()
+
         # users
         self.admin = UserFactory()
         self.user = UserFactory()
+
         # admin role
-        self.admin_role = RoleAssignment.objects.create( user=self.admin, role="SITE_ADMIN" )
+        self.admin_role = RoleAssignment.objects.create(
+            user=self.admin,
+            role="SITE_ADMIN"
+        )
         self.admin.active_role = self.admin_role
 
         # location
@@ -28,68 +43,124 @@ class AdminReturnItemWorkflowTests(TestCase):
         self.equipment = EquipmentFactory(room=self.room)
 
         # assignment
-        self.assignment = EquipmentAssignment.objects.create( equipment=self.equipment, user=self.user )
-        # create return request
-        self.return_request = create_equipment_return_request(
+        self.assignment = EquipmentAssignment.objects.create(
+            equipment=self.equipment,
+            user=self.user
+        )
+
+        self.return_request = create_mixed_return_request(
             user=self.user,
-            equipment_public_ids=[self.equipment.public_id],
+            items_payload=[
+                {
+                    "asset_type": "equipment",
+                    "public_id": self.equipment.public_id
+                }
+            ],
         )
 
         self.item = self.return_request.items.first()
 
         self.client.force_authenticate(self.admin)
 
+    # -----------------------------------------------------
+    # Approve item
+    # -----------------------------------------------------
 
     def test_admin_can_approve_return_item(self):
-
-        url = reverse( "admin-return-item-approve", args=[self.item.public_id] )
-
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 200)
-        self.item.refresh_from_db()
-        self.assertEqual(self.item.status, "approved")
-
-    def test_admin_can_deny_return_item(self):
+        """
+        Admin can approve a single return item.
+        """
 
         url = reverse(
-            "admin-return-item-deny",
+            "admin-return-request-item-approve",
             args=[self.item.public_id]
         )
 
-        response = self.client.post( url, {"reason": "Damaged"}, format="json" )
+        response = self.client.post(url)
+
         self.assertEqual(response.status_code, 200)
+
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, "approved")
+
+    # -----------------------------------------------------
+    # Deny item
+    # -----------------------------------------------------
+
+    def test_admin_can_deny_return_item(self):
+        """
+        Admin can deny a return item with a reason.
+        """
+
+        url = reverse(
+            "admin-return-request-item-deny",
+            args=[self.item.public_id]
+        )
+
+        response = self.client.post(
+            url,
+            {"reason": "Damaged"},
+            format="json"
+        )
+
+        self.assertEqual(response.status_code, 200)
+
         self.item.refresh_from_db()
         self.assertEqual(self.item.status, "denied")
 
-    
-    def test_request_status_updates_after_item_approval(self):
+    # -----------------------------------------------------
+    # Request status updates
+    # -----------------------------------------------------
 
-        url = reverse( "admin-return-item-approve", args=[self.item.public_id] )
+    def test_request_status_updates_after_item_approval(self):
+        """
+        When all items are approved, the parent request
+        should transition to 'approved'.
+        """
+
+        url = reverse(
+            "admin-return-request-item-approve",
+            args=[self.item.public_id]
+        )
 
         self.client.post(url)
-        self.return_request.refresh_from_db()
-        self.assertEqual( self.return_request.status, "approved" )
 
+        self.return_request.refresh_from_db()
+
+        self.assertEqual(self.return_request.status, "approved")
+
+    # -----------------------------------------------------
+    # Prevent double processing
+    # -----------------------------------------------------
 
     def test_item_cannot_be_processed_twice(self):
+        """
+        Once an item is processed, further actions on it
+        should be rejected.
+        """
 
-        url = reverse( "admin-return-item-approve", args=[self.item.public_id] )
+        url = reverse(
+            "admin-return-request-item-approve",
+            args=[self.item.public_id]
+        )
 
         self.client.post(url)
-
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, 400)
 
+    # -----------------------------------------------------
+    # Audit logging
+    # -----------------------------------------------------
 
-    def test_audit_log_created_for_item_approval(self):
+    def test_audit_log_created_for_item_denial(self):
+        """
+        An audit log entry should be created when an item is denied.
+        """
 
-        url = reverse(
-            "admin-return-item-approve",
-            args=[self.item.public_id]
-        )
+        url = reverse( "admin-return-request-item-deny", args=[self.item.public_id] )
 
-        self.client.post(url)
+        self.client.post(url, {"reason": "Damaged"}, format="json")
 
         audit = AuditLog.objects.filter(
             target_id=self.item.public_id
@@ -97,32 +168,35 @@ class AdminReturnItemWorkflowTests(TestCase):
 
         self.assertIsNotNone(audit)
 
+    # -----------------------------------------------------
+    # Partial processing scenario
+    # -----------------------------------------------------
+
     def test_partial_return_request_processing(self):
         """
-        Simulate real audit scenario:
-        A request contains multiple items and they are processed differently.
+        When multiple items in a request are processed differently
+        (some approved, some denied), the request should be marked as 'partial'.
         """
 
         # create TWO new equipments
         equipment1 = EquipmentFactory(room=self.room)
         equipment2 = EquipmentFactory(room=self.room)
 
-        EquipmentAssignment.objects.create(
-            equipment=equipment1,
-            user=self.user
-        )
+        EquipmentAssignment.objects.create( equipment=equipment1, user=self.user )
 
-        EquipmentAssignment.objects.create(
-            equipment=equipment2,
-            user=self.user
-        )
+        EquipmentAssignment.objects.create( equipment=equipment2, user=self.user )
 
-        # create request with the two new equipments
-        rr = create_equipment_return_request(
+        rr = create_mixed_return_request(
             user=self.user,
-            equipment_public_ids=[
-                equipment1.public_id,
-                equipment2.public_id
+            items_payload=[
+                {
+                    "asset_type": "equipment",
+                    "public_id": equipment1.public_id
+                },
+                {
+                    "asset_type": "equipment",
+                    "public_id": equipment2.public_id
+                }
             ],
         )
 
@@ -131,23 +205,20 @@ class AdminReturnItemWorkflowTests(TestCase):
         item1 = items[0]
         item2 = items[1]
 
-        approve_url = reverse(
-            "admin-return-item-approve",
-            args=[item1.public_id]
-        )
+        approve_url = reverse( "admin-return-request-item-approve", args=[item1.public_id] )
 
-        deny_url = reverse(
-            "admin-return-item-deny",
-            args=[item2.public_id]
-        )
+        deny_url = reverse( "admin-return-request-item-deny", args=[item2.public_id] )
 
         # approve first item
         self.client.post(approve_url)
 
         # deny second item
-        self.client.post(deny_url, {"reason": "Damaged"}, format="json")
+        self.client.post(
+            deny_url,
+            {"reason": "Damaged"},
+            format="json"
+        )
 
         rr.refresh_from_db()
 
-        # request should now be PARTIAL
         self.assertEqual(rr.status, "partial")

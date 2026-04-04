@@ -1,7 +1,7 @@
 from celery import shared_task
 from django.utils import timezone
 from db_inventory.models.site import Department
-from inventory_metrics.services.snapshots import generate_daily_auth_metrics, generate_daily_department_snapshot, generate_daily_system_metrics
+from inventory_metrics.services.snapshots import generate_daily_auth_metrics, generate_daily_department_snapshot, generate_daily_return_metrics, generate_daily_system_metrics
 from django.conf import settings
 import redis
 from db_inventory.models.security import ScheduledTaskRun
@@ -41,12 +41,7 @@ def run_daily_system_metrics_snapshot(self):
         run.duration_ms = int((time.monotonic() - start) * 1000)
         run.save()
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_kwargs={"max_retries": 3},
-    retry_backoff=True,
-)
+@shared_task( bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3}, retry_backoff=True, )
 def run_daily_department_snapshots(self):
     """
     Generate daily snapshots for all departments.
@@ -123,6 +118,40 @@ def run_daily_auth_metrics_snapshot(self):
             else ScheduledTaskRun.Status.SKIPPED
         )
         run.message = "Snapshot created" if created else "Snapshot already exists"
+
+    except Exception as exc:
+        run.status = ScheduledTaskRun.Status.FAILED
+        run.message = str(exc)
+        raise
+
+    finally:
+        run.duration_ms = int((time.monotonic() - start) * 1000)
+        run.save()
+
+@shared_task( bind=True, autoretry_for=(DatabaseError,), retry_kwargs={"max_retries": 3, "countdown": 60}, )
+def run_daily_return_metrics_snapshot(self):
+    start = time.monotonic()
+
+    run = ScheduledTaskRun.objects.create(
+        task_name="run_daily_return_metrics_snapshot",
+        status=ScheduledTaskRun.Status.STARTED,
+        schema_version=settings.SNAPSHOT_SCHEMA_VERSION,
+    )
+
+    try:
+        created = generate_daily_return_metrics()
+
+        run.status = (
+            ScheduledTaskRun.Status.SUCCESS
+            if created
+            else ScheduledTaskRun.Status.SKIPPED
+        )
+
+        run.message = (
+            "Return metrics snapshot created"
+            if created
+            else "Return metrics snapshot already exists"
+        )
 
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED

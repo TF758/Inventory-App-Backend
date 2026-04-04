@@ -2,7 +2,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from django.urls import reverse
 
-from db_inventory.factories import DepartmentFactory, EquipmentFactory, LocationFactory, RoomFactory, UserFactory, UserLocationFactory
+from db_inventory.factories import DepartmentFactory, EquipmentFactory, LocationFactory, RoomFactory, UserFactory, UserPlacementFactory
 from db_inventory.models.asset_assignment import EquipmentAssignment
 from db_inventory.models.assets import EquipmentStatus
 from db_inventory.models.roles import RoleAssignment
@@ -16,7 +16,7 @@ class TestAssignEquipment(EquipmentAssignmentAPITestBase):
 
     def test_room_admin_can_assign_equipment_to_user_in_same_room(self):
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=self.room)
+        UserPlacementFactory(user=assignee, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
 
@@ -42,7 +42,7 @@ class TestAssignEquipment(EquipmentAssignmentAPITestBase):
         other_room = RoomFactory(location=self.location)
 
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=other_room)
+        UserPlacementFactory(user=assignee, room=other_room)
 
         equipment = EquipmentFactory(room=self.room)
 
@@ -70,8 +70,8 @@ class TestReassignEquipment(EquipmentAssignmentAPITestBase):
     def test_reassign_equipment_within_scope(self):
         user_a = UserFactory()
         user_b = UserFactory()
-        UserLocationFactory(user=user_a, room=self.room)
-        UserLocationFactory(user=user_b, room=self.room)
+        UserPlacementFactory(user=user_a, room=self.room)
+        UserPlacementFactory(user=user_b, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
         EquipmentAssignment.objects.create(
@@ -100,8 +100,8 @@ class TestReassignEquipment(EquipmentAssignmentAPITestBase):
 
         user_a = UserFactory()
         user_b = UserFactory()
-        UserLocationFactory(user=user_a, room=self.room)
-        UserLocationFactory(user=user_b, room=other_room)
+        UserPlacementFactory(user=user_a, room=self.room)
+        UserPlacementFactory(user=user_b, room=other_room)
 
         equipment = EquipmentFactory(room=self.room)
         EquipmentAssignment.objects.create(
@@ -133,7 +133,7 @@ class TestUnassignEquipment(EquipmentAssignmentAPITestBase):
 
     def test_unassign_equipment(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
         EquipmentAssignment.objects.create(
@@ -167,7 +167,7 @@ class TestEquipmentAssignmentEdgeCases(EquipmentAssignmentAPITestBase):
         other_room = RoomFactory(location=other_location)
 
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
 
@@ -198,8 +198,8 @@ class TestEquipmentAssignmentGuards(EquipmentAssignmentAPITestBase):
     def test_assign_fails_if_equipment_already_assigned(self):
         user_a = UserFactory()
         user_b = UserFactory()
-        UserLocationFactory(user=user_a, room=self.room)
-        UserLocationFactory(user=user_b, room=self.room)
+        UserPlacementFactory(user=user_a, room=self.room)
+        UserPlacementFactory(user=user_b, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
         EquipmentAssignment.objects.create(
@@ -224,7 +224,7 @@ class TestEquipmentAssignmentGuards(EquipmentAssignmentAPITestBase):
 
     def test_reassign_to_same_user_fails(self):
         user = UserFactory()
-        UserLocationFactory(user=user, room=self.room)
+        UserPlacementFactory(user=user, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
         EquipmentAssignment.objects.create(
@@ -269,7 +269,7 @@ class TestAssignEquipmentLocationAdmin(EquipmentAssignmentAPITestBase):
         other_room = RoomFactory(location=other_location)
 
         assignee = UserFactory()
-        UserLocationFactory(user=assignee, room=other_room)
+        UserPlacementFactory(user=assignee, room=other_room)
 
         equipment = EquipmentFactory(room=other_room)
 
@@ -297,8 +297,8 @@ class TestEquipmentAssignmentUnassignGuards(EquipmentAssignmentAPITestBase):
         assigned_user = UserFactory()
         other_user = UserFactory()
 
-        UserLocationFactory(user=assigned_user, room=self.room)
-        UserLocationFactory(user=other_user, room=self.room)
+        UserPlacementFactory(user=assigned_user, room=self.room)
+        UserPlacementFactory(user=other_user, room=self.room)
 
         equipment = EquipmentFactory(room=self.room)
 

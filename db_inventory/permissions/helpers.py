@@ -118,7 +118,7 @@ def is_user_in_scope(
             return True
 
     current_ul = (
-        UserLocation.objects
+        UserPlacement.objects
         .select_related("room__location__department")
         .filter(user=target_user, is_current=True)
     )
@@ -328,16 +328,25 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
                 | Q(room__location__department=active_role.department)
             )
 
-        elif model_class == ReturnRequest:
+    elif model_class == ReturnRequest:
 
-            if active_role.room:
-                q |= Q(items__room=active_role.room)
+        if active_role.room:
+            q |= Q(
+                requester__user_placements__is_current=True,
+                requester__user_placements__room=active_role.room
+            )
 
-            elif active_role.location:
-                q |= Q(items__room__location=active_role.location)
+        elif active_role.location:
+            q |= Q(
+                requester__user_placements__is_current=True,
+                requester__user_placements__room__location=active_role.location
+            )
 
-            elif active_role.department:
-                q |= Q(items__room__location__department=active_role.department)
+        elif active_role.department:
+            q |= Q(
+                requester__user_placements__is_current=True,
+                requester__user_placements__room__location__department=active_role.department
+            )
 
     elif model_class == AssetAgreementItem:
 
@@ -350,7 +359,7 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         elif active_role.department:
             q |= Q(agreement__department=active_role.department)
 
-    elif model_class == UserLocation:
+    elif model_class == UserPlacement:
         if active_role.department:
             q |= Q(room__location__department=active_role.department)
         elif active_role.location:
@@ -362,13 +371,13 @@ def filter_queryset_by_scope(user: User, queryset, model_class):
         user_q = Q()
         if active_role.department:
             user_q |= Q(role_assignments__department=active_role.department)
-            user_q |= Q(user_locations__room__location__department=active_role.department)
+            user_q |= Q(user_placements__room__location__department=active_role.department)
         elif active_role.location:
             user_q |= Q(role_assignments__location=active_role.location)
-            user_q |= Q(user_locations__room__location=active_role.location)
+            user_q |= Q(user_placements__room__location=active_role.location)
         elif active_role.room:
             user_q |= Q(role_assignments__room=active_role.room)
-            user_q |= Q(user_locations__room=active_role.room)
+            user_q |= Q(user_placements__room=active_role.room)
 
         if active_role.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
             user_q |= Q(active_role__isnull=True,
@@ -485,7 +494,7 @@ def can_assign_asset_to_user(
 
     # ROOM roles → user must be in same room
     if admin_role.role.startswith("ROOM_"):
-        return UserLocation.objects.filter(
+        return UserPlacement.objects.filter(
             user=target_user,
             room=admin_role.room,
             is_current=True,
@@ -493,7 +502,7 @@ def can_assign_asset_to_user(
 
     # LOCATION roles → user must be in same location
     if admin_role.role.startswith("LOCATION_"):
-        return UserLocation.objects.filter(
+        return UserPlacement.objects.filter(
             user=target_user,
             room__location=admin_role.location,
             is_current=True,
@@ -501,7 +510,7 @@ def can_assign_asset_to_user(
 
     # DEPARTMENT roles → user must be in same department
     if admin_role.role.startswith("DEPARTMENT_"):
-        return UserLocation.objects.filter(
+        return UserPlacement.objects.filter(
             user=target_user,
             room__location__department=admin_role.department,
             is_current=True,

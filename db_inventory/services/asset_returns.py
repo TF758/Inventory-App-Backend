@@ -3,236 +3,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
 from db_inventory.models.base import generate_public_id
-
-@transaction.atomic
-def create_equipment_return_request(user, equipment_public_ids, notes=""):
-
-    MAX_EQUIPMENT_PER_RETURN = 20
-
-    if len(equipment_public_ids) > MAX_EQUIPMENT_PER_RETURN:
-        raise ValidationError(
-            f"Maximum {MAX_EQUIPMENT_PER_RETURN} equipment allowed per return request."
-        )
-
-    assignments = (
-        EquipmentAssignment.objects
-        .select_related("equipment")
-        .filter(
-            equipment__public_id__in=equipment_public_ids,
-            returned_at__isnull=True,
-            user=user
-        )
-    )
-    
-    if assignments.count() != len(equipment_public_ids):
-        raise ValidationError(
-            "Some equipment are not assigned to the user or already returned."
-        )
-
-    request = ReturnRequest.objects.create(
-        requester=user,
-        notes=notes
-    )
-
-    items = []
-
-    for assignment in assignments:
-
-        exists = ReturnRequestItem.objects.filter(
-            equipment_assignment=assignment,
-            return_request__status=ReturnRequest.Status.PENDING
-        ).exists()
-
-        if exists:
-            raise ValidationError(
-                f"{assignment.equipment.public_id} already has a pending return request"
-            )
-
-        equipment = assignment.equipment
-
-        item = ReturnRequestItem(
-                return_request=request,
-                item_type="equipment",
-                equipment_assignment=assignment,
-                room = assignment.equipment.room
-            )
-        
-        item.public_id = generate_public_id("RRI")  # <-- ADD THIS
-        items.append(item)
-
-        # Equipment timeline event
-        EquipmentEvent.objects.create(
-            equipment=equipment,
-            user=user,
-            event_type=EquipmentEvent.Event_Choices.RETURN_REQUESTED,
-            reported_by=user,
-            notes=notes
-        )
-
-    ReturnRequestItem.objects.bulk_create(items)
-
-    return request
-
-
-@transaction.atomic
-def create_accessory_return_request(user, accessory_payload, notes=""):
-
-    MAX_ASSET_PAYLOAD = 20
-
-    if len(accessory_payload) > MAX_ASSET_PAYLOAD:
-        raise ValidationError(
-            f"Maximum {MAX_ASSET_PAYLOAD} Accessories allowed per return request."
-        )
-
-    request = ReturnRequest.objects.create(
-        requester=user,
-        notes=notes
-    )
-
-    items = []
-
-    for entry in accessory_payload:
-
-        accessory_id = entry["accessory_public_id"]
-        quantity = entry["quantity"]
-
-        try:
-            assignment = (
-                AccessoryAssignment.objects
-                .select_related("accessory")
-                .get(
-                    accessory__public_id=accessory_id,
-                    user=user
-                )
-            )
-
-        except AccessoryAssignment.DoesNotExist:
-            raise ValidationError(
-                f"{accessory_id} is not assigned to this user."
-            )
-
-        if quantity > assignment.quantity:
-            raise ValidationError(
-                f"Cannot return more than assigned quantity for {accessory_id}"
-            )
-
-
-        exists = ReturnRequestItem.objects.filter(
-            accessory_assignment=assignment,
-            return_request__status=ReturnRequest.Status.PENDING
-        ).exists()
-
-        if exists:
-            raise ValidationError(
-                f"{accessory_id} already has a pending return request"
-            )
-
-        accessory = assignment.accessory
-
-        item = ReturnRequestItem(
-        return_request=request,
-        item_type="accessory",
-        accessory_assignment=assignment,
-        quantity=quantity,
-        room=assignment.accessory.room
-        )
-
-        item.public_id = generate_public_id("RRI")  # <-- ADD THIS
-        items.append(item)
-
-        # Timeline event
-        AccessoryEvent.objects.create(
-            accessory=accessory,
-            user=user,
-            quantity=quantity,
-            quantity_change=0,  # inventory not changed yet
-            event_type=AccessoryEvent.EventType.RETURN_REQUESTED,
-            reported_by=user,
-            notes=notes,
-        )
-
-    ReturnRequestItem.objects.bulk_create(items)
-
-    return request
-
-@transaction.atomic
-def create_consumable_return_request(user, consumable_payload, notes=""):
-
-    if len(consumable_payload) > 20:
-        raise ValidationError(
-            "Maximum 20 consumables can be returned per request."
-        )
-
-    request = ReturnRequest.objects.create(
-        requester=user,
-        notes=notes
-    )
-
-    items = []
-
-    for entry in consumable_payload:
-
-        consumable_id = entry["consumable_public_id"]
-        quantity = entry["quantity"]
-
-        try:
-            issue = (
-                ConsumableIssue.objects
-                .select_related("consumable")
-                .get(
-                    consumable__public_id=consumable_id,
-                    user=user
-                )
-            )
-        except ConsumableIssue.DoesNotExist:
-            raise ValidationError(
-                f"{consumable_id} is not issued to this user."
-            )
-
-        if quantity > issue.quantity:
-            raise ValidationError(
-                f"Cannot return more than remaining quantity for {consumable_id}"
-            )
-
-        # Prevent duplicate pending return
-        exists = ReturnRequestItem.objects.filter(
-            consumable_issue=issue,
-            return_request__status=ReturnRequest.Status.PENDING
-        ).exists()
-
-        if exists:
-            raise ValidationError(
-                f"{consumable_id} already has a pending return request"
-            )
-
-        consumable = issue.consumable
-
-        item = ReturnRequestItem(
-            return_request=request,
-            item_type="consumable",
-            consumable_issue=issue,
-            quantity=quantity,
-            room=issue.consumable.room
-        )
-
-        item.public_id = generate_public_id("RRI")  # <-- ADD THIS
-        items.append(item)
-
-        # Timeline event
-        ConsumableEvent.objects.create(
-            consumable=consumable,
-            issue=issue,
-            user=user,
-            quantity=quantity,
-            quantity_change=0,  # inventory unchanged yet
-            event_type=ConsumableEvent.EventType.RETURN_REQUESTED,
-            reported_by=user,
-            notes=notes
-        )
-
-    ReturnRequestItem.objects.bulk_create(items)
-
-    return request
+from db_inventory.utils.query_helpers import get_user_accessories, get_user_consumables
+from db_inventory.services.asset_return_builders import build_accessory_return_items, build_consumable_return_items, build_equipment_return_items
 
 
 @transaction.atomic
@@ -424,3 +196,90 @@ def deny_return_item(item, admin_user, reason=""):
     ])
 
     update_return_request_status(item.return_request)
+
+
+@transaction.atomic
+def create_mixed_return_request(user, items_payload, notes=""):
+
+    MAX_TOTAL_ITEMS = 20
+
+    if len(items_payload) > MAX_TOTAL_ITEMS:
+        raise ValidationError(
+            f"Maximum {MAX_TOTAL_ITEMS} items allowed per request."
+        )
+
+    request = ReturnRequest.objects.create(
+        requester=user,
+        notes=notes
+    )
+
+    equipment_ids = []
+    accessory_payload = []
+    consumable_payload = []
+
+    # -----------------------------
+    # Split payload by type
+    # -----------------------------
+    for item in items_payload:
+
+        item_type = item.get("asset_type")
+
+        if item_type == "equipment":
+            equipment_ids.append(item["public_id"])
+
+        elif item_type == "accessory":
+            accessory_payload.append({
+                "accessory_public_id": item["public_id"],
+                "quantity": item["quantity"],
+            })
+
+        elif item_type == "consumable":
+            consumable_payload.append({
+                "consumable_public_id": item["public_id"],
+                "quantity": item["quantity"],
+            })
+
+        else:
+            raise ValidationError(f"Invalid asset type: {item_type}")
+
+    # -----------------------------
+    # Build items via builders 🔥
+    # -----------------------------
+    all_items = []
+
+    if equipment_ids:
+        all_items.extend(
+            build_equipment_return_items(
+                user,
+                equipment_ids,
+                request,
+                notes
+            )
+        )
+
+    if accessory_payload:
+        all_items.extend(
+            build_accessory_return_items(
+                user,
+                accessory_payload,
+                request,
+                notes
+            )
+        )
+
+    if consumable_payload:
+        all_items.extend(
+            build_consumable_return_items(
+                user,
+                consumable_payload,
+                request,
+                notes
+            )
+        )
+
+    # -----------------------------
+    # Bulk insert
+    # -----------------------------
+    ReturnRequestItem.objects.bulk_create(all_items)
+
+    return request

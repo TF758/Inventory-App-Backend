@@ -1,5 +1,5 @@
 from db_inventory.models.security import Notification
-from db_inventory.models.asset_assignment import EquipmentAssignment
+from db_inventory.models.asset_assignment import EquipmentAssignment, ReturnRequest, ReturnRequestItem
 from db_inventory.models.assets import Component, Consumable, EquipmentStatus
 from db_inventory.models.roles import RoleAssignment
 from .permissions import filter_queryset_by_scope
@@ -13,10 +13,11 @@ from django.utils.text import capfirst
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import timedelta
-from django.db.models import Count, Sum, Q, F
+from django.db.models import Count, Sum, Q, F, Exists, OuterRef
 from django.utils import timezone
 from rest_framework.response import Response
 from django.conf import settings
+import datetime
 
 class ScopeFilterMixin:
     """
@@ -713,8 +714,11 @@ class AreaDashboardMixin:
         # --------------------
         # Equipment
         # --------------------
-        equipment_qs = Equipment.objects.filter(room__in=rooms,
-                is_deleted=False)
+        equipment_qs = Equipment.objects.filter(
+            room__in=rooms,
+            is_deleted=False
+        )
+
         total_equipment = equipment_qs.count()
 
         assigned_equipment = EquipmentAssignment.objects.filter(
@@ -746,8 +750,10 @@ class AreaDashboardMixin:
         # --------------------
         # Consumables
         # --------------------
-        consumables_qs = Consumable.objects.filter(room__in=rooms,
-                is_deleted=False)
+        consumables_qs = Consumable.objects.filter(
+            room__in=rooms,
+            is_deleted=False
+        )
 
         low_stock = consumables_qs.filter(
             quantity__gt=0,
@@ -756,8 +762,11 @@ class AreaDashboardMixin:
 
         out_of_stock = consumables_qs.filter(quantity=0).count()
 
-        accessories_qs = Accessory.objects.filter(room__in=rooms,
-                is_deleted=False)
+        accessories_qs = Accessory.objects.filter(
+            room__in=rooms,
+            is_deleted=False
+        )
+
         components_qs = Component.objects.filter(
             equipment__room__in=rooms
         )
@@ -786,6 +795,20 @@ class AreaDashboardMixin:
                 "ROOM_ADMIN",
             ]
         ).values("user").distinct().count()
+
+        return_qs = ReturnRequest.objects.filter(
+            requester__user_placements__is_current=True,
+            requester__user_placements__room__in=rooms,
+        ).distinct()
+
+        pending_requests = return_qs.filter(
+            status=ReturnRequest.Status.PENDING
+        ).count()
+
+        overdue_requests = return_qs.filter(
+            status=ReturnRequest.Status.PENDING,
+            requested_at__lte=timezone.now() - datetime.timedelta(days=7)
+        ).count()
 
         # --------------------
         # Response
@@ -816,11 +839,19 @@ class AreaDashboardMixin:
                     "admins": admin_users,
                     "non_admins": max(total_users - admin_users, 0),
                 },
+
+                # 🔥 NEW (focused + meaningful)
+                "returns": {
+                    "pending": pending_requests,
+                    "overdue": overdue_requests,
+                },
             },
             "attention": {
                 "damaged_equipment": damaged_equipment,
                 "out_of_stock_consumables": out_of_stock,
                 "low_stock_consumables": low_stock,
+                "pending_returns": pending_requests,
+                "overdue_returns": overdue_requests,
             },
         }
 

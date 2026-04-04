@@ -1,7 +1,7 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
-from db_inventory.models import User, RoleAssignment, Department, Location, Room, UserLocation
+from db_inventory.models import User, RoleAssignment, Department, Location, Room, UserPlacement
 from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory
 import uuid
 
@@ -58,8 +58,8 @@ class SiteAdminFullUserCreateTest(APITestCase):
         data = response.data
         self.assertEqual(data["user"]["email"], "alice.site@example.com")
         self.assertEqual(data["role_assignment"]["role"], "ROOM_ADMIN")
-        # Fetch the UserLocation for the newly created user
-        ul_instance = UserLocation.objects.get(user__email="alice.site@example.com")
+        # Fetch the UserPlacement for the newly created user
+        ul_instance = UserPlacement.objects.get(user__email="alice.site@example.com")
 
         # Assert it exists and matches the expected room
         self.assertIsNotNone(ul_instance)
@@ -139,8 +139,8 @@ class DepartmentAdminFullUserCreateTest(APITestCase):
         self.assertEqual(data["user"]["email"], "bob.dept@example.com")
         self.assertEqual(data["role_assignment"]["role"], "ROOM_ADMIN")
 
-        # Confirm UserLocation created correctly
-        ul_instance = UserLocation.objects.get(user__email="bob.dept@example.com")
+        # Confirm UserPlacement created correctly
+        ul_instance = UserPlacement.objects.get(user__email="bob.dept@example.com")
         self.assertIsNotNone(ul_instance)
         self.assertEqual(ul_instance.room, self.room)
 

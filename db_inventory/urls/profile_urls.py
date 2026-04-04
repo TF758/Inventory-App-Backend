@@ -13,6 +13,10 @@ urlpatterns = [
 
     path( "me/", self_viewsets.SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile" ),
 
+    path( "me/assets/", self_viewsets.SelfAllAssetsViewSet.as_view({"get": "list"}), name="self-user-assets", ),
+
+    path( "me/assets/return/", asset_returns_viewset.MixedAssetReturnViewSet.as_view({"post": "create"}), name="self-return-assets", ),
+
     path( "me/equipment/", self_viewsets.SelfAssignedEquipmentViewSet.as_view({"get": "list"}), name="self-user-equipment" ),
 
     path( "me/accessories/", self_viewsets.SelfAccessoryViewSet.as_view({"get": "list"}), name="self-user-accessories" ),
@@ -25,16 +29,6 @@ urlpatterns = [
 
     path( "me/consumables/use/", UseConsumableView.as_view(), name="use-consumable" ),
 
-
-    # -------------------------
-    # Returns
-    # -------------------------
-
-    path( "me/equipment/return/", asset_returns_viewset.EquipmentReturnViewSet.as_view({"post": "create"}), name="self-return-equipment" ),
-
-    path( "me/accessories/return/", asset_returns_viewset.AccessoryReturnViewSet.as_view({"post": "create"}), name="self-return-accessories" ),
-
-    path( "me/consumables/return/", asset_returns_viewset.ConsumableReturnViewSet.as_view({"post": "create"}), name="self-return-consumables" ),
 
 
     # -------------------------
@@ -56,4 +50,5 @@ urlpatterns = [
         UserProfileViewSet.as_view({"get": "retrieve"}),
         name="user-profile-detail"
     ),
+
 ]

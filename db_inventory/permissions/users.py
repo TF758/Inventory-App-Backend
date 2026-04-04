@@ -178,7 +178,7 @@ class RolePermission(BasePermission):
         except PermissionDenied:
             return False
         
-class UserLocationPermission(BasePermission):
+class UserPlacementPermission(BasePermission):
     method_role_map = {
         "GET": "ROOM_VIEWER",    # minimum role to read
         "HEAD": "ROOM_VIEWER",

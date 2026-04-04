@@ -91,16 +91,26 @@ class Room(PublicIDModel):
             parts.append(f"Department: {self.location.department.name}")
         return f"{self.name} ({', '.join(parts[1:])})" if len(parts) > 1 else self.name
 
-class UserLocation(PublicIDModel):
+class UserPlacement(PublicIDModel):
     """
     Tracks the physical room assignment history of a user.
     Only one location may be marked as current per user.
     """
 
-    PUBLIC_ID_PREFIX = "UL"
+    PUBLIC_ID_PREFIX = "UP"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE, related_name="user_locations",)
-    room = models.ForeignKey(Room, on_delete=models.SET_NULL,null=True,blank=True,related_name="user_locations",)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_placements",
+    )
+    room = models.ForeignKey(
+        Room,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="user_placements",
+    )
 
     is_current = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
@@ -120,23 +130,16 @@ class UserLocation(PublicIDModel):
                 name="unique_current_location_per_user",
             ),
             models.CheckConstraint(
-            condition=(
-                Q(is_current=False) |
-                Q(room__isnull=False)
-            ),
-            name="current_user_location_requires_room"
-        )
+                condition=(
+                    Q(is_current=False) |
+                    Q(room__isnull=False)
+                ),
+                name="current_user_location_requires_room"
+            )
         ]
 
-    # --------------------
-    # Validation
-    # --------------------
-
     def clean(self):
-        """
-        Prevent assigning the same user to the same room more than once.
-        """
-        if self.room and UserLocation.objects.filter(
+        if self.room and UserPlacement.objects.filter(
             user=self.user,
             room=self.room
         ).exclude(pk=self.pk).exists():
@@ -151,3 +154,5 @@ class UserLocation(PublicIDModel):
     def __str__(self):
         room = self.room.name if self.room else "No Room"
         return f"{self.user} – {room}"
+
+UserLocation = UserPlacement

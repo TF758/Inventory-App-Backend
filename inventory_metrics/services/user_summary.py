@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.db.models import Count
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.roles import RoleAssignment
-from db_inventory.models.site import UserLocation
+from db_inventory.models.site import UserPlacement
 from db_inventory.models.users import User
 
 
@@ -20,7 +20,7 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
 
     if "demographics" in sections:
         current_location = (
-            UserLocation.objects.filter(user=user, is_current=True)
+            UserPlacement.objects.filter(user=user, is_current=True)
             .select_related("room", "room__location")
             .first()
         )

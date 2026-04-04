@@ -4,7 +4,7 @@ from inventory_metrics.utils.analytics_helpers import percentage_delta, truncate
 from inventory_metrics.utils.viewset_helpers import get_snapshot_range_start
 from datetime import timedelta
 
-from django.db.models import Max, Subquery, OuterRef
+from django.db.models import Max, Subquery, OuterRef, Sum
 from django.utils import timezone
 
 def build_department_kpis(*, department: Department):
@@ -91,6 +91,37 @@ def build_department_kpis(*, department: Department):
             "delta": safe_delta(
                 today.total_consumables_quantity,
                 yesterday.total_consumables_quantity if yesterday else None,
+            ),
+        },
+        # -------------------------
+        # Returns
+        # -------------------------
+        "total_return_requests": {
+            "value": today.total_return_requests,
+            "delta": safe_delta(
+                today.total_return_requests,
+                yesterday.total_return_requests if yesterday else None,
+            ),
+        },
+        "pending_return_requests": {
+            "value": today.pending_return_requests,
+            "delta": safe_delta(
+                today.pending_return_requests,
+                yesterday.pending_return_requests if yesterday else None,
+            ),
+        },
+        "returns_created_24h": {
+            "value": today.returns_created_last_24h,
+            "delta": safe_delta(
+                today.returns_created_last_24h,
+                yesterday.returns_created_last_24h if yesterday else None,
+            ),
+        },
+        "returns_processed_24h": {
+            "value": today.returns_processed_last_24h,
+            "delta": safe_delta(
+                today.returns_processed_last_24h,
+                yesterday.returns_processed_last_24h if yesterday else None,
             ),
         },
     }
@@ -314,6 +345,114 @@ def build_department_accessory_trends(*, department, days, granularity):
         for row in qs
     ]
 
+def build_department_return_state_trends(*, department, days, granularity):
+    start = get_snapshot_range_start(
+        model=DailyDepartmentSnapshot,
+        days=days,
+        date_field="snapshot_date",
+        filters={"department": department},
+    )
+
+    if not start:
+        return []
+
+    base = (
+        DailyDepartmentSnapshot.objects
+        .filter(department=department, snapshot_date__gte=start)
+        .annotate(period=truncate_date("snapshot_date", granularity))
+    )
+
+    latest_per_period = (
+        base.values("period")
+        .annotate(latest_date=Max("snapshot_date"))
+    )
+
+    qs = (
+        base.filter(
+            snapshot_date=Subquery(
+                latest_per_period
+                .filter(period=OuterRef("period"))
+                .values("latest_date")[:1]
+            )
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row.period.isoformat(),
+            "pending": row.pending_return_requests,
+            "approved": row.approved_return_requests,
+            "denied": row.denied_return_requests,
+            "partial": row.partial_return_requests,
+        }
+        for row in qs
+    ]
+
+def build_department_return_flow_trends(*, department, days, granularity):
+    start = get_snapshot_range_start(
+        model=DailyDepartmentSnapshot,
+        days=days,
+        date_field="snapshot_date",
+        filters={"department": department},
+    )
+
+    if not start:
+        return []
+
+    qs = (
+        DailyDepartmentSnapshot.objects
+        .filter(department=department, snapshot_date__gte=start)
+        .annotate(period=truncate_date("snapshot_date", granularity))
+        .values("period")
+        .annotate(
+            created=Sum("returns_created_last_24h"),
+            processed=Sum("returns_processed_last_24h"),
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row["period"].isoformat(),
+            "created": row["created"],
+            "processed": row["processed"],
+        }
+        for row in qs
+    ]
+def build_department_return_flow_trends(*, department, days, granularity):
+    start = get_snapshot_range_start(
+        model=DailyDepartmentSnapshot,
+        days=days,
+        date_field="snapshot_date",
+        filters={"department": department},
+    )
+
+    if not start:
+        return []
+
+    qs = (
+        DailyDepartmentSnapshot.objects
+        .filter(department=department, snapshot_date__gte=start)
+        .annotate(period=truncate_date("snapshot_date", granularity))
+        .values("period")
+        .annotate(
+            created=Sum("returns_created_last_24h"),
+            processed=Sum("returns_processed_last_24h"),
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row["period"].isoformat(),
+            "created": row["created"],
+            "processed": row["processed"],
+        }
+        for row in qs
+    ]
+
+
 def get_department_overview(*, department, days, granularity, sections):
     charts = {}
 
@@ -344,6 +483,21 @@ def get_department_overview(*, department, days, granularity, sections):
             days=days,
             granularity=granularity,
         )
+
+    if "return_state" in sections:
+        charts["return_state"] = build_department_return_state_trends(
+            department=department,
+            days=days,
+            granularity=granularity,
+        )
+
+    if "return_flow" in sections:
+        charts["return_flow"] = build_department_return_flow_trends(
+            department=department,
+            days=days,
+            granularity=granularity,
+        )
+            
 
     return {
         "kpis": build_department_kpis(department=department),

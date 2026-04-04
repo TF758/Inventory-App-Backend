@@ -32,7 +32,7 @@ class SelfUserProfileSerializer(serializers.ModelSerializer):
 
     def get_current_location(self, obj):
         ul = (
-            obj.user_locations
+            obj.user_placements
             .select_related("room__location__department")
             .filter(is_current=True)
             .first()
@@ -100,6 +100,8 @@ class SelfAssignedEquipmentSerializer(serializers.Serializer):
     model = serializers.CharField(source="equipment.model")
     status = serializers.CharField(source="equipment.status")
 
+    has_pending_return_request = serializers.BooleanField(read_only=True)
+
     room = serializers.SerializerMethodField()
 
     def get_room(self, obj):
@@ -117,6 +119,9 @@ class SelfAccessoryAssignmentSerializer(serializers.ModelSerializer):
     accessory_name = serializers.CharField( source="accessory.name", read_only=True, )
     room_name = serializers.CharField( source="accessory.room.name", read_only=True, )
     room_public_id = serializers.CharField( source="accessory.room.public_id", read_only=True, )
+    has_pending_return_request = serializers.BooleanField(read_only=True)
+    pending_return_quantity = serializers.IntegerField(read_only=True)
+    available_return_quantity = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = AccessoryAssignment
@@ -127,6 +132,9 @@ class SelfAccessoryAssignmentSerializer(serializers.ModelSerializer):
             "assigned_at",
             "room_name",
             "room_public_id",
+            "has_pending_return_request",
+            "pending_return_quantity",
+            "available_return_quantity"
         )
 
 class SelfConsumableIssueSerializer(serializers.ModelSerializer):
@@ -134,6 +142,9 @@ class SelfConsumableIssueSerializer(serializers.ModelSerializer):
     name = serializers.CharField( source="consumable.name", read_only=True, )
     room_name = serializers.CharField( source="consumable.room.name", read_only=True, )
     room_public_id = serializers.CharField( source="consumable.room.public_id", read_only=True, )
+    has_pending_return_request = serializers.BooleanField(read_only=True)
+    pending_return_quantity = serializers.IntegerField(read_only=True)
+    available_return_quantity = serializers.IntegerField(read_only=True)
     class Meta:
         model = ConsumableIssue
         fields = (
@@ -143,5 +154,68 @@ class SelfConsumableIssueSerializer(serializers.ModelSerializer):
             "assigned_at",
             "room_name",
             "room_public_id",
-            "purpose",       
+            "purpose",
+            "has_pending_return_request",
+            "pending_return_quantity",
+            "available_return_quantity",       
         )
+
+
+class SelfAssetSerializer(serializers.Serializer):
+    asset_type = serializers.CharField()
+    public_id = serializers.CharField()
+
+    name = serializers.CharField()
+
+    brand = serializers.CharField(required=False, allow_null=True)
+    model = serializers.CharField(required=False, allow_null=True)
+    serial_number = serializers.CharField(required=False, allow_null=True)
+
+    quantity = serializers.IntegerField(required=False, allow_null=True)
+    available_return_quantity = serializers.IntegerField(required=False, allow_null=True)
+
+    assigned_at = serializers.DateTimeField()
+
+    room = serializers.CharField(required=False, allow_null=True)
+    location = serializers.CharField(required=False, allow_null=True)
+    department = serializers.CharField(required=False, allow_null=True)
+
+    can_return = serializers.BooleanField()
+    has_pending_return_request = serializers.BooleanField(read_only=True)
+
+class MixedAssetReturnItemSerializer(serializers.Serializer):
+    asset_type = serializers.ChoiceField(
+        choices=["equipment", "accessory", "consumable"]
+    )
+    public_id = serializers.CharField()
+    quantity = serializers.IntegerField(required=False, min_value=1)
+
+    def validate(self, data):
+        if data["asset_type"] in ["accessory", "consumable"]:
+            if "quantity" not in data:
+                raise serializers.ValidationError(
+                    f"Quantity required for {data['asset_type']}"
+                )
+        return data
+
+
+class MixedAssetReturnSerializer(serializers.Serializer):
+    items = MixedAssetReturnItemSerializer(many=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        if not data["items"]:
+            raise serializers.ValidationError("At least one item is required.")
+
+        seen = set()
+
+        for item in data["items"]:
+            key = (item["asset_type"], item["public_id"])
+
+            if key in seen:
+                raise serializers.ValidationError(
+                    f"Duplicate item: {item['public_id']}"
+                )
+            seen.add(key)
+
+        return data

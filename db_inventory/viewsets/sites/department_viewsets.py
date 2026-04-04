@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserLocation, Room
+from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserPlacement, Room
 from db_inventory.serializers.roles import RoleReadSerializer
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.filters import *
@@ -77,7 +77,7 @@ class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
         department_id = self.kwargs["public_id"]
 
         qs = (
-            UserLocation.objects.filter(
+            UserPlacement.objects.filter(
                 is_current=True,
                 room__location__department__public_id=department_id
             )

@@ -14,11 +14,11 @@ urlpatterns = [
     path("unallocated/", user_viewsets.UnallocatedUserViewSet.as_view({"get": "list"}), name="unassigned-users"),
 
     # Placement
-    path("placement/", user_viewsets.UserLocationViewSet.as_view({
+    path("placement/", user_viewsets.UserPlacementViewSet.as_view({
         "get": "list",
         "post": "create",
     }), name='userlocation-list-create' ),
-    path("placement/<str:public_id>/", user_viewsets.UserLocationViewSet.as_view({
+    path("placement/<str:public_id>/", user_viewsets.UserPlacementViewSet.as_view({
         "get": "retrieve",
         "put": "update",
         "patch": "partial_update",
@@ -37,7 +37,7 @@ urlpatterns = [
     path("<str:user_public_id>/consumables/", user_viewsets.UserConsumableIssueViewSet.as_view({"get": "list"})),
 
     # Current placement
-    path("<str:user_public_id>/current-placement/", user_viewsets.UserLocationByUserView.as_view()),
+    path("<str:user_public_id>/current-placement/", user_viewsets.UserPlacementByUserView.as_view()),
 
     path("<str:user_public_id>/asset-status/", user_viewsets.UserAssetStatusView.as_view(), name="user-asset-status"),
 

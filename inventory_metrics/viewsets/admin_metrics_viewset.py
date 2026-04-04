@@ -257,3 +257,90 @@ class RoleAssignmentMetricsOverview(APIView):
             "users_without_active_role": users_without_active_role,
             "role_assignments": role_assignments_data
         })
+
+class ReturnMetricsOverview(APIView):
+    """
+    Live return workflow metrics for admin dashboard.
+    """
+
+    def get(self, request):
+        now = timezone.now()
+        last_24h = now - timedelta(hours=24)
+        last_7d = now - timedelta(days=7)
+
+        # -------------------------
+        # Request-level
+        # -------------------------
+        total_requests = ReturnRequest.objects.count()
+        pending_requests = ReturnRequest.objects.filter(status=ReturnRequest.Status.PENDING).count()
+        approved_requests = ReturnRequest.objects.filter(status=ReturnRequest.Status.APPROVED).count()
+        denied_requests = ReturnRequest.objects.filter(status=ReturnRequest.Status.DENIED).count()
+        partial_requests = ReturnRequest.objects.filter(status=ReturnRequest.Status.PARTIAL).count()
+        completed_requests = ReturnRequest.objects.filter(status=ReturnRequest.Status.COMPLETED).count()
+
+        # -------------------------
+        # Activity
+        # -------------------------
+        requests_last_24h = ReturnRequest.objects.filter(requested_at__gte=last_24h).count()
+        requests_last_7d = ReturnRequest.objects.filter(requested_at__gte=last_7d).count()
+
+        processed_last_24h = ReturnRequest.objects.filter(processed_at__gte=last_24h).count()
+        processed_last_7d = ReturnRequest.objects.filter(processed_at__gte=last_7d).count()
+
+        # -------------------------
+        # Item-level
+        # -------------------------
+        total_items = ReturnRequestItem.objects.count()
+        pending_items = ReturnRequestItem.objects.filter(status=ReturnRequestItem.Status.PENDING).count()
+        approved_items = ReturnRequestItem.objects.filter(status=ReturnRequestItem.Status.APPROVED).count()
+        denied_items = ReturnRequestItem.objects.filter(status=ReturnRequestItem.Status.DENIED).count()
+
+        # -------------------------
+        # Type breakdown
+        # -------------------------
+        equipment_items = ReturnRequestItem.objects.filter( item_type=ReturnRequestItem.ItemType.EQUIPMENT ).count()
+
+        accessory_items = ReturnRequestItem.objects.filter( item_type=ReturnRequestItem.ItemType.ACCESSORY ).count()
+
+        consumable_items = ReturnRequestItem.objects.filter( item_type=ReturnRequestItem.ItemType.CONSUMABLE ).count()
+
+        # -------------------------
+        # Optional derived metric
+        # -------------------------
+        approval_rate = (
+            (approved_requests / total_requests) * 100
+            if total_requests > 0 else 0
+        )
+
+        data = {
+            "requests": {
+                "total": total_requests,
+                "pending": pending_requests,
+                "approved": approved_requests,
+                "denied": denied_requests,
+                "partial": partial_requests,
+                "completed": completed_requests,
+            },
+            "activity": {
+                "created_last_24h": requests_last_24h,
+                "created_last_7d": requests_last_7d,
+                "processed_last_24h": processed_last_24h,
+                "processed_last_7d": processed_last_7d,
+            },
+            "items": {
+                "total": total_items,
+                "pending": pending_items,
+                "approved": approved_items,
+                "denied": denied_items,
+            },
+            "types": {
+                "equipment": equipment_items,
+                "accessory": accessory_items,
+                "consumable": consumable_items,
+            },
+            "insights": {
+                "approval_rate_percent": round(approval_rate, 2),
+            },
+        }
+
+        return Response(data)

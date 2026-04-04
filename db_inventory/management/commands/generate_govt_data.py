@@ -10,10 +10,10 @@ django.setup()
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 
-from db_inventory.models.site import Department, Location, Room, UserLocation
+from db_inventory.models.site import Department, Location, Room, UserPlacement
 from db_inventory.models.users import User
 from db_inventory.models import RoleAssignment
-import factory
+import itertools
 from db_inventory.factories import (
     UserFactory,
     AdminUserFactory,
@@ -24,7 +24,8 @@ from db_inventory.factories import (
 )
 
 from ...ministry_data import (
-    LIST_OF_MINISTIRES,
+    LIST_OF_MINISTRIES,
+
     FINANCE_LOCATIONS,
     HEALTH_LOCATIONS,
     EQUITY_LOCATIONS,
@@ -36,6 +37,9 @@ from ...ministry_data import (
     TOURISM_LOCATIONS,
     COMMERCE_LOCATIONS,
     PUBLIC_SERVICE_LOCATIONS,
+    HOME_AFFAIRS_LOCATIONS,
+    JUSTICE_LOCATIONS,
+    EDUCATION_LOCATIONS
 )
 
 faker = Faker()
@@ -50,21 +54,58 @@ ROLE_LEVELS = [
     "ROOM_ADMIN", "ROOM_CLERK", "ROOM_VIEWER",
 ]
 
-MINISTRY_TO_LOCATIONS = {
-    "Ministry of Finance, Economic Development and Youth Economy": FINANCE_LOCATIONS,
-    "Ministry of Tourism, Investment, Creative Industries, Culture and Information": TOURISM_LOCATIONS,
-    "Ministry of Health, Wellness and Elderly Affairs": HEALTH_LOCATIONS,
-    "Ministry of Education, Sustainable Development, Innovation, Science, Technology and Vocational Training": [],
-    "Ministry of External Affairs, International Trade, Civil Aviation and Diaspora Affairs": EXTERNAL_AFFAIRS_LOCATIONS,
-    "Ministry of Infrastructure, Ports, Transport, Physical Development and Urban Renewal": TRANSPORT_LOCATIONS,
-    "Ministry of Commerce, Manufacturing, Business Development, Cooperatives and Consumer Affairs": COMMERCE_LOCATIONS,
-    "Ministry of Equity, Social Justice and Empowerment": EQUITY_LOCATIONS,
-    "Ministry of the Public Service, Home Affairs, Labour and Gender Affairs": PUBLIC_SERVICE_LOCATIONS,
-    "Ministry of Youth Development and Sports": YOUTH_AND_SPORTS_LOCATIONS,
-    "Ministry of Agriculture, Fisheries, Food Security and Rural Development": AGRICULTURE_LOCATIONS,
-    "Ministry of Housing and Local Government": HOUSING_LOCATIONS,
-}
+def merge_locations(*lists):
+    seen = set()
+    result = []
+    for lst in lists:
+        for item in lst:
+            if item not in seen:
+                seen.add(item)
+                result.append(item)
+    return result
 
+MINISTRY_TO_LOCATIONS = {
+
+    # Finance + Justice (correct portfolio grouping)
+    "Finance, Justice, National Security, Constituency Development and People Empowerment":
+        merge_locations(FINANCE_LOCATIONS, JUSTICE_LOCATIONS),
+
+    "Tourism, Commerce, Investment, Creative Industries, Culture and Heritage":
+        merge_locations(TOURISM_LOCATIONS, COMMERCE_LOCATIONS),
+
+    "External Affairs, International Trade, Civil Aviation and Diaspora Affairs":
+        EXTERNAL_AFFAIRS_LOCATIONS,
+
+    "Health, Wellness and Nutrition":
+        HEALTH_LOCATIONS,
+
+    "Infrastructure, Ports Services and Energy":
+        TRANSPORT_LOCATIONS,
+
+    "Agriculture, Fisheries, Food Security and Climate Change":
+        AGRICULTURE_LOCATIONS,
+
+    "Equity, Labour, Gender and Elderly Affairs, Social Justice and Consumer Welfare":
+        EQUITY_LOCATIONS,
+
+    "Education, Youth Development, Sports and Digital Transformation":
+        merge_locations(EDUCATION_LOCATIONS, YOUTH_AND_SPORTS_LOCATIONS),
+
+    "Economic Development and the Youth Economy":
+        merge_locations(COMMERCE_LOCATIONS, YOUTH_AND_SPORTS_LOCATIONS),
+
+    "Home Affairs, Crime Prevention, Conflict Resolution and Persons with Disabilities":
+        HOME_AFFAIRS_LOCATIONS,
+
+    "Physical Development and Public Utilities":
+        merge_locations(TRANSPORT_LOCATIONS, HOUSING_LOCATIONS),
+
+    "Housing, Local Government and Urban Renewal":
+        HOUSING_LOCATIONS,
+
+    "Public Service, Transport, Information and Utilities Regulations":
+        merge_locations(PUBLIC_SERVICE_LOCATIONS, TRANSPORT_LOCATIONS),
+}
 
 def normalize(name: str) -> str:
     return name.strip().replace("Saint-Lucia", "Saint Lucia").replace("  ", " ")
@@ -96,13 +137,17 @@ class Command(BaseCommand):
 
         departments, locations, rooms = [], [], []
 
-        for ministry in tqdm(LIST_OF_MINISTIRES, desc="Ministries"):
+        for ministry in tqdm(LIST_OF_MINISTRIES, desc="Ministries"):
             dept = Department.objects.create(name=ministry)
             departments.append(dept)
 
             seen_locations = set()
+            locations_list = MINISTRY_TO_LOCATIONS.get(ministry)
 
-            for raw in MINISTRY_TO_LOCATIONS.get(ministry, []):
+            if not locations_list:
+                print(f"⚠️ No locations for: {ministry}")
+                continue
+            for raw in locations_list:
                 name = normalize(raw)
                 if name in seen_locations:
                     continue
@@ -129,20 +174,31 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Sites created."))
 
+        # -------------------------------
+        # Build lookup maps (NEW)
+        # -------------------------------
+        locations_by_department = {}
+        rooms_by_location = {}
 
+        for loc in locations:
+            locations_by_department.setdefault(loc.department_id, []).append(loc)
+
+        for room in rooms:
+            rooms_by_location.setdefault(room.location_id, []).append(room)
+
+        # -------------------------------
+        # Users
+        # -------------------------------
         self.stdout.write(
-    self.style.MIGRATE_HEADING(
-        f"Creating {TOTAL_USERS:,} users (fast mode)"
-    )
-)
+            self.style.MIGRATE_HEADING(
+                f"Creating {TOTAL_USERS:,} users (fast mode)"
+            )
+        )
 
         users = []
         password_hash = make_password("password")
 
-        for i in tqdm(
-            range(TOTAL_USERS),
-            desc="Preparing users",
-        ):
+        for i in tqdm(range(TOTAL_USERS), desc="Preparing users"):
             users.append(
                 User(
                     public_id=f"USR{i+1:07d}",
@@ -156,15 +212,11 @@ class Command(BaseCommand):
                 )
             )
 
-        for start in tqdm(
-            range(0, TOTAL_USERS, BATCH_SIZE),
-            desc="Saving users to database",
-        ):
+        for start in tqdm(range(0, TOTAL_USERS, BATCH_SIZE), desc="Saving users"):
             User.objects.bulk_create(
                 users[start:start + BATCH_SIZE],
                 batch_size=BATCH_SIZE,
             )
-
 
         for u in tqdm(users, desc="Activating users"):
             u.is_active = random.random() < 0.9
@@ -176,7 +228,9 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"{len(users):,} users created."))
 
-
+        # -------------------------------
+        # Admin
+        # -------------------------------
         self.stdout.write(self.style.MIGRATE_HEADING("Creating admin user"))
 
         admin = AdminUserFactory(email="admin@gmail.com")
@@ -191,50 +245,86 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Admin user created."))
 
+        # -------------------------------
+        # Assign users to locations (UPDATED)
+        # -------------------------------
+        self.stdout.write(self.style.MIGRATE_HEADING("Assigning users to locations"))
 
-        self.stdout.write(
-            self.style.MIGRATE_HEADING("Assigning users to locations")
-        )
+        user_placements = []
 
-        user_locations = []
+        # ✅ Step 1: guarantee every room has at least 1 user
+        users_iter = iter(users)
 
-        for user in tqdm(users, desc="Assigning locations"):
-            # ~90% of users get a location
-            if random.random() < 0.9:
-                room = random.choice(rooms)
-                user_locations.append(
-                    UserLocation(
+        for room in rooms:
+            try:
+                user = next(users_iter)
+            except StopIteration:
+                break
+
+            user_placements.append(
+                UserPlacement(user=user, room=room, is_current=True)
+            )
+
+        # ✅ Step 2: distribute remaining users within ministry
+        remaining_users = users[len(user_placements):]
+
+        for user in tqdm(remaining_users, desc="Assigning locations"):
+            if random.random() < 0.98:
+
+                dept = random.choice(departments)
+
+                dept_locations = locations_by_department.get(dept.id, [])
+                if not dept_locations:
+                    continue
+
+                loc = random.choice(dept_locations)
+
+                loc_rooms = rooms_by_location.get(loc.id, [])
+                if not loc_rooms:
+                    continue
+
+                room = random.choice(loc_rooms)
+
+                user_placements.append(
+                    UserPlacement(
                         user=user,
                         room=room,
                         is_current=True,
                     )
                 )
 
-        # bulk insert
-        UserLocation.objects.bulk_create(
-            user_locations,
+        UserPlacement.objects.bulk_create(
+            user_placements,
             batch_size=BATCH_SIZE,
         )
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"{len(user_locations):,} users assigned to rooms"
-            )
+            self.style.SUCCESS(f"{len(user_placements):,} users assigned to rooms")
         )
 
-
+        # -------------------------------
+        # Assign roles (UPDATED)
+        # -------------------------------
         self.stdout.write(self.style.MIGRATE_HEADING("Assigning roles"))
 
         for user in tqdm(users, desc="Assigning roles"):
             roles = []
             used = set()
 
+            # 🔑 get user's assigned room (enforces ministry consistency)
+            user_loc = next((ul for ul in user_placements if ul.user_id == user.id), None)
+            if not user_loc:
+                continue
+
+            room = user_loc.room
+            loc = room.location
+            dept = loc.department
+
             for _ in range(pick_role_count()):
                 role = random.choice(ROLE_LEVELS)
 
                 try:
                     if role.startswith("DEPARTMENT"):
-                        dept = random.choice(departments)
                         key = ("D", dept.id)
                         if key in used:
                             continue
@@ -244,7 +334,6 @@ class Command(BaseCommand):
                         ))
 
                     elif role.startswith("LOCATION"):
-                        loc = random.choice(locations)
                         key = ("L", loc.id)
                         if key in used:
                             continue
@@ -254,7 +343,6 @@ class Command(BaseCommand):
                         ))
 
                     elif role.startswith("ROOM"):
-                        room = random.choice(rooms)
                         key = ("R", room.id)
                         if key in used:
                             continue
@@ -271,24 +359,28 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Roles assigned."))
 
+        # -------------------------------
+        # Equipment (UPDATED)
+        # -------------------------------
         self.stdout.write(self.style.MIGRATE_HEADING("Creating assets"))
 
-        equipment = [
-            EquipmentFactory(room=random.choice(rooms))
-            for _ in tqdm(range(len(rooms) * 3), desc="Equipment")
-        ]
+        equipment = []
 
+        for room in rooms:
+            equipment.append(EquipmentFactory(room=room))
+
+        # keep randomness
+        for _ in tqdm(range(len(rooms) * 2), desc="Equipment"):
+            equipment.append(EquipmentFactory(room=random.choice(rooms)))
+
+        # components
         for eq in tqdm(equipment, desc="Components"):
             ComponentFactory.create_batch(2, equipment=eq)
 
-        AccessoryFactory.create_batch(
-            len(rooms) * 2,
-            room=factory.Iterator(rooms, cycle=True),
-        )
+        for room in tqdm( itertools.islice(itertools.cycle(rooms), len(rooms) * 2), desc="Accessories" ):
+            AccessoryFactory(room=room)
 
-        ConsumableFactory.create_batch(
-            len(rooms) * 3,
-            room=factory.Iterator(rooms, cycle=True),
-        )
+        for room in tqdm( itertools.islice(itertools.cycle(rooms), len(rooms) * 3), desc="Consumables" ):
+            ConsumableFactory(room=room)
 
         self.stdout.write(self.style.SUCCESS("Assets generated successfully 🎉"))

@@ -29,6 +29,13 @@ def generate_base62_identifier(length: int = 12) -> str:
     return int_to_base62(random_int).rjust(length, BASE62_ALPHABET[0])
 
 
+def generate_unique_prefixed_id(model_class, prefix, max_attempts=5):
+    for _ in range(max_attempts):
+        public_id = generate_prefixed_id(prefix)
+        if not model_class.objects.filter(public_id=public_id).exists():
+            return public_id
+    raise RuntimeError("Failed to generate unique public_id")
+
 def generate_prefixed_id(prefix: str, length: int = 10) -> str:
     """
     Generate a prefixed Base62 ID (no uniqueness check).

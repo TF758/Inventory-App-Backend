@@ -56,7 +56,7 @@ def send_password_reset_email(self, email: str):
         return
     token = event.token
 
-    reset_link = f"{settings.FRONTEND_URL}/password-reset?token={token}"
+    reset_link = f"{settings.FRONTEND_URL}/password-reset/confirm?token={token}"
 
     try:
         send_mail(
