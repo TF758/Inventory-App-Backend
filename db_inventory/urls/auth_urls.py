@@ -2,14 +2,15 @@ from django.urls import path, include
 
 from db_inventory.viewsets import audit_viewsets
 from db_inventory.viewsets import auth_viewsets
-from db_inventory.viewsets import session_viewsets
 
 urlpatterns = [
     path( "security/settings/", auth_viewsets.SecuritySettingsAPIView.as_view(), name="security_settings", ),
     # --- Audit Logs ---
     path( "audit-logs/", audit_viewsets.AuditLogViewSet.as_view({"get": "list"}), name="audit-log-list", ),
     path( "audit-logs/<str:public_id>/", audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve"}), name="audit-log-detail", ),
-  
+    # --- User Sessions ---
+    path( "sessions/revoke-all/", auth_viewsets.RevokeUserSessionsViewset.as_view({"post": "revoke_all"}), name="user-session-revoke-all", ),
+
     # --- Lock / Unlock User Accounts ---
     path( "users/<str:public_id>/lock/", auth_viewsets.UserLockViewSet.as_view({"post": "lock"}), name="user-lock", ),
     path( "users/<str:public_id>/unlock/", auth_viewsets.UserLockViewSet.as_view({"post": "unlock"}), name="user-unlock", ),
@@ -33,14 +34,6 @@ urlpatterns = [
 
     # --- Session Activity ---
     path( "sessions/activity/", auth_viewsets.SessionActivityAPIView.as_view(), name="session-activity", ),
-
-
-    # --- User Sessions ---
-    path( "sessions/", session_viewsets.UserSessionViewSet.as_view({"get": "list"}), name="session-list", ),
-    path( "sessions/<uuid:pk>/revoke/", session_viewsets.UserSessionViewSet.as_view({"post": "revoke"}), name="session-revoke", ),
-    path( "sessions/logout-others/", session_viewsets.UserSessionViewSet.as_view({"post": "logout_others"}), name="session-logout-others", ),
-    path( "sessions/revoke-by-ip/", session_viewsets.UserSessionViewSet.as_view({"post": "revoke_by_ip"}), name="session-revoke-by-ip", ),
-    path( "sessions/revoke-all/", session_viewsets.RevokeUserSessionsViewset.as_view({"post": "revoke_all"}), name="user-session-revoke-all", ),
 
     
 ]
