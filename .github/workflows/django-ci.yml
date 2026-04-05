@@ -1,4 +1,4 @@
-name: Django CI
+name: Django Test Suite
 
 on:
   pull_request:
@@ -24,6 +24,9 @@ jobs:
           echo "SESSION_IDLE_MINUTES=30" >> .env.dev
           echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
 
+      - name: Enable Docker BuildKit
+        run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
+
       - name: Build containers
         run: docker compose build
 
@@ -31,7 +34,7 @@ jobs:
         run: docker compose up -d db redis
 
       - name: Run migrations
-        run: docker compose run api python manage.py migrate
+        run: docker compose run --rm api python manage.py migrate
 
       - name: Run tests
-        run: docker compose run api python manage.py test
+        run: docker compose run --rm api python manage.py test --parallel
