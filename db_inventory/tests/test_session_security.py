@@ -6,7 +6,15 @@ from rest_framework import status
 from django.urls import reverse
 from django.test import TestCase
 from rest_framework_simplejwt.tokens import AccessToken
+from django.test import override_settings
+from django.conf import settings
 
+@override_settings(
+    REST_FRAMEWORK={
+        **settings.REST_FRAMEWORK,
+        "DEFAULT_THROTTLE_CLASSES": [],
+    }
+)
 class SessionSecurityTests(TestCase):
 
     def setUp(self):
