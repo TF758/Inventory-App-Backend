@@ -51,7 +51,7 @@ class UserWriteSerializer(serializers.ModelSerializer):
 
         if password and confirm_password and password != confirm_password:
             raise serializers.ValidationError({
-                "confirm_password": "Password fields do not match."
+                "confirm_password": "Password fields do not match." #nosec
             })
 
         return attrs
