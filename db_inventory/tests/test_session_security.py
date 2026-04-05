@@ -11,7 +11,6 @@ from django.conf import settings
 
 @override_settings(
     REST_FRAMEWORK={
-        **settings.REST_FRAMEWORK,
         "DEFAULT_THROTTLE_CLASSES": [],
     }
 )
