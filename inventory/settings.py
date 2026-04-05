@@ -279,7 +279,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "accept",
     "origin",
-     "Content-Disposition",
+    "Content-Disposition",
+    "x-device-name",
 ]
 
 CORS_EXPOSE_HEADERS = [
