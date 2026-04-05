@@ -35,4 +35,4 @@ jobs:
       - name: Run migrations
         run: docker compose exec -T api python manage.py migrate
       - name: Run tests
-        run: docker compose exec -T api python manage.py test --parallel
+        run: docker compose exec -T api python manage.py test
