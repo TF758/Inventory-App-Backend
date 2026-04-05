@@ -21,7 +21,7 @@ class UserSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()               
     absolute_expires_at = models.DateTimeField()     
-    last_used_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=256, null=True, blank=True)
     user_agent_hash = models.CharField(max_length=64, null=True, blank=True)

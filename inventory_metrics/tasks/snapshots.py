@@ -97,9 +97,11 @@ def run_daily_department_snapshots(self):
         run.duration_ms = int((time.monotonic() - start_ts) * 1000)
         run.save()
 
-@shared_task(bind=True, 
-             autoretry_for=(Exception,), 
-             retry_kwargs={"max_retries": 3, "countdown": 60})
+@shared_task(
+    bind=True,
+    autoretry_for=(DatabaseError,),
+    retry_kwargs={"max_retries": 3, "countdown": 60},
+)
 def run_daily_auth_metrics_snapshot(self):
     start = time.monotonic()
 
@@ -117,7 +119,11 @@ def run_daily_auth_metrics_snapshot(self):
             if created
             else ScheduledTaskRun.Status.SKIPPED
         )
-        run.message = "Snapshot created" if created else "Snapshot already exists"
+        run.message = (
+            "Auth metrics snapshot created"
+            if created
+            else "Auth metrics snapshot already exists"
+        )
 
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED

@@ -1,4 +1,4 @@
-from rest_framework.generics import ListAPIView
+from django.db.models import Case, When, Value, IntegerField
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.models.security import UserSession
@@ -23,7 +23,7 @@ class UserSessionViewSet(viewsets.GenericViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = UserSessionFilter
 
-    ordering = ["-created_at"]
+    ordering = ["status", "-last_used_at"]
 
     # --------------------------------
     # List Sessions
@@ -31,6 +31,15 @@ class UserSessionViewSet(viewsets.GenericViewSet):
     def list(self, request):
 
         queryset = self.filter_queryset(self.get_queryset())
+
+        queryset = queryset.annotate(
+            status_priority=Case(
+                When(status=UserSession.Status.ACTIVE, then=Value(0)),
+                When(status=UserSession.Status.EXPIRED, then=Value(1)),
+                When(status=UserSession.Status.REVOKED, then=Value(2)),
+                output_field=IntegerField(),
+            )
+        ).order_by("status_priority", "-last_used_at")
 
         page = self.paginate_queryset(queryset)
 

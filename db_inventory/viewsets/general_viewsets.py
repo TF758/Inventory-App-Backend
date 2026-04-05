@@ -183,6 +183,7 @@ class SessionTokenLoginView(TokenObtainPairView):
         )
 
         return response   
+    
 class RefreshAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -316,12 +317,15 @@ class RefreshAPIView(APIView):
                     # update session activity metadata
                     session.last_ip_address = ip
 
+                    session.last_used_at = now
+
                     session.save(
                         update_fields=[
                             "previous_refresh_token_hash",
                             "refresh_token_hash",
                             "expires_at",
                             "last_ip_address",
+                            "last_used_at",
                         ]
                     )
 
@@ -429,10 +433,26 @@ class LogoutAPIView(APIView):
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
 
         try:
-            session = UserSession.objects.select_for_update().get(
-                Q(refresh_token_hash=hashed_refresh)
-                | Q(previous_refresh_token_hash=hashed_refresh)
-            )
+            with transaction.atomic():
+
+                session = UserSession.objects.select_for_update().get(
+                    Q(refresh_token_hash=hashed_refresh)
+                    | Q(previous_refresh_token_hash=hashed_refresh)
+                )
+
+                # Idempotent logout
+                if session.status != UserSession.Status.ACTIVE:
+                    response = Response(
+                        {"detail": "Successfully logged out."},
+                        status=status.HTTP_200_OK,
+                    )
+                    response.delete_cookie("refresh", path="/")
+                    return response
+
+                session.status = UserSession.Status.REVOKED
+                session.last_ip_address = ip
+                session.save(update_fields=["status", "last_ip_address"])
+
         except UserSession.DoesNotExist:
             response = Response(
                 {"detail": "Successfully logged out."},
@@ -440,26 +460,6 @@ class LogoutAPIView(APIView):
             )
             response.delete_cookie("refresh", path="/")
             return response
-
-        # Idempotent logout
-        if session.status != UserSession.Status.ACTIVE:
-            response = Response(
-                {"detail": "Successfully logged out."},
-                status=status.HTTP_200_OK,
-            )
-            response.delete_cookie("refresh", path="/")
-            return response
-
-        try:
-            session.status = UserSession.Status.REVOKED
-            session.last_ip_address = ip
-
-            session.save(
-                update_fields=[
-                    "status",
-                    "last_ip_address",
-                ]
-            )
 
         except Exception:
             logger.exception(
@@ -471,7 +471,7 @@ class LogoutAPIView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Optional audit log
+        # Audit log
         try:
             AuditLog.objects.create(
                 event_type=AuditLog.Events.LOGOUT,

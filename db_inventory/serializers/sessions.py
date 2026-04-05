@@ -7,6 +7,8 @@ class UserSessionSerializer(serializers.ModelSerializer):
     user_public_id = serializers.UUIDField(source="user.public_id", read_only=True)
     user_email = serializers.EmailField(source="user.email", read_only=True)
 
+    is_current = serializers.SerializerMethodField()
+
     class Meta:
         model = UserSession
         fields = [
@@ -22,5 +24,16 @@ class UserSessionSerializer(serializers.ModelSerializer):
             "user_agent",
             "device_name",
             "last_ip_address",
+            "is_current",
         ]
         read_only_fields = fields
+
+    def get_is_current(self, obj):
+        request = self.context.get("request")
+
+        if not request or not request.auth:
+            return False
+
+        session_id = request.auth.get("session_id")
+
+        return str(obj.id) == str(session_id)
