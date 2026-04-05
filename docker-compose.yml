@@ -30,18 +30,11 @@ jobs:
       - name: Build containers
         run: docker compose build
 
-      - name: Start services
-        run: docker compose up -d
-
-      - name: Wait for database
-        run: |
-          until docker compose exec -T db pg_isready -U inventory
-          do
-            sleep 2
-          done
+      - name: Start database and redis
+        run: docker compose up -d db redis
 
       - name: Run migrations
-        run: docker compose exec -T api python manage.py migrate
+        run: docker compose run --rm api python manage.py migrate
 
       - name: Run tests
-        run: docker compose exec -T api python manage.py test --parallel
+        run: docker compose run --rm api python manage.py test --parallel
