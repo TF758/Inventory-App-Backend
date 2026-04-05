@@ -172,7 +172,6 @@ REST_FRAMEWORK = {
         "anon": env("THROTTLE_ANON", default="100/hour"),
         "user": env("THROTTLE_USER", default="1000/hour"),
 
-      
         "login": env("THROTTLE_LOGIN", default="5/min"),
         "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
         "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
@@ -183,6 +182,10 @@ REST_FRAMEWORK = {
         "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
     },
 }
+
+# Disable throttling during tests
+if IS_TESTING:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []
 
 ROOT_URLCONF = 'inventory.urls'
 
@@ -279,7 +282,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "accept",
     "origin",
-     "Content-Disposition",
+    "Content-Disposition",
+    "x-device-name",
 ]
 
 CORS_EXPOSE_HEADERS = [

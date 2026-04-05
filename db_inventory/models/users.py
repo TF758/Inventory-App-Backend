@@ -100,7 +100,8 @@ class PasswordResetEvent(models.Model):
 
     def is_valid(self):
         return (
-            self.used_at is None
+            self.is_active
+            and self.used_at is None
             and self.expires_at >= timezone.now()
         )
 

@@ -77,6 +77,8 @@ class AuditLog(PublicIDModel):
         LOGIN = "login"
         LOGIN_FAILED = "login_failed"
         LOGOUT = "logout"
+        ACCOUNT_LOCKED = "account_locked"
+        ACCOUNT_UNLOCKED = "account_unlocked"
         USER_CREATED = "user_created"
         USER_UPDATED = "user_updated"
         ADMIN_RESET_PASSWORD = "admin_reset_password"

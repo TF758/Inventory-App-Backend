@@ -15,6 +15,10 @@ from db_inventory.factories import UserFactory
     "db_inventory.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
     new=[]
 )
+@mock.patch(
+    "db_inventory.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
+    new=[]
+)
 class LogoutAPIViewTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -64,28 +68,32 @@ class LogoutAPIViewTests(TestCase):
         self.assertEqual(session.status, UserSession.Status.REVOKED)
 
     # --------------------
-    # FAILURE CASES
+    # IDEMPOTENT / SAFE CASES
     # --------------------
-    def test_logout_missing_cookie_returns_400(self):
+    def test_logout_missing_cookie_returns_200(self):
         response = self.client.post(self.url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("No refresh token", response.json()["detail"])
 
-    def test_logout_invalid_token_returns_400(self):
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Successfully logged out", response.json()["detail"])
+
+    def test_logout_invalid_token_returns_200(self):
         self.client.cookies["refresh"] = "invalid-token"
-        response = self.client.post(self.url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Invalid or expired session", response.json()["detail"])
 
-    def test_logout_already_revoked_session_returns_400(self):
+        response = self.client.post(self.url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Successfully logged out", response.json()["detail"])
+
+    def test_logout_already_revoked_session_returns_200(self):
         session, raw_refresh = self._make_session_with_cookie(
             status_value=UserSession.Status.REVOKED
         )
         self.client.cookies["refresh"] = raw_refresh
 
         response = self.client.post(self.url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Invalid or expired session", response.json()["detail"])
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Successfully logged out", response.json()["detail"])
 
     # --------------------
     # EXCEPTION PATHS
@@ -121,8 +129,10 @@ class LogoutAPIViewTests(TestCase):
     # --------------------
     def test_logout_only_revokes_target_session(self):
         session1, raw_refresh1 = self._make_session_with_cookie()
+
         session2_raw = secrets.token_urlsafe(32)
         now = timezone.now()
+
         session2 = UserSession.objects.create(
             user=self.user,
             refresh_token_hash=UserSession.hash_token(session2_raw),
@@ -135,26 +145,26 @@ class LogoutAPIViewTests(TestCase):
             ip_address="127.0.0.2",
         )
 
-        # Cookie points to session1
         self.client.cookies["refresh"] = raw_refresh1
 
         response = self.client.post(self.url, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         session1.refresh_from_db()
         session2.refresh_from_db()
+
         self.assertEqual(session1.status, UserSession.Status.REVOKED)
         self.assertEqual(session2.status, UserSession.Status.ACTIVE)
 
     def test_logout_is_idempotent(self):
         session, raw_refresh = self._make_session_with_cookie()
 
-        # first logout succeeds
         resp1 = self.client.post(self.url, format="json")
         self.assertEqual(resp1.status_code, status.HTTP_200_OK)
 
-        # reuse same cookie -> should now fail safely
         self.client.cookies["refresh"] = raw_refresh
         resp2 = self.client.post(self.url, format="json")
-        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Invalid or expired session", resp2.json()["detail"])
+
+        self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+        self.assertIn("Successfully logged out", resp2.json()["detail"])

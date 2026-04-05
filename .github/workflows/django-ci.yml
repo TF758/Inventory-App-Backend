@@ -1,18 +1,16 @@
-name: Django CI
-
+---
+name: Django Test Suite
 on:
-  pull_request:
+  pull_request: null
   push:
-    branches: [main]
-
+    branches:
+      - main
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Create env file
         run: |
           echo "DJANGO_ENV=dev" >> .env.dev
@@ -23,15 +21,18 @@ jobs:
           echo "DB_PASSWORD=inventory" >> .env.dev
           echo "SESSION_IDLE_MINUTES=30" >> .env.dev
           echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
-
+      - name: Enable Docker BuildKit
+        run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
       - name: Build containers
         run: docker compose build
-
-      - name: Start database and redis
-        run: docker compose up -d db redis
-
+      - name: Start services
+        run: docker compose up -d
+      - name: Wait for database
+        run: |
+          until docker compose exec -T db pg_isready -U inventory; do
+            sleep 2
+          done
       - name: Run migrations
-        run: docker compose run api python manage.py migrate
-
+        run: docker compose exec -T api python manage.py migrate
       - name: Run tests
-        run: docker compose run api python manage.py test
+        run: docker compose exec -T api python manage.py test

@@ -28,6 +28,7 @@ from django.conf import settings
 from db_inventory.security_policy import *
 
 
+
 logger = logging.getLogger(__name__) 
 
 class SessionTokenLoginView(TokenObtainPairView):
@@ -81,13 +82,30 @@ class SessionTokenLoginView(TokenObtainPairView):
             with transaction.atomic():
 
                 ua_hash = UserSession.hash_user_agent(user_agent)
+                device_name = request.headers.get("X-Device-Name")
+
+                # Load security policy
+                policy = SecuritySettings.load()
+
+                # Enforce max concurrent sessions
+                active_sessions = UserSession.objects.filter(
+                    user=user,
+                    status=UserSession.Status.ACTIVE,
+                ).order_by("created_at")
+
+                if active_sessions.count() >= policy.max_concurrent_sessions:
+                    oldest_session = active_sessions.first()
+                    if oldest_session:
+                        oldest_session.status = UserSession.Status.REVOKED
+                        oldest_session.save(update_fields=["status"])
 
                 session = UserSession.objects.create(
                     user=user,
                     refresh_token_hash=hashed_refresh,
+                    device_name=device_name,
+                    last_ip_address=ip,
                     expires_at=now + get_session_idle_timeout(),
                     absolute_expires_at=now + get_session_absolute_lifetime(),
-                    user_agent=user_agent,
                     user_agent_hash=ua_hash,
                     ip_address=ip,
                 )
@@ -105,7 +123,6 @@ class SessionTokenLoginView(TokenObtainPairView):
         try:
             access_token_obj = AccessToken.for_user(user)
 
-            # apply policy-based expiration
             access_token_obj.set_exp(
                 lifetime=get_access_token_lifetime()
             )
@@ -118,6 +135,7 @@ class SessionTokenLoginView(TokenObtainPairView):
 
         except Exception:
             session.delete()
+
             logger.exception(
                 "Access token generation failed",
                 extra={"user_id": user.pk},
@@ -152,7 +170,7 @@ class SessionTokenLoginView(TokenObtainPairView):
             "force_password_change": user.force_password_change,
         }
 
-        response = Response(response_data, status=200)
+        response = Response(response_data, status=status.HTTP_200_OK)
 
         response.set_cookie(
             key="refresh",
@@ -164,12 +182,18 @@ class SessionTokenLoginView(TokenObtainPairView):
             max_age=int(get_session_absolute_lifetime().total_seconds()),
         )
 
-        return response
+        return response   
     
 class RefreshAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
     throttle_classes = [RefreshTokenThrottle]
+
+    def get_client_ip(self, request):
+        xff = request.META.get("HTTP_X_FORWARDED_FOR")
+        if xff:
+            return xff.split(",")[0].strip()
+        return request.META.get("REMOTE_ADDR")
 
     def post(self, request):
 
@@ -184,7 +208,7 @@ class RefreshAPIView(APIView):
 
             hashed_refresh = UserSession.hash_token(raw_refresh)
 
-            ip = request.META.get("REMOTE_ADDR")
+            ip = self.get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
 
             # ----------------------------------------
@@ -202,12 +226,17 @@ class RefreshAPIView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
 
+            now = timezone.now()
+
             # ----------------------------------------
             # Refresh token reuse detection
             # ----------------------------------------
             if session.previous_refresh_token_hash == hashed_refresh:
-                session.status = UserSession.Status.REVOKED
-                session.save(update_fields=["status"])
+
+                # revoke entire family
+                UserSession.objects.filter(
+                    session_family=session.session_family
+                ).update(status=UserSession.Status.REVOKED)
 
                 resp = Response(
                     {"detail": "Invalid or expired session."},
@@ -216,12 +245,11 @@ class RefreshAPIView(APIView):
                 resp.delete_cookie("refresh", path="/")
                 return resp
 
-            now = timezone.now()
-
             # ----------------------------------------
             # Expiration checks
             # ----------------------------------------
             if session.absolute_expires_at <= now or session.expires_at <= now:
+
                 session.status = UserSession.Status.EXPIRED
                 session.save(update_fields=["status"])
 
@@ -238,6 +266,7 @@ class RefreshAPIView(APIView):
             req_ua_hash = UserSession.hash_user_agent(user_agent)
 
             if session.user_agent_hash and session.user_agent_hash != req_ua_hash:
+
                 session.status = UserSession.Status.REVOKED
                 session.save(update_fields=["status"])
 
@@ -282,14 +311,21 @@ class RefreshAPIView(APIView):
                     session.previous_refresh_token_hash = session.refresh_token_hash
                     session.refresh_token_hash = new_hash
 
-                    # 🔐 policy-driven idle refresh
+                    # refresh idle timeout
                     session.expires_at = now + get_session_idle_timeout()
+
+                    # update session activity metadata
+                    session.last_ip_address = ip
+
+                    session.last_used_at = now
 
                     session.save(
                         update_fields=[
                             "previous_refresh_token_hash",
                             "refresh_token_hash",
                             "expires_at",
+                            "last_ip_address",
+                            "last_used_at",
                         ]
                     )
 
@@ -308,10 +344,7 @@ class RefreshAPIView(APIView):
             # ----------------------------------------
             try:
                 access_token = AccessToken.for_user(user)
-
-                access_token.set_exp(
-                    lifetime=get_access_token_lifetime()
-                )
+                access_token.set_exp(lifetime=get_access_token_lifetime())
 
             except Exception:
                 logger.exception(
@@ -369,13 +402,23 @@ class LogoutAPIView(APIView):
     permission_classes = []
     authentication_classes = []
 
+    def get_client_ip(self, request):
+        xff = request.META.get("HTTP_X_FORWARDED_FOR")
+        if xff:
+            return xff.split(",")[0].strip()
+        return request.META.get("REMOTE_ADDR")
+
     def post(self, request):
+
         raw_refresh = request.COOKIES.get("refresh")
+
         if not raw_refresh:
-            return Response(
-                {"detail": "No refresh token found."},
-                status=status.HTTP_400_BAD_REQUEST,
+            response = Response(
+                {"detail": "Successfully logged out."},
+                status=status.HTTP_200_OK,
             )
+            response.delete_cookie("refresh", path="/")
+            return response
 
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
@@ -386,41 +429,69 @@ class LogoutAPIView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        ip = self.get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
+
         try:
-            session = UserSession.objects.get(
-                Q(refresh_token_hash=hashed_refresh) |
-                Q(previous_refresh_token_hash=hashed_refresh)
-            )
+            with transaction.atomic():
+
+                session = UserSession.objects.select_for_update().get(
+                    Q(refresh_token_hash=hashed_refresh)
+                    | Q(previous_refresh_token_hash=hashed_refresh)
+                )
+
+                # Idempotent logout
+                if session.status != UserSession.Status.ACTIVE:
+                    response = Response(
+                        {"detail": "Successfully logged out."},
+                        status=status.HTTP_200_OK,
+                    )
+                    response.delete_cookie("refresh", path="/")
+                    return response
+
+                session.status = UserSession.Status.REVOKED
+                session.last_ip_address = ip
+                session.save(update_fields=["status", "last_ip_address"])
+
         except UserSession.DoesNotExist:
-            return Response(
-                {"detail": "Invalid or expired session."},
-                status=status.HTTP_400_BAD_REQUEST,
+            response = Response(
+                {"detail": "Successfully logged out."},
+                status=status.HTTP_200_OK,
             )
+            response.delete_cookie("refresh", path="/")
+            return response
 
-        # 🔑 Idempotency check
-        if session.status != UserSession.Status.ACTIVE:
-            return Response(
-                {"detail": "Invalid or expired session."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            session.status = UserSession.Status.REVOKED
-            session.save(update_fields=["status"])
         except Exception:
-            logger.exception("Logout session revoke failed")
+            logger.exception(
+                "Logout session revoke failed",
+                extra={"session_id": str(session.id)},
+            )
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        # Audit log
+        try:
+            AuditLog.objects.create(
+                event_type=AuditLog.Events.LOGOUT,
+                user=session.user,
+                user_public_id=str(session.user.public_id),
+                user_email=session.user.email,
+                ip_address=ip,
+                user_agent=user_agent,
+            )
+        except Exception:
+            logger.warning("Logout audit log failed")
+
         response = Response(
             {"detail": "Successfully logged out."},
             status=status.HTTP_200_OK,
         )
-        response.delete_cookie("refresh", path="/")
-        return response
 
+        response.delete_cookie("refresh", path="/")
+
+        return response
 
 def get_serializer_field_info(serializer_class: Serializer):
         """Return cleaned up metadata for serializer fields"""

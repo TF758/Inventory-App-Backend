@@ -21,10 +21,13 @@ class UserSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()               
     absolute_expires_at = models.DateTimeField()     
-    last_used_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=256, null=True, blank=True)
     user_agent_hash = models.CharField(max_length=64, null=True, blank=True)
+    session_family = models.UUIDField( default=uuid.uuid4, db_index=True, )
+    device_name = models.CharField( max_length=128, null=True, blank=True, )
+    last_ip_address = models.GenericIPAddressField( null=True, blank=True, )
 
     class Meta:
         indexes = [
@@ -32,6 +35,8 @@ class UserSession(models.Model):
             models.Index(fields=["status"]),
             models.Index(fields=["expires_at"]),
             models.Index(fields=["absolute_expires_at"]),
+            models.Index(fields=["refresh_token_hash"]),
+            models.Index(fields=["previous_refresh_token_hash"]),
         ]
 
     def is_valid(self) -> bool:
@@ -154,8 +159,6 @@ class SecuritySettings(models.Model):
     revoke_sessions_on_password_change = models.BooleanField(default=True)
 
     updated_at = models.DateTimeField(auto_now=True)
-
-    CACHE_KEY = "security_settings_singleton"
 
     CACHE_KEY = "security_settings_singleton"
 
