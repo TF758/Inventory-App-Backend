@@ -164,15 +164,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-
-
-    "DEFAULT_THROTTLE_CLASSES": []
-    if IS_TESTING
-    else [
+    "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-
     "DEFAULT_THROTTLE_RATES": {
         "anon": env("THROTTLE_ANON", default="100/hour"),
         "user": env("THROTTLE_USER", default="1000/hour"),
@@ -187,6 +182,10 @@ REST_FRAMEWORK = {
         "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
     },
 }
+
+# Disable throttling during tests
+if IS_TESTING:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []
 
 ROOT_URLCONF = 'inventory.urls'
 
