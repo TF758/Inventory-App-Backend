@@ -122,7 +122,7 @@ def build_site_audit_log_report(
         "user_created": "User Created",
         "user_updated": "User Updated",
         "user_deleted": "User Deleted",
-        "password_reset": "Password Reset",
+        "password_reset": "Password Reset", #nosec
         "role_assigned": "Role Assigned",
         "user_moved": "User Moved",
     }
