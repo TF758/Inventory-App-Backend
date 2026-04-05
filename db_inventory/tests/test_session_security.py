@@ -9,11 +9,6 @@ from rest_framework_simplejwt.tokens import AccessToken
 from django.test import override_settings
 from django.conf import settings
 
-@override_settings(
-    REST_FRAMEWORK={
-        "DEFAULT_THROTTLE_CLASSES": [],
-    }
-)
 class SessionSecurityTests(TestCase):
 
     def setUp(self):

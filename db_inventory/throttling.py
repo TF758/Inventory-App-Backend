@@ -1,8 +1,15 @@
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from rest_framework.exceptions import Throttled
+from django.conf import settings
 
 class LoginThrottle(AnonRateThrottle):
     scope = "login"
+
+    def allow_request(self, request, view):
+        # Disable throttling during tests
+        if getattr(settings, "IS_TESTING", False):
+            return True
+        return super().allow_request(request, view)
 
     def throttle_failure(self):
         raise Throttled(

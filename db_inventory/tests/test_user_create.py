@@ -9,8 +9,8 @@ class SiteAdminFullUserCreateTest(APITestCase):
     """Verify that SITE_ADMIN can create users anywhere"""
 
     def setUp(self):
-        # --- Create SITE_ADMIN ---
         self.site_admin = AdminUserFactory()
+
         self.site_admin_role = RoleAssignment.objects.create(
             user=self.site_admin,
             role="SITE_ADMIN",
@@ -19,10 +19,11 @@ class SiteAdminFullUserCreateTest(APITestCase):
             room=None,
             assigned_by=self.site_admin
         )
+
         self.site_admin.active_role = self.site_admin_role
         self.site_admin.save()
 
-        self.client.force_login(self.site_admin)
+        self.client.force_authenticate(user=self.site_admin)
 
         # --- Department, Location, Room ---
         self.department = DepartmentFactory(name="IT")
