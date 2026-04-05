@@ -164,15 +164,19 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_THROTTLE_CLASSES": [
+
+
+    "DEFAULT_THROTTLE_CLASSES": []
+    if IS_TESTING
+    else [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
+
     "DEFAULT_THROTTLE_RATES": {
         "anon": env("THROTTLE_ANON", default="100/hour"),
         "user": env("THROTTLE_USER", default="1000/hour"),
 
-      
         "login": env("THROTTLE_LOGIN", default="5/min"),
         "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
         "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
