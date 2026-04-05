@@ -81,12 +81,12 @@ class AuditLog(PublicIDModel):
         ACCOUNT_UNLOCKED = "account_unlocked"
         USER_CREATED = "user_created"
         USER_UPDATED = "user_updated"
-        ADMIN_RESET_PASSWORD = "admin_reset_password"
+        ADMIN_RESET_PASSWORD = "admin_reset_password" # nosec
         ADMIN_UPDATED_USER = "admin_updated_user"
         USER_DELETED = "user_deleted"
 
-        PASSWORD_RESET_REQUESTED = "password_reset_requested"
-        PASSWORD_RESET_COMPLETED = "password_reset_completed"
+        PASSWORD_RESET_REQUESTED = "password_reset_requested" # nosec
+        PASSWORD_RESET_COMPLETED = "password_reset_completed" # nosec
 
         ROLE_ASSIGNED = "role_assigned"
         ROLE_REVOKED = "role_revoked"

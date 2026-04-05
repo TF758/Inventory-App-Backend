@@ -6,14 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copy uv from the base image
+# Copy uv binary
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy requirements file and install deps
+# Copy dependency file first for caching
 COPY requirements.txt .
-RUN uv pip install -r requirements.txt --system
 
-# Copy entire project (including manage.py, apps, settings)
+# Install dependencies (system environment)
+RUN uv pip install --system -r requirements.txt
+
+# Copy application code
 COPY . .
 
 EXPOSE 8000

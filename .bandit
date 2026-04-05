@@ -1,0 +1,9 @@
+exclude_dirs:
+  - tests
+  - migrations
+  - management/commands
+  - venv
+  - .venv
+
+skips:
+  - B311

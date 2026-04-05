@@ -1,16 +1,41 @@
----
 name: Django Test Suite
+
 on:
-  pull_request: null
   push:
     branches:
       - main
+  pull_request:
+
 jobs:
-  test:
+  security:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install security tools
+        run: |
+          pip install bandit pip-audit
+
+      - name: Run Bandit security scan
+        run: bandit -r . -c .bandit
+
+      - name: Run dependency vulnerability scan
+        run: pip-audit
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Create env file
         run: |
           echo "DJANGO_ENV=dev" >> .env.dev
@@ -21,18 +46,24 @@ jobs:
           echo "DB_PASSWORD=inventory" >> .env.dev
           echo "SESSION_IDLE_MINUTES=30" >> .env.dev
           echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
+
       - name: Enable Docker BuildKit
         run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
+
       - name: Build containers
         run: docker compose build
+
       - name: Start services
         run: docker compose up -d
+
       - name: Wait for database
         run: |
           until docker compose exec -T db pg_isready -U inventory; do
             sleep 2
           done
+
       - name: Run migrations
         run: docker compose exec -T api python manage.py migrate
+
       - name: Run tests
         run: docker compose exec -T api python manage.py test
