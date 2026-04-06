@@ -1,6 +1,6 @@
 
+from inventory_metrics.tasks.reports import generate_report_task
 from inventory_metrics.models.reports import ReportJob
-from inventory_metrics.tasks import generate_site_asset_report_task, generate_site_audit_log_report_task
 from inventory_metrics.serializers.site_reports import SiteAssetRequestSerializer, SiteAuditLogRequestSerializer
 from rest_framework.views import APIView
 from db_inventory.models import Department, Location, Room, AuditLog
@@ -30,7 +30,7 @@ class SiteAssetExcelReportAPIView(APIView):
             params=serializer.validated_data,
         )
 
-        generate_site_asset_report_task.delay(job.id)
+        generate_report_task.delay(job.id)
 
         return Response(
             {
@@ -53,7 +53,7 @@ class SiteAuditLogReportAPIView(APIView):
             params=serializer.validated_data,
         )
 
-        generate_site_audit_log_report_task.delay(job.id)
+        generate_report_task.delay(job.id)
 
         return Response(
             {

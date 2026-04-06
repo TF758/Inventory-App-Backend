@@ -10,10 +10,8 @@ from django.utils import timezone
 import json
 
 from urllib3 import request
-from inventory_metrics.utils.excel_renderer import render_workbook
-from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
+from inventory_metrics.tasks.reports import generate_report_task
 from inventory_metrics.models import ReportJob
-from inventory_metrics.tasks import generate_user_summary_report_task
 from inventory_metrics.serializers.user_report import UserSummaryReportSerializer, UserSummaryReportRequestSerializer
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
@@ -33,7 +31,7 @@ class UserSummaryReport(APIView):
             params=serializer.validated_data,
         )
 
-        generate_user_summary_report_task.delay(job.id)
+        generate_report_task.delay(job.id)
 
         return Response(
             {

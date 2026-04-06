@@ -21,7 +21,7 @@ def site_asset_to_workbook_spec(payload: dict) -> dict:
     # -----------------------------
     # Asset sheets
     # -----------------------------
-    for asset_type, rows in payload["assets"].items():
+    for asset_type, rows in payload["data"]["assets"].items():
         if rows:
             headers = list(rows[0].keys())
             data_rows = [
@@ -48,7 +48,7 @@ def site_audit_log_to_workbook_spec(payload: dict) -> dict:
     spec = {}
 
     meta = payload["meta"]
-    logs = payload["logs"]
+    logs = payload["data"]["logs"]
 
     # -----------------------------
     # Report Info
