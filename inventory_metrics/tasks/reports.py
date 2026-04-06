@@ -19,6 +19,20 @@ from django.db import DatabaseError
 
 redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
+from datetime import datetime
+from django.utils.timezone import is_aware
+
+def normalize_datetimes(obj):
+    if isinstance(obj, dict):
+        return {k: normalize_datetimes(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [normalize_datetimes(v) for v in obj]
+    if isinstance(obj, datetime):
+        if is_aware(obj):
+            return obj.replace(tzinfo=None)
+        return obj
+    return obj
+
 
 @shared_task(
     bind=True,
@@ -55,9 +69,11 @@ def generate_user_summary_report_task(self, report_job_id: int):
             sections=job.params["sections"],
         )
 
+        clean_data = normalize_datetimes(raw_data)
+
         payload = wrap_report_payload(
             report_type="user_summary",
-            data=raw_data,
+            data=clean_data,
         )
 
         # -----------------------------

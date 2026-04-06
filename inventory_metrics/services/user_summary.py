@@ -44,7 +44,7 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
         thirty_days_ago = timezone.now() - timedelta(days=30)
 
         data["loginStats"] = {
-            "last_login": user.last_login,
+           
             "active_sessions": sessions.filter(status="active").count(),
             "revoked_sessions": sessions.filter(status="revoked").count(),
             "expired_sessions": sessions.filter(status="expired").count(),
