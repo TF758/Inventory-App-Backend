@@ -1,5 +1,7 @@
 
 
+from data_import.renderers import asset_import_to_workbook_spec
+from data_import.services.import_builder import build_asset_import
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from inventory_metrics.services.user_summary import build_user_summary_report
 from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec, site_audit_log_to_workbook_spec
@@ -74,6 +76,13 @@ def site_audit_params(params, user):
         "generated_by": user,
     }
 
+def asset_import_params(params, user):
+    return {
+        "asset_type": params["asset_type"],
+        "stored_file_name": params["stored_file_name"],
+        "generated_by": user,
+    }
+
 
 # ---------------------------------------------------------
 # Report definitions
@@ -98,4 +107,10 @@ REPORT_DEFINITIONS = {
         "renderer": site_audit_log_to_workbook_spec,
         "param_map": site_audit_params,
     },
+
+    "asset_import": {
+    "builder": build_asset_import,
+    "renderer": asset_import_to_workbook_spec,
+    "param_map": asset_import_params,
+}
 }

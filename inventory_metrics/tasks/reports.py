@@ -74,27 +74,47 @@ def generate_report_task(self, report_job_id: int):
             job.save(update_fields=["status", "started_at"])
 
         # -----------------------------
-        # build data
+        # build report data
         # -----------------------------
         builder_params = definition["param_map"](job.params, job.user)
-        
-        raw_data = builder(**builder_params)
+
+
+        # Import reports already have stored results
+        if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
+            raw_data = job.result_payload
+        else:
+            raw_data = builder(**builder_params)
 
         raw_data = normalize_datetimes(raw_data)
 
-        if not raw_data:
+        if raw_data is None:
             raise RuntimeError("Report payload is empty")
+
+        # -----------------------------
+        # build metadata
+        # -----------------------------
+        extra_meta = {
+            "generated_by": job.user.get_username(),
+        }
+
+        # audit reports
+        if "audit_period_days" in job.params:
+            extra_meta["audit_period_days"] = job.params["audit_period_days"]
+
+        # asset import reports
+        if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
+            extra_meta["asset_type"] = job.params.get("asset_type")
+            extra_meta["original_file_name"] = job.params.get("original_file_name")
 
         payload = wrap_report_payload(
             report_type=job.report_type,
             data=raw_data,
-            extra_meta={
-                "generated_by": job.user.get_username(),
-                "audit_period_days": job.params.get("audit_period_days", 30),
-            },
+            extra_meta=extra_meta,
         )
 
-        # add site metadata if present
+        # -----------------------------
+        # attach site metadata if present
+        # -----------------------------
         site = job.params.get("site")
 
         if site:
@@ -110,10 +130,19 @@ def generate_report_task(self, report_job_id: int):
             model = site_model_map.get(site["siteType"])
 
             if model:
-                site_obj = model.objects.filter(public_id=site["siteId"]).only("name").first()
+                site_obj = (
+                    model.objects
+                    .filter(public_id=site["siteId"])
+                    .only("name")
+                    .first()
+                )
+
                 if site_obj:
                     payload["meta"]["site_name"] = site_obj.name
 
+        # -----------------------------
+        # render workbook
+        # -----------------------------
         workbook_spec = renderer(payload)
 
         wb = render_workbook(workbook_spec)

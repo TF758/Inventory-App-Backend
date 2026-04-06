@@ -39,7 +39,7 @@ class ReportJob(PublicIDModel):
     finished_at = models.DateTimeField(null=True, blank=True)
     report_file = models.CharField(max_length=500, blank=True)
 
-    error_report_csv = models.TextField(blank=True)
+    result_payload = models.JSONField(null=True, blank=True)
 
     notification_sent = models.BooleanField(default=False)
 

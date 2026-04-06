@@ -28,8 +28,8 @@ class AssetImportCreateView(APIView):
 
         job = ReportJob.objects.create(
             user=request.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
             params={
-                "job_type": "asset_import",
                 "asset_type": asset_type,
                 "stored_file_name": stored_file_name,
                 "original_file_name": uploaded_file.name,
@@ -46,27 +46,3 @@ class AssetImportCreateView(APIView):
             },
             status=status.HTTP_202_ACCEPTED,
         )
-
-class ImportErrorReportDownloadView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, job_id):
-
-        job = ReportJob.objects.get(public_id=job_id, user=request.user)
-
-        if not job.error_report_csv:
-            return Response(
-                {"detail": "No error report available."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        response = HttpResponse(
-            job.error_report_csv,
-            content_type="text/csv",
-        )
-
-        response["Content-Disposition"] = (
-            f'attachment; filename="import_errors_{job.public_id}.csv"'
-        )
-
-        return response
