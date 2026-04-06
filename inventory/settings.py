@@ -116,6 +116,18 @@ REDIS_REPORTS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_REPORTS}"
 REPORT_CACHE_TTL_SECONDS = env.int("REPORT_CACHE_TTL_SECONDS", default=900)
 ASGI_APPLICATION = "inventory.asgi.application"
 
+
+# -------------------------------------------------
+# Report storage (filesystem)
+# -------------------------------------------------
+
+REPORTS_DIR = BASE_DIR / "reports"
+REPORTS_DIR.mkdir(exist_ok=True)
+
+REPORT_RETENTION_DAYS = env.int("REPORT_RETENTION_DAYS", default=30)
+
+REPORT_FILENAME_TEMPLATE = "{report_type}-{public_id}"
+
 # -------------------------------------------------
 # Channel layers (WebSockets)
 # -------------------------------------------------
