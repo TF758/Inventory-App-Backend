@@ -8,6 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 import redis
 from django.utils import timezone
 import json
+
+from urllib3 import request
 from inventory_metrics.utils.excel_renderer import render_workbook
 from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
 from inventory_metrics.models import ReportJob
@@ -26,12 +28,10 @@ class UserSummaryReport(APIView):
         serializer.is_valid(raise_exception=True)
 
         job = ReportJob.objects.create(
-        user=request.user,
-        params={
-            **serializer.validated_data,
-            "report_type": "user_summary",
-        },
-         )
+            user=request.user,
+            report_type="user_summary",
+            params=serializer.validated_data,
+        )
 
         generate_user_summary_report_task.delay(job.id)
 

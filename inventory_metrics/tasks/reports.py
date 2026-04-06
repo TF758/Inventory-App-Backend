@@ -1,8 +1,11 @@
+import io
 import json
 from celery import shared_task
 from django.utils import timezone
 from django.db import transaction
 from db_inventory.mixins import NotificationMixin
+from inventory_metrics.utils.excel_renderer import render_workbook
+from inventory_metrics.viewsets.general import REPORT_RENDERERS
 from inventory_metrics.utils.report_payload import wrap_report_payload
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from inventory_metrics.models import ReportJob
@@ -19,7 +22,7 @@ redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
 @shared_task(
     bind=True,
-    autoretry_for=(DatabaseError, redis.exceptions.RedisError),
+    autoretry_for=(DatabaseError,),
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
@@ -37,7 +40,7 @@ def generate_user_summary_report_task(self, report_job_id: int):
         job = ReportJob.objects.select_related("user").get(id=report_job_id)
 
         # -----------------------------
-        # Mark RUNNING (business state)
+        # Mark RUNNING
         # -----------------------------
         with transaction.atomic():
             job.status = ReportJob.Status.RUNNING
@@ -45,28 +48,51 @@ def generate_user_summary_report_task(self, report_job_id: int):
             job.save(update_fields=["status", "started_at"])
 
         # -----------------------------
-        # Build payload
+        # Build report data
         # -----------------------------
-
         raw_data = build_user_summary_report(
             user_identifier=job.params["user"],
             sections=job.params["sections"],
         )
+
         payload = wrap_report_payload(
             report_type="user_summary",
             data=raw_data,
         )
 
-        redis_key = f"report:{job.public_id}"
+        # -----------------------------
+        # Render XLSX
+        # -----------------------------
+        renderer_cfg = REPORT_RENDERERS.get(job.report_type)
+        renderer = renderer_cfg.get("xlsx")
+
+        if not renderer:
+            raise RuntimeError("No XLSX renderer configured for report.")
+
+        workbook_spec = renderer(payload["data"])
+        wb = render_workbook(workbook_spec)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
 
         # -----------------------------
-        # Cache in Redis
+        # Save file to REPORTS_DIR
         # -----------------------------
-        redis_reports_client.setex(
-            redis_key,
-            settings.REPORT_CACHE_TTL_SECONDS,
-            json.dumps(payload, default=str),
+        filename = settings.REPORT_FILENAME_TEMPLATE.format(
+            report_type=job.report_type,
+            public_id=job.public_id,
         )
+        filename = f"{filename}.xlsx"
+
+        file_path = settings.REPORTS_DIR / filename
+
+        with open(file_path, "wb") as f:
+            f.write(buffer.getvalue())
+
+        # Save filename reference
+        job.report_file = filename
+        job.save(update_fields=["report_file"])
 
         # -----------------------------
         # Mark DONE + notify
@@ -86,22 +112,21 @@ def generate_user_summary_report_task(self, report_job_id: int):
                     entity=job,
                     meta={
                         "report_type": "user_summary",
-                        "formats": ["xlsx", "json"],
+                        "formats": ["xlsx"],
                     },
                 )
+
                 job.notification_sent = True
                 job.save(update_fields=["notification_sent"])
 
         # -----------------------------
-        # Mark task SUCCESS
+        # Mark SUCCESS
         # -----------------------------
         run.status = ScheduledTaskRun.Status.SUCCESS
         run.message = f"ReportJob {job.public_id} completed"
 
     except Exception as exc:
-        # -----------------------------
-        # Mark FAILED (both layers)
-        # -----------------------------
+
         with transaction.atomic():
             job.status = ReportJob.Status.FAILED
             job.error = str(exc)

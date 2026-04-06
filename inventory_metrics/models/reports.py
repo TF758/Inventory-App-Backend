@@ -37,6 +37,7 @@ class ReportJob(PublicIDModel):
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
+    report_file = models.CharField(max_length=500, blank=True)
 
     error_report_csv = models.TextField(blank=True)
 

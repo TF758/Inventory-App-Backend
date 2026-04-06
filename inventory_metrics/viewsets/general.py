@@ -41,13 +41,6 @@ class DownloadReport(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, public_id: str):
-        fmt = request.GET.get("format", "xlsx").lower()
-
-        if fmt not in {"json", "xlsx"}:
-            return JsonResponse(
-                {"detail": "Invalid format. Use ?format=json or ?format=xlsx."},
-                status=400,
-            )
 
         job = get_object_or_404(
             ReportJob,
@@ -77,65 +70,29 @@ class DownloadReport(APIView):
             )
 
         # -----------------------------
-        # Fetch cached payload
+        # Ensure file exists
         # -----------------------------
-        redis_key = f"report:{job.public_id}"
-        cached_payload = redis_reports_client.get(redis_key)
+        if not job.report_file:
+            raise Http404("Report file not available.")
 
-        if not cached_payload:
-            raise Http404("Report expired. Please regenerate.")
+        file_path = settings.REPORTS_DIR / job.report_file
 
-        payload = json.loads(cached_payload.decode("utf-8"))
-        if "data" not in payload:
-            return JsonResponse(
-                {"detail": "Invalid report payload format."},
-                status=500,
-            )
-        timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
+        if not file_path.exists():
+            raise Http404("Report file not found.")
 
-        report_type = job.params.get("report_type")
-        renderer_cfg = REPORT_RENDERERS.get(report_type)
-
-        if not renderer_cfg:
-            return JsonResponse(
-                {"detail": "Unsupported report type."},
-                status=400,
+        # -----------------------------
+        # Stream file
+        # -----------------------------
+        with open(file_path, "rb") as f:
+            response = HttpResponse(
+                f.read(),
+                content_type=(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
             )
 
-        # -----------------------------
-        # JSON response
-        # -----------------------------
-        if fmt == "json":
-            response = JsonResponse(payload, safe=False)
-            response["Content-Disposition"] = (
-                f'attachment; filename="report-{report_type}-{job.public_id}-{timestamp}.json"'
-            )
-            return response
-
-        # -----------------------------
-        # XLSX response
-        # -----------------------------
-        renderer = renderer_cfg.get("xlsx")
-        if not renderer:
-            return JsonResponse(
-                {"detail": "XLSX format not supported for this report."},
-                status=400,
-            )
-
-        workbook_spec = renderer(payload["data"])
-        wb = render_workbook(workbook_spec)
-
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-
-        response = HttpResponse(
-            buffer.getvalue(),
-            content_type=(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            ),
-        )
         response["Content-Disposition"] = (
-            f'attachment; filename="report-{report_type}-{job.public_id}-{timestamp}.xlsx"'
+            f'attachment; filename="{job.report_file}"'
         )
+
         return response
