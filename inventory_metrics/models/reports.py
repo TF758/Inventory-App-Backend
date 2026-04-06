@@ -5,13 +5,9 @@ from django.utils import timezone
 
 from db_inventory.models.base import PublicIDModel
 
-
-
-
 class ReportJob(PublicIDModel):
     """
-    Ephemeral async report job.
-    Payload lives in Redis, not DB.
+    Async report / job record.
     """
 
     PUBLIC_ID_PREFIX = "RPT"
@@ -22,11 +18,18 @@ class ReportJob(PublicIDModel):
         DONE = "done"
         FAILED = "failed"
 
+    class ReportType(models.TextChoices):
+        USER_SUMMARY = "user_summary", "User Summary"
+        SITE_ASSETS = "site_assets", "Site Assets"
+        SITE_AUDIT_LOGS = "site_audit_logs", "Site Audit Logs"
+        ASSET_IMPORT = "asset_import", "Asset Import"
+
     user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="report_jobs", )
+
+    report_type = models.CharField( max_length=40, choices=ReportType.choices, db_index=True, )
 
     status = models.CharField( max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True, )
 
-    # Input parameters used to build the report
     params = models.JSONField()
 
     error = models.TextField(blank=True)
@@ -42,8 +45,9 @@ class ReportJob(PublicIDModel):
     class Meta:
         indexes = [
             models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "report_type"]),
             models.Index(fields=["created_at"]),
         ]
 
     def __str__(self):
-        return f"{self.public_id} [{self.status}]"
+        return f"{self.public_id} [{self.report_type} | {self.status}]"
