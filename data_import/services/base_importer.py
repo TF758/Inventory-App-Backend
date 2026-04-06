@@ -1,145 +1,157 @@
 import csv
-import io
 from dataclasses import dataclass, field
-from typing import Any
 
-from django.core.files.base import ContentFile
-from django.utils import timezone
+from django.core.files.storage import default_storage
 
-from inventory.data_import.models import ImportJob
-from inventory.db_inventory.models.site import Room
-from inventory.db_inventory.permissions.helpers import is_in_scope
+from db_inventory.models.site import Room
+from db_inventory.permissions.helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
 
 
 
 
 @dataclass
-class RowResult:
+class ImportRowIssue:
     row_number: int
-    status: str  # imported / skipped / failed
+    status: str
     reason: str
-    raw_data: dict[str, Any] = field(default_factory=dict)
+    row_data: dict = field(default_factory=dict)
 
 
 @dataclass
-class ImportSummary:
+class ImportResult:
     total_rows: int = 0
     imported_rows: int = 0
     skipped_rows: int = 0
     failed_rows: int = 0
-    rows: list[RowResult] = field(default_factory=list)
+    issues: list[ImportRowIssue] = field(default_factory=list)
 
-    def add_imported(self, row_number: int, raw_data: dict[str, Any]) -> None:
+    def add_imported(self):
         self.imported_rows += 1
-        self.rows.append(RowResult(row_number=row_number, status="imported", reason="", raw_data=raw_data))
 
-    def add_skipped(self, row_number: int, reason: str, raw_data: dict[str, Any]) -> None:
+    def add_skipped(self, row_number: int, reason: str, row_data: dict):
         self.skipped_rows += 1
-        self.rows.append(RowResult(row_number=row_number, status="skipped", reason=reason, raw_data=raw_data))
+        self.issues.append(
+            ImportRowIssue(
+                row_number=row_number,
+                status="skipped",
+                reason=reason,
+                row_data=row_data,
+            )
+        )
 
-    def add_failed(self, row_number: int, reason: str, raw_data: dict[str, Any]) -> None:
+    def add_failed(self, row_number: int, reason: str, row_data: dict):
         self.failed_rows += 1
-        self.rows.append(RowResult(row_number=row_number, status="failed", reason=reason, raw_data=raw_data))
+        self.issues.append(
+            ImportRowIssue(
+                row_number=row_number,
+                status="failed",
+                reason=reason,
+                row_data=row_data,
+            )
+        )
 
 
 class BaseAssetImporter:
-    required_headers: set[str] = set()
-    allowed_headers: set[str] = set()
+    required_headers = set()
+    allowed_headers = set()
     serializer_class = None
-    asset_type: str = ""
 
-    def __init__(self, *, job: ImportJob):
-        self.job = job
-        self.user = job.created_by
-        self.summary = ImportSummary()
-        self._seen_keys: set[tuple] = set()
+    def __init__(self, *, user):
+        self.user = user
+        self.seen_keys = set()
 
-    def run(self) -> ImportSummary:
-        self.job.status = ImportJob.Status.RUNNING
-        self.job.started_at = timezone.now()
-        self.job.save(update_fields=["status", "started_at"])
+    def run(self, *, stored_file_name: str) -> dict:
+        result = ImportResult()
 
-        try:
-            rows = self._read_csv()
-            self.summary.total_rows = len(rows)
-            self._validate_row_limit(rows)
+        with default_storage.open(stored_file_name, "r") as f:
+            reader = csv.DictReader(f)
 
-            for row_number, raw_row in enumerate(rows, start=2):  # header is row 1
+            if not reader.fieldnames:
+                raise ValueError("CSV file must include a header row.")
+
+            headers = {h.strip() for h in reader.fieldnames if h}
+            missing = self.required_headers - headers
+            extra = headers - self.allowed_headers
+
+            if missing:
+                raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
+            if extra:
+                raise ValueError(f"Unexpected columns: {', '.join(sorted(extra))}")
+
+            rows = list(reader)
+            result.total_rows = len(rows)
+
+            if result.total_rows > 10_000:
+                raise ValueError("CSV exceeds the 10,000 row limit.")
+
+            for row_number, raw_row in enumerate(rows, start=2):
                 if self._is_blank_row(raw_row):
                     continue
 
                 try:
-                    normalized = self.normalize_row(raw_row)
-                    room = self.resolve_room(normalized)
-                    self.check_room_permission(room)
+                    row = self.normalize_row(raw_row)
 
-                    dedupe_key = self.get_dedupe_key(normalized, room)
-                    if dedupe_key in self._seen_keys:
-                        self.summary.add_skipped(row_number, "Duplicate row in file.", normalized)
+                    room = self.resolve_room(row)
+                    self.check_write_permission(room)
+
+                    dedupe_key = self.get_file_dedupe_key(row, room)
+                    if dedupe_key in self.seen_keys:
+                        result.add_skipped(row_number, "Duplicate row in file.", raw_row)
                         continue
-                    self._seen_keys.add(dedupe_key)
+                    self.seen_keys.add(dedupe_key)
 
-                    if self.is_duplicate(normalized, room):
-                        self.summary.add_skipped(row_number, "Duplicate asset already exists.", normalized)
+                    if self.exists_in_db(row, room):
+                        result.add_skipped(row_number, "Duplicate asset already exists.", raw_row)
                         continue
 
-                    payload = self.build_serializer_payload(normalized, room)
-                    serializer = self.serializer_class(data=payload, context={"request": None})
+                    payload = self.build_payload(row, room)
 
+                    serializer = self.serializer_class(data=payload)
                     if not serializer.is_valid():
-                        self.summary.add_failed(row_number, self.format_serializer_errors(serializer.errors), normalized)
+                        result.add_failed(row_number, str(serializer.errors), raw_row)
                         continue
 
                     serializer.save()
-                    self.summary.add_imported(row_number, normalized)
+                    result.add_imported()
 
                 except PermissionError as exc:
-                    self.summary.add_skipped(row_number, str(exc), raw_row)
+                    result.add_skipped(row_number, str(exc), raw_row)
                 except ValueError as exc:
-                    self.summary.add_failed(row_number, str(exc), raw_row)
+                    result.add_failed(row_number, str(exc), raw_row)
                 except Exception as exc:
-                    self.summary.add_failed(row_number, f"Unexpected error: {exc}", raw_row)
+                    result.add_failed(row_number, f"Unexpected error: {exc}", raw_row)
 
-            self._attach_report()
-            self._finalize_success()
-            return self.summary
+        return self.to_payload(result)
 
-        except Exception as exc:
-            self.job.status = ImportJob.Status.FAILED
-            self.job.error_message = str(exc)
-            self.job.finished_at = timezone.now()
-            self.job.save(update_fields=["status", "error_message", "finished_at"])
-            raise
+    def to_payload(self, result: ImportResult) -> dict:
+        return {
+            "summary": {
+                "total_rows": result.total_rows,
+                "imported_rows": result.imported_rows,
+                "skipped_rows": result.skipped_rows,
+                "failed_rows": result.failed_rows,
+            },
+            "issues": [
+                {
+                    "row_number": item.row_number,
+                    "status": item.status,
+                    "reason": item.reason,
+                    "row_data": item.row_data,
+                }
+                for item in result.issues
+            ],
+        }
 
-    def _read_csv(self) -> list[dict[str, str]]:
-        self.job.source_file.open("rb")
-        raw_bytes = self.job.source_file.read()
-        text = raw_bytes.decode("utf-8-sig")
-        stream = io.StringIO(text)
-        reader = csv.DictReader(stream)
+    def _is_blank_row(self, row: dict) -> bool:
+        return all(not str(v or "").strip() for v in row.values())
 
-        if not reader.fieldnames:
-            raise ValueError("CSV file is missing a header row.")
+    def normalize_row(self, row: dict) -> dict:
+        return {
+            key: value.strip() if isinstance(value, str) else value
+            for key, value in row.items()
+        }
 
-        headers = {h.strip() for h in reader.fieldnames if h}
-        missing = self.required_headers - headers
-        extra = headers - self.allowed_headers
-
-        if missing:
-            raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
-        if extra:
-            raise ValueError(f"Unexpected columns: {', '.join(sorted(extra))}")
-
-        return list(reader)
-
-    def _validate_row_limit(self, rows: list[dict[str, str]]) -> None:
-        if len(rows) > 10_000:
-            raise ValueError("CSV exceeds the maximum allowed row limit of 10,000.")
-
-    def _is_blank_row(self, row: dict[str, Any]) -> bool:
-        return all(not str(value or "").strip() for value in row.values())
-
-    def resolve_room(self, row: dict[str, Any]) -> Room:
+    def resolve_room(self, row: dict):
         room_public_id = (row.get("room") or "").strip()
         if not room_public_id:
             raise ValueError("Room is required.")
@@ -147,66 +159,31 @@ class BaseAssetImporter:
         room = Room.objects.filter(public_id=room_public_id).first()
         if not room:
             raise ValueError(f"Room '{room_public_id}' does not exist.")
+
         return room
 
-    def check_room_permission(self, room: Room) -> None:
+    def check_write_permission(self, room):
         active_role = getattr(self.user, "active_role", None)
         if not active_role:
             raise PermissionError("User has no active role.")
+
         if active_role.role == "SITE_ADMIN":
             return
+
+        if is_viewer_role(active_role.role):
+            raise PermissionError("User does not have permission to import assets.")
+
+        if not has_hierarchy_permission(active_role.role, "ROOM_CLERK"):
+            raise PermissionError("User does not have sufficient role to import assets.")
+
         if not is_in_scope(active_role, room=room):
-            raise PermissionError(f"No permission for room '{room.public_id}'.")
+            raise PermissionError(f"User is out of scope for room '{room.public_id}'.")
 
-    def _attach_report(self) -> None:
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["row", "status", "reason", "data"])
-
-        for item in self.summary.rows:
-            if item.status == "imported":
-                continue
-            writer.writerow([
-                item.row_number,
-                item.status,
-                item.reason,
-                item.raw_data,
-            ])
-
-        report_name = f"import_job_{self.job.id}_report.csv"
-        self.job.report_file.save(report_name, ContentFile(output.getvalue().encode("utf-8")))
-        output.close()
-
-    def _finalize_success(self) -> None:
-        self.job.status = ImportJob.Status.COMPLETED
-        self.job.total_rows = self.summary.total_rows
-        self.job.imported_rows = self.summary.imported_rows
-        self.job.skipped_rows = self.summary.skipped_rows
-        self.job.failed_rows = self.summary.failed_rows
-        self.job.finished_at = timezone.now()
-        self.job.save(
-            update_fields=[
-                "status",
-                "total_rows",
-                "imported_rows",
-                "skipped_rows",
-                "failed_rows",
-                "finished_at",
-                "report_file",
-            ]
-        )
-
-    def format_serializer_errors(self, errors: dict[str, Any]) -> str:
-        return str(errors)
-
-    def normalize_row(self, row: dict[str, Any]) -> dict[str, Any]:
-        return {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
-
-    def build_serializer_payload(self, row: dict[str, Any], room: Room) -> dict[str, Any]:
+    def build_payload(self, row: dict, room):
         raise NotImplementedError
 
-    def get_dedupe_key(self, row: dict[str, Any], room: Room) -> tuple:
+    def get_file_dedupe_key(self, row: dict, room):
         raise NotImplementedError
 
-    def is_duplicate(self, row: dict[str, Any], room: Room) -> bool:
+    def exists_in_db(self, row: dict, room):
         raise NotImplementedError

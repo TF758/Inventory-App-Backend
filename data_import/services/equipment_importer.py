@@ -1,53 +1,46 @@
 
+
+
+from data_import.services.base_importer import BaseAssetImporter
 from db_inventory.models.assets import Equipment, EquipmentStatus
 from db_inventory.serializers.equipment import EquipmentWriteSerializer
 
-from .base_importer import BaseAssetImporter
-
 
 class EquipmentImporter(BaseAssetImporter):
-    asset_type = "equipment"
     serializer_class = EquipmentWriteSerializer
     required_headers = {"name", "brand", "model", "serial_number", "status", "room"}
     allowed_headers = required_headers
 
     def normalize_row(self, row: dict) -> dict:
         row = super().normalize_row(row)
-        row["name"] = row.get("name", "")
-        row["brand"] = row.get("brand", "")
-        row["model"] = row.get("model", "")
 
-        serial = row.get("serial_number", "")
-        row["serial_number"] = serial or None
+        serial = row.get("serial_number") or None
+        row["serial_number"] = serial
 
         status = (row.get("status") or "").strip().upper()
         valid_statuses = {choice for choice, _ in EquipmentStatus.choices}
         row["status"] = status if status in valid_statuses else EquipmentStatus.OK
+
         return row
 
-    def build_serializer_payload(self, row: dict, room) -> dict:
+    def build_payload(self, row: dict, room):
         return {
-            "name": row["name"],
-            "brand": row["brand"],
-            "model": row["model"],
-            "serial_number": row["serial_number"],
+            "name": row.get("name", ""),
+            "brand": row.get("brand", ""),
+            "model": row.get("model", ""),
+            "serial_number": row.get("serial_number"),
+            "status": row.get("status"),
             "room": room.public_id,
         }
 
-    def get_dedupe_key(self, row: dict, room) -> tuple:
+    def get_file_dedupe_key(self, row: dict, room):
         return (
-            row.get("name", "").strip(),
-            row.get("serial_number") or "",
+            (row.get("name") or "").strip(),
+            (row.get("serial_number") or "").strip(),
         )
 
-    def is_duplicate(self, row: dict, room) -> bool:
-        name = row.get("name", "").strip()
-        serial = row.get("serial_number")
-
-        if not serial:
-            return False
-
+    def exists_in_db(self, row: dict, room):
         return Equipment.objects.filter(
-            name=name,
-            serial_number=serial,
+            name=(row.get("name") or "").strip(),
+            serial_number=row.get("serial_number"),
         ).exists()
