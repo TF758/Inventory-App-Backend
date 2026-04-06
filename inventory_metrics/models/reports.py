@@ -35,6 +35,8 @@ class ReportJob(PublicIDModel):
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 
+    error_report_csv = models.TextField(blank=True)
+
     notification_sent = models.BooleanField(default=False)
 
     class Meta:

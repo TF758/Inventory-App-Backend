@@ -80,6 +80,7 @@ INSTALLED_APPS = [
 
     'db_inventory',
     'inventory_metrics',
+    'data_import',
 
     'rest_framework',
     'rest_framework_simplejwt',

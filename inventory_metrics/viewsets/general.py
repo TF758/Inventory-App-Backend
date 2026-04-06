@@ -31,6 +31,10 @@ REPORT_RENDERERS = {
         "xlsx": site_audit_log_to_workbook_spec,
         "json": None,
     },
+     "asset_import": {
+        "xlsx": None,
+        "json": None,
+    },
 }
 
 class DownloadReport(APIView):
