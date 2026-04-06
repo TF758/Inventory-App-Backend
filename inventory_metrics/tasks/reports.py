@@ -205,21 +205,46 @@ def generate_site_asset_report_task(self, report_job_id: int):
         if not raw_data:
             raise RuntimeError("Site asset report payload is empty")
 
+        clean_data = normalize_datetimes(raw_data)
+
         payload = wrap_report_payload(
             report_type="site_assets",
-            data=raw_data,
+            data=clean_data,
         )
 
-        if payload is None:
-            raise RuntimeError("Site asset report payload is empty")
+        # -----------------------------
+        # Render XLSX
+        # -----------------------------
+        renderer_cfg = REPORT_RENDERERS.get(job.report_type)
+        renderer = renderer_cfg.get("xlsx")
 
-        redis_key = f"report:{job.public_id}"
+        if not renderer:
+            raise RuntimeError("No XLSX renderer configured for report.")
 
-        redis_reports_client.setex(
-            redis_key,
-            settings.REPORT_CACHE_TTL_SECONDS,
-            json.dumps(payload, default=str),
+        workbook_spec = renderer(payload["data"])
+        wb = render_workbook(workbook_spec)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        # -----------------------------
+        # Save file
+        # -----------------------------
+        filename = settings.REPORT_FILENAME_TEMPLATE.format(
+            report_type=job.report_type,
+            public_id=job.public_id,
         )
+
+        filename = f"{filename}.xlsx"
+
+        file_path = settings.REPORTS_DIR / filename
+
+        with open(file_path, "wb") as f:
+            f.write(buffer.getvalue())
+
+        job.report_file = filename
+        job.save(update_fields=["report_file"])
 
         # -----------------------------
         # Mark DONE + notify
@@ -242,6 +267,7 @@ def generate_site_asset_report_task(self, report_job_id: int):
                         "formats": ["xlsx"],
                     },
                 )
+
                 job.notification_sent = True
                 job.save(update_fields=["notification_sent"])
 
@@ -252,9 +278,7 @@ def generate_site_asset_report_task(self, report_job_id: int):
         run.message = f"ReportJob {job.public_id} completed"
 
     except Exception as exc:
-        # -----------------------------
-        # Mark FAILED (guarded)
-        # -----------------------------
+
         if job is not None:
             with transaction.atomic():
                 job.status = ReportJob.Status.FAILED
@@ -264,6 +288,7 @@ def generate_site_asset_report_task(self, report_job_id: int):
 
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+
         raise
 
     finally:

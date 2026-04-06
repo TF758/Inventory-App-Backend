@@ -26,10 +26,8 @@ class SiteAssetExcelReportAPIView(APIView):
 
         job = ReportJob.objects.create(
             user=request.user,
-            params={
-                **serializer.validated_data,
-                "report_type": "site_assets",
-            },
+            report_type="site_assets",
+            params=serializer.validated_data,
         )
 
         generate_site_asset_report_task.delay(job.id)
