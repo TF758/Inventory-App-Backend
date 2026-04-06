@@ -49,10 +49,8 @@ class SiteAuditLogReportAPIView(APIView):
 
         job = ReportJob.objects.create(
             user=request.user,
-            params={
-                **serializer.validated_data,
-                "report_type": "site_audit_logs",
-            },
+            report_type="site_audit_logs",
+            params=serializer.validated_data,
         )
 
         generate_site_audit_log_report_task.delay(job.id)

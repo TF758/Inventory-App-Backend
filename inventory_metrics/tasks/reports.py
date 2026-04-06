@@ -314,7 +314,6 @@ def generate_site_audit_log_report_task(self, report_job_id: int):
     job = None
 
     try:
-
         job = ReportJob.objects.select_related("user").get(id=report_job_id)
 
         # -----------------------------
@@ -339,18 +338,46 @@ def generate_site_audit_log_report_task(self, report_job_id: int):
         if not raw_data:
             raise RuntimeError("Site audit log report payload is empty")
 
+        clean_data = normalize_datetimes(raw_data)
+
         payload = wrap_report_payload(
             report_type="site_audit_logs",
-            data=raw_data,
+            data=clean_data,
         )
 
-        redis_key = f"report:{job.public_id}"
+        # -----------------------------
+        # Render XLSX
+        # -----------------------------
+        renderer_cfg = REPORT_RENDERERS.get(job.report_type)
+        renderer = renderer_cfg.get("xlsx")
 
-        redis_reports_client.setex(
-            redis_key,
-            settings.REPORT_CACHE_TTL_SECONDS,
-            json.dumps(payload, default=str),
+        if not renderer:
+            raise RuntimeError("No XLSX renderer configured for report.")
+
+        workbook_spec = renderer(payload["data"])
+        wb = render_workbook(workbook_spec)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        # -----------------------------
+        # Save file
+        # -----------------------------
+        filename = settings.REPORT_FILENAME_TEMPLATE.format(
+            report_type=job.report_type,
+            public_id=job.public_id,
         )
+
+        filename = f"{filename}.xlsx"
+
+        file_path = settings.REPORTS_DIR / filename
+
+        with open(file_path, "wb") as f:
+            f.write(buffer.getvalue())
+
+        job.report_file = filename
+        job.save(update_fields=["report_file"])
 
         # -----------------------------
         # Mark DONE + notify
@@ -370,22 +397,21 @@ def generate_site_audit_log_report_task(self, report_job_id: int):
                     entity=job,
                     meta={
                         "report_type": "site_audit_logs",
-                        "formats": ["xlsx", "json"],
+                        "formats": ["xlsx"],
                     },
                 )
+
                 job.notification_sent = True
                 job.save(update_fields=["notification_sent"])
 
         # -----------------------------
-        # Mark task SUCCESS
+        # Mark SUCCESS
         # -----------------------------
         run.status = ScheduledTaskRun.Status.SUCCESS
         run.message = f"ReportJob {job.public_id} completed"
 
     except Exception as exc:
-        # -----------------------------
-        # Mark FAILED (guarded)
-        # -----------------------------
+
         if job is not None:
             with transaction.atomic():
                 job.status = ReportJob.Status.FAILED
@@ -395,10 +421,9 @@ def generate_site_audit_log_report_task(self, report_job_id: int):
 
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+
         raise
 
     finally:
         run.duration_ms = int((time.monotonic() - start_ts) * 1000)
         run.save()
-
-

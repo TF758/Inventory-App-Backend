@@ -215,3 +215,5 @@ __marimo__/
 *.key
 
 staticfiles/
+*.csv
+*.xlsx
