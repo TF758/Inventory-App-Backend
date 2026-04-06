@@ -1,7 +1,7 @@
 
 
 from data_import.services.base_importer import BaseAssetImporter
-from db_inventory.models.assets import Consumable
+from db_inventory.models.assets import Accessory, Consumable
 from db_inventory.serializers.consumables import ConsumableWriteSerializer
 
 
@@ -35,13 +35,12 @@ class ConsumableImporter(BaseAssetImporter):
         }
 
     def get_file_dedupe_key(self, row: dict, room):
-        return (
-            (row.get("name") or "").strip(),
-            room.public_id,
-        )
+        name = (row.get("name") or "").strip().lower()
+        return (name, room.public_id)
 
     def exists_in_db(self, row: dict, room):
-        return Consumable.objects.filter(
+        return Accessory.objects.filter(
             name=(row.get("name") or "").strip(),
+            serial_number=row.get("serial_number"),
             room=room,
         ).exists()

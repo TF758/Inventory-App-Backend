@@ -34,11 +34,10 @@ class EquipmentImporter(BaseAssetImporter):
         }
 
     def get_file_dedupe_key(self, row: dict, room):
-        return (
-            (row.get("name") or "").strip(),
-            (row.get("serial_number") or "").strip(),
-        )
+        name = (row.get("name") or "").strip().lower()
+        serial = (row.get("serial_number") or "").strip().lower()
 
+        return ( name, serial)
     def exists_in_db(self, row: dict, room):
         return Equipment.objects.filter(
             name=(row.get("name") or "").strip(),

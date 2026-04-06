@@ -5,9 +5,10 @@ from django.core.files.storage import default_storage
 
 from db_inventory.models.site import Room
 from db_inventory.permissions.helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
+import pandas as pd
+import io
 
-
-
+from data_import.utils import load_and_normalize_csv
 
 @dataclass
 class ImportRowIssue:
@@ -63,63 +64,102 @@ class BaseAssetImporter:
     def run(self, *, stored_file_name: str) -> dict:
         result = ImportResult()
 
-        with default_storage.open(stored_file_name, "r") as f:
-            reader = csv.DictReader(f)
+        if not stored_file_name:
+            raise ValueError("Import file path is missing.")
 
-            if not reader.fieldnames:
-                raise ValueError("CSV file must include a header row.")
+        if not default_storage.exists(stored_file_name):
+            raise ValueError(f"Import file not found: {stored_file_name}")
 
-            headers = {h.strip() for h in reader.fieldnames if h}
-            missing = self.required_headers - headers
-            extra = headers - self.allowed_headers
+        # -----------------------------
+        # Load and normalize CSV
+        # -----------------------------
+        with default_storage.open(stored_file_name, "rb") as f:
+            df = load_and_normalize_csv(f)
+        
+        print("Detected columns:", df.columns.tolist())
 
-            if missing:
-                raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
-            if extra:
-                raise ValueError(f"Unexpected columns: {', '.join(sorted(extra))}")
+        headers = set(df.columns)
 
-            rows = list(reader)
-            result.total_rows = len(rows)
+        missing = self.required_headers - headers
+        extra = headers - self.allowed_headers
 
-            if result.total_rows > 10_000:
-                raise ValueError("CSV exceeds the 10,000 row limit.")
+        if missing:
+            raise ValueError(
+                f"Missing required columns: {', '.join(sorted(missing))}"
+            )
 
-            for row_number, raw_row in enumerate(rows, start=2):
-                if self._is_blank_row(raw_row):
+        if extra:
+            raise ValueError(
+                f"Unexpected columns: {', '.join(sorted(extra))}"
+            )
+
+        rows = df.to_dict(orient="records")
+
+        result.total_rows = len(rows)
+
+        if result.total_rows > 10_000:
+            raise ValueError("CSV exceeds the 10,000 row limit.")
+
+        # -----------------------------
+        # Process rows
+        # -----------------------------
+        for index, raw_row in enumerate(rows, start=2):
+
+            try:
+                row_data = self.normalize_row(raw_row)
+
+                room = self.resolve_room(row_data)
+                self.check_write_permission(room)
+
+                dedupe_key = self.get_file_dedupe_key(row_data, room)
+
+                # duplicate in file
+                if dedupe_key in self.seen_keys:
+                    result.add_skipped(
+                        index,
+                        "Duplicate row in file.",
+                        raw_row,
+                    )
                     continue
 
-                try:
-                    row = self.normalize_row(raw_row)
+                self.seen_keys.add(dedupe_key)
 
-                    room = self.resolve_room(row)
-                    self.check_write_permission(room)
+                # duplicate in database
+                if self.exists_in_db(row_data, room):
+                    result.add_skipped(
+                        index,
+                        "Duplicate asset already exists.",
+                        raw_row,
+                    )
+                    continue
 
-                    dedupe_key = self.get_file_dedupe_key(row, room)
-                    if dedupe_key in self.seen_keys:
-                        result.add_skipped(row_number, "Duplicate row in file.", raw_row)
-                        continue
-                    self.seen_keys.add(dedupe_key)
+                payload = self.build_payload(row_data, room)
 
-                    if self.exists_in_db(row, room):
-                        result.add_skipped(row_number, "Duplicate asset already exists.", raw_row)
-                        continue
+                serializer = self.serializer_class(data=payload)
 
-                    payload = self.build_payload(row, room)
+                if not serializer.is_valid():
+                    result.add_failed(
+                        index,
+                        str(serializer.errors),
+                        raw_row,
+                    )
+                    continue
 
-                    serializer = self.serializer_class(data=payload)
-                    if not serializer.is_valid():
-                        result.add_failed(row_number, str(serializer.errors), raw_row)
-                        continue
+                serializer.save()
+                result.add_imported()
 
-                    serializer.save()
-                    result.add_imported()
+            except PermissionError as exc:
+                result.add_skipped(index, str(exc), raw_row)
 
-                except PermissionError as exc:
-                    result.add_skipped(row_number, str(exc), raw_row)
-                except ValueError as exc:
-                    result.add_failed(row_number, str(exc), raw_row)
-                except Exception as exc:
-                    result.add_failed(row_number, f"Unexpected error: {exc}", raw_row)
+            except ValueError as exc:
+                result.add_failed(index, str(exc), raw_row)
+
+            except Exception as exc:
+                result.add_failed(
+                    index,
+                    f"Unexpected error: {exc}",
+                    raw_row,
+                )
 
         return self.to_payload(result)
 
@@ -153,10 +193,12 @@ class BaseAssetImporter:
 
     def resolve_room(self, row: dict):
         room_public_id = (row.get("room") or "").strip()
+
         if not room_public_id:
             raise ValueError("Room is required.")
 
         room = Room.objects.filter(public_id=room_public_id).first()
+
         if not room:
             raise ValueError(f"Room '{room_public_id}' does not exist.")
 
@@ -164,6 +206,7 @@ class BaseAssetImporter:
 
     def check_write_permission(self, room):
         active_role = getattr(self.user, "active_role", None)
+
         if not active_role:
             raise PermissionError("User has no active role.")
 
@@ -174,10 +217,14 @@ class BaseAssetImporter:
             raise PermissionError("User does not have permission to import assets.")
 
         if not has_hierarchy_permission(active_role.role, "ROOM_CLERK"):
-            raise PermissionError("User does not have sufficient role to import assets.")
+            raise PermissionError(
+                "User does not have sufficient role to import assets."
+            )
 
         if not is_in_scope(active_role, room=room):
-            raise PermissionError(f"User is out of scope for room '{room.public_id}'.")
+            raise PermissionError(
+                f"User is out of scope for room '{room.public_id}'."
+            )
 
     def build_payload(self, row: dict, room):
         raise NotImplementedError
