@@ -4,10 +4,13 @@ def user_summary_to_workbook_spec(payload: dict) -> dict:
 
     spec = {}
 
+    meta = payload.get("meta", {})
+    data = payload.get("data", {})
+
     # --------------------
     # Demographics
     # --------------------
-    demographics = payload.get("demographics")
+    demographics = data.get("demographics")
     if demographics:
         rows = [
             [key.replace("_", " ").title(), value]
@@ -24,7 +27,7 @@ def user_summary_to_workbook_spec(payload: dict) -> dict:
     # --------------------
     # Login Stats
     # --------------------
-    login_stats = payload.get("loginStats")
+    login_stats = data.get("loginStats")
     if login_stats:
         spec["Login Stats"] = {
             "headers": list(login_stats.keys()),
@@ -39,11 +42,9 @@ def user_summary_to_workbook_spec(payload: dict) -> dict:
     # --------------------
     # Audit Summary
     # --------------------
-    audit_summary = payload.get("auditSummary")
+    audit_summary = data.get("auditSummary")
     if audit_summary:
-        rows = [
-            ["Total Events", audit_summary.get("total", 0)]
-        ]
+        rows = [["Total Events", audit_summary.get("total", 0)]]
 
         for event, count in audit_summary.get("events", {}).items():
             rows.append([event, count])
@@ -58,7 +59,7 @@ def user_summary_to_workbook_spec(payload: dict) -> dict:
     # --------------------
     # Role Summary
     # --------------------
-    role_summary = payload.get("roleSummary")
+    role_summary = data.get("roleSummary")
     if role_summary:
         rows = [
             [
@@ -81,7 +82,7 @@ def user_summary_to_workbook_spec(payload: dict) -> dict:
     # --------------------
     # Password Events
     # --------------------
-    password_events = payload.get("passwordevents")
+    password_events = data.get("passwordevents")
     if password_events:
         rows = [
             ["Total password reset events", password_events.get("total_password_reset_events", 0)],
