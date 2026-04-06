@@ -65,28 +65,64 @@ class Command(BaseCommand):
     help = "Backfill ~2 years of realistic analytics data"
 
     def handle(self, *args, **kwargs):
+
         DAYS = 730
         BATCH_SIZE = 5000
         today = timezone.localdate()
 
         self.stdout.write(self.style.WARNING("Clearing existing metrics…"))
+
         DailySystemMetrics.objects.all().delete()
         DailyAuthMetrics.objects.all().delete()
         DailyDepartmentSnapshot.objects.all().delete()
+        DailyReturnMetrics.objects.all().delete()
 
         # ------------------------------
-        # Baselines (current state)
+        # Baselines
         # ------------------------------
+
         baseline_users = User.objects.filter(is_active=True).count()
         baseline_sessions = UserSession.objects.count()
         baseline_equipment = Equipment.objects.count()
 
         baseline_failed_logins = max(10, baseline_users // 20)
-
-        # 🔥 NEW: Return baseline
         baseline_return_requests = max(5, baseline_users // 10)
 
         departments = list(Department.objects.all())
+
+        # ------------------------------
+        # Cache department statistics
+        # ------------------------------
+
+        dept_stats = {}
+
+        for dept in departments:
+            dept_stats[dept.id] = {
+                "users": User.objects.filter(active_role__department=dept).count(),
+                "locations": Location.objects.filter(department=dept).count(),
+                "rooms": Room.objects.filter(location__department=dept).count(),
+                "equipment": Equipment.objects.filter(
+                    room__location__department=dept
+                ).count(),
+            }
+
+        # ------------------------------
+        # Cache inventory metrics
+        # ------------------------------
+
+        baseline_components = Component.objects.count()
+        baseline_consumables = Consumable.objects.count()
+        baseline_accessories = Accessory.objects.count()
+
+        baseline_component_quantity = (
+            Component.objects.aggregate(q=models.Sum("quantity"))["q"] or 0
+        )
+        baseline_consumable_quantity = (
+            Consumable.objects.aggregate(q=models.Sum("quantity"))["q"] or 0
+        )
+        baseline_accessory_quantity = (
+            Accessory.objects.aggregate(q=models.Sum("quantity"))["q"] or 0
+        )
 
         system_rows = []
         auth_rows = []
@@ -96,10 +132,11 @@ class Command(BaseCommand):
         # ------------------------------
         # Generate timeline
         # ------------------------------
+
         for days_ago in tqdm(range(DAYS, 0, -1), desc="Generating days"):
+
             date = today - datetime.timedelta(days=days_ago)
 
-            # === SYSTEM METRICS ===
             total_users = trend(baseline_users, days_ago, DAYS, growth=0.8)
 
             active_users = weekly_seasonality(
@@ -131,25 +168,19 @@ class Command(BaseCommand):
                     equipment_under_repair=noise(int(baseline_equipment * 0.07), 0.2),
                     equipment_damaged=noise(int(baseline_equipment * 0.03), 0.3),
 
-                    total_components=Component.objects.count(),
-                    total_components_quantity=noise(
-                        Component.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
-                        0.05,
-                    ),
-                    total_consumables=Consumable.objects.count(),
-                    total_consumables_quantity=noise(
-                        Consumable.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
-                        0.05,
-                    ),
-                    total_accessories=Accessory.objects.count(),
-                    total_accessories_quantity=noise(
-                        Accessory.objects.aggregate(q=models.Sum("quantity"))["q"] or 0,
-                        0.05,
-                    ),
+                    total_components=baseline_components,
+                    total_components_quantity=noise(baseline_component_quantity, 0.05),
+                    total_consumables=baseline_consumables,
+                    total_consumables_quantity=noise(baseline_consumable_quantity, 0.05),
+                    total_accessories=baseline_accessories,
+                    total_accessories_quantity=noise(baseline_accessory_quantity, 0.05),
                 )
             )
 
-            # === AUTH METRICS ===
+            # ------------------------------
+            # AUTH METRICS
+            # ------------------------------
+
             incident = incident_multiplier()
 
             failed_logins = clamp(
@@ -182,13 +213,16 @@ class Command(BaseCommand):
                 )
             )
 
-            # === DEPARTMENT METRICS ===
-            for dept in tqdm(departments, desc="🏢 Departments", leave=False, unit="dept"):
-                dept_users = User.objects.filter(
-                    active_role__department=dept
-                ).count()
+            # ------------------------------
+            # Department metrics
+            # ------------------------------
 
-                # 🔥 RETURN METRICS (DEPT)
+            for dept in departments:
+
+                stats = dept_stats[dept.id]
+
+                dept_users = stats["users"]
+
                 dept_total_returns = clamp(
                     weekly_seasonality(
                         trend(baseline_return_requests, days_ago, DAYS, growth=0.7),
@@ -199,6 +233,7 @@ class Command(BaseCommand):
                 dept_pending = int(dept_total_returns * random.uniform(0.2, 0.4))
                 dept_approved = int(dept_total_returns * random.uniform(0.4, 0.6))
                 dept_denied = int(dept_total_returns * random.uniform(0.05, 0.15))
+
                 dept_partial = max(
                     0,
                     dept_total_returns - (
@@ -206,9 +241,9 @@ class Command(BaseCommand):
                     )
                 )
 
-                returns_created_24h = clamp( noise(int(dept_total_returns * 0.15), 0.3) )
+                returns_created_24h = clamp(noise(int(dept_total_returns * 0.15), 0.3))
+                returns_processed_24h = clamp(noise(int(dept_total_returns * 0.12), 0.3))
 
-                returns_processed_24h = clamp( noise(int(dept_total_returns * 0.12), 0.3) )
                 dept_rows.append(
                     DailyDepartmentSnapshot(
                         department=dept,
@@ -219,16 +254,9 @@ class Command(BaseCommand):
                         total_users=noise(dept_users, 0.05),
                         total_admins=random.randint(1, max(1, dept_users // 20)),
 
-                        total_locations=Location.objects.filter(
-                            department=dept
-                        ).count(),
-                        total_rooms=Room.objects.filter(
-                            location__department=dept
-                        ).count(),
-
-                        total_equipment=Equipment.objects.filter(
-                            room__location__department=dept
-                        ).count(),
+                        total_locations=stats["locations"],
+                        total_rooms=stats["rooms"],
+                        total_equipment=stats["equipment"],
 
                         equipment_ok=random.randint(10, 100),
                         equipment_under_repair=random.randint(0, 20),
@@ -241,7 +269,6 @@ class Command(BaseCommand):
                         total_accessories=random.randint(30, 150),
                         total_accessories_quantity=random.randint(200, 3000),
 
-
                         total_return_requests=dept_total_returns,
                         pending_return_requests=dept_pending,
                         approved_return_requests=dept_approved,
@@ -253,7 +280,9 @@ class Command(BaseCommand):
                     )
                 )
 
-
+            # ------------------------------
+            # Global return metrics
+            # ------------------------------
 
             total_requests = clamp(
                 weekly_seasonality(
@@ -265,6 +294,7 @@ class Command(BaseCommand):
             pending = int(total_requests * random.uniform(0.2, 0.4))
             approved = int(total_requests * random.uniform(0.4, 0.6))
             denied = int(total_requests * random.uniform(0.05, 0.15))
+
             partial = max(0, total_requests - (pending + approved + denied))
 
             completed = approved
@@ -280,6 +310,7 @@ class Command(BaseCommand):
 
             equipment_items = int(total_items * random.uniform(0.4, 0.6))
             accessory_items = int(total_items * random.uniform(0.2, 0.4))
+
             consumable_items = max(
                 0,
                 total_items - (equipment_items + accessory_items)
@@ -317,14 +348,18 @@ class Command(BaseCommand):
                     schema_version=1,
                 )
             )
+
         # ------------------------------
         # Bulk insert
         # ------------------------------
+
         self.stdout.write(self.style.MIGRATE_HEADING("Bulk inserting rows…"))
 
         with transaction.atomic():
+
             DailySystemMetrics.objects.bulk_create(system_rows, batch_size=BATCH_SIZE)
             DailyAuthMetrics.objects.bulk_create(auth_rows, batch_size=BATCH_SIZE)
             DailyDepartmentSnapshot.objects.bulk_create(dept_rows, batch_size=BATCH_SIZE)
             DailyReturnMetrics.objects.bulk_create(return_rows, batch_size=BATCH_SIZE)
+
         self.stdout.write(self.style.SUCCESS("✓ Backfill complete with realistic variation"))

@@ -13,6 +13,8 @@ from django.db import transaction
 @shared_task(bind=True)
 def delete_old_reports(self):
     start_ts = time.monotonic()
+    deleted_jobs = 0
+    deleted_files = 0
 
     run = ScheduledTaskRun.objects.create(
         task_name="delete_old_reports",

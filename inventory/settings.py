@@ -126,6 +126,11 @@ REPORTS_DIR.mkdir(exist_ok=True)
 
 REPORT_RETENTION_DAYS = env.int("REPORT_RETENTION_DAYS", default=30)
 
+REPORT_DELETE_CRON =  env(
+    "TASKRUN_CLEANUP_CRON",
+    default="0 12 * * *",
+)
+
 REPORT_FILENAME_TEMPLATE = "{report_type}-{public_id}"
 
 # -------------------------------------------------
@@ -460,6 +465,7 @@ DAILY_SYSTEM_METRICS_CRON  = env(
     "DAILY_SYSTEM_METRICS_CRON",
     default="0 2 * * *",
 )
+
 
 # ScheduledTaskRun retention
 TASKRUN_SUCCESS_RETENTION_DAYS=env.int("TASKRUN_SUCCESS_RETENTION_DAYS", default=7)
