@@ -6,18 +6,23 @@ from tqdm import tqdm
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction
 
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
+from db_inventory.models.asset_assignment import (
+    AccessoryAssignment,
+    ConsumableIssue,
+    EquipmentAssignment,
+    ReturnRequest,
+    ReturnRequestItem,
+)
 from db_inventory.models.site import Room, UserPlacement
-from db_inventory.models.users import User
-
-
 
 
 class Command(BaseCommand):
-    help = "Generate realistic asset return data"
+    help = "Generate realistic asset return data (bulk optimized)"
 
     def handle(self, *args, **options):
+
         self.stdout.write(self.style.WARNING("🧹 Purging return history..."))
 
         ReturnRequestItem.objects.all().delete()
@@ -28,11 +33,10 @@ class Command(BaseCommand):
         DAYS = 730
         today = timezone.now()
 
-        self.stdout.write(self.style.WARNING("Generating realistic return data..."))
+        # ----------------------------------
+        # Load data
+        # ----------------------------------
 
-        # ----------------------------------
-        # Users with current locations ONLY
-        # ----------------------------------
         user_placements = list(
             UserPlacement.objects.filter(is_current=True).select_related(
                 "user",
@@ -58,33 +62,33 @@ class Command(BaseCommand):
             ConsumableIssue.objects.filter(returned_at__isnull=True)
         )
 
-        total_requests = 0
-        use_tqdm = sys.stdout.isatty()
+        request_rows = []
+        request_items = []
 
+        use_tqdm = sys.stdout.isatty()
         pbar = tqdm(range(DAYS, 0, -1), disable=not use_tqdm)
 
+        # ----------------------------------
+        # Generate requests
+        # ----------------------------------
+
         for day_offset in pbar:
+
             date = today - datetime.timedelta(days=day_offset)
 
-            # Simulate daily volume
             num_requests = random.randint(5, 20)
 
             for _ in range(num_requests):
-                # ----------------------------------
-                # Pick user with location
-                # ----------------------------------
+
                 user_loc = random.choice(user_placements)
                 requester = user_loc.user
                 user_room = user_loc.room
 
                 requested_at = date + datetime.timedelta(
-                    hours=random.randint(8, 18),  # business hours bias
+                    hours=random.randint(8, 18),
                     minutes=random.randint(0, 59),
                 )
 
-                # ----------------------------------
-                # Status based on age
-                # ----------------------------------
                 days_ago = (today - requested_at).days
 
                 if days_ago > 30:
@@ -113,7 +117,7 @@ class Command(BaseCommand):
                     processed_at = requested_at + datetime.timedelta(hours=delay_hours)
                     processed_by = random.choice([ul.user for ul in user_placements])
 
-                request = ReturnRequest.objects.create(
+                request = ReturnRequest(
                     requester=requester,
                     status=status,
                     requested_at=requested_at,
@@ -122,12 +126,13 @@ class Command(BaseCommand):
                     notes="Auto-generated realistic return",
                 )
 
-                # ----------------------------------
-                # Items
-                # ----------------------------------
+                request_rows.append(request)
+
+                # items for this request
                 num_items = random.randint(1, 4)
 
                 for _ in range(num_items):
+
                     item_type = random.choice(
                         [
                             ReturnRequestItem.ItemType.EQUIPMENT,
@@ -136,17 +141,8 @@ class Command(BaseCommand):
                         ]
                     )
 
-                    # ----------------------------------
-                    # Room realism (80% same room)
-                    # ----------------------------------
-                    if random.random() < 0.8 and user_room:
-                        room = user_room
-                    else:
-                        room = random.choice(rooms)
+                    room = user_room if random.random() < 0.8 else random.choice(rooms)
 
-                    # ----------------------------------
-                    # Item status aligned with request
-                    # ----------------------------------
                     if status == ReturnRequest.Status.PENDING:
                         item_status = ReturnRequestItem.Status.PENDING
                     elif status == ReturnRequest.Status.COMPLETED:
@@ -162,7 +158,6 @@ class Command(BaseCommand):
                         )
 
                     kwargs = {
-                        "return_request": request,
                         "item_type": item_type,
                         "room": room,
                         "status": item_status,
@@ -175,9 +170,6 @@ class Command(BaseCommand):
                         "notes": "Auto-generated item",
                     }
 
-                    # ----------------------------------
-                    # Assign assets realistically
-                    # ----------------------------------
                     if (
                         item_type == ReturnRequestItem.ItemType.EQUIPMENT
                         and equipment_assignments
@@ -202,17 +194,33 @@ class Command(BaseCommand):
                         kwargs["consumable_issue"] = con
                         kwargs["quantity"] = random.randint(1, con.quantity)
 
-                    ReturnRequestItem.objects.create(**kwargs)
+                    request_items.append((request, kwargs))
 
-                total_requests += 1
+        # ----------------------------------
+        # Bulk insert
+        # ----------------------------------
 
-            pbar.set_postfix(
-                {
-                    "daily": num_requests,
-                    "total": total_requests,
-                }
-            )
+        self.stdout.write(self.style.WARNING("Writing requests to database..."))
+
+        with transaction.atomic():
+
+            ReturnRequest.objects.bulk_create(request_rows, batch_size=1000)
+
+            item_rows = []
+
+            for request, kwargs in request_items:
+                item_rows.append(
+                    ReturnRequestItem(
+                        return_request=request,
+                        **kwargs,
+                    )
+                )
+
+            ReturnRequestItem.objects.bulk_create(item_rows, batch_size=2000)
 
         self.stdout.write(
-            self.style.SUCCESS(f"Generated {total_requests} realistic return requests")
+            self.style.SUCCESS(
+                f"Generated {len(request_rows):,} return requests "
+                f"and {len(item_rows):,} items 🎉"
+            )
         )

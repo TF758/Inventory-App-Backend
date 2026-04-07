@@ -137,6 +137,7 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
             "brand",
             "model",
             "serial_number",
+            "status",
             "room",
         ]
         read_only_fields = ["public_id"]

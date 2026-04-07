@@ -85,6 +85,16 @@ class Command(BaseCommand):
             cron_expr=settings.TASKRUN_CLEANUP_CRON,
         )
 
+
+        # -------------------------------
+        # Report lifecycle
+        # -------------------------------
+        upsert_task(
+            name="DB Maintenance: delete old reports",
+            task="inventory_metrics.tasks.cleanup.delete_old_reports",
+            cron_expr=settings.REPORT_DELETE_CRON,
+        )
+
         self.stdout.write(
             self.style.SUCCESS("DB maintenance beat tasks configured.")
         )

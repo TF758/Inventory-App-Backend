@@ -4,6 +4,8 @@ import django
 from faker import Faker
 from tqdm import tqdm  # progress bars
 from django.contrib.auth.hashers import make_password
+
+from db_inventory.models.assets import Accessory, Component, Consumable, Equipment
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")
 django.setup()
 
@@ -123,21 +125,25 @@ def pick_role_count():
         return random.randint(3, 5)
 
 
+
 class Command(BaseCommand):
     help = "Purge and reseed core data (users, roles, sites, assets)"
 
     def handle(self, *args, **kwargs):
+
         self.stdout.write(self.style.WARNING("Flushing database…"))
         call_command("flush", "--no-input")
 
         # -------------------------------
         # Departments / Locations / Rooms
         # -------------------------------
+
         self.stdout.write(self.style.MIGRATE_HEADING("Creating site hierarchy"))
 
         departments, locations, rooms = [], [], []
 
         for ministry in tqdm(LIST_OF_MINISTRIES, desc="Ministries"):
+
             dept = Department.objects.create(name=ministry)
             departments.append(dept)
 
@@ -145,15 +151,22 @@ class Command(BaseCommand):
             locations_list = MINISTRY_TO_LOCATIONS.get(ministry)
 
             if not locations_list:
-                print(f"⚠️ No locations for: {ministry}")
                 continue
+
             for raw in locations_list:
+
                 name = normalize(raw)
+
                 if name in seen_locations:
                     continue
+
                 seen_locations.add(name)
 
-                loc = Location.objects.create(department=dept, name=name)
+                loc = Location.objects.create(
+                    department=dept,
+                    name=name
+                )
+
                 locations.append(loc)
 
                 seen_rooms = set()
@@ -161,22 +174,32 @@ class Command(BaseCommand):
                 attempts = 0
 
                 while len(seen_rooms) < room_count:
+
                     attempts += 1
+
                     if attempts > room_count * 5:
                         break
 
                     room_name = f"{faker.word().capitalize()} Room"
+
                     if room_name in seen_rooms:
                         continue
 
                     seen_rooms.add(room_name)
-                    rooms.append(Room.objects.create(location=loc, name=room_name))
+
+                    rooms.append(
+                        Room.objects.create(
+                            location=loc,
+                            name=room_name
+                        )
+                    )
 
         self.stdout.write(self.style.SUCCESS("Sites created."))
 
         # -------------------------------
-        # Build lookup maps (NEW)
+        # Build lookup maps
         # -------------------------------
+
         locations_by_department = {}
         rooms_by_location = {}
 
@@ -189,9 +212,10 @@ class Command(BaseCommand):
         # -------------------------------
         # Users
         # -------------------------------
+
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                f"Creating {TOTAL_USERS:,} users (fast mode)"
+                f"Creating {TOTAL_USERS:,} users"
             )
         )
 
@@ -199,6 +223,7 @@ class Command(BaseCommand):
         password_hash = make_password("password")
 
         for i in tqdm(range(TOTAL_USERS), desc="Preparing users"):
+
             users.append(
                 User(
                     public_id=f"USR{i+1:07d}",
@@ -215,23 +240,14 @@ class Command(BaseCommand):
         for start in tqdm(range(0, TOTAL_USERS, BATCH_SIZE), desc="Saving users"):
             User.objects.bulk_create(
                 users[start:start + BATCH_SIZE],
-                batch_size=BATCH_SIZE,
+                batch_size=BATCH_SIZE
             )
-
-        for u in tqdm(users, desc="Activating users"):
-            u.is_active = random.random() < 0.9
-
-        User.objects.bulk_update(users, ["is_active"])
-
-        if User.objects.filter(public_id__isnull=True).exists():
-            raise RuntimeError("Some users missing public_id")
 
         self.stdout.write(self.style.SUCCESS(f"{len(users):,} users created."))
 
         # -------------------------------
         # Admin
         # -------------------------------
-        self.stdout.write(self.style.MIGRATE_HEADING("Creating admin user"))
 
         admin = AdminUserFactory(email="admin@gmail.com")
 
@@ -240,46 +256,50 @@ class Command(BaseCommand):
             role="SITE_ADMIN",
             assigned_by=admin,
         )
+
         admin.active_role = admin_role
         admin.save(update_fields=["active_role"])
 
-        self.stdout.write(self.style.SUCCESS("Admin user created."))
+        # -------------------------------
+        # Assign users to rooms
+        # -------------------------------
 
-        # -------------------------------
-        # Assign users to locations (UPDATED)
-        # -------------------------------
         self.stdout.write(self.style.MIGRATE_HEADING("Assigning users to locations"))
 
         user_placements = []
 
-        # ✅ Step 1: guarantee every room has at least 1 user
         users_iter = iter(users)
 
         for room in rooms:
+
             try:
                 user = next(users_iter)
             except StopIteration:
                 break
 
             user_placements.append(
-                UserPlacement(user=user, room=room, is_current=True)
+                UserPlacement(
+                    user=user,
+                    room=room,
+                    is_current=True
+                )
             )
 
-        # ✅ Step 2: distribute remaining users within ministry
         remaining_users = users[len(user_placements):]
 
-        for user in tqdm(remaining_users, desc="Assigning locations"):
+        for user in tqdm(remaining_users):
+
             if random.random() < 0.98:
 
                 dept = random.choice(departments)
+                dept_locations = locations_by_department.get(dept.id)
 
-                dept_locations = locations_by_department.get(dept.id, [])
                 if not dept_locations:
                     continue
 
                 loc = random.choice(dept_locations)
+                loc_rooms = rooms_by_location.get(loc.id)
 
-                loc_rooms = rooms_by_location.get(loc.id, [])
                 if not loc_rooms:
                     continue
 
@@ -289,30 +309,30 @@ class Command(BaseCommand):
                     UserPlacement(
                         user=user,
                         room=room,
-                        is_current=True,
+                        is_current=True
                     )
                 )
 
-        UserPlacement.objects.bulk_create(
-            user_placements,
-            batch_size=BATCH_SIZE,
-        )
+        UserPlacement.objects.bulk_create(user_placements, batch_size=BATCH_SIZE)
 
-        self.stdout.write(
-            self.style.SUCCESS(f"{len(user_placements):,} users assigned to rooms")
-        )
+        placement_map = {p.user_id: p for p in user_placements}
 
         # -------------------------------
-        # Assign roles (UPDATED)
+        # Assign roles
         # -------------------------------
+
         self.stdout.write(self.style.MIGRATE_HEADING("Assigning roles"))
 
-        for user in tqdm(users, desc="Assigning roles"):
+        role_rows = []
+        roles_by_user = {}
+
+        for user in tqdm(users):
+
             roles = []
             used = set()
 
-            # 🔑 get user's assigned room (enforces ministry consistency)
-            user_loc = next((ul for ul in user_placements if ul.user_id == user.id), None)
+            user_loc = placement_map.get(user.id)
+
             if not user_loc:
                 continue
 
@@ -321,66 +341,142 @@ class Command(BaseCommand):
             dept = loc.department
 
             for _ in range(pick_role_count()):
+
                 role = random.choice(ROLE_LEVELS)
 
                 try:
+
                     if role.startswith("DEPARTMENT"):
+
                         key = ("D", dept.id)
+
                         if key in used:
                             continue
+
                         used.add(key)
-                        roles.append(RoleAssignment.objects.create(
-                            user=user, role=role, department=dept
-                        ))
+
+                        role_obj = RoleAssignment(
+                            user=user,
+                            role=role,
+                            department=dept,
+                        )
 
                     elif role.startswith("LOCATION"):
+
                         key = ("L", loc.id)
+
                         if key in used:
                             continue
+
                         used.add(key)
-                        roles.append(RoleAssignment.objects.create(
-                            user=user, role=role, location=loc
-                        ))
+
+                        role_obj = RoleAssignment(
+                            user=user,
+                            role=role,
+                            location=loc,
+                        )
 
                     elif role.startswith("ROOM"):
+
                         key = ("R", room.id)
+
                         if key in used:
                             continue
+
                         used.add(key)
-                        roles.append(RoleAssignment.objects.create(
-                            user=user, role=role, room=room
-                        ))
+
+                        role_obj = RoleAssignment(
+                            user=user,
+                            role=role,
+                            room=room,
+                        )
+
+                    else:
+                        continue
+
+                    role_rows.append(role_obj)
+                    roles.append(role_obj)
+
                 except Exception:
                     continue
 
             if roles and random.random() > 0.15:
+                roles_by_user[user.id] = roles
+
+        # -------------------------------
+        # Bulk create roles
+        # -------------------------------
+
+        RoleAssignment.objects.bulk_create(role_rows, batch_size=BATCH_SIZE)
+
+        # -------------------------------
+        # Assign active roles
+        # -------------------------------
+
+        for user in users:
+
+            roles = roles_by_user.get(user.id)
+
+            if roles:
                 user.active_role = random.choice(roles)
-                user.save(update_fields=["active_role"])
 
-        self.stdout.write(self.style.SUCCESS("Roles assigned."))
+        User.objects.bulk_update(users, ["active_role"], batch_size=BATCH_SIZE)
 
         # -------------------------------
-        # Equipment (UPDATED)
+        # Equipment
         # -------------------------------
-        self.stdout.write(self.style.MIGRATE_HEADING("Creating assets"))
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Creating equipment"))
 
         equipment = []
 
         for room in rooms:
-            equipment.append(EquipmentFactory(room=room))
+            equipment.append(EquipmentFactory.build(room=room))
 
-        # keep randomness
         for _ in tqdm(range(len(rooms) * 2), desc="Equipment"):
-            equipment.append(EquipmentFactory(room=random.choice(rooms)))
+            equipment.append(EquipmentFactory.build(room=random.choice(rooms)))
 
-        # components
-        for eq in tqdm(equipment, desc="Components"):
-            ComponentFactory.create_batch(2, equipment=eq)
+        Equipment.objects.bulk_create(equipment, batch_size=BATCH_SIZE)
 
-        for room in tqdm( itertools.islice(itertools.cycle(rooms), len(rooms) * 2), desc="Accessories" ):
-            AccessoryFactory(room=room)
+        equipment = list(Equipment.objects.all())
 
-        for room in tqdm( itertools.islice(itertools.cycle(rooms), len(rooms) * 3), desc="Consumables" ):
-            ConsumableFactory(room=room)
+        # -------------------------------
+        # Components
+        # -------------------------------
+
+        components = []
+
+        for eq in tqdm(equipment, desc="Preparing components"):
+            components.extend(ComponentFactory.build_batch(2, equipment=eq))
+
+        Component.objects.bulk_create(components, batch_size=BATCH_SIZE)
+
+        # -------------------------------
+        # Accessories
+        # -------------------------------
+
+        accessories = []
+
+        for room in tqdm(
+            itertools.islice(itertools.cycle(rooms), len(rooms) * 2),
+            desc="Accessories"
+        ):
+            accessories.append(AccessoryFactory.build(room=room))
+
+        Accessory.objects.bulk_create(accessories, batch_size=BATCH_SIZE)
+
+        # -------------------------------
+        # Consumables
+        # -------------------------------
+
+        consumables = []
+
+        for room in tqdm(
+            itertools.islice(itertools.cycle(rooms), len(rooms) * 3),
+            desc="Consumables"
+        ):
+            consumables.append(ConsumableFactory.build(room=room))
+
+        Consumable.objects.bulk_create(consumables, batch_size=BATCH_SIZE)
 
         self.stdout.write(self.style.SUCCESS("Assets generated successfully 🎉"))

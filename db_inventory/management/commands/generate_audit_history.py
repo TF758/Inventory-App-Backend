@@ -12,6 +12,7 @@ from tqdm import tqdm
 from db_inventory.factories import AuditLogFactory
 from db_inventory.models.assets import Consumable, Equipment
 from db_inventory.models.roles import RoleAssignment
+from db_inventory.models.base import PublicIDRegistry
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")
 django.setup()
@@ -121,14 +122,25 @@ def pick_event_type():
 
 
 def assign_public_ids(logs):
-    used = set()
-    for log in logs:
-        while True:
-            candidate = generate_prefixed_id("LOG")
-            if candidate not in used:
-                log.public_id = candidate
-                used.add(candidate)
-                break
+
+    ids = [
+        generate_prefixed_id("LOG")
+        for _ in range(len(logs))
+    ]
+
+    registry_rows = [
+        PublicIDRegistry(
+            public_id=pid,
+            model_label="audit.AuditLog"
+        )
+        for pid in ids
+    ]
+
+    PublicIDRegistry.objects.bulk_create(registry_rows)
+
+    for log, pid in zip(logs, ids):
+        log.public_id = pid
+        
 def resolve_org_context(user):
     role = getattr(user, "active_role", None)
     if not role:

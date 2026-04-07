@@ -7,15 +7,17 @@ import io
 from rest_framework.permissions import IsAuthenticated
 import redis
 from django.utils import timezone
-import json
-from inventory_metrics.utils.excel_renderer import render_workbook
-from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
+from django.db.models import Q
+
+from inventory_metrics.tasks.reports import generate_report_task
 from inventory_metrics.models import ReportJob
-from inventory_metrics.tasks import generate_user_summary_report_task
-from inventory_metrics.serializers.user_report import UserSummaryReportSerializer, UserSummaryReportRequestSerializer
+from inventory_metrics.serializers.user_report import  UserSummaryReportRequestSerializer
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class UserSummaryReport(APIView):
@@ -25,15 +27,26 @@ class UserSummaryReport(APIView):
         serializer = UserSummaryReportRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        job = ReportJob.objects.create(
-        user=request.user,
-        params={
-            **serializer.validated_data,
-            "report_type": "user_summary",
-        },
-         )
+        user_identifier = serializer.validated_data["user"].strip()
 
-        generate_user_summary_report_task.delay(job.id)
+        user_exists = User.objects.filter(
+            Q(public_id__iexact=user_identifier) |
+            Q(email__iexact=user_identifier)
+        ).exists()
+
+        if not user_exists:
+            return Response(
+                {"detail": "Invalid user identifier."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        job = ReportJob.objects.create(
+            user=request.user,
+            report_type=ReportJob.ReportType.USER_SUMMARY,
+            params=serializer.validated_data,
+        )
+
+        generate_report_task.delay(job.id)
 
         return Response(
             {

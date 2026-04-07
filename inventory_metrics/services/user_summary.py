@@ -1,26 +1,62 @@
 from datetime import timedelta
 from django.utils import timezone
 from django.db.models import Count
-from db_inventory.models.audit import AuditLog
-from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.site import UserPlacement
 from db_inventory.models.users import User
 
+def build_user_summary_report(
+    *,
+    user_identifier: str,
+    sections: list[str],
+    generated_by=None,
+) -> dict:
+    """
+    Build a User Summary Report.
 
+    This service function gathers user-related data and returns a structured
+    dictionary that can later be rendered into a report by the report renderer.
 
-def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> dict:
+    Parameters
+    ----------
+    user_identifier : str
+        The identifier used to locate the user. This can be either:
+        - User.public_id
+        - User.email
+
+    sections : list[str]
+        A list of report sections to include in the output. Only the requested
+        sections will be queried and included in the result.
+
+        Allowed values:
+            - "demographics"
+            - "loginStats"
+            - "roleSummary"
+            - "auditSummary"
+            - "passwordevents"
+
+    generated_by : User | None
+        The user who triggered report generation. This is optional and may be
+        used for metadata or auditing purposes.
+    """
+
     user = (
         User.objects.filter(public_id=user_identifier).first()
         or User.objects.filter(email=user_identifier).first()
     )
+
     if not user:
         raise ValueError("User not found")
 
     data = {}
 
+    # -------------------------------------------------
+    # Demographics Section
+    # -------------------------------------------------
     if "demographics" in sections:
+
         current_location = (
-            UserPlacement.objects.filter(user=user, is_current=True)
+            UserPlacement.objects
+            .filter(user=user, is_current=True)
             .select_related("room", "room__location")
             .first()
         )
@@ -39,12 +75,15 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
             ),
         }
 
+    # -------------------------------------------------
+    # Login Statistics
+    # -------------------------------------------------
     if "loginStats" in sections:
+
         sessions = user.sessions.all()
         thirty_days_ago = timezone.now() - timedelta(days=30)
 
         data["loginStats"] = {
-            "last_login": user.last_login,
             "active_sessions": sessions.filter(status="active").count(),
             "revoked_sessions": sessions.filter(status="revoked").count(),
             "expired_sessions": sessions.filter(status="expired").count(),
@@ -53,7 +92,11 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
             ).count(),
         }
 
+    # -------------------------------------------------
+    # Audit Summary
+    # -------------------------------------------------
     if "auditSummary" in sections:
+
         logs = user.audit_logs.all()
 
         event_counts = (
@@ -63,12 +106,21 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
 
         data["auditSummary"] = {
             "total": logs.count(),
-            "events": {e["event_type"]: e["count"] for e in event_counts},
+            "events": {
+                e["event_type"]: e["count"]
+                for e in event_counts
+            },
         }
 
+    # -------------------------------------------------
+    # Role Summary
+    # -------------------------------------------------
     if "roleSummary" in sections:
+
         roles = user.role_assignments.select_related(
-            "department", "location", "room"
+            "department",
+            "location",
+            "room",
         )
 
         data["roleSummary"] = [
@@ -85,7 +137,11 @@ def build_user_summary_report(*, user_identifier: str, sections: list[str]) -> d
             for role in roles
         ]
 
+    # -------------------------------------------------
+    # Password Event Summary
+    # -------------------------------------------------
     if "passwordevents" in sections:
+
         resets = user.password_reset_events.all()
 
         data["passwordevents"] = {

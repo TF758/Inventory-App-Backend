@@ -80,6 +80,7 @@ INSTALLED_APPS = [
 
     'db_inventory',
     'inventory_metrics',
+    'data_import',
 
     'rest_framework',
     'rest_framework_simplejwt',
@@ -114,6 +115,23 @@ REDIS_REPORTS_URL = f"{REDIS_BASE_URL}/{REDIS_DB_REPORTS}"
 # Report cache
 REPORT_CACHE_TTL_SECONDS = env.int("REPORT_CACHE_TTL_SECONDS", default=900)
 ASGI_APPLICATION = "inventory.asgi.application"
+
+
+# -------------------------------------------------
+# Report storage (filesystem)
+# -------------------------------------------------
+
+REPORTS_DIR = BASE_DIR / "reports"
+REPORTS_DIR.mkdir(exist_ok=True)
+
+REPORT_RETENTION_DAYS = env.int("REPORT_RETENTION_DAYS", default=30)
+
+REPORT_DELETE_CRON =  env(
+    "TASKRUN_CLEANUP_CRON",
+    default="0 12 * * *",
+)
+
+REPORT_FILENAME_TEMPLATE = "{report_type}-{public_id}"
 
 # -------------------------------------------------
 # Channel layers (WebSockets)
@@ -447,6 +465,7 @@ DAILY_SYSTEM_METRICS_CRON  = env(
     "DAILY_SYSTEM_METRICS_CRON",
     default="0 2 * * *",
 )
+
 
 # ScheduledTaskRun retention
 TASKRUN_SUCCESS_RETENTION_DAYS=env.int("TASKRUN_SUCCESS_RETENTION_DAYS", default=7)

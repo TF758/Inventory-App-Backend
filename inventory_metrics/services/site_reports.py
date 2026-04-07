@@ -13,6 +13,35 @@ def build_site_asset_report(
     asset_types: list[str],
     generated_by=None,
 ) -> dict:
+    """
+    Build a Site Asset Report.
+
+    This service gathers asset data (equipment/accessories/consumables) associated with a specific site scope
+    (department, location, or room). It returns structured data that can
+    later be rendered into an Excel report.
+
+    Parameters
+    ----------
+    site_type : str
+        Scope of the report. One of:
+            - department
+            - location
+            - room
+
+    site_id : str
+        Public ID of the site object.
+
+    asset_types : list[str]
+        Types of assets to include in the report:
+            - equipment
+            - component
+            - consumable
+            - accessory
+
+    generated_by : User | None
+        Optional user that triggered the report.
+    """
+
     site_model_map = {
         "department": Department,
         "location": Location,
@@ -49,23 +78,13 @@ def build_site_asset_report(
     site_model = site_model_map[site_type]
     site_obj = site_model.objects.get(public_id=site_id)
 
-    generated_at = timezone.now()
-
     payload = {
-        "meta": {
-            "site_type": site_type,
-            "site_id": site_obj.public_id,
-            "site_name": site_obj.name,
-            "generated_by": (
-                generated_by.get_username() if generated_by else "System"
-            ),
-            "generated_at": generated_at,
-        },
         "assets": {},
         "totals": {},
     }
 
     for asset_type in asset_types:
+
         asset_info = asset_model_map.get(asset_type)
         if not asset_info:
             continue
@@ -81,17 +100,24 @@ def build_site_asset_report(
         payload["assets"][asset_type] = []
 
         for obj in qs:
+
             row = {}
+
             for field in fields:
+
                 if field == "equipment_id":
                     row[field] = obj.equipment.public_id if obj.equipment else None
+
                 elif field == "room_id":
                     row[field] = obj.room.public_id if obj.room else None
+
                 else:
                     row[field] = getattr(obj, field, None)
+
             payload["assets"][asset_type].append(row)
 
     return payload
+
 
 def build_site_audit_log_report(
     *,
@@ -99,11 +125,28 @@ def build_site_audit_log_report(
     audit_period_days: int,
     generated_by=None,
 ) -> dict:
-    site_model_map = {
-        "department": Department,
-        "location": Location,
-        "room": Room,
-    }
+    """
+    Build a Site Audit Log Report.
+
+    Collects audit log entries associated with a site scope
+    (department, location, or room) within a given time window.
+
+    Parameters
+    ----------
+    site : dict
+        {
+            "siteType": "department | location | room",
+            "siteId": "<public_id>"
+        }
+
+    audit_period_days : int
+        Time window for audit logs. Allowed values:
+        30, 60, 90, 120.
+
+    generated_by : User | None
+        User who triggered the report (optional).
+
+    """
 
     site_filter_field_map = {
         "department": "department__public_id",
@@ -130,14 +173,11 @@ def build_site_audit_log_report(
     site_type = site["siteType"]
     site_id = site["siteId"]
 
-    if site_type not in site_model_map:
+    if site_type not in site_filter_field_map:
         raise ValueError("Invalid siteType")
 
     if audit_period_days not in ALLOWED_PERIODS:
         raise ValueError("Invalid audit_period_days")
-
-    site_model = site_model_map[site_type]
-    site_obj = site_model.objects.get(public_id=site_id)
 
     start_date = timezone.now() - timedelta(days=audit_period_days)
     site_filter_field = site_filter_field_map[site_type]
@@ -150,21 +190,12 @@ def build_site_audit_log_report(
     )
 
     payload = {
-        "meta": {
-            "site_type": site_type,
-            "site_id": site_obj.public_id,
-            "site_name": site_obj.name,
-            "audit_period_days": audit_period_days,
-            "generated_by": (
-                generated_by.get_username() if generated_by else "System"
-            ),
-            "generated_at": timezone.now(),
-        },
-        "logs": [],
+        "logs": []
     }
 
     for log in logs:
-        local_time = log.created_at.astimezone()
+
+        local_time = timezone.localtime(log.created_at).replace(tzinfo=None)
 
         payload["logs"].append({
             "date": local_time.strftime("%Y-%m-%d"),
@@ -185,5 +216,5 @@ def build_site_audit_log_report(
             "source_ip": log.ip_address,
             "audit_reference": log.public_id,
         })
-        
+
     return payload
