@@ -118,10 +118,14 @@ jobs:
 
           if ls .coverage* 1> /dev/null 2>&1; then
             coverage combine
-            coverage report --fail-under=70
+            coverage report -m --fail-under=70
             coverage html
+
+            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+            coverage report >> $GITHUB_STEP_SUMMARY
           else
-            echo "No coverage files found"
+            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "No coverage files found." >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload coverage report
