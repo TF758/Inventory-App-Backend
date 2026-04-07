@@ -69,7 +69,8 @@ jobs:
 
       - name: Run tests with coverage (parallel)
         run: |
-          docker compose exec -T api coverage run manage.py test ${{ matrix.suite }} --parallel
+          docker compose exec -T api coverage run manage.py test --parallel
+          docker compose exec -T api coverage combine
           docker compose exec -T api coverage report --fail-under=70
           docker compose exec -T api coverage html
 
