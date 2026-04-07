@@ -2,8 +2,7 @@ name: Django Test Suite
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
 jobs:
@@ -11,17 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install security tools
-        run: |
-          pip install bandit pip-audit
+        run: pip install bandit pip-audit
 
       - name: Run Bandit security scan
         run: bandit -r . -c .bandit
@@ -29,8 +25,14 @@ jobs:
       - name: Run dependency vulnerability scan
         run: pip-audit
 
-  test:
+  tests:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        suite:
+          - db_inventory.tests
+          - data_import.tests
 
     steps:
       - name: Checkout code
@@ -65,5 +67,17 @@ jobs:
       - name: Run migrations
         run: docker compose exec -T api python manage.py migrate
 
-      - name: Run tests
-        run: docker compose exec -T api python manage.py test
+      - name: Run tests with coverage (parallel)
+        run: |
+          docker compose exec -T api coverage run manage.py test ${{ matrix.suite }} --parallel
+          docker compose exec -T api coverage report --fail-under=70
+          docker compose exec -T api coverage html
+
+      - name: Copy coverage report
+        run: docker compose cp api:/app/htmlcov ./htmlcov
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.suite }}
+          path: htmlcov
