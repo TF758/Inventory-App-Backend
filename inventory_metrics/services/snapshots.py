@@ -331,7 +331,7 @@ def generate_daily_auth_metrics(for_date=None):
 
     now = timezone.now()
 
-    start = datetime.datetime.combine(for_date, datetime.datetime.min.time(), tzinfo=timezone.utc)
+    start = timezone.make_aware(datetime.datetime.combine(for_date, datetime.datetime.min.time()))
     end = start + timedelta(days=1)
 
     with transaction.atomic():
