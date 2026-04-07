@@ -76,7 +76,7 @@ class BaseAssetImporter:
         with default_storage.open(stored_file_name, "rb") as f:
             df = load_and_normalize_csv(f)
         
-        print("Detected columns:", df.columns.tolist())
+        # print("Detected columns:", df.columns.tolist())
 
         headers = set(df.columns)
 

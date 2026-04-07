@@ -39,8 +39,7 @@ class ConsumableImporter(BaseAssetImporter):
         return (name, room.public_id)
 
     def exists_in_db(self, row: dict, room):
-        return Accessory.objects.filter(
+        return Consumable.objects.filter(
             name=(row.get("name") or "").strip(),
-            serial_number=row.get("serial_number"),
             room=room,
         ).exists()

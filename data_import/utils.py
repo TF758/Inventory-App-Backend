@@ -69,6 +69,6 @@ def load_and_normalize_csv(file_obj):
     # Remove empty rows
     df = df.dropna(how="all")
 
-    print("Detected columns:", df.columns.tolist())
+    # print("Detected columns:", df.columns.tolist())
 
     return df
