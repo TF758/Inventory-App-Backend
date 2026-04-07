@@ -10,11 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install security tools
         run: pip install bandit pip-audit
@@ -35,22 +38,30 @@ jobs:
           - data_import.tests
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create env file
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Create CI environment file
         run: |
           echo "DJANGO_ENV=dev" >> .env.dev
           echo "DEBUG=True" >> .env.dev
-          echo "SECRET_KEY=ci-secret-key" >> .env.dev
+          echo "SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars" >> .env.dev
           echo "DB_NAME=inventory" >> .env.dev
           echo "DB_USER=inventory" >> .env.dev
           echo "DB_PASSWORD=inventory" >> .env.dev
           echo "SESSION_IDLE_MINUTES=30" >> .env.dev
           echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
-
-      - name: Enable Docker BuildKit
-        run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
 
       - name: Build containers
         run: docker compose build
@@ -67,18 +78,43 @@ jobs:
       - name: Run migrations
         run: docker compose exec -T api python manage.py migrate
 
-      - name: Run tests with coverage (parallel)
+      - name: Run tests with coverage
         run: |
-          docker compose exec -T api coverage run manage.py test --parallel
-          docker compose exec -T api coverage combine
-          docker compose exec -T api coverage report --fail-under=70
-          docker compose exec -T api coverage html
+          docker compose exec -T api coverage run manage.py test ${{ matrix.suite }} --parallel
 
-      - name: Copy coverage report
-        run: docker compose cp api:/app/htmlcov ./htmlcov
+      - name: Copy coverage file
+        run: docker compose cp api:/app/.coverage .coverage.${{ matrix.suite }}
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.suite }}
+          path: .coverage.${{ matrix.suite }}
+
+  coverage:
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage
+
+      - name: Install coverage
+        run: pip install coverage
+
+      - name: Combine coverage results
+        run: |
+          coverage combine coverage
+          coverage report --fail-under=70
+          coverage html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
           path: htmlcov
