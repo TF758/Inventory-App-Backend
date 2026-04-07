@@ -82,16 +82,18 @@ jobs:
         run: |
           docker compose exec -T api coverage run --parallel-mode manage.py test ${{ matrix.suite }} --parallel
 
-      - name: Copy coverage file
+      - name: Collect coverage files
         run: |
-          docker compose exec -T api sh -c "ls -a /app/.coverage*" || true
-          docker compose cp api:/app/. .
+          mkdir coverage-files
+          docker compose exec -T api sh -c "ls -a /app/.coverage*"
+          docker compose exec -T api sh -c "for f in /app/.coverage*; do cp \$f /tmp/; done"
+          docker compose cp api:/tmp/.coverage* coverage-files/ || true
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.suite }}
-          path: .coverage*
+          path: coverage-files/.coverage*
 
   coverage:
     needs: tests
