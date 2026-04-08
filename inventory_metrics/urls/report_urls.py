@@ -1,7 +1,7 @@
 from django.urls import path, include
 from inventory_metrics.viewsets.user_reports import UserSummaryReport
 from inventory_metrics.viewsets.site_reports import SiteAssetExcelReportAPIView, SiteAuditLogReportAPIView
-from inventory_metrics.viewsets.general import DownloadReport
+from inventory.inventory_metrics.viewsets.reports import DownloadReport
 from django.urls import re_path
 
 urlpatterns = [
