@@ -191,11 +191,12 @@ def generate_report_task(self, report_job_id: int):
                     notif_type="report_ready",
                     level="info",
                     title="Your report is ready",
-                    message="Click to download your report.",
+                    message="Go to your reports page to download the report.",
                     entity=job,
                     meta={
                         "report_type": job.report_type,
-                        "formats": ["xlsx"],
+                        "report_public_id": job.public_id,
+                       
                     },
                 )
 
