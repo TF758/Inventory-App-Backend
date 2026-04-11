@@ -40,7 +40,6 @@ def normalize_datetimes(obj):
         return obj
     return obj
 
-
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True)
 def generate_report_task(self, report_job_id: int):
 
@@ -55,6 +54,7 @@ def generate_report_task(self, report_job_id: int):
     job = None
 
     try:
+
         job = ReportJob.objects.select_related("user").get(id=report_job_id)
 
         definition = REPORT_DEFINITIONS.get(job.report_type)
@@ -65,21 +65,15 @@ def generate_report_task(self, report_job_id: int):
         builder = definition["builder"]
         renderer = definition["renderer"]
 
-        # -----------------------------
-        # mark RUNNING
-        # -----------------------------
         with transaction.atomic():
             job.status = ReportJob.Status.RUNNING
             job.started_at = timezone.now()
             job.save(update_fields=["status", "started_at"])
 
-        # -----------------------------
-        # build report data
-        # -----------------------------
+
         builder_params = definition["param_map"](job.params, job.user)
 
 
-        # Import reports already have stored results
         if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
             raw_data = job.result_payload
         else:
@@ -90,21 +84,10 @@ def generate_report_task(self, report_job_id: int):
         if raw_data is None:
             raise RuntimeError("Report payload is empty")
 
-        # -----------------------------
-        # build metadata
-        # -----------------------------
+
         extra_meta = {
             "generated_by": job.user.get_username(),
         }
-
-        # audit reports
-        if "audit_period_days" in job.params:
-            extra_meta["audit_period_days"] = job.params["audit_period_days"]
-
-        # asset import reports
-        if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
-            extra_meta["asset_type"] = job.params.get("asset_type")
-            extra_meta["original_file_name"] = job.params.get("original_file_name")
 
         payload = wrap_report_payload(
             report_type=job.report_type,
@@ -112,37 +95,6 @@ def generate_report_task(self, report_job_id: int):
             extra_meta=extra_meta,
         )
 
-        # -----------------------------
-        # attach site metadata if present
-        # -----------------------------
-        site = job.params.get("site")
-
-        if site:
-            payload["meta"]["site_type"] = site.get("siteType")
-            payload["meta"]["site_id"] = site.get("siteId")
-
-            site_model_map = {
-                "department": Department,
-                "location": Location,
-                "room": Room,
-            }
-
-            model = site_model_map.get(site["siteType"])
-
-            if model:
-                site_obj = (
-                    model.objects
-                    .filter(public_id=site["siteId"])
-                    .only("name")
-                    .first()
-                )
-
-                if site_obj:
-                    payload["meta"]["site_name"] = site_obj.name
-
-        # -----------------------------
-        # render workbook
-        # -----------------------------
         workbook_spec = renderer(payload)
 
         wb = render_workbook(workbook_spec)
@@ -151,9 +103,6 @@ def generate_report_task(self, report_job_id: int):
         wb.save(buffer)
         buffer.seek(0)
 
-        # -----------------------------
-        # save report file
-        # -----------------------------
         filename = settings.REPORT_FILENAME_TEMPLATE.format(
             report_type=job.report_type,
             public_id=job.public_id,
@@ -168,9 +117,6 @@ def generate_report_task(self, report_job_id: int):
 
         job.report_file = filename
 
-        # -----------------------------
-        # mark DONE
-        # -----------------------------
         with transaction.atomic():
 
             job.status = ReportJob.Status.DONE
@@ -196,7 +142,6 @@ def generate_report_task(self, report_job_id: int):
                     meta={
                         "report_type": job.report_type,
                         "report_public_id": job.public_id,
-                       
                     },
                 )
 
