@@ -1,6 +1,7 @@
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
-
+from datetime import datetime
+from django.utils.timezone import is_aware
 
 def autosize_columns(ws):
     for col in ws.columns:
@@ -12,6 +13,10 @@ def autosize_columns(ws):
         ws.column_dimensions[col_letter].width = max_length + 2
 
 
+def excel_safe(value):
+    if isinstance(value, datetime) and is_aware(value):
+        return value.replace(tzinfo=None)
+    return value
 
 def render_workbook(spec: dict) -> Workbook:
     wb = Workbook()
@@ -26,16 +31,14 @@ def render_workbook(spec: dict) -> Workbook:
         rows = sheet.get("rows", [])
 
         if headers:
-            ws.append(headers)
+            ws.append([excel_safe(v) for v in headers])
 
         for row in rows:
-            ws.append(row)
+            ws.append([excel_safe(v) for v in row])
 
-    # Remove default sheet if we created our own
     if created_any and default_ws.title == "Sheet":
         wb.remove(default_ws)
 
-    # Safety: Excel REQUIRES at least one visible sheet
     if not wb.sheetnames:
         ws = wb.create_sheet(title="Report")
         ws.append(["No data available"])
@@ -54,11 +57,10 @@ def render_workbook_streaming(spec: dict) -> Workbook:
         rows = sheet.get("rows", [])
 
         if headers:
-            ws.append(headers)
+            ws.append([excel_safe(v) for v in headers])
 
-        # rows can now be generator OR list
         for row in rows:
-            ws.append(row)
+            ws.append([excel_safe(v) for v in row])
 
     return wb
 

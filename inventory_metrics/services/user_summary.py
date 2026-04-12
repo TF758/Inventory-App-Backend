@@ -6,7 +6,7 @@ from db_inventory.models.users import User
 from db_inventory.models.audit import AuditLog
 from django.db.models import Q
 
-from inventory_metrics.utils import resolve_audit_date_range
+from inventory_metrics.utils.resolve_audit_date_range import resolve_audit_date_range
 
 MAX_YEARS = 5
 MAX_ROWS = 5_000_000

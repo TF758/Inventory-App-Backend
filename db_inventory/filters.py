@@ -557,6 +557,8 @@ class AuditLogFilter(django_filters.FilterSet):
     created_at_after = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_at_before = django_filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
 
+    exclude_noise = django_filters.BooleanFilter(method="filter_exclude_noise")
+
     class Meta:
         model = AuditLog
         fields = [
@@ -569,6 +571,11 @@ class AuditLogFilter(django_filters.FilterSet):
             "created_at_after",
             "created_at_before",
         ]
+
+    def filter_exclude_noise(self, queryset, name, value):
+        if value:
+            return queryset.exclude(event_type__in=AuditLog.Events.NOISE_EVENTS)
+        return queryset
 
 
 class EquipmentAssignmentFilter(django_filters.FilterSet):

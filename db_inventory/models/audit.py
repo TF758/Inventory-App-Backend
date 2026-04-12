@@ -102,7 +102,7 @@ class AuditLog(PublicIDModel):
 
 
         USER_MOVED = "user_moved"
-        USER_ASSIGNED = "user_assigned", "User Assigned"
+        USER_ASSIGNED = "user_assigned"
         EXPORT_GENERATED = "export_generated"
         ASSET_CONDEMNED = "asset_condemned"
         ASSET_RESTOCKED = "asset_restocked"
@@ -118,7 +118,14 @@ class AuditLog(PublicIDModel):
         SITE_RELOCATED = "site_relocated"
         SITE_RENAMED = "site_renamed"
         STOCK_USED = "stock_used"
-        RETURN_REQUESTED = "return_requested", "Return Requested"
+        RETURN_REQUESTED = "return_requested"
+
+
+        NOISE_EVENTS = [
+            LOGIN,
+            LOGIN_FAILED,
+            LOGOUT,
+        ]
 
 
 class SiteNameChangeHistory(models.Model):
