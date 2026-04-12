@@ -3,6 +3,21 @@ from django.utils import timezone
 from django.db.models import Count
 from db_inventory.models.site import UserPlacement
 from db_inventory.models.users import User
+from db_inventory.models.audit import AuditLog
+from django.db.models import Q
+
+from inventory.inventory_metrics.utils import resolve_audit_date_range
+
+MAX_YEARS = 5
+MAX_ROWS = 5_000_000
+
+RELATIVE_RANGES = {
+    "last_30_days": timedelta(days=30),
+    "last_90_days": timedelta(days=90),
+    "last_1_year": timedelta(days=365),
+    "last_2_years": timedelta(days=365 * 2),
+    "last_3_years": timedelta(days=365 * 3),
+}
 
 def build_user_summary_report(
     *,
@@ -150,3 +165,140 @@ def build_user_summary_report(
         }
 
     return data
+
+def generate_user_audit_history_rows(logs):
+    """
+    Stream audit history rows for large exports.
+    Keeps memory usage constant even for millions of rows.
+    """
+
+    for log in logs.order_by("created_at").iterator(chunk_size=5000):
+
+        yield [
+            log.created_at,
+            log.event_type,
+            log.description,
+            log.target_model,
+            log.target_id,
+            log.target_name,
+            log.department_name,
+            log.location_name,
+            log.room_name,
+            log.ip_address,
+            log.user_agent,
+        ]
+
+def build_user_audit_history_report(
+    *,
+    user_identifier: str,
+    start_date=None,
+    end_date=None,
+    relative_range: str | None = None,
+    generated_by=None,
+) -> dict:
+    """
+    Build a User Audit History Report.
+
+    Returns:
+        {
+            report_info: {...},
+            audit_stats: {...},
+            history: [...]
+        }
+    """
+
+    # -------------------------------------------------
+    # Locate User
+    # -------------------------------------------------
+
+    user = (
+        User.objects.filter(public_id=user_identifier).first()
+        or User.objects.filter(email=user_identifier).first()
+    )
+
+    if not user:
+        raise ValueError("User not found")
+
+    # -------------------------------------------------
+    # Resolve Date Range
+    # -------------------------------------------------
+
+    start_date, end_date = resolve_audit_date_range(
+        start_date=start_date,
+        end_date=end_date,
+        relative_range=relative_range,
+    )
+
+    # -------------------------------------------------
+    # Base Query
+    # -------------------------------------------------
+
+    logs = AuditLog.objects.filter(
+        Q(user=user) |
+        Q(user_public_id=user.public_id)
+    )
+
+    if start_date:
+        logs = logs.filter(created_at__gte=start_date)
+
+    if end_date:
+        logs = logs.filter(created_at__lte=end_date)
+
+    # -------------------------------------------------
+    # Row Count Guard
+    # -------------------------------------------------
+
+    total_rows = logs.count()
+
+    if total_rows > MAX_ROWS:
+        raise RuntimeError(
+            f"Report exceeds maximum allowed rows ({MAX_ROWS}). "
+            "Please narrow the date range."
+        )
+
+    # -------------------------------------------------
+    # Aggregate Stats
+    # -------------------------------------------------
+
+    stats_qs = (
+        logs.values("event_type")
+        .annotate(count=Count("id"))
+        .order_by("event_type")
+    )
+
+    audit_stats = {
+        s["event_type"]: s["count"]
+        for s in stats_qs
+        if s["count"] > 0
+    }
+
+    # -------------------------------------------------
+    # History Rows
+    # -------------------------------------------------
+
+    history_rows = generate_user_audit_history_rows(logs)
+
+    # -------------------------------------------------
+    # Report Metadata
+    # -------------------------------------------------
+
+    report_info = {
+        "generated_by": generated_by.get_username() if generated_by else None,
+        "generated_at": timezone.now(),
+        "user_public_id": user.public_id,
+        "user_email": user.email,
+        "user_full_name": user.get_full_name(),
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_events": total_rows,
+    }
+
+    # -------------------------------------------------
+    # Return Builder Payload
+    # -------------------------------------------------
+
+    return {
+        "report_info": report_info,
+        "audit_stats": audit_stats,
+        "history_rows": history_rows,
+    }

@@ -7,7 +7,7 @@ from db_inventory.mixins import NotificationMixin
 from db_inventory.models.site import Department, Location, Room, Room
 from inventory_metrics.utils.report_payload import wrap_report_payload
 from inventory_metrics.report_registry import REPORT_DEFINITIONS
-from inventory_metrics.utils.excel_renderer import render_workbook
+from inventory_metrics.utils.excel_renderer import render_workbook, render_workbook_streaming
 from inventory_metrics.models import ReportJob
 from django.conf import settings
 import redis
@@ -97,7 +97,10 @@ def generate_report_task(self, report_job_id: int):
 
         workbook_spec = renderer(payload)
 
-        wb = render_workbook(workbook_spec)
+        if definition.get("streaming", False):
+            wb = render_workbook_streaming(workbook_spec)
+        else:
+            wb = render_workbook(workbook_spec)
 
         buffer = io.BytesIO()
         wb.save(buffer)

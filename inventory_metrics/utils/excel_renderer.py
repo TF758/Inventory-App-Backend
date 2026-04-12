@@ -41,3 +41,39 @@ def render_workbook(spec: dict) -> Workbook:
         ws.append(["No data available"])
 
     return wb
+
+def render_workbook_streaming(spec: dict) -> Workbook:
+
+    wb = Workbook(write_only=True)
+
+    for sheet_name, sheet in spec.items():
+
+        ws = wb.create_sheet(title=str(sheet_name)[:31])
+
+        headers = sheet.get("headers", [])
+        rows = sheet.get("rows", [])
+
+        if headers:
+            ws.append(headers)
+
+        # rows can now be generator OR list
+        for row in rows:
+            ws.append(row)
+
+    return wb
+
+def estimate_excel_size_mb(row_count: int, avg_row_bytes: int = 220) -> float:
+    """
+    Estimate XLSX file size for audit history exports.
+
+    XLSX files compress well, but audit rows average
+    roughly ~200–250 bytes once written.
+
+    Returns MB estimate.
+    """
+
+    estimated_bytes = row_count * avg_row_bytes
+
+    mb = estimated_bytes / (1024 * 1024)
+
+    return round(mb, 2)
