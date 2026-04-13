@@ -87,3 +87,45 @@ def resolve_audit_date_range(
             )
 
     return start_date, end_date
+
+def resolve_report_date_range(params: dict):
+    """
+    Resolve report date range from either explicit dates or relative_range.
+
+    Returns
+    -------
+    (start_date, end_date)
+    """
+
+    start_date = params.get("start_date")
+    end_date = params.get("end_date")
+    relative = params.get("relative_range")
+
+    now = timezone.now().date()
+
+    if relative:
+
+        if relative == "last_30_days":
+            start_date = now - timedelta(days=30)
+
+        elif relative == "last_90_days":
+            start_date = now - timedelta(days=90)
+
+        elif relative == "last_1_year":
+            start_date = now - timedelta(days=365)
+
+        elif relative == "last_2_years":
+            start_date = now - timedelta(days=730)
+
+        elif relative == "last_3_years":
+            start_date = now - timedelta(days=1095)
+
+        end_date = now
+
+    else:
+        # If no relative range provided, use explicit dates
+        # fallback end_date if missing
+        if not end_date:
+            end_date = now
+
+    return start_date, end_date

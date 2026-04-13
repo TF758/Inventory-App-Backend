@@ -13,7 +13,7 @@ from inventory_metrics.utils.excel_renderer import estimate_excel_size_mb
 from inventory_metrics.utils.resolve_audit_date_range import resolve_audit_date_range
 from inventory_metrics.tasks.reports import generate_report_task
 from inventory_metrics.models import ReportJob
-from inventory_metrics.serializers.user_report import  UserAuditHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
+from inventory_metrics.serializers.user_report import  UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
@@ -234,4 +234,51 @@ class UserAuditHistoryPreview(APIView):
                 "stats": stats,
                 "preview": preview,
             }
+        )
+
+class UserLoginHistoryReport(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+
+        serializer = UserLoginHistoryReportRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Copy serializer data before modifying
+        params = serializer.validated_data.copy()
+
+        # Convert date objects to ISO strings for JSONField
+        if params.get("start_date"):
+            params["start_date"] = params["start_date"].isoformat()
+
+        if params.get("end_date"):
+            params["end_date"] = params["end_date"].isoformat()
+
+        user_identifier = params["user"].strip()
+
+        user_exists = User.objects.filter(
+            Q(public_id__iexact=user_identifier) |
+            Q(email__iexact=user_identifier)
+        ).exists()
+
+        if not user_exists:
+            return Response(
+                {"detail": "Invalid user identifier."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        job = ReportJob.objects.create(
+            user=request.user,
+            report_type=ReportJob.ReportType.USER_LOGIN_HISTORY,
+            params=params,
+        )
+
+        generate_report_task.delay(job.id)
+
+        return Response(
+            {
+                "report_id": job.public_id,
+                "status": "queued",
+            },
+            status=status.HTTP_202_ACCEPTED,
         )
