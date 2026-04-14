@@ -25,6 +25,7 @@ class ReportJob(PublicIDModel):
         ASSET_IMPORT = "asset_import", "Asset Import"
         USER_AUDIT_HISTORY = "user_audit_history", "User Audit History"
         USER_LOGIN_HISTORY = "user_login_history", "User Login History"
+        ASSET_HISTORY = "asset_history", "Asset History"
 
     user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="report_jobs", )
 

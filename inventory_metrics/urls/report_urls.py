@@ -1,4 +1,5 @@
 from django.urls import path, include
+from inventory_metrics.viewsets.asset_reports import AssetHistoryReport
 from inventory_metrics.viewsets.user_reports import UserAuditHistoryPreview, UserAuditHistoryReport, UserLoginHistoryReport, UserSummaryReport
 from inventory_metrics.viewsets.reports import DownloadReport, MyReportJobViewSet, ReportJobAdminViewSet
 from inventory_metrics.viewsets.site_reports import SiteAssetExcelReportAPIView, SiteAssetExcelReportAPIView
@@ -41,4 +42,6 @@ urlpatterns = [
     path( "user-audit-history/", UserAuditHistoryReport.as_view(), name="user-audit-history-report", ),
     path( "user-audit-history/preview/", UserAuditHistoryPreview.as_view(), name="user-audit-history-preview", ),
     path("user-login-history/", UserLoginHistoryReport.as_view(), name="user-login-history-report"),
+    path("asset-history/", AssetHistoryReport.as_view(), name="asset-history-report"),
+    
 ]
