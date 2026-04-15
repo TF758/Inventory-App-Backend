@@ -1,4 +1,7 @@
 [run]
+branch = True
+parallel = True
+
 source =
     db_inventory
     inventory_metrics
@@ -10,8 +13,14 @@ omit =
     manage.py
     */admin.py
 
+
 [report]
+fail_under = 70
+
 exclude_lines =
     pragma: no cover
     if TYPE_CHECKING:
     if __name__ == "__main__":
+
+show_missing = True
+skip_covered = True
