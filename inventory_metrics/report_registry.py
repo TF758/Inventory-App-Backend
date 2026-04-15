@@ -2,10 +2,13 @@
 
 from data_import.renderers import asset_import_to_workbook_spec
 from data_import.services.import_builder import build_asset_import
+from inventory_metrics.services.asset_reports import build_asset_history_report
+from inventory_metrics.utils.report_adapters.asset_reports import asset_history_to_workbook_spec
+from inventory_metrics.utils.resolve_audit_date_range import resolve_report_date_range
 from inventory_metrics.services.site_reports import build_site_asset_report, build_site_audit_log_report
-from inventory_metrics.services.user_summary import build_user_summary_report
+from inventory_metrics.services.user_summary import build_user_audit_history_report, build_user_login_history_report, build_user_summary_report
 from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec, site_audit_log_to_workbook_spec
-from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
+from inventory_metrics.utils.report_adapters.user_summary import user_audit_history_to_workbook_spec, user_login_history_to_workbook_spec, user_summary_to_workbook_spec
 
 
 """
@@ -83,7 +86,43 @@ def asset_import_params(params, user):
         "generated_by": user,
     }
 
+def user_audit_history_params(params, user):
 
+    return {
+        "user_identifier": params["user"],
+        "start_date": params.get("start_date"),
+        "end_date": params.get("end_date"),
+        "relative_range": params.get("relative_range"),
+        "generated_by": user,
+    }
+def user_login_history_params(params, user):
+
+    start_date, end_date = resolve_report_date_range(params)
+
+    return {
+        "user_identifier": params["user"],
+        "start_date": start_date,
+        "end_date": end_date,
+        "generated_by": user,
+    }
+
+def asset_history_params(params, user):
+    return {
+        "asset_identifier": params["asset_identifier"],
+        "asset_type": params["asset_type"],
+        "start_date": params.get("start_date"),
+        "end_date": params.get("end_date"),
+        "generated_by": user,
+    }
+
+def asset_history_params(params, user):
+    return {
+        "asset_identifier": params["asset_identifier"],
+        "asset_type": params["asset_type"],
+        "start_date": params.get("start_date"),
+        "end_date": params.get("end_date"),
+        "generated_by": user,
+    }
 # ---------------------------------------------------------
 # Report definitions
 # ---------------------------------------------------------
@@ -112,5 +151,25 @@ REPORT_DEFINITIONS = {
     "builder": build_asset_import,
     "renderer": asset_import_to_workbook_spec,
     "param_map": asset_import_params,
+    },
+
+ "user_audit_history": {
+        "builder": build_user_audit_history_report,
+        "renderer": user_audit_history_to_workbook_spec,
+        "param_map": user_audit_history_params,
+         "streaming": True,
+    },   
+
+    "user_login_history": {
+    "builder": build_user_login_history_report,
+    "renderer": user_login_history_to_workbook_spec,
+    "param_map": user_login_history_params,
+    "streaming": True,
+},
+"asset_history": {
+    "builder": build_asset_history_report,
+    "renderer": asset_history_to_workbook_spec,
+    "param_map": asset_history_params,
 }
+
 }

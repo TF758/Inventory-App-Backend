@@ -3,6 +3,7 @@ import factory
 from django.utils import timezone
 from datetime import timedelta
 import secrets
+import uuid
 
 from .user_factories import UserFactory
 
@@ -12,4 +13,7 @@ class UserSessionFactory(factory.django.DjangoModelFactory):
 
     user = factory.SubFactory(UserFactory)
     status = UserSession.Status.ACTIVE
-    expires_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=7))
+    expires_at = factory.LazyFunction( lambda: timezone.now() + timedelta(days=7) )
+    absolute_expires_at = factory.LazyFunction( lambda: timezone.now() + timedelta(days=30) )
+    last_used_at = factory.LazyFunction(timezone.now)
+    refresh_token_hash = factory.LazyFunction( lambda: uuid.uuid4().hex )

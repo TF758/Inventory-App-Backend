@@ -93,3 +93,93 @@ class UserSummaryReportRequestSerializer(serializers.Serializer):
             )
 
         return value
+
+class UserAuditHistoryReportRequestSerializer(serializers.Serializer):
+
+    user = serializers.CharField()
+
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+
+    relative_range = serializers.ChoiceField(
+        choices=[
+            "last_30_days",
+            "last_90_days",
+            "last_1_year",
+            "last_2_years",
+            "last_3_years",
+        ],
+        required=False
+    )
+
+    def validate(self, attrs):
+
+        start = attrs.get("start_date")
+        end = attrs.get("end_date")
+        relative = attrs.get("relative_range")
+
+        if relative and (start or end):
+            raise serializers.ValidationError(
+                "relative_range cannot be used with explicit dates."
+            )
+
+        if start and end and start > end:
+            raise serializers.ValidationError(
+                "start_date cannot be after end_date."
+            )
+
+        return attrs
+
+class UserLoginHistoryReportRequestSerializer(serializers.Serializer):
+
+    user = serializers.CharField( help_text="User public_id or email address" )
+    start_date = serializers.DateField( required=False, help_text="Start date for the report period" )
+    end_date = serializers.DateField( required=False, help_text="End date for the report period" )
+
+    relative_range = serializers.ChoiceField(
+        choices=[
+            "last_30_days",
+            "last_90_days",
+            "last_1_year",
+            "last_2_years",
+            "last_3_years",
+        ],
+        required=False,
+        help_text="Relative time range for the report"
+    )
+
+    def validate_user(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Invalid user identifier."
+            )
+
+        return value
+
+    def validate(self, attrs):
+
+        start = attrs.get("start_date")
+        end = attrs.get("end_date")
+        relative = attrs.get("relative_range")
+
+        # Cannot mix relative and explicit dates
+        if relative and (start or end):
+            raise serializers.ValidationError(
+                "relative_range cannot be used with explicit dates."
+            )
+
+        # Explicit date validation
+        if start and end and start > end:
+            raise serializers.ValidationError(
+                "start_date cannot be after end_date."
+            )
+
+        # Ensure at least one range method is used
+        if not relative and not (start and end):
+            raise serializers.ValidationError(
+                "Provide either relative_range or start_date and end_date."
+            )
+
+        return attrs

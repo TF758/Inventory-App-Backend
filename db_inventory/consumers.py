@@ -15,21 +15,26 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         self.group_name = f"user_{user.public_id}"
 
-        await self.channel_layer.group_add(
-            self.group_name,
-            self.channel_name,
-        )
+        if self.channel_layer:
+            await self.channel_layer.group_add(
+                self.group_name,
+                self.channel_name,
+            )
 
         await self.accept()
 
     async def disconnect(self, close_code):
         user = self.scope.get("user")
 
-        if user and not user.is_anonymous:
+        if user and not user.is_anonymous and self.channel_layer:
             await self.channel_layer.group_discard(
-                f"user_{user.public_id}",
+                self.group_name,
                 self.channel_name,
             )
+
+    async def receive(self, text_data=None, bytes_data=None):
+        if text_data == "ping":
+            await self.send(text_data="pong")
 
     async def notification(self, event):
         await self.send(text_data=json.dumps(event["payload"]))

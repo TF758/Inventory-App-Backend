@@ -1,8 +1,26 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from django.utils import timezone
 from django.db.models import Count
 from db_inventory.models.site import UserPlacement
 from db_inventory.models.users import User
+from db_inventory.models.audit import AuditLog
+from django.db.models import Q,  Min, Max
+from django.db.models.functions import TruncDate
+from db_inventory.models.security import UserSession
+from inventory_metrics.utils.resolve_audit_date_range import resolve_audit_date_range
+from django.utils import timezone
+from datetime import datetime, time
+
+MAX_YEARS = 5
+MAX_ROWS = 5_000_000
+
+RELATIVE_RANGES = {
+    "last_30_days": timedelta(days=30),
+    "last_90_days": timedelta(days=90),
+    "last_1_year": timedelta(days=365),
+    "last_2_years": timedelta(days=365 * 2),
+    "last_3_years": timedelta(days=365 * 3),
+}
 
 def build_user_summary_report(
     *,
@@ -150,3 +168,288 @@ def build_user_summary_report(
         }
 
     return data
+
+def generate_user_audit_history_rows(logs):
+    """
+    Stream audit history rows for large exports.
+    Keeps memory usage constant even for millions of rows.
+    """
+
+    for log in logs.order_by("created_at").iterator(chunk_size=5000):
+
+        yield [
+            log.created_at,
+            log.event_type,
+            log.description,
+            log.target_model,
+            log.target_id,
+            log.target_name,
+            log.department_name,
+            log.location_name,
+            log.room_name,
+            log.ip_address,
+            log.user_agent,
+        ]
+
+def build_user_audit_history_report(
+    *,
+    user_identifier: str,
+    start_date=None,
+    end_date=None,
+    relative_range: str | None = None,
+    generated_by=None,
+) -> dict:
+    """
+    Build a User Audit History Report.
+
+    Returns:
+        {
+            report_info: {...},
+            audit_stats: {...},
+            history: [...]
+        }
+    """
+
+    # -------------------------------------------------
+    # Locate User
+    # -------------------------------------------------
+
+    user = (
+        User.objects.filter(public_id=user_identifier).first()
+        or User.objects.filter(email=user_identifier).first()
+    )
+
+    if not user:
+        raise ValueError("User not found")
+
+    # -------------------------------------------------
+    # Resolve Date Range
+    # -------------------------------------------------
+
+    start_date, end_date = resolve_audit_date_range(
+        start_date=start_date,
+        end_date=end_date,
+        relative_range=relative_range,
+    )
+
+    # -------------------------------------------------
+    # Base Query
+    # -------------------------------------------------
+
+    logs = AuditLog.objects.filter(
+        Q(user=user) |
+        Q(user_public_id=user.public_id)
+    )
+
+    if start_date:
+        logs = logs.filter(created_at__gte=start_date)
+
+    if end_date:
+        logs = logs.filter(created_at__lte=end_date)
+
+    # -------------------------------------------------
+    # Row Count Guard
+    # -------------------------------------------------
+
+    total_rows = logs.count()
+
+    if total_rows > MAX_ROWS:
+        raise RuntimeError(
+            f"Report exceeds maximum allowed rows ({MAX_ROWS}). "
+            "Please narrow the date range."
+        )
+
+    # -------------------------------------------------
+    # Aggregate Stats
+    # -------------------------------------------------
+
+    stats_qs = (
+        logs.values("event_type")
+        .annotate(count=Count("id"))
+        .order_by("event_type")
+    )
+
+    audit_stats = {
+        s["event_type"]: s["count"]
+        for s in stats_qs
+        if s["count"] > 0
+    }
+
+    # -------------------------------------------------
+    # History Rows
+    # -------------------------------------------------
+
+    history_rows = generate_user_audit_history_rows(logs)
+
+    # -------------------------------------------------
+    # Report Metadata
+    # -------------------------------------------------
+
+    report_info = {
+        "generated_by": generated_by.get_username() if generated_by else None,
+        "generated_at": timezone.now(),
+        "user_public_id": user.public_id,
+        "user_email": user.email,
+        "user_full_name": user.get_full_name(),
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_events": total_rows,
+    }
+
+    # -------------------------------------------------
+    # Return Builder Payload
+    # -------------------------------------------------
+
+    return {
+        "report_info": report_info,
+        "audit_stats": audit_stats,
+        "history_rows": history_rows,
+    }
+
+LOGIN_EVENT_TYPES = [
+    AuditLog.Events.LOGIN,
+    AuditLog.Events.LOGIN_FAILED,
+    AuditLog.Events.LOGOUT,
+]
+
+
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
+
+def build_user_login_history_report(
+    *,
+    user_identifier: str,
+    start_date,
+    end_date,
+    generated_by=None,
+):
+    
+    if isinstance(start_date, str):
+        start_date = date.fromisoformat(start_date)
+
+    if isinstance(end_date, str):
+        end_date = date.fromisoformat(end_date)
+
+    start_dt = timezone.make_aware(datetime.combine(start_date, time.min))
+    end_dt   = timezone.make_aware(datetime.combine(end_date, time.max))
+
+    user = (
+        User.objects.filter(public_id=user_identifier).first()
+        or User.objects.filter(email=user_identifier).first()
+    )
+
+    if not user:
+        raise ValueError("User not found")
+    
+
+
+    logs = AuditLog.objects.filter(
+        Q(user=user) | Q(user_public_id=user.public_id),
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+        event_type__in=LOGIN_EVENT_TYPES,
+    )
+
+
+    sessions = UserSession.objects.filter(
+        user=user,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    )
+
+    login_count = logs.filter(event_type=AuditLog.Events.LOGIN).count()
+    logout_count = logs.filter(event_type=AuditLog.Events.LOGOUT).count()
+    failed_login_count = logs.filter(event_type=AuditLog.Events.LOGIN_FAILED).count()
+
+    total_attempts = login_count + failed_login_count
+
+    login_success_ratio = (
+        round((login_count / total_attempts) * 100, 2)
+        if total_attempts > 0
+        else 0
+    )
+
+    first_login = logs.order_by("created_at").values_list("created_at", flat=True).first()
+    last_login = logs.values_list("created_at", flat=True).first()
+
+
+    data = {}
+
+    data["summary_stats"] = {
+        "total_logins": login_count,
+        "total_logouts": logout_count,
+        "failed_logins": failed_login_count,
+        "login_success_ratio_percent": login_success_ratio,
+        "unique_ips": logs.exclude(ip_address__isnull=True).values("ip_address").distinct().count(),
+        "unique_devices": logs.exclude(user_agent__isnull=True).values("user_agent").distinct().count(),
+        "first_login": first_login,
+        "last_login": last_login,
+    }
+
+    history = [
+        {
+            "timestamp": log.created_at,
+            "event_type": log.event_type,
+            "description": log.description,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "department": log.department_name,
+            "location": log.location_name,
+            "room": log.room_name,
+        }
+        for log in logs
+    ]
+
+
+    data["login_history"] = history
+
+    data["session_stats"] = {
+        "total_sessions": sessions.count(),
+        "active_sessions": sessions.filter(status=UserSession.Status.ACTIVE).count(),
+        "revoked_sessions": sessions.filter(status=UserSession.Status.REVOKED).count(),
+        "expired_sessions": sessions.filter(status=UserSession.Status.EXPIRED).count(),
+    }
+
+
+    ip_breakdown = list(
+        logs.values("ip_address")
+        .annotate(
+            count=Count("id"),
+            first_seen=Min("created_at"),
+            last_seen=Max("created_at"),
+        )
+        .order_by("-count")
+    )
+
+
+    data["ip_breakdown"] = ip_breakdown
+
+    device_breakdown = list(
+        logs.values("user_agent")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+
+    data["device_breakdown"] = device_breakdown
+
+    timeline = list(
+        logs.annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+
+
+    data["login_timeline"] = timeline
+
+    return {
+        "target_user": {
+            "public_id": user.public_id,
+            "email": user.email,
+            "full_name": user.get_full_name(),
+        },
+        "start_date": start_date,
+        "end_date": end_date,
+        "generated_by": generated_by.get_username() if generated_by else None,
+        "data": data,
+    }

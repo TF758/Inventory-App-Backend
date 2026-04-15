@@ -1,41 +1,25 @@
 import json
 from django.shortcuts import get_object_or_404
 import redis
-
+from rest_framework import viewsets
 from django.conf import settings
 from django.http import Http404, JsonResponse, HttpResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-import io
 import json
+from django_filters.rest_framework import DjangoFilterBackend
+from django.http import FileResponse
+from db_inventory.pagination import FlexiblePagination
+from inventory_metrics.filters import ReportJobFilter
+from inventory_metrics.serializers.reports import ReportJobSerializer
 from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec, site_audit_log_to_workbook_spec
-from inventory_metrics.utils.excel_renderer import render_workbook
 from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
 from inventory_metrics.models.reports import ReportJob
-from inventory_metrics.redis import redis_reports_client
-from django.utils import timezone
-
+from rest_framework import mixins, viewsets, permissions
+import os
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
-REPORT_RENDERERS = {
-    "user_summary": {
-        "xlsx": user_summary_to_workbook_spec,
-        "json": None,
-    },
-    "site_assets": {
-        "xlsx": site_asset_to_workbook_spec,
-        "json": None,
-    },
-    "site_audit_logs": {
-        "xlsx": site_audit_log_to_workbook_spec,
-        "json": None,
-    },
-     "asset_import": {
-        "xlsx": None,
-        "json": None,
-    },
-}
 
 class DownloadReport(APIView):
     permission_classes = [IsAuthenticated]
@@ -48,9 +32,6 @@ class DownloadReport(APIView):
             user=request.user,
         )
 
-        # -----------------------------
-        # Job state handling
-        # -----------------------------
         if job.status in (
             ReportJob.Status.PENDING,
             ReportJob.Status.RUNNING,
@@ -69,9 +50,6 @@ class DownloadReport(APIView):
                 status=409,
             )
 
-        # -----------------------------
-        # Ensure file exists
-        # -----------------------------
         if not job.report_file:
             raise Http404("Report file not available.")
 
@@ -79,20 +57,65 @@ class DownloadReport(APIView):
 
         if not file_path.exists():
             raise Http404("Report file not found.")
+        
+        print(job.report_file)
 
-        # -----------------------------
-        # Stream file
-        # -----------------------------
-        with open(file_path, "rb") as f:
-            response = HttpResponse(
-                f.read(),
-                content_type=(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                ),
-            )
+        return FileResponse(
+            open(file_path, "rb"),
+            as_attachment=True,
+            filename=job.report_file,
+        )
+    
+class MyReportJobViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet, ):
+    """
+    Users can view and delete their own reports.
+    Deleting a report removes the associated file.
+    """
 
-        response["Content-Disposition"] = (
-            f'attachment; filename="{job.report_file}"'
+    serializer_class = ReportJobSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = FlexiblePagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ReportJobFilter
+    lookup_field = "public_id"
+
+    def get_queryset(self):
+        return (
+            ReportJob.objects
+            .filter(user=self.request.user)
+            .order_by("-created_at")
         )
 
-        return response
+    def perform_destroy(self, instance):
+        """
+        Delete report file from disk when deleting the job.
+        """
+
+        if instance.report_file:
+            file_path = os.path.join(settings.REPORTS_DIR, instance.report_file)
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        instance.delete()
+
+
+class ReportJobAdminViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet, ):
+    serializer_class = ReportJobSerializer
+    permission_classes = [permissions.IsAdminUser]
+    pagination_class = FlexiblePagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ReportJobFilter
+    lookup_field = "public_id"
+
+    queryset = ReportJob.objects.select_related("user").order_by("-created_at")
+
+    def perform_destroy(self, instance):
+
+        if instance.report_file:
+            file_path = os.path.join(settings.REPORTS_DIR, instance.report_file)
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        instance.delete()

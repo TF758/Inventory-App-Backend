@@ -1,6 +1,7 @@
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
-
+from datetime import datetime
+from django.utils.timezone import is_aware
 
 def autosize_columns(ws):
     for col in ws.columns:
@@ -12,6 +13,10 @@ def autosize_columns(ws):
         ws.column_dimensions[col_letter].width = max_length + 2
 
 
+def excel_safe(value):
+    if isinstance(value, datetime) and is_aware(value):
+        return value.replace(tzinfo=None)
+    return value
 
 def render_workbook(spec: dict) -> Workbook:
     wb = Workbook()
@@ -26,18 +31,51 @@ def render_workbook(spec: dict) -> Workbook:
         rows = sheet.get("rows", [])
 
         if headers:
-            ws.append(headers)
+            ws.append([excel_safe(v) for v in headers])
 
         for row in rows:
-            ws.append(row)
+            ws.append([excel_safe(v) for v in row])
 
-    # Remove default sheet if we created our own
     if created_any and default_ws.title == "Sheet":
         wb.remove(default_ws)
 
-    # Safety: Excel REQUIRES at least one visible sheet
     if not wb.sheetnames:
         ws = wb.create_sheet(title="Report")
         ws.append(["No data available"])
 
     return wb
+
+def render_workbook_streaming(spec: dict) -> Workbook:
+
+    wb = Workbook(write_only=True)
+
+    for sheet_name, sheet in spec.items():
+
+        ws = wb.create_sheet(title=str(sheet_name)[:31])
+
+        headers = sheet.get("headers", [])
+        rows = sheet.get("rows", [])
+
+        if headers:
+            ws.append([excel_safe(v) for v in headers])
+
+        for row in rows:
+            ws.append([excel_safe(v) for v in row])
+
+    return wb
+
+def estimate_excel_size_mb(row_count: int, avg_row_bytes: int = 220) -> float:
+    """
+    Estimate XLSX file size for audit history exports.
+
+    XLSX files compress well, but audit rows average
+    roughly ~200–250 bytes once written.
+
+    Returns MB estimate.
+    """
+
+    estimated_bytes = row_count * avg_row_bytes
+
+    mb = estimated_bytes / (1024 * 1024)
+
+    return round(mb, 2)
