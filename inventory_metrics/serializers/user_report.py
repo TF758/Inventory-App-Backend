@@ -132,19 +132,9 @@ class UserAuditHistoryReportRequestSerializer(serializers.Serializer):
 
 class UserLoginHistoryReportRequestSerializer(serializers.Serializer):
 
-    user = serializers.CharField(
-        help_text="User public_id or email address"
-    )
-
-    start_date = serializers.DateField(
-        required=False,
-        help_text="Start date for the report period"
-    )
-
-    end_date = serializers.DateField(
-        required=False,
-        help_text="End date for the report period"
-    )
+    user = serializers.CharField( help_text="User public_id or email address" )
+    start_date = serializers.DateField( required=False, help_text="Start date for the report period" )
+    end_date = serializers.DateField( required=False, help_text="End date for the report period" )
 
     relative_range = serializers.ChoiceField(
         choices=[

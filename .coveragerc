@@ -1,0 +1,17 @@
+[run]
+source =
+    db_inventory
+    inventory_metrics
+
+omit =
+    */migrations/*
+    */tests/*
+    */factories/*
+    manage.py
+    */admin.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    if __name__ == "__main__":
