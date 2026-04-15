@@ -4,6 +4,9 @@ from faker import Faker
 import random
 from django.utils import timezone
 
+from db_inventory.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+from db_inventory.models.roles import RoleAssignment
+
 fake = Faker()
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -39,3 +42,51 @@ class UserPlacementFactory(factory.django.DjangoModelFactory):
     room = None
     is_current = True
     date_joined = factory.LazyFunction(timezone.now)
+
+
+
+
+class RoleAssignmentFactory(factory.django.DjangoModelFactory):
+
+    class Meta:
+        model = RoleAssignment
+
+    user = factory.SubFactory(UserFactory)
+
+    role = "SITE_ADMIN"
+
+    department = None
+    location = None
+    room = None
+
+    assigned_by = factory.SubFactory(UserFactory)
+
+    class Params:
+
+        site_admin = factory.Trait(
+            role="SITE_ADMIN",
+            department=None,
+            location=None,
+            room=None,
+        )
+
+        department_role = factory.Trait(
+            role="DEPARTMENT_ADMIN",
+            department=factory.SubFactory(DepartmentFactory),
+            location=None,
+            room=None,
+        )
+
+        location_role = factory.Trait(
+            role="LOCATION_ADMIN",
+            department=None,
+            location=factory.SubFactory(LocationFactory),
+            room=None,
+        )
+
+        room_role = factory.Trait(
+            role="ROOM_ADMIN",
+            department=None,
+            location=None,
+            room=factory.SubFactory(RoomFactory),
+        )

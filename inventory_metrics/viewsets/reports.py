@@ -20,24 +20,6 @@ import os
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
-REPORT_RENDERERS = {
-    "user_summary": {
-        "xlsx": user_summary_to_workbook_spec,
-        "json": None,
-    },
-    "site_assets": {
-        "xlsx": site_asset_to_workbook_spec,
-        "json": None,
-    },
-    "site_audit_logs": {
-        "xlsx": site_audit_log_to_workbook_spec,
-        "json": None,
-    },
-     "asset_import": {
-        "xlsx": None,
-        "json": None,
-    },
-}
 
 class DownloadReport(APIView):
     permission_classes = [IsAuthenticated]
