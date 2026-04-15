@@ -1,12 +1,14 @@
 from rest_framework.permissions import IsAuthenticated
 
 from db_inventory.models.assets import Accessory, Consumable, Equipment
-from inventory_metrics.models.reports import ReportJob
-from inventory_metrics.serializers.asset_reports import AssetHistoryReportRequestSerializer
-from inventory_metrics.tasks.reports import generate_report_task
+
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+
+from reporting.api.serializers.asset_reports import AssetHistoryReportRequestSerializer
+from reporting.models.reports import ReportJob
+from reporting.tasks.reports import generate_report_task
 
 
 class AssetHistoryReport(APIView):

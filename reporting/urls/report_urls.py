@@ -1,9 +1,13 @@
 from django.urls import path, include
-from inventory_metrics.viewsets.asset_reports import AssetHistoryReport
-from inventory_metrics.viewsets.user_reports import UserAuditHistoryPreview, UserAuditHistoryReport, UserLoginHistoryReport, UserSummaryReport
-from inventory_metrics.viewsets.reports import DownloadReport, MyReportJobViewSet, ReportJobAdminViewSet
-from inventory_metrics.viewsets.site_reports import SiteAssetExcelReportAPIView, SiteAssetExcelReportAPIView, SiteAuditLogReportAPIView
+
 from django.urls import re_path
+
+from reporting.api.viewsets.asset_reports import AssetHistoryReport
+from reporting.api.viewsets.reports import DownloadReport, MyReportJobViewSet, ReportJobAdminViewSet
+from reporting.api.viewsets.site_reports import SiteAssetExcelReportAPIView, SiteAuditLogReportAPIView
+from reporting.api.viewsets.user_reports import UserAuditHistoryPreview, UserAuditHistoryReport, UserLoginHistoryReport, UserSummaryReport
+
+
 
 
 

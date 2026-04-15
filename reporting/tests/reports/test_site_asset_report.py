@@ -4,8 +4,8 @@ from django.utils import timezone
 from db_inventory.factories.user_factories import UserFactory
 from db_inventory.factories.site_factories import ( DepartmentFactory, LocationFactory, RoomFactory, )
 from db_inventory.factories.asset_factories import ( EquipmentFactory, ComponentFactory, ConsumableFactory, AccessoryFactory, )
-from inventory_metrics.services.site_reports import build_site_asset_report
-from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec
+from reporting.services.site_reports import build_site_asset_report
+from reporting.utils.report_adapters.site_reports import site_asset_to_workbook_spec
 
 
 class SiteAssetReportTests(TestCase):

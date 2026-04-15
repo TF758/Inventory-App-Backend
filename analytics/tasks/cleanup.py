@@ -5,8 +5,10 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from db_inventory.models.security import ScheduledTaskRun
-from inventory_metrics.models.reports import ReportJob
+
 from django.db import transaction
+
+from reporting.models.reports import ReportJob
 
 
 

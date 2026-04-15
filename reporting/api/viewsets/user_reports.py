@@ -1,19 +1,16 @@
 from rest_framework import status
 from rest_framework.response import Response
-from django.http import Http404, JsonResponse, HttpResponse
 from django.conf import settings
 from rest_framework.views import APIView
-import io
 from rest_framework.permissions import IsAuthenticated
 import redis
-from django.utils import timezone
 from django.db.models import Q, Count
 from db_inventory.models.audit import AuditLog
-from inventory_metrics.utils.excel_renderer import estimate_excel_size_mb
-from inventory_metrics.utils.resolve_audit_date_range import resolve_audit_date_range
-from inventory_metrics.tasks.reports import generate_report_task
-from inventory_metrics.models import ReportJob
-from inventory_metrics.serializers.user_report import  UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
+from reporting.api.serializers.user_report import UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
+from reporting.models.reports import ReportJob
+from reporting.tasks.reports import generate_report_task
+from reporting.utils import resolve_audit_date_range
+from reporting.utils.excel_renderer import estimate_excel_size_mb
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 

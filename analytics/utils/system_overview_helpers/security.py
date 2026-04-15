@@ -1,7 +1,8 @@
 from django.db.models import Max, OuterRef, Subquery,  Sum
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailySystemMetrics
-from inventory_metrics.utils.analytics_helpers import truncate_date
-from inventory_metrics.utils.viewset_helpers import get_snapshot_range_start
+
+from analytics.models.metrics import DailyAuthMetrics, DailySystemMetrics
+from analytics.utils.analytics_helpers import truncate_date
+from analytics.utils.utils.viewset_helpers import get_snapshot_range_start
 
 
 def build_session_trends(*, days: int, granularity: str):

@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from inventory_metrics.viewsets.health import AssetHealthView, HealthOverviewView, SecurityHealthView, SessionHealthView, SiteStructureHealthView, UserHealthView, ReturnHealthOverviewView
+from analytics.api.viewsets.health import AssetHealthView, HealthOverviewView, ReturnHealthOverviewView, SecurityHealthView, SessionHealthView, SiteStructureHealthView, UserHealthView
 
 
 urlpatterns = [

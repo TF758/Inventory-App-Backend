@@ -4,14 +4,15 @@ from celery import shared_task
 from django.utils import timezone
 from django.db import transaction
 from db_inventory.mixins import NotificationMixin
-from inventory_metrics.utils.report_payload import wrap_report_payload
-from inventory_metrics.report_registry import REPORT_DEFINITIONS
-from inventory_metrics.utils.excel_renderer import render_workbook, render_workbook_streaming
-from inventory_metrics.models import ReportJob
 from django.conf import settings
 import redis
 from db_inventory.models.security import Notification, ScheduledTaskRun
 import time
+
+from inventory_metrics.report_registry import REPORT_DEFINITIONS
+from reporting.models.reports import ReportJob
+from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming
+from reporting.utils.report_payload import wrap_report_payload
 
 
 redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)

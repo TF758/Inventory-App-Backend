@@ -2,7 +2,8 @@ from django.test import TestCase
 from unittest.mock import patch
 from data_import.tasks import run_asset_import_task
 from db_inventory.factories.user_factories import UserFactory
-from inventory_metrics.models.reports import ReportJob
+from reporting.models.reports import ReportJob
+
 
 
 class AssetImportTaskTests(TestCase):

@@ -10,7 +10,8 @@ from rest_framework import status
 from data_import.tasks import run_asset_import_task
 from data_import.utils import store_import_upload
 from data_import.serializers import AssetImportRequestSerializer
-from inventory_metrics.models.reports import ReportJob
+from reporting.models.reports import ReportJob
+
 
 
 

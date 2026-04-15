@@ -9,7 +9,9 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from inventory_metrics.viewsets.health import User
+
+from db_inventory.models.users import User
+
 
 
 class UserSessionViewSet(viewsets.GenericViewSet):

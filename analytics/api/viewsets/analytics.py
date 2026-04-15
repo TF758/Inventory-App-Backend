@@ -10,7 +10,7 @@ from db_inventory.models.site import Department
 from analytics.utils.analytics_helpers import parse_range_to_days
 from analytics.utils.department_analytic_helpers import get_department_overview
 from analytics.utils.system_overview_helpers.overview import get_system_overview
-from inventory_metrics.redis import redis_reports_client
+from core.redis import redis_reports_client
 
 
 class SystemOverviewAnalytics(APIView):
