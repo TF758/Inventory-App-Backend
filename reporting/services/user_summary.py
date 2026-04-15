@@ -10,7 +10,7 @@ from db_inventory.models.security import UserSession
 from django.utils import timezone
 from datetime import datetime, time
 
-from reporting.utils import resolve_audit_date_range
+from reporting.utils.resolve_audit_date_range import resolve_audit_date_range
 
 MAX_YEARS = 5
 MAX_ROWS = 5_000_000

@@ -1,7 +1,8 @@
 
 from celery import shared_task
 from data_import.services.import_builder import build_asset_import
-from inventory_metrics.tasks.reports import generate_report_task
+
+from reporting.tasks.reports import generate_report_task
 from reporting.models.reports import ReportJob
 
 

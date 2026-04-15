@@ -79,7 +79,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'db_inventory',
-    'inventory_metrics',
+    # 'inventory_metrics',
 
     "core",
     "assets",
