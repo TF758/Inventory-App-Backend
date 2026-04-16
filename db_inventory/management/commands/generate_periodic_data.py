@@ -39,25 +39,25 @@ class Command(BaseCommand):
         # ------------------------------------------------------------------
         upsert_task(
             name="Generate daily system metrics snapshot",
-            task="inventory_metrics.tasks.snapshots.run_daily_system_metrics_snapshot",
+            task="analytics.tasks.snapshots.run_daily_system_metrics_snapshot",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
         upsert_task(
             name="Generate daily department snapshots",
-            task="inventory_metrics.tasks.snapshots.run_daily_department_snapshots",
+            task="analytics.tasks.snapshots.run_daily_department_snapshots",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
         upsert_task(
             name="Generate daily auth metrics snapshot",
-            task="inventory_metrics.tasks.snapshots.run_daily_auth_metrics_snapshot",
+            task="analytics.tasks.snapshots.run_daily_auth_metrics_snapshot",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
         upsert_task(
             name="Generate daily return metrics snapshot",
-            task="inventory_metrics.tasks.snapshots.run_daily_return_metrics_snapshot",
+            task="analytics.tasks.snapshots.run_daily_return_metrics_snapshot",
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 

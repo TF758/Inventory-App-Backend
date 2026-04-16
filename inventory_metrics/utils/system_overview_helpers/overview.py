@@ -1,7 +1,8 @@
-from inventory_metrics.utils.cache import get_cached_section
-from inventory_metrics.utils.system_overview_helpers.kpis import build_system_kpis
 
 
+
+from analytics.utils.system_overview_helpers.kpis import build_system_kpis
+from analytics.utils.utils.cache import get_cached_section
 
 
 def get_system_overview(*, days: int, granularity: str, sections: list[str]):

@@ -1,12 +1,14 @@
 from celery import shared_task
 from django.utils import timezone
 from db_inventory.models.site import Department
-from inventory_metrics.services.snapshots import generate_daily_auth_metrics, generate_daily_department_snapshot, generate_daily_return_metrics, generate_daily_system_metrics
+
 from django.conf import settings
 import redis
 from db_inventory.models.security import ScheduledTaskRun
 import time
 from django.db import DatabaseError
+
+from analytics.services.snapshots import generate_daily_auth_metrics, generate_daily_department_snapshot, generate_daily_return_metrics, generate_daily_system_metrics
 
 redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 

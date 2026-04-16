@@ -1,7 +1,8 @@
 from django.db.models import Max, OuterRef, Subquery, Avg, Sum
-from inventory_metrics.models.metrics import DailyReturnMetrics
-from inventory_metrics.utils.analytics_helpers import truncate_date
-from inventory_metrics.utils.viewset_helpers import get_snapshot_range_start
+
+from analytics.models.metrics import DailyReturnMetrics
+from analytics.utils.analytics_helpers import truncate_date
+from analytics.utils.utils.viewset_helpers import get_snapshot_range_start
 
 
 def build_return_flow_trends(*, days: int, granularity: str):

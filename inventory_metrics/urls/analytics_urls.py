@@ -1,10 +1,9 @@
 # inventory_metrics/urls/analytics_urls.py
 
 from django.urls import path
-from inventory_metrics.viewsets.analytics import (
-    DepartmentOverviewAnalytics,
-    SystemOverviewAnalytics,
-)
+
+from analytics.api.viewsets.analytics import DepartmentOverviewAnalytics, SystemOverviewAnalytics
+
 
 urlpatterns = [
     path(

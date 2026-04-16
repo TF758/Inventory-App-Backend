@@ -4,15 +4,8 @@ from django.utils import timezone
 import random
 from db_inventory.models import Department, Location
 from db_inventory.factories import DepartmentFactory
-from inventory_metrics.models.metrics import DailyAuthMetrics
-from inventory_metrics.models import (
-    DailySystemMetrics,
-    DailySecurityMetrics,
-    DailyRoleMetrics,
-    DailyDepartmentSnapshot,
-    DailyLocationSnapshot,
-    DailyLoginMetrics
-)
+from analytics.models.metrics import DailyAuthMetrics, DailySystemMetrics
+from analytics.models.snapshots import DailyDepartmentSnapshot
 
 # --------------------------
 # Daily System Metrics

@@ -91,7 +91,7 @@ class Command(BaseCommand):
         # -------------------------------
         upsert_task(
             name="DB Maintenance: delete old reports",
-            task="inventory_metrics.tasks.cleanup.delete_old_reports",
+            task="analytics.tasks.cleanup.delete_old_reports",
             cron_expr=settings.REPORT_DELETE_CRON,
         )
 

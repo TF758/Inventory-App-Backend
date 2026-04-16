@@ -9,7 +9,7 @@ import redis
 from db_inventory.models.security import Notification, ScheduledTaskRun
 import time
 
-from inventory_metrics.report_registry import REPORT_DEFINITIONS
+from reporting.report_registry import REPORT_DEFINITIONS
 from reporting.models.reports import ReportJob
 from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming
 from reporting.utils.report_payload import wrap_report_payload

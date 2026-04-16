@@ -10,13 +10,12 @@ import json
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import FileResponse
 from db_inventory.pagination import FlexiblePagination
-from inventory_metrics.filters import ReportJobFilter
-from inventory_metrics.serializers.reports import ReportJobSerializer
-from inventory_metrics.utils.report_adapters.site_reports import site_asset_to_workbook_spec, site_audit_log_to_workbook_spec
-from inventory_metrics.utils.report_adapters.user_summary import user_summary_to_workbook_spec
-from inventory_metrics.models.reports import ReportJob
 from rest_framework import mixins, viewsets, permissions
 import os
+
+from reporting.api.serializers.reports import ReportJobSerializer
+from reporting.filters import ReportJobFilter
+from reporting.models.reports import ReportJob
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 

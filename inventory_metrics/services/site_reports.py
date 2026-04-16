@@ -2,9 +2,11 @@
 from db_inventory.models.assets import Equipment, Accessory, Component, Consumable
 from db_inventory.models.site import Department, Location, Room
 from db_inventory.models.audit import AuditLog
-from inventory_metrics.utils.viewset_helpers import build_site_filter
+
 from django.utils import timezone
 from datetime import timedelta
+
+from analytics.utils.utils.viewset_helpers import build_site_filter
 
 def build_site_asset_report(
     *,

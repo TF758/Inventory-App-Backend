@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from inventory_metrics.models import (
-    DailySystemMetrics,
-    DailyDepartmentSnapshot,
-)
+
+from analytics.models.metrics import DailySystemMetrics
+from analytics.models.snapshots import DailyDepartmentSnapshot
 
 class DailySystemMetricsSerializer(serializers.ModelSerializer):
     class Meta:

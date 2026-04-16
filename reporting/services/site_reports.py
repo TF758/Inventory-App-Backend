@@ -5,7 +5,7 @@ from db_inventory.models.audit import AuditLog
 from django.utils import timezone
 from datetime import timedelta
 
-from inventory_metrics.utils.viewset_helpers import build_site_filter
+from analytics.utils.utils.viewset_helpers import build_site_filter
 
 def build_site_asset_report(
     *,

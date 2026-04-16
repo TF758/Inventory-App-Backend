@@ -7,9 +7,11 @@ from db_inventory.models.audit import AuditLog
 from django.db.models import Q,  Min, Max
 from django.db.models.functions import TruncDate
 from db_inventory.models.security import UserSession
-from inventory_metrics.utils.resolve_audit_date_range import resolve_audit_date_range
+
 from django.utils import timezone
 from datetime import datetime, time
+
+from inventory_metrics.utils.resolve_audit_date_range import resolve_audit_date_range
 
 MAX_YEARS = 5
 MAX_ROWS = 5_000_000

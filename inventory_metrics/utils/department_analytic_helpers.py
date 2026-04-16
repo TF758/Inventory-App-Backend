@@ -1,11 +1,12 @@
 from db_inventory.models.site import Department
-from inventory_metrics.models.snapshots import DailyDepartmentSnapshot
-from inventory_metrics.utils.analytics_helpers import percentage_delta, truncate_date
-from inventory_metrics.utils.viewset_helpers import get_snapshot_range_start
 from datetime import timedelta
 
 from django.db.models import Max, Subquery, OuterRef, Sum
 from django.utils import timezone
+
+from analytics.models.snapshots import DailyDepartmentSnapshot
+from analytics.utils.analytics_helpers import percentage_delta, truncate_date
+from analytics.utils.utils.viewset_helpers import get_snapshot_range_start
 
 def build_department_kpis(*, department: Department):
     today = (

@@ -1,6 +1,7 @@
 import django_filters
 
-from inventory_metrics.models.reports import ReportJob
+from reporting.models.reports import ReportJob
+
 
 
 

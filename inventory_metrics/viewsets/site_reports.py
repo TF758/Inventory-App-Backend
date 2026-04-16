@@ -1,19 +1,12 @@
-
-from inventory_metrics.tasks.reports import generate_report_task
-from inventory_metrics.models.reports import ReportJob
-from inventory_metrics.serializers.site_reports import SiteAssetRequestSerializer, SiteAuditLogRequestSerializer
 from rest_framework.views import APIView
-from db_inventory.models import Department, Location, Room, AuditLog
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
 from rest_framework import status
-from django.utils import timezone
-from datetime import timedelta
 from rest_framework.response import Response
-from openpyxl import Workbook
-from openpyxl.styles import Font
 from rest_framework.permissions import IsAuthenticated
-import datetime
+
+from reporting.api.serializers.site_reports import SiteAssetRequestSerializer, SiteAuditLogRequestSerializer
+from reporting.models.reports import ReportJob
+from reporting.tasks.reports import generate_report_task
+
 
 
 

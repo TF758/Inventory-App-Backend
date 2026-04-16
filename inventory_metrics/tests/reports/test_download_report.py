@@ -5,8 +5,7 @@ import uuid
 from rest_framework.test import APIClient
 
 from db_inventory.factories.user_factories import UserFactory
-from inventory_metrics.models import ReportJob
-
+from reporting.models.reports import ReportJob
 
 class DownloadReportTests(TestCase):
 

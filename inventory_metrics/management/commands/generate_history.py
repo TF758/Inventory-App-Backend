@@ -10,11 +10,8 @@ from db_inventory.models import (
 from tqdm import tqdm
 
 from db_inventory.models.site import Room
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics
-from inventory_metrics.models import (
-    DailySystemMetrics,
-    DailyDepartmentSnapshot,
-)
+from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
+from analytics.models.snapshots import DailyDepartmentSnapshot
 
 
 def clamp(val: int) -> int:

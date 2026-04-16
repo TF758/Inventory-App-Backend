@@ -11,10 +11,11 @@ from db_inventory.models.users import PasswordResetEvent, User
 from db_inventory.models.site import Department, Location, Room
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
-from inventory_metrics.models.snapshots import DailyDepartmentSnapshot
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from django.contrib.auth import get_user_model
 from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max
+
+from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
+from analytics.models.snapshots import DailyDepartmentSnapshot
 
 
 User = get_user_model()

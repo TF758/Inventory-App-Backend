@@ -1,6 +1,6 @@
 from django.urls import include, path
 
-from inventory_metrics.viewsets.admin_metrics_viewset import AdminMetricsOverview, LoginMetricsOverview, ReturnMetricsOverview, RoleAssignmentMetricsOverview, SecurityMetricsOverview, UserMetricsOverview
+from analytics.api.viewsets.admin_metrics_viewset import AdminMetricsOverview, LoginMetricsOverview, ReturnMetricsOverview, RoleAssignmentMetricsOverview, SecurityMetricsOverview, UserMetricsOverview
 
 
 

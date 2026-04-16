@@ -1,9 +1,11 @@
 from django.contrib import admin
 
-from inventory_metrics.models.reports import ReportJob
-from inventory_metrics.models.snapshots import DailyDepartmentSnapshot
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics,DailySystemMetrics
+
 from django.utils.html import format_html
+
+from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
+from analytics.models.snapshots import DailyDepartmentSnapshot
+from reporting.models.reports import ReportJob
 
 @admin.register(ReportJob)
 class ReportJobAdmin(admin.ModelAdmin):

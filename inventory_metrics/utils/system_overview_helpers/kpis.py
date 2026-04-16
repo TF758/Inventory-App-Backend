@@ -1,6 +1,8 @@
 from datetime import timedelta
-from inventory_metrics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
-from inventory_metrics.utils.analytics_helpers import percentage_delta
+
+from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
+from analytics.utils.analytics_helpers import percentage_delta
+
 
 
 def build_system_kpis():

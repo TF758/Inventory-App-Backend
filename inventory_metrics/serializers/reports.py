@@ -1,7 +1,8 @@
 
 from rest_framework import serializers
 
-from inventory_metrics.models.reports import ReportJob
+from reporting.models.reports import ReportJob
+
 
 
 class ReportJobSerializer(serializers.ModelSerializer):
