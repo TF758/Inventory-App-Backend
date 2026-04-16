@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from db_inventory.serializers.rooms import  *
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.models import *
+from sites.models.sites import  Room, UserPlacement
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *

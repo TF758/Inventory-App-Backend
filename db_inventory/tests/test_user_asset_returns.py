@@ -9,8 +9,6 @@ from db_inventory.models import (
     ConsumableIssue,
 )
 from db_inventory.factories import AccessoryFactory, ConsumableFactory, EquipmentFactory, UserFactory
-from rest_framework.views import APIView
-from rest_framework.test import force_authenticate
 from django.utils import timezone
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 

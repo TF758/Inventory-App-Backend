@@ -1,6 +1,6 @@
 
 from rest_framework import serializers
-from db_inventory.models import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 import re #regex for sanitization
 
 

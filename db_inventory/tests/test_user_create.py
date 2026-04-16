@@ -1,8 +1,9 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
-from db_inventory.models import User, RoleAssignment, Department, Location, Room, UserPlacement
+from db_inventory.models import User, RoleAssignment
 from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory
+from sites.models.sites import UserPlacement
 import uuid
 
 class SiteAdminFullUserCreateTest(APITestCase):

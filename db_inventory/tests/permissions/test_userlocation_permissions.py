@@ -2,14 +2,11 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, APITestCase, APIClient
 from rest_framework import status
 from rest_framework.reverse import reverse
-from db_inventory.models import User, UserPlacement, Room, Department, Location, RoleAssignment
+from db_inventory.models import   RoleAssignment
 from db_inventory.factories import UserFactory, AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserPlacementFactory
-from db_inventory.tests.utils.userlocation_test_base import UserPlacementPermissionTestBase
 from db_inventory.permissions.users import UserPlacementPermission
 from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
-from db_inventory.permissions.helpers import is_in_scope
-from rest_framework.request import Request
-
+from sites.models.sites import UserPlacement
 
 class UserPlacementPermissionMatrixTests(TestCase):
 

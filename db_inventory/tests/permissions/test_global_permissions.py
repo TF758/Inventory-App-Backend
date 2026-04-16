@@ -6,7 +6,8 @@ from db_inventory.permissions.helpers import (
     check_permission, ensure_permission
 )
 from db_inventory.factories import UserFactory, RoomFactory, LocationFactory, DepartmentFactory, AdminUserFactory
-from db_inventory.models import User, Room, Location, Department, RoleAssignment
+from db_inventory.models import RoleAssignment
+
 
 class GlobalPermissionTests(TestCase):
 

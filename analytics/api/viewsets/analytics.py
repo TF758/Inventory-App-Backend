@@ -5,12 +5,13 @@ from django.utils import timezone
 import json
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from db_inventory.models.site import Department
+
 
 from analytics.utils.analytics_helpers import parse_range_to_days
 from analytics.utils.department_analytic_helpers import get_department_overview
 from analytics.utils.system_overview_helpers.overview import get_system_overview
 from core.redis import redis_reports_client
+from inventory.sites.models.sites import Department
 
 
 class SystemOverviewAnalytics(APIView):

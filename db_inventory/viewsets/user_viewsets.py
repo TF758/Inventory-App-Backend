@@ -6,7 +6,7 @@ from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, U
 from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
-from db_inventory.models import User, UserPlacement, RoleAssignment, Room, Department, Location
+from db_inventory.models import User, RoleAssignment
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.audit import AuditLog
 from sites.models.sites import UserPlacement, Room, Department, Location

@@ -1,5 +1,6 @@
 from rest_framework import viewsets
-from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserPlacement, Room
+from db_inventory.models import Consumable,Equipment, Component, Accessory
+from sites.models.sites import Department, Location, Room, UserPlacement
 from db_inventory.serializers.roles import RoleReadSerializer
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.filters import *

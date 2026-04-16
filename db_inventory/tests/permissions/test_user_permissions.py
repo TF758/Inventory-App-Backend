@@ -1,7 +1,7 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
-from db_inventory.models import User, RoleAssignment, Department
+from db_inventory.models import RoleAssignment
 from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, UserFactory, RoomFactory
 from rest_framework.test import force_authenticate
 from rest_framework.test import APIClient

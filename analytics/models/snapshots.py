@@ -1,5 +1,5 @@
 from django.db import models
-from sites.models.sites import Department, Location
+from sites.models.sites import Department
 from django.utils import timezone
 
 

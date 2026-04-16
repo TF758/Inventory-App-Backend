@@ -1,9 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
-
 from django.test import TestCase
-
-
 from db_inventory.models import Accessory
 from db_inventory.factories.asset_factories import AccessoryFactory
 from db_inventory.models.base import PublicIDRegistry
