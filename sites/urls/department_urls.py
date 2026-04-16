@@ -1,6 +1,7 @@
 from django.urls import path
 
-from db_inventory.viewsets.sites import department_viewsets
+from sites.api.viewsets import department_viewsets
+
 
 
 

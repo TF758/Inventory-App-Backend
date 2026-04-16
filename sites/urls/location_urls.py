@@ -1,6 +1,8 @@
 from django.urls import path
 
-from db_inventory.viewsets.sites import location_viewsets
+from sites.api.viewsets import location_viewsets
+
+
 
 
 urlpatterns = [
