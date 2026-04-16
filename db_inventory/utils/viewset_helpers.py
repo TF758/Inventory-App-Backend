@@ -1,5 +1,5 @@
 
-from db_inventory.models.site import Department, Location, Room, UserPlacement
+from sites.models.sites import Department, Location, Room, UserPlacement
 from db_inventory.models.users import User
 from db_inventory.utils.constants import ADMIN_ROLES
 from django.db.models import Q

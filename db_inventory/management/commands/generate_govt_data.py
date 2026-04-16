@@ -12,7 +12,7 @@ django.setup()
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 
-from db_inventory.models.site import Department, Location, Room, UserPlacement
+from sites.models.sites import Department, Location, Room, UserPlacement
 from db_inventory.models.users import User
 from db_inventory.models import RoleAssignment
 import itertools

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from db_inventory.models.users import User
-from db_inventory.models.site import Room, UserPlacement
+from sites.models.sites import Room, UserPlacement
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction

@@ -1,6 +1,6 @@
 from db_inventory.models.base import PublicIDModel
 from django.db import models
-from db_inventory.models.site import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 from django.apps import apps
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db.models import Sum

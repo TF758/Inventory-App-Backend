@@ -1,5 +1,5 @@
 from django.contrib import admin
-from db_inventory.models.site import *
+from sites.models.sites import *
 from db_inventory.models.base import *
 from db_inventory.models.assets import *
 from db_inventory.models.users import *

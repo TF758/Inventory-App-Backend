@@ -1,4 +1,4 @@
-from db_inventory.models.site import Department
+from sites.models.sites import Department
 from datetime import timedelta
 
 from django.db.models import Max, Subquery, OuterRef, Sum

@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django.utils import timezone
 from django.db.models import Count
-from db_inventory.models.site import UserPlacement
+from sites.models.sites import UserPlacement
 from db_inventory.models.users import User
 from db_inventory.models.audit import AuditLog
 from django.db.models import Q,  Min, Max

@@ -8,7 +8,7 @@ import datetime
 from db_inventory.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from db_inventory.models.security import UserSession
 from db_inventory.models.users import PasswordResetEvent, User
-from db_inventory.models.site import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from django.contrib.auth import get_user_model

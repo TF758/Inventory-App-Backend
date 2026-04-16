@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from db_inventory.models.base import PublicIDModel
-from db_inventory.models.site import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 from django.conf import settings
 from django.db.models import Q
 

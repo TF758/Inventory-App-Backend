@@ -3,7 +3,7 @@ from db_inventory.models.asset_assignment import AccessoryAssignment, Consumable
 from db_inventory.models.assets import AssetAgreement, AssetAgreementItem, Equipment
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
-from db_inventory.models.site import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 

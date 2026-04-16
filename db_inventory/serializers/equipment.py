@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 from  db_inventory.models.assets import Equipment, EquipmentStatus
-from db_inventory.models.site import  Room
+from sites.models.sites import  Room
 from db_inventory.permissions.helpers import is_admin_role, is_in_scope
 
 class EquipmentSerializer(serializers.ModelSerializer):

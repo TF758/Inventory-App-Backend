@@ -1,6 +1,6 @@
 
 from db_inventory.models.assets import Equipment, Accessory, Component, Consumable
-from db_inventory.models.site import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 from db_inventory.models.audit import AuditLog
 from django.utils import timezone
 from datetime import timedelta

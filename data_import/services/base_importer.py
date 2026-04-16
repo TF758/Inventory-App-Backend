@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 from django.core.files.storage import default_storage
 
-from db_inventory.models.site import Room
+from sites.models.sites import Room
 from db_inventory.permissions.helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
 import pandas as pd
 import io

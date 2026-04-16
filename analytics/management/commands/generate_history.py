@@ -8,7 +8,7 @@ from db_inventory.models import (
     Equipment, Component, Consumable, Accessory
 )
 from tqdm import tqdm
-from db_inventory.models.site import Room
+from sites.models.sites import Room
 from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
 

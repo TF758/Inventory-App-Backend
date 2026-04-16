@@ -15,7 +15,7 @@ from db_inventory.models.asset_assignment import (
     ReturnRequest,
     ReturnRequestItem,
 )
-from db_inventory.models.site import Room, UserPlacement
+from sites.models.sites import Room, UserPlacement
 
 
 class Command(BaseCommand):

@@ -1,4 +1,4 @@
-# inventory_metrics/urls/health_urls.py
+
 
 from django.urls import path
 

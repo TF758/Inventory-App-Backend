@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
-from db_inventory.models.site import Department, Location, Room, UserPlacement
+from sites.models.sites import Department, Location, Room
 from datetime import timedelta
 from django.utils import timezone
 from db_inventory.models.audit import AuditLog

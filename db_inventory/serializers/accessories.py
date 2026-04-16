@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from db_inventory.models.site import Location, Room
+from sites.models.sites import Location, Room
 from db_inventory.models.assets import Accessory
 from db_inventory.serializers.locations import LocationFullSerializer
 from db_inventory.serializers.rooms import RoomNameSerializer

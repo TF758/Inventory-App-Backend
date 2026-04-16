@@ -4,7 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from db_inventory.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
 from db_inventory.permissions.helpers import has_asset_custody_scope
-from db_inventory.models.site import Department, Location, Room
+from sites.models.sites import Department, Location, Room
 
 
 

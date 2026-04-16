@@ -2,7 +2,7 @@
 
 from django.conf import settings
 from db_inventory.models.base import PublicIDModel
-from db_inventory.models.site import Department, Location,Room
+from sites.models.sites import Department, Location,Room
 from django.db import models
 from db_inventory.models.users import User
 from django.utils import timezone

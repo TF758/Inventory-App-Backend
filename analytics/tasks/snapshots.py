@@ -1,6 +1,6 @@
 from celery import shared_task
 from django.utils import timezone
-from db_inventory.models.site import Department
+from sites.models.sites import Department
 
 from django.conf import settings
 import redis

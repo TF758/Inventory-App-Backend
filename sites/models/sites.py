@@ -155,4 +155,3 @@ class UserPlacement(PublicIDModel):
         room = self.room.name if self.room else "No Room"
         return f"{self.user} – {room}"
 
-UserLocation = UserPlacement

@@ -1,4 +1,4 @@
-# inventory_metrics/urls/analytics_urls.py
+
 
 from django.urls import path
 

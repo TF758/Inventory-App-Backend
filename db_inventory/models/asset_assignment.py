@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q, F
 
 from db_inventory.models.base import PublicIDModel
-from db_inventory.models.site import Room
+from sites.models.sites import Room
 
 
 class EquipmentAssignment(models.Model):

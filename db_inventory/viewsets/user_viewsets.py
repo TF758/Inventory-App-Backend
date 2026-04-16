@@ -9,7 +9,7 @@ from django.db import transaction
 from db_inventory.models import User, UserPlacement, RoleAssignment, Room, Department, Location
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.site import UserPlacement, Room, Department, Location
+from sites.models.sites import UserPlacement, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import  UserFilter, UserPlacementFilter
