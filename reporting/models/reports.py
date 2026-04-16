@@ -47,7 +47,6 @@ class ReportJob(PublicIDModel):
     notification_sent = models.BooleanField(default=False)
 
     class Meta:
-        db_table = "inventory_metrics_reportjob"
         indexes = [
             models.Index(fields=["user", "status"]),
             models.Index(fields=["user", "report_type"]),

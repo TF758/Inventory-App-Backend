@@ -4,7 +4,7 @@ parallel = True
 
 source =
     db_inventory
-    inventory_metrics
+    reporting
 
 omit =
     */migrations/*

@@ -51,7 +51,7 @@ jobs:
         suite:
           - db_inventory.tests
           - data_import.tests
-          - inventory_metrics.tests
+          - reporting.tests
 
     steps:
       - name: Checkout repository

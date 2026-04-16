@@ -1,5 +1,3 @@
-# inventory_metrics/utils/report_payload.py
-
 from django.utils import timezone
 from django.conf import settings
 
