@@ -7,12 +7,12 @@ from analytics.api.viewsets.analytics import DepartmentOverviewAnalytics, System
 
 urlpatterns = [
     path(
-        "system/overview/",
+        "system/",
         SystemOverviewAnalytics.as_view(),
         name="analytics_system_overview",
     ),
        path(
-        "departments/<str:department_id>/overview/",
+        "departments/<str:department_id>/",
         DepartmentOverviewAnalytics.as_view(),
         name="analytics_department_overview",
     ),
