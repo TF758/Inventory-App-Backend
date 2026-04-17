@@ -3,9 +3,10 @@ from rest_framework.test import APIRequestFactory, APITestCase, APIClient
 from rest_framework import status
 from rest_framework.reverse import reverse
 from db_inventory.models import   RoleAssignment
-from db_inventory.factories import UserFactory, AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserPlacementFactory
+from db_inventory.factories import UserFactory
 from db_inventory.permissions.users import UserPlacementPermission
 from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from sites.models.sites import UserPlacement
 
 class UserPlacementPermissionMatrixTests(TestCase):

@@ -5,10 +5,10 @@ from rest_framework import status
 from db_inventory.models import AuditLog, RoleAssignment, User
 from db_inventory.factories import (
     UserFactory, AdminUserFactory,
-    DepartmentFactory, LocationFactory, RoomFactory,
     EquipmentFactory
 )
 from django.test import TransactionTestCase
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 
 class AuditLogTests(TransactionTestCase):
     reset_sequences = True

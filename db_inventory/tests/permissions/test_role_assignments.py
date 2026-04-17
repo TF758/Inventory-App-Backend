@@ -1,7 +1,7 @@
 from rest_framework import status
 from db_inventory.models import RoleAssignment
 from db_inventory.tests.utils._role_permissions_base import RoleAssignmentTestBase
-from db_inventory.factories import UserFactory, DepartmentFactory, LocationFactory, RoomFactory
+from db_inventory.factories import UserFactory
 from rest_framework import status
 from db_inventory.models import RoleAssignment
 from db_inventory.tests.utils._role_permissions_base import RoleAssignmentTestBase

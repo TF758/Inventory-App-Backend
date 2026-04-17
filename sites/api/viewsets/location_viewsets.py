@@ -1,19 +1,20 @@
 from rest_framework import viewsets
 from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.serializers.roles import RoleReadSerializer
-from db_inventory.serializers.locations import LocationWriteSerializer, LocationRoomSerializer, LocationReadSerializer, LocationListSerializer, LocationComponentSerializer
 from db_inventory.serializers.users import UserAreaSerializer
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
+from db_inventory.permissions.users import RolePermission, UserPermission
+from sites.api.serializers.locations import LocationComponentSerializer, LocationListSerializer, LocationReadSerializer, LocationRoomSerializer, LocationWriteSerializer
 from sites.models.sites import Location, Room, UserPlacement
 from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *
 from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
-from db_inventory.permissions import LocationPermission, AssetPermission, RolePermission, UserPermission
+from sites.permissions.sites import LocationPermission
 from django.db.models import Case, When, Value, IntegerField
 from db_inventory.pagination import FlexiblePagination
 from django.db.models import Q
@@ -24,7 +25,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
-from db_inventory.permissions.assets import HasAssignmentScopePermission
+from db_inventory.permissions.assets import AssetPermission, HasAssignmentScopePermission
 
 class LocationDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [IsAuthenticated]

@@ -1,10 +1,13 @@
 from django.test import TestCase
 
 from data_import.services.equipment_importer import EquipmentImporter
-from db_inventory.factories.site_factories import RoomFactory
+
 from db_inventory.factories.user_factories import UserFactory
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.assets import EquipmentStatus
+from sites.factories.site_factories import RoomFactory
+
+
 
 
 class EquipmentImporterTests(TestCase):

@@ -4,9 +4,10 @@ from django.core.files.storage import default_storage
 
 from data_import.services.equipment_importer import EquipmentImporter
 from db_inventory.factories.asset_factories import EquipmentFactory
-from db_inventory.factories.site_factories import RoomFactory
+
 from db_inventory.factories.user_factories import UserFactory
 from db_inventory.models.roles import RoleAssignment
+from sites.factories.site_factories import RoomFactory
 
 
 

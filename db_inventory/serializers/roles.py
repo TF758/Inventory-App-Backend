@@ -2,8 +2,6 @@ from rest_framework import serializers
 from db_inventory.models.users import User
 from sites.models.sites import Department, Location, Room
 from db_inventory.models.roles import RoleAssignment
-from db_inventory.permissions.helpers import ensure_permission
-from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 

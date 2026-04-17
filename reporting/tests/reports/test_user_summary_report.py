@@ -8,7 +8,7 @@ from db_inventory.factories.security_factories import PasswordResetEventFactory
 from db_inventory.factories.session_factories import UserSessionFactory
 from db_inventory.factories.user_factories import RoleAssignmentFactory, UserFactory
 from db_inventory.models.audit import AuditLog
-from db_inventory.factories.site_factories import DepartmentFactory
+from sites.factories.site_factories import DepartmentFactory
 from reporting.services.user_summary import build_user_summary_report
 from reporting.utils.report_adapters.user_summary import user_summary_to_workbook_spec
 

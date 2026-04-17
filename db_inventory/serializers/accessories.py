@@ -1,8 +1,6 @@
 from rest_framework import serializers
 from sites.models.sites import Location, Room
 from db_inventory.models.assets import Accessory
-from db_inventory.serializers.locations import LocationFullSerializer
-from db_inventory.serializers.rooms import RoomNameSerializer
 from rest_framework.validators import UniqueValidator
 
 from db_inventory.models.asset_assignment import AccessoryAssignment

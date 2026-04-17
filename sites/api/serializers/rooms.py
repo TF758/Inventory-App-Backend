@@ -1,6 +1,7 @@
 from rest_framework import serializers
+from sites.api.serializers.locations import LocationListSerializer, LocationNameSerializer, LocationReadSerializer
 from sites.models.sites import Room,Location
-from db_inventory.serializers.locations import * 
+
 
 class RoomSerializer(serializers.ModelSerializer):
     location_detail = LocationNameSerializer(source = "location", read_only = True)

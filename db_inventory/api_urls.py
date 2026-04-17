@@ -21,9 +21,6 @@ urlpatterns = [
     # ----------------------------
     path("auth/", include("db_inventory.urls.auth_urls")),
     path("inventory/", include("db_inventory.urls.inventory_urls")),
-    path("departments/", include("db_inventory.urls.department_urls")),
-    path("locations/", include("db_inventory.urls.location_urls")),
-    path("rooms/", include("db_inventory.urls.room_urls")),
     path("users/", include("db_inventory.urls.users_urls")), 
     path("profiles/", include("db_inventory.urls.profile_urls")),
     path("admin/", include("db_inventory.urls.admin_urls")),

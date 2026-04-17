@@ -1,10 +1,14 @@
 from rest_framework.test import APIClient, APITestCase
-from db_inventory.factories import UserFactory, RoomFactory, LocationFactory, DepartmentFactory, AdminUserFactory
+from db_inventory.factories import UserFactory, AdminUserFactory
 from django.urls import reverse
 from db_inventory.models import  RoleAssignment
 from db_inventory.permissions.helpers import is_in_scope, check_permission, ensure_permission
 from django.test import TestCase
 from rest_framework.exceptions import PermissionDenied
+
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+
+
 class RoomAdminScopeTests(TestCase):
     """
     Test Room-level role permissions:

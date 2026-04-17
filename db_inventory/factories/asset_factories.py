@@ -2,7 +2,9 @@ from db_inventory.models import Equipment, Component, Accessory, Consumable
 import factory
 from faker import Faker
 
-from .site_factories import RoomFactory
+from sites.factories.site_factories import RoomFactory
+
+
 
 fake = Faker()
 

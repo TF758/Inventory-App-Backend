@@ -1,9 +1,11 @@
 import factory
 from factory import fuzzy
 from django.utils import timezone
-from db_inventory.factories import DepartmentFactory
+
 from analytics.models.metrics import DailyAuthMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
+from sites.factories.site_factories import DepartmentFactory
+
 
 # --------------------------
 # Daily System Metrics

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from db_inventory.serializers.departments import *
+from sites.api.serializers.departments import DepartmentListSerializer, DepartmentReadSerializer
 from sites.models.sites import Location,Room,UserPlacement, Department
 from db_inventory.models.assets import Component
 

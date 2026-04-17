@@ -1,8 +1,8 @@
 from rest_framework.permissions import BasePermission
-from .constants import ROLE_HIERARCHY
-from sites.models.sites import Department, Location, Room
-from .helpers import  is_in_scope, check_permission, is_viewer_role, is_admin_role, has_hierarchy_permission
 
+from db_inventory.permissions.constants import ROLE_HIERARCHY
+from db_inventory.permissions.helpers import has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
+from sites.models.sites import Department, Location, Room
 
 class RoomPermission(BasePermission):
     """

@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from db_inventory.models import Consumable, Department, Location, Equipment, Component, Accessory, UserPlacement, Room
+from db_inventory.models import Consumable,  Equipment, Component, Accessory
 from db_inventory.serializers.roles import RoleReadSerializer
 from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.filters import *
@@ -7,23 +7,23 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
 from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
-from db_inventory.permissions import DepartmentPermission, UserPermission, LocationPermission, AssetPermission, RolePermission, RoomPermission
 from db_inventory.pagination import  FlexiblePagination
-from django.db.models import Q
-from db_inventory.serializers.departments import *
+
 from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.serializers.users import UserAreaSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
-from db_inventory.serializers.rooms import RoomSerializer
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from db_inventory.models.assets import EquipmentStatus
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from datetime import timedelta
+from db_inventory.permissions.assets import AssetPermission
+from db_inventory.permissions.users import RolePermission, UserPermission
+from sites.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
+from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
+from sites.api.serializers.rooms import RoomSerializer
 
 class DepartmentDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [IsAuthenticated]

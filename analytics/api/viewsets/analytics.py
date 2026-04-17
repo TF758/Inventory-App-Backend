@@ -11,7 +11,7 @@ from analytics.utils.analytics_helpers import parse_range_to_days
 from analytics.utils.department_analytic_helpers import get_department_overview
 from analytics.utils.system_overview_helpers.overview import get_system_overview
 from core.redis import redis_reports_client
-from inventory.sites.models.sites import Department
+from sites.models.sites import Department
 
 
 class SystemOverviewAnalytics(APIView):

@@ -4,8 +4,8 @@ from datetime import timedelta
 
 from db_inventory.models.audit import AuditLog
 from db_inventory.factories.audit_factories import AuditLogFactory
-from db_inventory.factories.site_factories import ( DepartmentFactory, LocationFactory, RoomFactory, )
 from db_inventory.factories.user_factories import UserFactory
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from reporting.services.site_reports import build_site_audit_log_report
 from reporting.utils.report_adapters.site_reports import site_audit_log_to_workbook_spec
 
