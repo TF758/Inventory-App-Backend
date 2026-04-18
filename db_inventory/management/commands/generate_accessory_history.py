@@ -12,7 +12,7 @@ from assignments.models.asset_assignment import (
     AccessoryEvent,
 )
 from db_inventory.models.assets import Accessory
-from db_inventory.models.users import User
+from users.models.users import User
 
 
 FAKE_EVENTS_PER_ACCESSORY = 50

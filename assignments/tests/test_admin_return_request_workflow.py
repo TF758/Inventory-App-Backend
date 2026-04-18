@@ -7,7 +7,6 @@ from db_inventory.permissions.assets import CanProcessReturnRequest
 from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.security import Notification
 from django.contrib.auth.models import AnonymousUser
-
 from assignments.services.asset_returns import create_mixed_return_request
 from sites.factories.site_factories import RoomFactory
 

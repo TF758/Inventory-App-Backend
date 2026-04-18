@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from db_inventory.models.users import User
+from users.models.users import User
 from db_inventory.utils.tokens import PasswordResetToken
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from django.contrib.auth import get_user_model

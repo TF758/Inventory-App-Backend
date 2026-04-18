@@ -3,8 +3,6 @@ import factory
 from faker import Faker
 import random
 from django.utils import timezone
-
-
 from db_inventory.models.roles import RoleAssignment
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from sites.models.sites import UserPlacement

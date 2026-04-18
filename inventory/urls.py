@@ -25,5 +25,7 @@ urlpatterns = [
     path('reports/', include('reporting.urls.report_urls')),   
     path('sites/', include('sites.urls.site_urls')),   
     path('imports/', include('data_import.import_urls')),
+    path('users/', include('users.urls.user_and_self_urls')),
+    path('roles/', include('users.urls.role_urls')),
 
 ]

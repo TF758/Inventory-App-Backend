@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
-from db_inventory.models import UserSession, User, AuditLog, SiteNameChangeHistory, SiteRelocationHistory
+from db_inventory.models import UserSession, AuditLog, SiteNameChangeHistory, SiteRelocationHistory
 from db_inventory.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SecuritySettingsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
@@ -23,8 +23,8 @@ from rest_framework.permissions import IsAuthenticated
 from db_inventory.authentication import SessionJWTAuthentication
 from django.utils import timezone
 from datetime import timedelta
-
 from db_inventory.security_policy import get_session_idle_timeout, invalidate_security_policy_cache
+from users.models.users import User
 from sites.models.sites import Department, Location, Room
 
 class SecuritySettingsAPIView(APIView):

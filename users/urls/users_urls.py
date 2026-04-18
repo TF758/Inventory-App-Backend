@@ -1,15 +1,11 @@
-# db_inventory/urls/user_urls.py
-
 from django.urls import path
 
-from db_inventory.viewsets import user_viewsets
+from users.api.viewsets import user_viewsets
 
 
 urlpatterns = [
 
-    # ----------------------------
-    # Static Routes FIRST
-    # ----------------------------
+
     path("create-full/", user_viewsets.FullUserCreateView.as_view(), name='create-full-user'),
     path("unallocated/", user_viewsets.UnallocatedUserViewSet.as_view({"get": "list"}), name="unassigned-users"),
 
@@ -41,9 +37,7 @@ urlpatterns = [
 
     path("<str:user_public_id>/asset-status/", user_viewsets.UserAssetStatusView.as_view(), name="user-asset-status"),
 
-    # ----------------------------
-    # Generic user routes LAST
-    # ----------------------------
+
     path("", user_viewsets.UserModelViewSet.as_view({
         "get": "list",
         "post": "create",

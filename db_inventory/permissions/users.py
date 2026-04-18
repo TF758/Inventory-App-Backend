@@ -1,9 +1,9 @@
 # myapp/permissions/users.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from users.models.roles import RoleAssignment
 from .constants import ROLE_HIERARCHY
 from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role, is_user_in_scope
 from sites.models.sites import Room, Location, Department
-from db_inventory.models.roles import RoleAssignment
 from rest_framework.exceptions import PermissionDenied
 
 ROLE_ASSIGNMENT_RULES = {

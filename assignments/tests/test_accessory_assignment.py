@@ -1,11 +1,9 @@
 from django.utils import timezone
-
-
 from db_inventory.models.roles import RoleAssignment
 from assignments.tests.assignments_test_bases import AccessoryAssignmentTestBase
 from db_inventory.factories.asset_factories import AccessoryFactory
-from db_inventory.factories.user_factories import UserFactory, UserPlacementFactory
 from assignments.models.asset_assignment import AccessoryAssignment
+from users.factories.user_factories import UserFactory, UserPlacementFactory
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 
 

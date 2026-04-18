@@ -1,5 +1,4 @@
 from django.shortcuts import get_object_or_404
-from db_inventory.serializers.self import  SelfAccessoryAssignmentSerializer, SelfAssetSerializer, SelfConsumableIssueSerializer, SelfUserProfileSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter, MixAssetFilter
 from db_inventory.pagination import FlexiblePagination
@@ -8,8 +7,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import ListModelMixin
-from db_inventory.serializers.self import SelfAssignedEquipmentSerializer
-from db_inventory.models.users import User
+from users.models.users import User
 from rest_framework.generics import RetrieveAPIView
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user_accessories, get_user_accessories_with_meta, get_user_consumables, get_user_consumables_with_meta, get_user_equipment, get_user_equipment_assignments, get_user_equipment_with_meta
 from django.db.models import Exists, OuterRef,  Subquery, Sum,  F, IntegerField, Value
@@ -19,8 +17,7 @@ from db_inventory.utils.asset_helpers import SelfAssetBuilder
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from hashlib import md5
+from users.api.serializers.self import SelfAccessoryAssignmentSerializer, SelfAssetSerializer, SelfAssignedEquipmentSerializer, SelfConsumableIssueSerializer, SelfUserProfileSerializer
 
 
 class SelfUserProfileViewSet(RetrieveModelMixin, GenericViewSet):

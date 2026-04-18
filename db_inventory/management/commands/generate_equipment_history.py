@@ -12,7 +12,7 @@ from assignments.models.asset_assignment import (
     EquipmentEvent,
 )
 from db_inventory.models.assets import Equipment
-from db_inventory.models.users import User
+from users.models.users import User
 
 
 FAKE_EVENTS_PER_EQUIPMENT = 50

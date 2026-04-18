@@ -18,8 +18,6 @@ urlpatterns = [
     # Core Modules
     # ----------------------------
     path("auth/", include("db_inventory.urls.auth_urls")),
-    path("users/", include("db_inventory.urls.users_urls")), 
-    path("profiles/", include("db_inventory.urls.profile_urls")),
 
     path("", include("db_inventory.notifications.urls")),
 
@@ -121,34 +119,6 @@ urlpatterns = [
 
     path("consumables-import/", consumable_viewsets.ConsumableBatchImportView.as_view(), name="consumables-batch-import"),
     path("consumables-validate-import/", consumable_viewsets.ConsumableBatchValidateView.as_view(), name="consumables-batch-validate"),
-
-    # ----------------------------
-    # Roles
-    # ----------------------------
-    path("roles/", role_viewsets.RoleAssignmentViewSet.as_view({
-        "get": "list",
-        "post": "create"
-    }), name="role-assignment-list-create"),
-
-    path("roles/<str:public_id>/", role_viewsets.RoleAssignmentViewSet.as_view({
-        "get": "retrieve",
-        "put": "update",
-        "patch": "partial_update",
-        "delete": "destroy"
-    }), name="role-detail"),
-
-    path("my-roles/", role_viewsets.UserRoleList.as_view(), name="my-role-list"),
-    path("roles/users/<str:public_id>/", role_viewsets.UserRoleList.as_view(), name="user-role-list"),
-
-    path("roles/me/active-role/", role_viewsets.ActiveRoleViewSet.as_view({
-        "get": "retrieve",
-        "put": "update"
-    }), name="my-active-role"),
-
-    path("roles/me/active-role/<str:role_id>/", role_viewsets.ActiveRoleViewSet.as_view({
-        "get": "retrieve",
-        "put": "update"
-    }), name="my-active-role-update"),
 
     # ----------------------------
     # Utility

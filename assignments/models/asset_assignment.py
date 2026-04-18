@@ -1,5 +1,5 @@
 from db_inventory.models.assets import Equipment, Accessory, Consumable
-from db_inventory.models.users import User
+from users.models.users import User
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q, F

@@ -1,9 +1,9 @@
 from rest_framework import serializers
-from db_inventory.models.users import User
+from users.models.roles import RoleAssignment
+from users.models.users import User
 from sites.models.sites import Department, Location, Room
-from db_inventory.models.roles import RoleAssignment
+
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
 
 
 class ActiveRoleSerializer(serializers.ModelSerializer):

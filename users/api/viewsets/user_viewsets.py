@@ -1,29 +1,27 @@
-
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
-from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer, UserAreaSerializer, UserPlacementWriteSerializer
-from db_inventory.serializers.roles import RoleWriteSerializer
 from rest_framework import status, views
 from django.db import transaction
-from db_inventory.models import User, RoleAssignment
-from db_inventory.models.roles import RoleAssignment
 from db_inventory.models.audit import AuditLog
+from users.models.roles import RoleAssignment
+from users.models.users import User
+from users.api.serializers.roles import RoleWriteSerializer
+from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserAreaSerializer, UserConsumableIssueSerializer, UserPlacementWriteSerializer, UserProfileSerializer, UserReadSerializerFull, UserTransferSerializer, UserWriteSerializer
 from sites.models.sites import UserPlacement, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import  UserFilter, UserPlacementFilter
 from db_inventory.mixins import NotificationMixin, ScopeFilterMixin
 from db_inventory.pagination import FlexiblePagination
-from db_inventory.permissions import UserPermission, RolePermission, UserPlacementPermission, is_in_scope, filter_queryset_by_scope, FullUserCreatePermission
-from django.db.models import Q
+from db_inventory.permissions import UserPermission,  UserPlacementPermission, filter_queryset_by_scope, FullUserCreatePermission
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from db_inventory.mixins import AuditMixin
 from db_inventory.permissions.helpers import ensure_permission, filter_user_assets_by_scope
-from django.db.models import Count, Q
+from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from django.utils import timezone
@@ -36,6 +34,7 @@ from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from db_inventory.services.assets import user_has_active_assets
+
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
     """

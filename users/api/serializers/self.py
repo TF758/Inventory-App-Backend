@@ -1,7 +1,5 @@
-
-from db_inventory.models.users import User
+from users.models.users import User
 from rest_framework import serializers
-
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 

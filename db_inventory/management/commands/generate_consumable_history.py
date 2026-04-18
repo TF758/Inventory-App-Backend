@@ -12,7 +12,7 @@ from assignments.models.asset_assignment import (
     ConsumableIssue,
 )
 from db_inventory.models.assets import Consumable
-from db_inventory.models.users import User
+from users.models.users import User
 
 
 FAKE_EVENTS_PER_CONSUMABLE = 50

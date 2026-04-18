@@ -1,16 +1,18 @@
 from django.contrib import admin
-from sites.models.sites import *
-from db_inventory.models.base import *
-from db_inventory.models.assets import *
-from db_inventory.models.users import *
-from db_inventory.models.security import *
-from db_inventory.models.roles import *
-from db_inventory.models.audit import *
-from assignments.models.asset_assignment import *
+from db_inventory.models.users import PasswordResetEvent
+
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
 from db_inventory.security_policy import invalidate_security_policy_cache
+from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from db_inventory.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
+from db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
+from db_inventory.models.base import PublicIDRegistry
+from db_inventory.models.security import Notification, ScheduledTaskRun, SecuritySettings, UserSession
+from sites.models.sites import Department, Location, Room, UserPlacement
+from users.models.roles import RoleAssignment
+from users.models.users import User
 
 # Simple models
 

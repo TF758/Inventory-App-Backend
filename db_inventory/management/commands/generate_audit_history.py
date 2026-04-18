@@ -20,7 +20,7 @@ django.setup()
 from django.core.management.base import BaseCommand
 
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.users import User
+from users.models.users import User
 from db_inventory.utils.ids import generate_prefixed_id
 
 

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
-from db_inventory.models.users import User, PasswordResetEvent
+from db_inventory.models.users import PasswordResetEvent
+from users.models.users import User
 from db_inventory.models.security import Notification, SecuritySettings, UserSession
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory
 from django.contrib.auth import password_validation

@@ -243,7 +243,7 @@ DATABASES = {
         "PORT": env("DB_PORT", default="5432"),
     }
 }
-AUTH_USER_MODEL = 'db_inventory.User'
+AUTH_USER_MODEL = 'users.User'
 
 
 # Password validation

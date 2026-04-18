@@ -13,9 +13,9 @@ from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestA
 from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from db_inventory.pagination import FlexiblePagination
-from db_inventory.serializers.self import MixedAssetReturnSerializer
 from assignments.api.serializers.returns import ReturnRequestSerializer
 from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
+from users.api.serializers.self import MixedAssetReturnSerializer
 
 
 class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):

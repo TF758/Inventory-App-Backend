@@ -2,9 +2,11 @@
 from typing import Optional
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
-from db_inventory.models import *
-from db_inventory.models.assets import AssetAgreement, AssetAgreementItem, EquipmentStatus
+from db_inventory.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment, EquipmentStatus
 from assignments.models.asset_assignment import ReturnRequest
+from db_inventory.models.audit import AuditLog
+from users.models.roles import RoleAssignment
+from users.models.users import User
 from sites.models.sites import Department, Location, UserPlacement
 from .constants import OWNER_ALLOWED_STATUSES, ROLE_HIERARCHY
 from sites.models.sites import Room

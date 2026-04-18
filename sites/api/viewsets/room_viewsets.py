@@ -7,6 +7,9 @@ from db_inventory.permissions.assets import AssetPermission
 from db_inventory.permissions.users import UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
+from users.models.roles import RoleAssignment
+from users.api.serializers.roles import RoleReadSerializer
+from users.api.serializers.users import UserAreaSerializer
 from sites.models.sites import Room
 from sites.api.serializers.rooms import RoomListSerializer, RoomReadSerializer, RoomWriteSerializer
 from sites.permissions.sites import RoomPermission

@@ -1,10 +1,8 @@
-from db_inventory.factories import (
-    UserFactory,
-    UserPlacementFactory,
-    AccessoryFactory,
-)
+
 from assignments.tests.assignments_test_bases import CondemnAccessoryTestBase
 from assignments.models.asset_assignment import AccessoryAssignment
+from db_inventory.factories.asset_factories import AccessoryFactory
+from users.factories.user_factories import UserFactory, UserPlacementFactory
 from sites.factories.site_factories import RoomFactory
 
 

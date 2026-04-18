@@ -4,6 +4,8 @@ from db_inventory.models import *
 from django.db.models import Case, When, Value, IntegerField, Q, Sum, F, Value
 from django.db.models.functions import Coalesce
 from db_inventory.utils.filters import BaseAssetNameFilter
+from users.models.roles import RoleAssignment
+from users.models.users import User
 from sites.models.sites import Department, Location, UserPlacement, Room
 from assignments.models.asset_assignment import EquipmentAssignment, AccessoryAssignment, ConsumableIssue, ReturnRequest, ReturnRequestItem
 
@@ -482,7 +484,7 @@ class RoleAssignmentFilter(django_filters.FilterSet):
     assigned_before = django_filters.DateTimeFilter(field_name="assigned_date", lookup_expr="lte")
 
     class Meta:
-        model = RoleAssignment
+    
         fields = [
             "search",
             "role",

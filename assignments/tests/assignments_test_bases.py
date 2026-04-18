@@ -2,7 +2,8 @@ from rest_framework.test import APITestCase
 from django.urls import reverse
 
 from db_inventory.models.roles import RoleAssignment
-from db_inventory.factories.user_factories import UserFactory
+
+from users.factories.user_factories import UserFactory
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 
 class AccessoryAssignmentTestBase(APITestCase):

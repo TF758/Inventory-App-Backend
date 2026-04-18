@@ -1,9 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
-from db_inventory.serializers.roles import *
-from db_inventory.models.users import User
-from db_inventory.models.roles import RoleAssignment
+from users.models.roles import RoleAssignment
+from users.models.users import User
 from db_inventory.permissions.helpers import ensure_permission
 from rest_framework import status
 from rest_framework.generics import ListAPIView
@@ -18,6 +17,7 @@ from django.db.models import Q
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from db_inventory.permissions.constants import ROLE_HIERARCHY
+from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer, RoleWriteSerializer
 
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):

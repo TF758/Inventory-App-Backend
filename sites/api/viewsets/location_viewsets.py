@@ -1,16 +1,16 @@
 from rest_framework import viewsets
-from db_inventory.serializers.equipment import EquipmentSerializer
-from db_inventory.serializers.roles import RoleReadSerializer
-from db_inventory.serializers.users import UserAreaSerializer
+from db_inventory.serializers.equipment import EquipmentSerializer, EquipmentSerializer
 from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
 from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
 from db_inventory.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
+from users.models.roles import RoleAssignment
+from users.api.serializers.roles import RoleReadSerializer
+from users.api.serializers.users import UserAreaSerializer
 from sites.api.serializers.locations import LocationComponentSerializer, LocationListSerializer, LocationReadSerializer, LocationRoomSerializer, LocationWriteSerializer
 from sites.models.sites import Location, Room, UserPlacement
-from db_inventory.models.roles import RoleAssignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import *

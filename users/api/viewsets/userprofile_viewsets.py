@@ -2,7 +2,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
-from db_inventory.serializers.users import  UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions import UserPermission
 from rest_framework.response import Response
@@ -17,6 +16,7 @@ from rest_framework.response import Response
 from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from users.models.users import User
 
 
