@@ -1,9 +1,7 @@
 from django.test import TestCase
 from django.utils import timezone
-
-from db_inventory.factories.user_factories import UserFactory
-
 from db_inventory.factories.asset_factories import ( EquipmentFactory, ComponentFactory, ConsumableFactory, AccessoryFactory, )
+from users.factories.user_factories import UserFactory
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from reporting.services.site_reports import build_site_asset_report
 from reporting.utils.report_adapters.site_reports import site_asset_to_workbook_spec

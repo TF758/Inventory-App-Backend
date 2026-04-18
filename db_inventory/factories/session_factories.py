@@ -2,10 +2,10 @@ from db_inventory.models.security import UserSession
 import factory
 from django.utils import timezone
 from datetime import timedelta
-import secrets
 import uuid
+from users.factories.user_factories import UserFactory
 
-from .user_factories import UserFactory
+
 
 class UserSessionFactory(factory.django.DjangoModelFactory):
     class Meta:

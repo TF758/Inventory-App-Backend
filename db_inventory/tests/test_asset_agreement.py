@@ -2,10 +2,13 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-
 from db_inventory.models.assets import  AssetAgreementItem
-from db_inventory.factories import AssetAgreementFactory, DepartmentFactory, EquipmentFactory, LocationFactory, RoomFactory, UserFactory, AssetAgreementItemFactory
-from db_inventory.models.roles import RoleAssignment
+
+from db_inventory.factories.asset_factories import EquipmentFactory
+from db_inventory.factories.agreement_factories import AssetAgreementFactory, AssetAgreementItemFactory
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+from users.factories.user_factories import UserFactory
+from users.models.roles import RoleAssignment
 
 
 class AssetAgreementPermissionTests(TestCase):

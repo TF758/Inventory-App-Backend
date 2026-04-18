@@ -6,9 +6,9 @@ from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
 import secrets
-
 from db_inventory.models import UserSession
-from db_inventory.factories import UserFactory
+from users.factories.user_factories import UserFactory
+
 
 
 @mock.patch(

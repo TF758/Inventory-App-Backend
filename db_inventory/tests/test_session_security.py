@@ -1,13 +1,12 @@
-
-from db_inventory.factories.user_factories import UserFactory
 from db_inventory.models.security import SecuritySettings, UserSession
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.urls import reverse
 from django.test import TestCase
 from rest_framework_simplejwt.tokens import AccessToken
-from django.test import override_settings
-from django.conf import settings
+
+from users.factories.user_factories import UserFactory
+
 
 class SessionSecurityTests(TestCase):
 

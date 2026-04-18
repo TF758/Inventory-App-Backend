@@ -2,12 +2,6 @@ from django.test import TestCase
 from django.utils import timezone
 from unittest.mock import patch
 
-from db_inventory.factories import (
-    AccessoryFactory,
-    AdminUserFactory,
-    ConsumableFactory,
-    EquipmentFactory,
-)
 from db_inventory.models.audit import AuditLog
 from db_inventory.services.assets import (
     hard_delete_asset,
@@ -15,6 +9,8 @@ from db_inventory.services.assets import (
     soft_delete_asset,
 )
 from assignments.services.equipment_assignment import StatusChangeResult
+from db_inventory.factories.asset_factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
+from users.factories.user_factories import AdminUserFactory
 
 
 

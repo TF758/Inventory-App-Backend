@@ -1,12 +1,12 @@
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
-from db_inventory.models.roles import RoleAssignment
-from users.models.users import User
+from django.contrib.auth import get_user_model
+from users.models.roles import RoleAssignment
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from users.factories.user_factories import AdminUserFactory
 from sites.models.sites import UserPlacement
-
+User = get_user_model()
 
 class SiteAdminFullUserCreateTest(APITestCase):
     """Verify that SITE_ADMIN can create users anywhere"""

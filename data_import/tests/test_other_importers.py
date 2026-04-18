@@ -5,9 +5,10 @@ from django.core.files.storage import default_storage
 from data_import.services.accessory_importer import AccessoryImporter
 from data_import.services.consumable_importer import ConsumableImporter
 
-from db_inventory.factories.user_factories import UserFactory
+
 from db_inventory.models.assets import Accessory, Consumable
-from db_inventory.models.roles import RoleAssignment
+from users.models.roles import RoleAssignment
+from users.factories.user_factories import UserFactory
 from sites.factories.site_factories import RoomFactory
 
 

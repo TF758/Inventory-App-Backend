@@ -5,8 +5,9 @@ from db_inventory.permissions.helpers import (
     is_in_scope,
     check_permission, ensure_permission
 )
-from db_inventory.factories import UserFactory, RoomFactory, LocationFactory, DepartmentFactory, AdminUserFactory
-from db_inventory.models import RoleAssignment
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+from users.factories.user_factories import AdminUserFactory, UserFactory
+from users.models.roles import RoleAssignment
 
 
 class GlobalPermissionTests(TestCase):

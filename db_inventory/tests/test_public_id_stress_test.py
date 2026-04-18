@@ -5,7 +5,7 @@ from django.test.utils import CaptureQueriesContext
 from django.db import connection
 from db_inventory.models import Accessory
 from db_inventory.factories.asset_factories import AccessoryFactory
-from db_inventory.models.base import PublicIDRegistry
+
 
 
 class PublicIDStressTests(TestCase):

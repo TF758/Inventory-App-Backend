@@ -1,8 +1,3 @@
-
-
-
-
-
 from analytics.utils.system_overview_helpers.kpis import build_system_kpis
 from analytics.utils.utils.cache import get_cached_section
 

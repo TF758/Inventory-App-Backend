@@ -3,8 +3,7 @@ from django.urls import reverse
 from django.conf import settings
 import uuid
 from rest_framework.test import APIClient
-
-from db_inventory.factories.user_factories import UserFactory
+from users.factories.user_factories import UserFactory
 from reporting.models.reports import ReportJob
 
 

@@ -5,15 +5,14 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.urls import reverse
-from django.db import IntegrityError
 from unittest import mock
 from django.core.cache import cache
 from rest_framework_simplejwt.tokens import AccessToken
 
-from db_inventory.models import UserSession, User
-from db_inventory.factories import UserFactory
+from db_inventory.models import UserSession
 from db_inventory.security_policy import get_session_absolute_lifetime, get_session_idle_timeout
 from db_inventory.models.security import SecuritySettings
+from users.factories.user_factories import UserFactory
 
 
 TEST_UA = "unittest-agent"

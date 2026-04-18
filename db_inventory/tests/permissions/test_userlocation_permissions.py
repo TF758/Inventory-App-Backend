@@ -2,10 +2,10 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, APITestCase, APIClient
 from rest_framework import status
 from rest_framework.reverse import reverse
-from db_inventory.models import   RoleAssignment
 from db_inventory.factories import UserFactory
 from db_inventory.permissions.users import UserPlacementPermission
-from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
+from users.models.roles import RoleAssignment
+from users.api.viewsets.user_viewsets import UserPlacementViewSet
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from sites.models.sites import UserPlacement
 
@@ -201,7 +201,6 @@ class RoomAdminUserPlacementIntegrationTests(APITestCase):
         self.client.force_authenticate(user=self.room_admin)
 
         # Disable side effects
-        from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
         UserPlacementViewSet.audit = lambda *a, **k: None
         UserPlacementViewSet.notify = lambda *a, **k: None
 
@@ -289,7 +288,6 @@ class UserPlacementBoundaryIntegrationTests(APITestCase):
         self.client.force_authenticate(user=self.viewer)
 
         # Disable side effects
-        from db_inventory.viewsets.user_viewsets import UserPlacementViewSet
         UserPlacementViewSet.audit = lambda *a, **k: None
         UserPlacementViewSet.notify = lambda *a, **k: None
 

@@ -1,5 +1,5 @@
 from django.utils import timezone
-from db_inventory.models.roles import RoleAssignment
+from users.models.roles import RoleAssignment
 from assignments.tests.assignments_test_bases import AccessoryAssignmentTestBase
 from db_inventory.factories.asset_factories import AccessoryFactory
 from assignments.models.asset_assignment import AccessoryAssignment

@@ -3,12 +3,13 @@ from django.urls import reverse
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.utils import timezone
-
-from db_inventory.factories import AdminUserFactory, EquipmentFactory, UserFactory
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from db_inventory.models.assets import EquipmentStatus
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.roles import RoleAssignment
+from db_inventory.factories.asset_factories import EquipmentFactory
+from users.factories.user_factories import AdminUserFactory, UserFactory
+from users.models.roles import RoleAssignment
+
 
 
 
@@ -116,7 +117,7 @@ class BatchEquipmentStatusChangeTests(TestCase):
 
     # 4️⃣ Permission Failure (Non-admin)
     def test_batch_status_change_permission_failure(self):
-        from db_inventory.factories import UserFactory
+
 
         user = UserFactory()
         self.client.force_authenticate(user=user)

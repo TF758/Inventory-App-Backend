@@ -1,13 +1,9 @@
 from rest_framework.test import APIClient, APITestCase
 from django.urls import reverse
-from db_inventory.models import RoleAssignment
-from db_inventory.factories import (
-    UserFactory,
-    AdminUserFactory,
-    DepartmentFactory,
-    LocationFactory,
-    RoomFactory,
-)
+
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+from users.factories.user_factories import AdminUserFactory, UserFactory
+from users.models.roles import RoleAssignment
 
 class RoleAssignmentTestBase(APITestCase):
     __test__ = False  # prevent test discovery for base class

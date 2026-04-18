@@ -1,8 +1,10 @@
 from rest_framework.test import APITestCase, APIClient
 from django.urls import reverse
 
-from db_inventory.factories import AdminUserFactory, DepartmentFactory, LocationFactory, RoomFactory, UserFactory
-from db_inventory.models.roles import RoleAssignment
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+from users.factories.user_factories import AdminUserFactory, UserFactory
+from users.models.roles import RoleAssignment
+
 
 class UserPlacementPermissionTestBase(APITestCase):
     """

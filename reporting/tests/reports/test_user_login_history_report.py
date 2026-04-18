@@ -4,8 +4,8 @@ from datetime import timedelta, date
 from db_inventory.models.audit import AuditLog
 from db_inventory.factories.audit_factories import AuditLogFactory
 from db_inventory.factories.session_factories import UserSessionFactory
-from db_inventory.factories.user_factories import UserFactory
 from db_inventory.models.security import UserSession
+from users.factories.user_factories import UserFactory
 from reporting.services.user_summary import build_user_login_history_report
 from reporting.utils.report_adapters.user_summary import user_login_history_to_workbook_spec
 

@@ -5,10 +5,10 @@ from django.utils import timezone
 from django.test import override_settings
 from rest_framework.test import APITestCase
 from unittest.mock import patch
-from db_inventory.models import User
-from db_inventory.factories import UserFactory
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.users import PasswordResetEvent
+from db_inventory.tests.test_audit_logs import User
+from users.factories.user_factories import UserFactory
 
 
 

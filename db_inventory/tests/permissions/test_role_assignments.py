@@ -1,12 +1,10 @@
 from rest_framework import status
-from db_inventory.models import RoleAssignment
 from db_inventory.tests.utils._role_permissions_base import RoleAssignmentTestBase
-from db_inventory.factories import UserFactory
 from rest_framework import status
-from db_inventory.models import RoleAssignment
 from db_inventory.tests.utils._role_permissions_base import RoleAssignmentTestBase
-from db_inventory.factories import UserFactory
 from db_inventory.permissions.constants import ROLE_HIERARCHY
+from users.models.roles import RoleAssignment
+from users.factories.user_factories import UserFactory
 
 
 class TestRoleAssignmentPermissions(RoleAssignmentTestBase):

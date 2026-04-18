@@ -3,7 +3,7 @@ from rest_framework.test import APITestCase
 from rest_framework.test import APIClient
 from django.urls import reverse
 from assignments.models.asset_assignment import ConsumableIssue
-from db_inventory.models.roles import RoleAssignment
+from users.models.roles import RoleAssignment
 from assignments.tests.assignments_test_bases import ConsumableAPITestBase
 from db_inventory.factories.asset_factories import ConsumableFactory
 from users.factories.user_factories import UserFactory, UserPlacementFactory

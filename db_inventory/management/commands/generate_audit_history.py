@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from db_inventory.factories import AuditLogFactory
 from db_inventory.models.assets import Consumable, Equipment
-from db_inventory.models.roles import RoleAssignment
+from users.models.roles import RoleAssignment
 from db_inventory.models.base import PublicIDRegistry
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")

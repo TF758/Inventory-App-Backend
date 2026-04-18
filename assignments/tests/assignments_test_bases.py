@@ -1,8 +1,6 @@
 from rest_framework.test import APITestCase
 from django.urls import reverse
-
-from db_inventory.models.roles import RoleAssignment
-
+from users.models.roles import RoleAssignment
 from users.factories.user_factories import UserFactory
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 

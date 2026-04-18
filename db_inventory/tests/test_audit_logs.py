@@ -2,13 +2,16 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-from db_inventory.models import AuditLog, RoleAssignment, User
-from db_inventory.factories import (
-    UserFactory, AdminUserFactory,
-    EquipmentFactory
-)
+from django.contrib.auth import get_user_model
+
 from django.test import TransactionTestCase
+from db_inventory.factories.asset_factories import EquipmentFactory
+from db_inventory.models.audit import AuditLog
+from users.factories.user_factories import AdminUserFactory, UserFactory
+from users.models.roles import RoleAssignment
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+
+User = get_user_model()
 
 class AuditLogTests(TransactionTestCase):
     reset_sequences = True

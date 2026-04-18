@@ -1,14 +1,10 @@
 from rest_framework.test import APITestCase, APIClient
 from django.urls import reverse
 from rest_framework.exceptions import PermissionDenied
-from db_inventory.factories import (
-    UserFactory,
-    DepartmentFactory,
-    LocationFactory,
-    AdminUserFactory,
-)
-from db_inventory.models import RoleAssignment
 from db_inventory.permissions.helpers import is_in_scope, check_permission, ensure_permission
+from sites.factories.site_factories import DepartmentFactory
+from users.factories.user_factories import AdminUserFactory, UserFactory
+from users.models.roles import RoleAssignment
 
 
 # -------------------------------

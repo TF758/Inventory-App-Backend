@@ -1,13 +1,5 @@
 from rest_framework.test import APIClient, APITestCase
 from django.urls import reverse
-from db_inventory.models import RoleAssignment
-from db_inventory.factories import (
-    UserFactory,
-    AdminUserFactory,
-    RoomFactory,
-    LocationFactory,
-    DepartmentFactory,
-)
 
 ROLE_MATRIX = {
     "ROOM_VIEWER": {
