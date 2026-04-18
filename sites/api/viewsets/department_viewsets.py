@@ -1,7 +1,6 @@
 from rest_framework import viewsets
 from db_inventory.models import Consumable,  Equipment, Component, Accessory
 from db_inventory.serializers.roles import RoleReadSerializer
-from db_inventory.serializers.assignment import EquipmentAssignmentSerializer
 from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -21,6 +20,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from db_inventory.permissions.assets import AssetPermission
 from db_inventory.permissions.users import RolePermission, UserPermission
+from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from sites.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
 from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
 from sites.api.serializers.rooms import RoomSerializer

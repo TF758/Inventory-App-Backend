@@ -1,8 +1,6 @@
 from django.test import TestCase
-from django.urls import reverse, resolve
-from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
-from rest_framework.request import Request
-from db_inventory.permissions.assets import CanRequestAssetReturn
+from django.urls import reverse
+from rest_framework.test import APIClient
 from db_inventory.models import (
     EquipmentAssignment,
     AccessoryAssignment,

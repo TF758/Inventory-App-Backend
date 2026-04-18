@@ -9,15 +9,14 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.mixins import AuditMixin, NotificationMixin
-from db_inventory.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer,SelfReturnAccessorySerializer
 from db_inventory.permissions.assets import CanManageAssetCustody, CanSelfReturnAsset, CanUseAsset
-from rest_framework import mixins, viewsets, filters
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, filters
 from rest_framework.generics import GenericAPIView
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
 from db_inventory.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
 from db_inventory.models.security import Notification
+from assignments.api.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer, SelfReturnAccessorySerializer
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):

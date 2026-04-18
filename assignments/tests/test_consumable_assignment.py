@@ -3,16 +3,16 @@ from rest_framework.test import APITestCase
 from rest_framework.test import APIClient
 from django.urls import reverse
 from db_inventory.factories import (
-    DepartmentFactory,
-    LocationFactory,
-    RoomFactory,
     UserFactory,
     UserPlacementFactory,
     ConsumableFactory,
 )
 from db_inventory.models.asset_assignment import ConsumableIssue
 from db_inventory.models.roles import RoleAssignment
-from db_inventory.tests.utils.assignments_test_bases import ConsumableAPITestBase
+from assignments.tests.assignments_test_bases import ConsumableAPITestBase
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
+
+
 
 
 class TestIssueConsumable(ConsumableAPITestBase):

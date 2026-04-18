@@ -21,8 +21,10 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
-from db_inventory.services.equipment_assignment import StatusChangeResult
+
 from django.db import transaction
+
+from assignments.services.equipment_assignment import StatusChangeResult
 
 
 class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):

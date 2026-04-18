@@ -21,6 +21,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('db_inventory.api_urls')),
     path('analytics/', include('analytics.urls.analytics_url')),
+    path('assignments/', include('assignments.urls.assignment_urls')),
     path('reports/', include('reporting.urls.report_urls')),   
     path('sites/', include('sites.urls.site_urls')),   
     path('imports/', include('data_import.import_urls')),

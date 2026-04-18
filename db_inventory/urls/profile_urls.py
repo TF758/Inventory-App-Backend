@@ -1,9 +1,12 @@
 # db_inventory/urls/profile_urls.py
 
 from django.urls import path
-from db_inventory.viewsets import self_viewsets, asset_returns_viewset
-from db_inventory.viewsets.asset_assignment.consumable_assignment import UseConsumableView
+
+
 from db_inventory.viewsets.user_viewsets import UserProfileViewSet
+from assignments.api.viewsets import asset_returns_viewset
+from assignments.api.viewsets.consumable_assignment import UseConsumableView
+from db_inventory.viewsets import self_viewsets
 
 urlpatterns = [
 

@@ -1,9 +1,9 @@
 from django.urls import path
 
+from assignments.api.viewsets import accessory_assignnment, equipment_assignment
+from assignments.api.viewsets.consumable_assignment import AdminReturnConsumableView, ConsumableDistributionViewSet, ConsumableEventHistoryViewSet, IssueConsumableView, ReportConsumableLossView, RestockConsumableView, UseConsumableView
 
-from db_inventory.viewsets.asset_assignment import equipment_assignment
-from db_inventory.viewsets.asset_assignment import accessory_assignnment
-from db_inventory.viewsets.asset_assignment.consumable_assignment import AdminReturnConsumableView, ConsumableDistributionViewSet, ConsumableEventHistoryViewSet, IssueConsumableView, ReportConsumableLossView, RestockConsumableView, UseConsumableView
+
 
 
 urlpatterns = [

@@ -25,9 +25,9 @@ from django.utils import timezone
 from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
 from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment,  unassign_equipment
 from db_inventory.models.assets import EquipmentStatus
 from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
+from assignments.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, unassign_equipment
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 

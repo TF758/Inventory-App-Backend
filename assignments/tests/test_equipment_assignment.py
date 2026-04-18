@@ -1,12 +1,9 @@
-from django.test import TestCase
-from rest_framework.test import APIClient
-from django.urls import reverse
-
-from db_inventory.factories import DepartmentFactory, EquipmentFactory, LocationFactory, RoomFactory, UserFactory, UserPlacementFactory
+from db_inventory.factories import EquipmentFactory, UserFactory, UserPlacementFactory
 from db_inventory.models.asset_assignment import EquipmentAssignment
-from db_inventory.models.assets import EquipmentStatus
 from db_inventory.models.roles import RoleAssignment
-from db_inventory.tests.utils.assignments_test_bases import EquipmentAssignmentAPITestBase
+from assignments.tests.assignments_test_bases import EquipmentAssignmentAPITestBase
+from sites.factories.site_factories import LocationFactory, RoomFactory
+
 
 class TestAssignEquipment(EquipmentAssignmentAPITestBase):
 

@@ -1,13 +1,12 @@
 
 from db_inventory.models.audit import AuditLog
 from db_inventory.permissions.helpers import can_hard_delete_asset, can_soft_delete_asset
-from db_inventory.services.equipment_assignment import StatusChangeResult
 from db_inventory.utils.asset_helpers import ASSET_CONFIG
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied
 
 from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from assignments.services.equipment_assignment import StatusChangeResult
 
 def create_asset_audit_log(
     *,

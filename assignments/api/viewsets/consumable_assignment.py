@@ -8,7 +8,6 @@ from db_inventory.models.asset_assignment import ConsumableEvent, ConsumableIssu
 from db_inventory.models.assets import Consumable
 from db_inventory.models.audit import AuditLog
 from db_inventory.permissions.assets import CanManageAssetCustody, CanReportConsumableLoss, CanUseAsset
-from db_inventory.serializers.assignment import ConsumableDistributionSerializer, ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, RestockConsumableSerializer, ReturnConsumableSerializer, UseConsumableSerializer
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets, filters
@@ -16,6 +15,8 @@ from db_inventory.pagination import FlexiblePagination
 from db_inventory.models.security import Notification
 from db_inventory.utils.viewset_helpers import get_admins_responsible_for_room, get_current_room_for_user, get_site_admins
 from django.http import Http404
+
+from assignments.api.serializers.assignment import ConsumableDistributionSerializer, ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, RestockConsumableSerializer, ReturnConsumableSerializer, UseConsumableSerializer
 
 class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """

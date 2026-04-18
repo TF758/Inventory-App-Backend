@@ -2,8 +2,6 @@ from django.urls import path, include
 
 from db_inventory.viewsets import agreement_viewsets
 
-
-
 from .viewsets import *
 
 """
@@ -20,10 +18,8 @@ urlpatterns = [
     # Core Modules
     # ----------------------------
     path("auth/", include("db_inventory.urls.auth_urls")),
-    path("inventory/", include("db_inventory.urls.inventory_urls")),
     path("users/", include("db_inventory.urls.users_urls")), 
     path("profiles/", include("db_inventory.urls.profile_urls")),
-    path("admin/", include("db_inventory.urls.admin_urls")),
 
     path("", include("db_inventory.notifications.urls")),
 

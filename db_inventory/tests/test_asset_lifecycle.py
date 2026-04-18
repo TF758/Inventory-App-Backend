@@ -14,7 +14,8 @@ from db_inventory.services.assets import (
     restore_asset,
     soft_delete_asset,
 )
-from db_inventory.services.equipment_assignment import StatusChangeResult
+from assignments.services.equipment_assignment import StatusChangeResult
+
 
 
 class _BaseAssetLifecycleTest():

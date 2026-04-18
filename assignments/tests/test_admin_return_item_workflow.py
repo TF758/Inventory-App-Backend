@@ -1,13 +1,14 @@
-from django.test import TransactionTestCase, TestCase
+from django.test import  TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from db_inventory.factories import EquipmentFactory, RoomFactory, UserFactory
+from db_inventory.factories import EquipmentFactory, UserFactory
 from db_inventory.models.asset_assignment import EquipmentAssignment
 from db_inventory.models.roles import RoleAssignment
-from db_inventory.models.security import Notification
 from db_inventory.models.audit import AuditLog
-from db_inventory.services.asset_returns import create_mixed_return_request
+from assignments.services.asset_returns import create_mixed_return_request
+from sites.factories.site_factories import RoomFactory
+
 
 class AdminReturnItemWorkflowTests(TestCase):
     """

@@ -1,12 +1,12 @@
-# db_inventory/api/admin_urls.py
 from django.urls import path
 
-from db_inventory.viewsets import asset_returns_viewset
+from assignments.api.viewsets import asset_returns_viewset
+
 
 urlpatterns = [
 
     # -------------------------
-    # Item workflow (specific first)
+    # Item workflow 
     # -------------------------
     path( "return-request-items/<str:public_id>/approve/", asset_returns_viewset.AdminReturnRequestItemWorkflowViewSet.as_view({"post": "approve"}), name="admin-return-request-item-approve", ),
     path( "return-request-items/<str:public_id>/deny/", asset_returns_viewset.AdminReturnRequestItemWorkflowViewSet.as_view({"post": "deny"}), name="admin-return-request-item-deny", ),

@@ -1,5 +1,3 @@
-# serializers/returns.py
-
 from rest_framework import serializers
 
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem

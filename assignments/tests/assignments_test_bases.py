@@ -1,9 +1,9 @@
-from rest_framework.test import APITestCase, APIClient
+from rest_framework.test import APITestCase
 from django.urls import reverse
-from django.test import TestCase
 
-from db_inventory.factories import DepartmentFactory, LocationFactory, RoomFactory, UserFactory
 from db_inventory.models.roles import RoleAssignment
+from db_inventory.factories.user_factories import UserFactory
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 
 class AccessoryAssignmentTestBase(APITestCase):
     @classmethod

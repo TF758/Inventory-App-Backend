@@ -9,7 +9,7 @@ from django.db.models import Case, When, Value, IntegerField
 from django.db import transaction
 from db_inventory.serializers.accessories import BatchAccessorySoftDeleteSerializer, BatchAccessoryHardDeleteSerializer
 from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
-from db_inventory.services.equipment_assignment import StatusChangeResult
+from assignments.services.equipment_assignment import StatusChangeResult
 from ...pagination import FlexiblePagination
 from rest_framework.views import APIView
 from rest_framework.response import Response

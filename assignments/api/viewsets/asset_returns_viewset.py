@@ -2,8 +2,6 @@
 from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
 from db_inventory.models.security import Notification
 from db_inventory.models.audit import AuditLog
-from db_inventory.serializers.returns import  ReturnRequestSerializer
-from db_inventory.services.asset_returns import approve_return_item, approve_return_request, create_mixed_return_request, deny_return_item
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +14,9 @@ from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers.self import MixedAssetReturnSerializer
+from assignments.api.serializers.returns import ReturnRequestSerializer
+from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
+
 
 class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):
 

@@ -1,10 +1,9 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
-from db_inventory.models.base import generate_public_id
-from db_inventory.utils.query_helpers import get_user_accessories, get_user_consumables
-from db_inventory.services.asset_return_builders import build_accessory_return_items, build_consumable_return_items, build_equipment_return_items
+from db_inventory.models.asset_assignment import AccessoryEvent, ConsumableEvent, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from assignments.services.asset_return_builders import build_accessory_return_items, build_consumable_return_items, build_equipment_return_items
+
 
 
 @transaction.atomic
