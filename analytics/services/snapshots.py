@@ -10,7 +10,7 @@ from db_inventory.models.security import UserSession
 from db_inventory.models.users import PasswordResetEvent, User
 from sites.models.sites import Department, Location, Room
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from django.contrib.auth import get_user_model
 from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max
 

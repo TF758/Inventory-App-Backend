@@ -1,4 +1,4 @@
-from db_inventory.models.asset_assignment import AccessoryEvent, ConsumableEvent, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import AccessoryEvent, ConsumableEvent, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
 from db_inventory.models.base import generate_public_id
 from db_inventory.utils.query_helpers import get_user_accessories, get_user_consumables
 from django.core.exceptions import ValidationError

@@ -5,7 +5,7 @@ from db_inventory.utils.asset_helpers import ASSET_CONFIG
 from django.db import transaction
 from django.utils import timezone
 
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assignments.services.equipment_assignment import StatusChangeResult
 
 def create_asset_audit_log(

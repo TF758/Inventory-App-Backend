@@ -1,14 +1,10 @@
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
-from db_inventory.models import (
-    EquipmentAssignment,
-    AccessoryAssignment,
-    ConsumableIssue,
-)
 from db_inventory.factories import AccessoryFactory, ConsumableFactory, EquipmentFactory, UserFactory
 from django.utils import timezone
-from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
+
 
 class MixedAssetReturnViewSetTests(TestCase):
 

@@ -6,6 +6,8 @@ from db_inventory.filters import *
 from db_inventory.permissions.assets import AssetPermission
 from db_inventory.permissions.users import UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
+from assignments.models.asset_assignment import EquipmentAssignment
+from sites.models.sites import Room
 from sites.api.serializers.rooms import RoomListSerializer, RoomReadSerializer, RoomWriteSerializer
 from sites.permissions.sites import RoomPermission
 from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin

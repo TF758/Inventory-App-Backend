@@ -2,7 +2,7 @@
 from db_inventory.models.users import User
 from rest_framework import serializers
 
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue
+from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 
 class SelfUserProfileSerializer(serializers.ModelSerializer):

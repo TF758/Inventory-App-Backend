@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from db_inventory.models.asset_assignment import AccessoryEvent, ConsumableEvent, EquipmentEvent, ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import AccessoryEvent, ConsumableEvent, EquipmentEvent, ReturnRequest, ReturnRequestItem
 from assignments.services.asset_return_builders import build_accessory_return_items, build_consumable_return_items, build_equipment_return_items
 
 

@@ -1,7 +1,7 @@
 import factory
 from django.utils import timezone
 
-from db_inventory.models.asset_assignment import (
+from assignments.models.asset_assignment import (
     ReturnRequest,
     ReturnRequestItem,
 )

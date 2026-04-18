@@ -1,5 +1,5 @@
 from db_inventory.models.security import Notification
-from db_inventory.models.asset_assignment import EquipmentAssignment, ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest, ReturnRequestItem
 from db_inventory.models.assets import Component, Consumable, EquipmentStatus
 from db_inventory.models.roles import RoleAssignment
 from .permissions import filter_queryset_by_scope

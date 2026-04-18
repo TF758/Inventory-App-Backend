@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from tqdm import tqdm
 
-from db_inventory.models.asset_assignment import (
+from assignments.models.asset_assignment import (
     EquipmentAssignment,
     EquipmentEvent,
 )

@@ -16,7 +16,7 @@ from db_inventory.filters import EquipmentAssignmentFilter
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.models.security import Notification
 from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
-from db_inventory.models.asset_assignment import EquipmentAssignment, EquipmentEvent
+from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 
 class EquipmentAssignmentViewSet(
     AuditMixin,

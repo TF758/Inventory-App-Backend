@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
 from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
-from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.serializers.self import MixedAssetReturnSerializer
 from assignments.api.serializers.returns import ReturnRequestSerializer

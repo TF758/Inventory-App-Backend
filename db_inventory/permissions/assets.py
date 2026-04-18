@@ -1,5 +1,5 @@
 from rest_framework.permissions import BasePermission
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from db_inventory.models.assets import AssetAgreement, AssetAgreementItem, Equipment
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role

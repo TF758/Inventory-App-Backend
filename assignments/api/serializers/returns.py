@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 
 
 class ReturnRequestItemSerializer(serializers.ModelSerializer):

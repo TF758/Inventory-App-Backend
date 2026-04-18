@@ -7,6 +7,7 @@ from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
 from db_inventory.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
+from assignments.models.asset_assignment import EquipmentAssignment
 from sites.api.serializers.locations import LocationComponentSerializer, LocationListSerializer, LocationReadSerializer, LocationRoomSerializer, LocationWriteSerializer
 from sites.models.sites import Location, Room, UserPlacement
 from db_inventory.models.roles import RoleAssignment

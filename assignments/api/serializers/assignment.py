@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from db_inventory.models.users import User
 from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
-from db_inventory.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent
+from assignments.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, ConsumableIssue, EquipmentAssignment, EquipmentEvent
 from rest_framework.serializers import ValidationError
 
 

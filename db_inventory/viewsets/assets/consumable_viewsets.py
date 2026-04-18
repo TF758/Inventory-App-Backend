@@ -1,11 +1,6 @@
 from rest_framework import viewsets
-from db_inventory.serializers.consumables import (
-BatchConsumableHardDeleteSerializer,
-BatchConsumableSoftDeleteSerializer,
-ConsumableWriteSerializer,
-ConsumableAreaReaSerializer
-)
-from db_inventory.models import Consumable, Room
+from db_inventory.serializers.consumables import ( BatchConsumableHardDeleteSerializer, BatchConsumableSoftDeleteSerializer, ConsumableWriteSerializer, ConsumableAreaReaSerializer )
+from db_inventory.models import Consumable
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import ConsumableFilter
@@ -21,10 +16,9 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
-
 from django.db import transaction
-
 from assignments.services.equipment_assignment import StatusChangeResult
+from sites.models.sites import Room
 
 
 class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):

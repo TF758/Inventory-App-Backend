@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction
 
-from db_inventory.models.asset_assignment import (
+from assignments.models.asset_assignment import (
     AccessoryAssignment,
     ConsumableIssue,
     EquipmentAssignment,

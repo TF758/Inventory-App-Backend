@@ -7,7 +7,7 @@ from db_inventory.factories import (
     UserPlacementFactory,
     ConsumableFactory,
 )
-from db_inventory.models.asset_assignment import ConsumableIssue
+from assignments.models.asset_assignment import ConsumableIssue
 from db_inventory.models.roles import RoleAssignment
 from assignments.tests.assignments_test_bases import ConsumableAPITestBase
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory

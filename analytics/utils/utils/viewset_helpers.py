@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from db_inventory.models import Equipment, Component, Consumable, Accessory
 from django.db.models import Q, Max
 
-from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 
 
 

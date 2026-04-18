@@ -6,7 +6,7 @@ from db_inventory.models.users import *
 from db_inventory.models.security import *
 from db_inventory.models.roles import *
 from db_inventory.models.audit import *
-from db_inventory.models.asset_assignment import *
+from assignments.models.asset_assignment import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline

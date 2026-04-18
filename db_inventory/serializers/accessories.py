@@ -3,7 +3,7 @@ from sites.models.sites import Location, Room
 from db_inventory.models.assets import Accessory
 from rest_framework.validators import UniqueValidator
 
-from db_inventory.models.asset_assignment import AccessoryAssignment
+from assignments.models.asset_assignment import AccessoryAssignment
 
 
 # Write Serializer

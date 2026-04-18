@@ -44,7 +44,7 @@ class Equipment(PublicIDModel):
     @property
     def is_assigned(self) -> bool:
         EquipmentAssignment = apps.get_model(
-            "db_inventory", "EquipmentAssignment"
+            "assignments", "EquipmentAssignment"
         )
         try:
             return self.active_assignment.returned_at is None

@@ -1,9 +1,11 @@
+from django.db import models
 import django_filters
 from db_inventory.models import *
 from django.db.models import Case, When, Value, IntegerField, Q, Sum, F, Value
 from django.db.models.functions import Coalesce
 from db_inventory.utils.filters import BaseAssetNameFilter
-from sites.models.sites import Department, Location, UserPlacement
+from sites.models.sites import Department, Location, UserPlacement, Room
+from assignments.models.asset_assignment import EquipmentAssignment, AccessoryAssignment, ConsumableIssue, ReturnRequest, ReturnRequestItem
 
 class UserFilter(django_filters.FilterSet):
     email = django_filters.CharFilter(lookup_expr="istartswith")

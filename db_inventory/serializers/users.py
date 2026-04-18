@@ -4,7 +4,7 @@ from sites.models.sites import Room, UserPlacement
 from django.utils import timezone
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from db_inventory.models.asset_assignment import AccessoryAssignment, ConsumableIssue
+from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 class UserReadSerializerFull(serializers.ModelSerializer):
     """Serilziers known information about a user"""

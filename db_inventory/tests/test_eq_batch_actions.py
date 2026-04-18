@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 from django.utils import timezone
 
 from db_inventory.factories import AdminUserFactory, EquipmentFactory, UserFactory
-from db_inventory.models.asset_assignment import EquipmentAssignment, EquipmentEvent
+from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from db_inventory.models.assets import EquipmentStatus
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.roles import RoleAssignment

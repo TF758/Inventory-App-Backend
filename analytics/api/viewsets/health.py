@@ -12,7 +12,7 @@ from db_inventory.models.assets import Accessory, Consumable, Equipment, Equipme
 from django.db.models import Exists, OuterRef, Sum, F
 
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset
-from db_inventory.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from analytics.utils.utils.viewset_helpers import get_return_health
 
 User = get_user_model()

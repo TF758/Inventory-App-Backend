@@ -1,10 +1,6 @@
 from rest_framework import viewsets
-from db_inventory.serializers.equipment import (
-EquipmentCondemnSerializer,
-EquipmentStatusChangeSerializer,
-EquipmentWriteSerializer
-,EquipmentSerializer
-)
+from db_inventory.serializers.equipment import ( EquipmentCondemnSerializer, EquipmentStatusChangeSerializer, EquipmentWriteSerializer ,EquipmentSerializer )
+from rest_framework.serializers import ValidationError
 from db_inventory.models import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -28,6 +24,8 @@ from db_inventory.permissions.helpers import can_assign_asset_to_user, get_activ
 from db_inventory.models.assets import EquipmentStatus
 from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from assignments.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, unassign_equipment
+from assignments.models.asset_assignment import EquipmentEvent
+from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 

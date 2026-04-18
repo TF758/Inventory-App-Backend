@@ -21,6 +21,8 @@ from django.shortcuts import get_object_or_404
 from db_inventory.permissions.assets import AssetPermission
 from db_inventory.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
+from assignments.models.asset_assignment import EquipmentAssignment
+from sites.models.sites import Room
 from sites.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
 from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
 from sites.api.serializers.rooms import RoomSerializer

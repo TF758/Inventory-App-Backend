@@ -1,14 +1,15 @@
 from django.db import transaction
 from django.utils import timezone
-from db_inventory.models import Equipment, EquipmentEvent
+
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.security import Notification
 from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from db_inventory.models.assets import EquipmentStatus
 from db_inventory.permissions.helpers import  is_admin_role, is_in_scope
 from db_inventory.utils.asset_helpers import equipment_event_from_status
+from db_inventory.models.assets import Equipment, EquipmentStatus
+from assignments.models.asset_assignment import EquipmentEvent
 
 class UnassignResult:
     SUCCESS = "success"
@@ -30,7 +31,7 @@ def unassign_equipment(
     lock_equipment=True,
 ):
 
-    EquipmentAssignment = apps.get_model("db_inventory", "EquipmentAssignment")
+    EquipmentAssignment = apps.get_model("assignments", "EquipmentAssignment")
 
     if now is None:
         now = timezone.now()
@@ -162,7 +163,7 @@ def assign_equipment(
     lock_equipment=True,
 ):
 
-    EquipmentAssignment = apps.get_model("db_inventory", "EquipmentAssignment")
+    EquipmentAssignment = apps.get_model("assignments", "EquipmentAssignment")
 
     if now is None:
         now = timezone.now()
@@ -316,7 +317,7 @@ def change_equipment_status(
     if now is None:
         now = timezone.now()
 
-    EquipmentAssignment = apps.get_model("db_inventory", "EquipmentAssignment")
+    EquipmentAssignment = apps.get_model("assignments", "EquipmentAssignment")
 
     def _execute():
 
@@ -397,7 +398,7 @@ def condemn_equipment(
     if now is None:
         now = timezone.now()
 
-    EquipmentAssignment = apps.get_model("db_inventory", "EquipmentAssignment")
+    EquipmentAssignment = apps.get_model("assignments", "EquipmentAssignment")
 
     def _execute():
 
