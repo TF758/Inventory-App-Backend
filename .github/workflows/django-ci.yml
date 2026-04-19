@@ -28,21 +28,7 @@ jobs:
       - name: Run dependency vulnerability scan
         run: pip-audit --progress-spinner off
 
-  build-image:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build API image
-        run: docker compose build api
-
   tests:
-    needs: build-image
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -50,8 +36,11 @@ jobs:
       matrix:
         suite:
           - core.tests
+          - assignments.tests
           - data_import.tests
           - reporting.tests
+          - users.tests
+          - full
 
     steps:
       - name: Checkout repository
@@ -71,6 +60,9 @@ jobs:
           echo "SESSION_IDLE_MINUTES=30" >> .env.dev
           echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
 
+      - name: Build containers
+        run: docker compose build
+
       - name: Start services
         run: docker compose up -d
 
@@ -87,7 +79,11 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          docker compose exec -T api coverage run --parallel-mode manage.py test ${{ matrix.suite }} --parallel
+          if [ "${{ matrix.suite }}" = "full" ]; then
+            docker compose exec -T api coverage run --parallel-mode manage.py test --parallel
+          else
+            docker compose exec -T api coverage run --parallel-mode manage.py test ${{ matrix.suite }} --parallel
+          fi
 
       - name: Extract coverage files from container
         run: |
