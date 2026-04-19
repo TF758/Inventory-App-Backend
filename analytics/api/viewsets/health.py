@@ -8,7 +8,7 @@ from django.utils import timezone
 from db_inventory.models.audit import AuditLog
 from db_inventory.models.security import UserSession
 from db_inventory.models.users import PasswordResetEvent
-from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
+from assets.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
 from django.db.models import Exists, OuterRef, Sum, F
 
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset

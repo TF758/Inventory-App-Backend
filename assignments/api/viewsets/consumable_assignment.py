@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from db_inventory.mixins import AuditMixin, NotificationMixin
 from assignments.models.asset_assignment import ConsumableEvent, ConsumableIssue
-from db_inventory.models.assets import Consumable
+from assets.models.assets import Consumable
 from db_inventory.models.audit import AuditLog
 from db_inventory.permissions.assets import CanManageAssetCustody, CanReportConsumableLoss, CanUseAsset
 from django.utils import timezone

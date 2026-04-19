@@ -1,6 +1,6 @@
 from django.utils import timezone
 
-from db_inventory.models.assets import Accessory, Consumable, Equipment
+from assets.models.assets import Accessory, Consumable, Equipment
 
 
 

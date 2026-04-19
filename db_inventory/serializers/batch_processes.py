@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
-from db_inventory.models.assets import EquipmentStatus
+from assets.models.assets import EquipmentStatus
 
 class BatchEquipmentPublicIDsSerializer(serializers.Serializer):
     """

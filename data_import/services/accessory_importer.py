@@ -1,7 +1,7 @@
 
 
 from data_import.services.base_importer import BaseAssetImporter
-from db_inventory.models.assets import Accessory
+from assets.models.assets import Accessory
 from assets.api.serializers.accessories import AccessoryWriteSerializer
 
 

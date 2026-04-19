@@ -11,7 +11,7 @@ from assignments.models.asset_assignment import (
     ConsumableEvent,
     ConsumableIssue,
 )
-from db_inventory.models.assets import Consumable
+from assets.models.assets import Consumable
 from users.models.users import User
 
 

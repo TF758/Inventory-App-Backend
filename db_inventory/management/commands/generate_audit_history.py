@@ -10,7 +10,7 @@ from django.db import transaction
 from tqdm import tqdm 
 
 from db_inventory.factories import AuditLogFactory
-from db_inventory.models.assets import Consumable, Equipment
+from assets.models.assets import Consumable, Equipment
 from users.models.roles import RoleAssignment
 from db_inventory.models.base import PublicIDRegistry
 

@@ -8,7 +8,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from db_inventory.permissions.helpers import  is_admin_role, is_in_scope
 from db_inventory.utils.asset_helpers import equipment_event_from_status
-from db_inventory.models.assets import Equipment, EquipmentStatus
+from assets.models.assets import Equipment, EquipmentStatus
 from assignments.models.asset_assignment import EquipmentEvent
 
 class UnassignResult:

@@ -1,7 +1,7 @@
 
 
 from data_import.services.base_importer import BaseAssetImporter
-from db_inventory.models.assets import Accessory, Consumable
+from assets.models.assets import Accessory, Consumable
 from assets.api.serializers.consumables import ConsumableWriteSerializer
 
 

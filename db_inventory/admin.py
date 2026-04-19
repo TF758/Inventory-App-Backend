@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
 from db_inventory.security_policy import invalidate_security_policy_cache
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
-from db_inventory.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
+from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
 from db_inventory.models.base import PublicIDRegistry
 from db_inventory.models.security import Notification, ScheduledTaskRun, SecuritySettings, UserSession

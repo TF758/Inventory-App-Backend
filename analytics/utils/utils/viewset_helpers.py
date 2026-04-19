@@ -4,10 +4,9 @@ from datetime import timedelta
 from django.utils import timezone
 import io
 from openpyxl import Workbook
-from db_inventory.models import Equipment, Component, Consumable, Accessory
 from django.db.models import Q, Max
-
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from assets.models.assets import Accessory, Component, Consumable, Equipment
 
 
 

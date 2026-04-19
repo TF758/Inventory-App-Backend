@@ -11,7 +11,7 @@ from assignments.models.asset_assignment import (
     EquipmentAssignment,
     EquipmentEvent,
 )
-from db_inventory.models.assets import Equipment
+from assets.models.assets import Equipment
 from users.models.users import User
 
 

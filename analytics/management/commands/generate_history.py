@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction, models
 from tqdm import tqdm
-from db_inventory.models.assets import Accessory, Component, Consumable, Equipment
+from assets.models.assets import Accessory, Component, Consumable, Equipment
 from db_inventory.models.security import UserSession
 from users.factories.user_factories import User
 from sites.models.sites import Department, Location, Room

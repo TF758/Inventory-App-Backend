@@ -1,4 +1,4 @@
-from db_inventory.models.assets import Equipment, Accessory, Consumable
+from assets.models.assets import Equipment, Accessory, Consumable
 from users.models.users import User
 from django.db import models
 from django.core.exceptions import ValidationError

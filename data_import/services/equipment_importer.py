@@ -2,7 +2,7 @@
 
 
 from data_import.services.base_importer import BaseAssetImporter
-from db_inventory.models.assets import Equipment, EquipmentStatus
+from assets.models.assets import Equipment, EquipmentStatus
 from assets.api.serializers.equipment import EquipmentWriteSerializer
 
 

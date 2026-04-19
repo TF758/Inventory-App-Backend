@@ -1,7 +1,6 @@
 from rest_framework import viewsets
-from db_inventory.serializers.equipment import ( EquipmentCondemnSerializer, EquipmentStatusChangeSerializer, EquipmentWriteSerializer ,EquipmentSerializer )
 from rest_framework.serializers import ValidationError
-from db_inventory.models import *
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import EquipmentFilter
@@ -21,10 +20,13 @@ from django.utils import timezone
 from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
 from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.models.assets import EquipmentStatus
-from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
+from assets.models.assets import Equipment, EquipmentStatus
+
 from assignments.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, unassign_equipment
 from assignments.models.asset_assignment import EquipmentEvent
+from assets.api.serializers.equipment import EquipmentCondemnSerializer, EquipmentSerializer, EquipmentStatusChangeSerializer, EquipmentWriteSerializer
+from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
+from db_inventory.models.audit import AuditLog
 from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):

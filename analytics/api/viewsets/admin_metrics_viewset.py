@@ -1,11 +1,17 @@
 from django.db.models import Sum
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from db_inventory.models import *
 from datetime import timedelta
 from django.db.models import Count, Q
 from db_inventory.permissions import ROLE_HIERARCHY
 from django.utils import timezone
+
+from assets.models.assets import Accessory, Component, Consumable, Equipment
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
+from db_inventory.models.security import UserSession
+from db_inventory.models.users import PasswordResetEvent
+from sites.models.sites import Department, Location, Room
+from users.factories.user_factories import User
 
 
 class AdminMetricsOverview(APIView):

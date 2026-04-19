@@ -1,6 +1,6 @@
 
 # Role hierarchy: higher numbers mean more power
-from db_inventory.models.assets import EquipmentStatus
+from assets.models.assets import EquipmentStatus
 
 
 ROLE_HIERARCHY = {

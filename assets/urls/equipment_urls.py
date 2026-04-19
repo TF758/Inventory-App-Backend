@@ -1,11 +1,8 @@
 from django.urls import path, include
-
 from assets.api.viewsets import equipment_viewsets
 
 
 urlpatterns = [
-
-
     # ----------------------------
     # Equipment
     # ----------------------------

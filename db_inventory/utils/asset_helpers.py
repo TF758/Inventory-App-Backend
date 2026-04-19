@@ -1,5 +1,5 @@
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
-from db_inventory.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
+from assets.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
 from django.core.exceptions import ValidationError
 
 from db_inventory.models.audit import AuditLog

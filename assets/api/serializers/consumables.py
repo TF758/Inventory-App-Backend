@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from db_inventory.models.assets import Consumable
+from assets.models.assets import Consumable
 from sites.models.sites import Location, Room
 
 

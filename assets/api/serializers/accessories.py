@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from sites.models.sites import Location, Room
-from db_inventory.models.assets import Accessory
+from assets.models.assets import Accessory
 from rest_framework.validators import UniqueValidator
 
 from assignments.models.asset_assignment import AccessoryAssignment

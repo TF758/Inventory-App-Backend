@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Exists, OuterRef,  Subquery, Sum,  F, IntegerField, Value
 from django.db.models.functions import Coalesce, Greatest
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
-from db_inventory.models.assets import Equipment
+from assets.models.assets import Equipment
 from users.models.users import User
 from django.db.models import Q
 

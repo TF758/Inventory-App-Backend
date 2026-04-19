@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
+from assets.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
 from db_inventory.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment

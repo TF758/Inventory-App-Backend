@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from db_inventory.models.assets import  Equipment
+from assets.models.assets import  Equipment
 from db_inventory.models.audit import AuditLog
 from rest_framework.exceptions import ValidationError
 from django.db import transaction

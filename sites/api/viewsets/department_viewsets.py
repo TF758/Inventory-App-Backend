@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from db_inventory.models import Consumable, Equipment, Component
+from assets.models.assets import Consumable, Equipment, Component
 from db_inventory.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
@@ -10,7 +10,7 @@ from django.db.models import Q
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from db_inventory.models.assets import EquipmentStatus
+from assets.models.assets import Accessory, EquipmentStatus
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from db_inventory.permissions.assets import AssetPermission

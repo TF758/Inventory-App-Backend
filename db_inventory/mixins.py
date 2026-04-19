@@ -1,12 +1,12 @@
 from db_inventory.models.security import Notification
 from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest
-from db_inventory.models.assets import Component, Consumable, EquipmentStatus
+from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from assets.api.serializers.accessories import AccessoryBatchWriteSerializer, AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from assets.api.serializers.equipment import EquipmentBatchtWriteSerializer, EquipmentSerializer
+from db_inventory.models.audit import AuditLog
 from users.models.roles import RoleAssignment
 from .permissions import filter_queryset_by_scope
-from db_inventory.models import AuditLog, Equipment, Accessory
 from django.db import transaction
 from collections import Counter
 from django.utils.text import capfirst

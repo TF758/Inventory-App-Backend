@@ -1,6 +1,6 @@
 from rest_framework.permissions import IsAuthenticated
 
-from db_inventory.models.assets import Accessory, Consumable, Equipment
+from assets.models.assets import Accessory, Consumable, Equipment
 
 from rest_framework.response import Response
 from rest_framework.views import APIView

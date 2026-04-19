@@ -1,6 +1,6 @@
 
 from db_inventory.mixins import ScopeFilterMixin
-from db_inventory.models.assets import AssetAgreement, AssetAgreementItem
+from assets.models.assets import AssetAgreement, AssetAgreementItem
 from db_inventory.serializers.agreement import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, AssetAgreementSerializer, AssetAgreementWriteSerializer
 from rest_framework import viewsets
 from rest_framework.decorators import action

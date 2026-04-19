@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from db_inventory.models.assets import Component
+from assets.models.assets import Component
 
 
 

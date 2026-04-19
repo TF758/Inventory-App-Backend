@@ -5,7 +5,7 @@ from django.utils import timezone
 from datetime import timedelta
 from datetime import date as date_type
 import datetime
-from db_inventory.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
+from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from db_inventory.models.security import UserSession
 from db_inventory.models.users import PasswordResetEvent, User
 from sites.models.sites import Department, Location, Room
