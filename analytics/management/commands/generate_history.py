@@ -3,12 +3,11 @@ import random
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction, models
-from db_inventory.models import (
-    Department, Location, User, UserSession,
-    Equipment, Component, Consumable, Accessory
-)
 from tqdm import tqdm
-from sites.models.sites import Room
+from db_inventory.models.assets import Accessory, Component, Consumable, Equipment
+from db_inventory.models.security import UserSession
+from users.factories.user_factories import User
+from sites.models.sites import Department, Location, Room
 from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
 

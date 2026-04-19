@@ -1,3 +1,4 @@
+import itertools
 import os
 import random
 import django
@@ -6,24 +7,17 @@ from tqdm import tqdm  # progress bars
 from django.contrib.auth.hashers import make_password
 
 from db_inventory.models.assets import Accessory, Component, Consumable, Equipment
+from db_inventory.factories.asset_factories import AccessoryFactory, ComponentFactory, ConsumableFactory, EquipmentFactory
+from db_inventory.tests.test_audit_logs import User
+from sites.models.sites import Department, Location, Room, UserPlacement
+from users.factories.user_factories import AdminUserFactory
+from users.models.roles import RoleAssignment
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")
 django.setup()
 
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 
-from sites.models.sites import Department, Location, Room, UserPlacement
-from users.models.users import User
-from db_inventory.models import RoleAssignment
-import itertools
-from db_inventory.factories import (
-    UserFactory,
-    AdminUserFactory,
-    EquipmentFactory,
-    ComponentFactory,
-    AccessoryFactory,
-    ConsumableFactory,
-)
 
 from ...ministry_data import (
     LIST_OF_MINISTRIES,
