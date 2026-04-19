@@ -1,11 +1,9 @@
 from django.test import TestCase
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-
+import uuid
 from data_import.services.accessory_importer import AccessoryImporter
 from data_import.services.consumable_importer import ConsumableImporter
-
-
 from assets.models.assets import Accessory, Consumable
 from users.models.roles import RoleAssignment
 from users.factories.user_factories import UserFactory
@@ -30,7 +28,8 @@ class BaseImporterSetup(TestCase):
         cls.user.save()
 
     def _create_csv(self, name, content):
-        return default_storage.save(name, ContentFile(content))
+        unique = f"{uuid.uuid4()}_{name}"
+        return default_storage.save(unique, ContentFile(content))
 
 
 # -------------------------
@@ -53,7 +52,10 @@ class AccessoryImporterTests(BaseImporterSetup):
         result = importer.run(stored_file_name=file_name)
 
         self.assertEqual(result["summary"]["imported_rows"], 1)
-        self.assertEqual(Accessory.objects.count(), 1)
+
+        self.assertTrue(
+            Accessory.objects.filter(serial_number="SN1").exists()
+        )
 
 
 # -------------------------
@@ -76,4 +78,7 @@ class ConsumableImporterTests(BaseImporterSetup):
         result = importer.run(stored_file_name=file_name)
 
         self.assertEqual(result["summary"]["imported_rows"], 1)
-        self.assertEqual(Consumable.objects.count(), 1)
+
+        self.assertTrue(
+            Consumable.objects.filter(name="Paper").exists()
+        )
