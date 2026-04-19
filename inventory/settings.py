@@ -78,9 +78,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'db_inventory',
+    'core',
 
-    "core",
     "assets",
     "assignments",
     "sites",
