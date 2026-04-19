@@ -15,7 +15,7 @@ from users.factories.user_factories import UserFactory
 
 
 @patch(
-    "db_inventory.viewsets.general_viewsets.PasswordResetRequestView.throttle_classes",
+    "core.viewsets.general_viewsets.PasswordResetRequestView.throttle_classes",
     new=[]
 )
 class PasswordResetRequestTests(TestCase):
@@ -25,7 +25,7 @@ class PasswordResetRequestTests(TestCase):
         self.inactive_user = UserFactory(email="inactive@example.com", is_active=False)
         self.url = reverse("password-reset-request")
 
-    @patch("db_inventory.tasks.send_password_reset_email.delay")
+    @patch("core.tasks.send_password_reset_email.delay")
     def test_request_always_returns_200_for_existing_user(self, mock_delay):
         response = self.client.post(self.url, {"email": self.active_user.email})
         self.assertEqual(response.status_code, 200)
@@ -35,19 +35,19 @@ class PasswordResetRequestTests(TestCase):
         )
         mock_delay.assert_called_once_with(self.active_user.email)
 
-    @patch("db_inventory.tasks.send_password_reset_email.delay")
+    @patch("core.tasks.send_password_reset_email.delay")
     def test_request_always_returns_200_for_missing_user(self, mock_delay):
         response = self.client.post(self.url, {"email": "missing@example.com"})
         self.assertEqual(response.status_code, 200)
         mock_delay.assert_called_once_with("missing@example.com")
 
-    @patch("db_inventory.tasks.send_password_reset_email.delay")
+    @patch("core.tasks.send_password_reset_email.delay")
     def test_request_inactive_user_still_returns_200(self, mock_delay):
         response = self.client.post(self.url, {"email": self.inactive_user.email})
         self.assertEqual(response.status_code, 200)
         mock_delay.assert_called_once_with(self.inactive_user.email)
 
-    @patch("db_inventory.tasks.send_password_reset_email.delay")
+    @patch("core.tasks.send_password_reset_email.delay")
     def test_case_insensitive_email_lookup(self, mock_delay):
         response = self.client.post(self.url, {"email": "ACTIVE@EXAMPLE.COM"})
         self.assertEqual(response.status_code, 200)
@@ -76,7 +76,7 @@ class PasswordResetRequestTests(TestCase):
 # PASSWORD RESET CONFIRM TESTS
 # ----------------------------------------------------------------------
 @patch(
-    "db_inventory.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
+    "core.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
     new=[]
 )
 class PasswordResetConfirmTests(APITestCase):
@@ -85,7 +85,7 @@ class PasswordResetConfirmTests(APITestCase):
         self.user = User.objects.create_user( email="test@example.com", password="OldPass123!", is_active=True, )
         self.url = reverse("password-reset-confirm")
 
-    @patch( "db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=(None, "expired"),)
+    @patch( "core.utils.tokens.PasswordResetToken.verify_token", return_value=(None, "expired"),)
     def test_confirm_expired_token(self, mock_verify):
         """
         Expired or invalid tokens both result in: TOKEN_INVALID
@@ -101,7 +101,7 @@ class PasswordResetConfirmTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"][0], "TOKEN_EXPIRED")
 
-    @patch( "db_inventory.utils.tokens.PasswordResetToken.verify_token", return_value=(None, "invalid"), )
+    @patch( "core.utils.tokens.PasswordResetToken.verify_token", return_value=(None, "invalid"), )
     def test_confirm_invalid_token(self, mock_verify):
         data = {
             "token": "invalid-token",
@@ -115,7 +115,7 @@ class PasswordResetConfirmTests(APITestCase):
         self.assertEqual(response.json()["code"][0], "TOKEN_INVALID")
 
 @patch(
-    "db_inventory.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
+    "core.viewsets.general_viewsets.PasswordResetConfirmView.throttle_classes",
     new=[]
 )
 class PasswordResetTokenExpirationTests(TestCase):

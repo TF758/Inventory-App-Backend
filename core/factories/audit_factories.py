@@ -51,7 +51,7 @@ class SiteNameChangeHistoryFactory(factory.django.DjangoModelFactory):
     object_public_id = factory.Sequence(lambda n: f"SITE-{n:05d}")
     old_name = factory.Faker("company")
     new_name = factory.Faker("company")
-    user = factory.SubFactory("db_inventory.factories.user.UserFactory")
+    user = factory.SubFactory("core.factories.user.UserFactory")
     user_email = factory.LazyAttribute(lambda o: o.user.email if o.user else None)
     reason = factory.Faker("sentence", nb_words=6)
 
@@ -70,7 +70,7 @@ class SiteRelocationHistoryFactory(factory.django.DjangoModelFactory):
     to_parent_public_id = factory.Sequence(lambda n: f"PAR-{n:05d}")
     to_parent_name = factory.Faker("company")
 
-    user = factory.SubFactory("db_inventory.factories.user.UserFactory")
+    user = factory.SubFactory("core.factories.user.UserFactory")
     user_email = factory.LazyAttribute(lambda o: o.user.email if o.user else None)
 
     reason = factory.Faker("sentence", nb_words=8)

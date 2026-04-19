@@ -12,11 +12,11 @@ from users.factories.user_factories import UserFactory
 
 
 @mock.patch(
-    "db_inventory.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
+    "core.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
     new=[]
 )
 @mock.patch(
-    "db_inventory.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
+    "core.viewsets.general_viewsets.LogoutAPIView.throttle_classes",
     new=[]
 )
 class LogoutAPIViewTests(TestCase):
@@ -102,7 +102,7 @@ class LogoutAPIViewTests(TestCase):
         _, raw_refresh = self._make_session_with_cookie()
 
         with mock.patch(
-            "db_inventory.models.UserSession.hash_token",
+            "core.models.UserSession.hash_token",
             side_effect=Exception("Hashing failed"),
         ):
             response = self.client.post(self.url, format="json")

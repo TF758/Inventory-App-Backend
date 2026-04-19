@@ -41,13 +41,13 @@ class Command(BaseCommand):
 
         upsert_task(
             name="Simulation: generate notifications",
-            task="db_inventory.tasks.generate_data.generate_notifications",
+            task="core.tasks.generate_data.generate_notifications",
             cron_expr="*/10 * * * *",
         )
 
         upsert_task(
             name="Simulation: generate user sessions",
-            task="db_inventory.tasks.generate_data.generate_user_sessions",
+            task="core.tasks.generate_data.generate_user_sessions",
             cron_expr="*/15 * * * *",
         )
 

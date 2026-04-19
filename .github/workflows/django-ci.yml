@@ -49,7 +49,7 @@ jobs:
     strategy:
       matrix:
         suite:
-          - db_inventory.tests
+          - core.tests
           - data_import.tests
           - reporting.tests
 

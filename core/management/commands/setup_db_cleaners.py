@@ -45,19 +45,19 @@ class Command(BaseCommand):
         # -------------------------------
         upsert_task(
             name="01 Auto-read stale notifications",
-            task="db_inventory.tasks.cleanup.auto_read_stale_notifications",
+            task="core.tasks.cleanup.auto_read_stale_notifications",
             cron_expr=settings.NOTIF_AUTO_READ_CRON,
         )
 
         upsert_task(
             name="01 Auto-soft-delete notifications",
-            task="db_inventory.tasks.cleanup.auto_soft_delete_notifications",
+            task="core.tasks.cleanup.auto_soft_delete_notifications",
             cron_expr=settings.NOTIF_SOFT_DELETE_CRON,
         )
 
         upsert_task(
             name="01 DB Maintenance: cleanup notifications",
-            task="db_inventory.tasks.cleanup.cleanup_notifications",
+            task="core.tasks.cleanup.cleanup_notifications",
             cron_expr=settings.NOTIF_CLEANUP_CRON,
         )
 
@@ -66,13 +66,13 @@ class Command(BaseCommand):
         # -------------------------------
         upsert_task(
             name="DB Maintenance: expire user sessions",
-            task="db_inventory.tasks.cleanup.expire_user_sessions",
+            task="core.tasks.cleanup.expire_user_sessions",
             cron_expr=settings.USERSESSION_EXPIRE_CRON,
         )
 
         upsert_task(
             name="DB Maintenance: cleanup user sessions",
-            task="db_inventory.tasks.cleanup.cleanup_user_sessions",
+            task="core.tasks.cleanup.cleanup_user_sessions",
             cron_expr=settings.USERSESSION_CLEANUP_CRON,
         )
 
@@ -81,7 +81,7 @@ class Command(BaseCommand):
         # -------------------------------
         upsert_task(
             name="DB Maintenance: cleanup scheduled task runs",
-            task="db_inventory.tasks.cleanup.cleanup_scheduled_task_runs",
+            task="core.tasks.cleanup.cleanup_scheduled_task_runs",
             cron_expr=settings.TASKRUN_CLEANUP_CRON,
         )
 

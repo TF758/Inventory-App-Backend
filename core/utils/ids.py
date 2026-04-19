@@ -82,7 +82,7 @@ def reserve_public_id(prefix: str, model_label: str) -> str:
     - Retries on collision
     """
 
-    PublicIDRegistry = apps.get_model("db_inventory", "PublicIDRegistry")
+    PublicIDRegistry = apps.get_model("core", "PublicIDRegistry")
 
     for _ in range(20):
         candidate = generate_prefixed_id(prefix)
