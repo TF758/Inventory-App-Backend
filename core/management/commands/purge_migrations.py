@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 APPS = [
-    "db_inventory",
     "core",
     "assets",
     "assignments",

@@ -1,7 +1,7 @@
 
 
 
-from db_inventory.models.base import PublicIDModel
+from core.models.base import PublicIDModel
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError

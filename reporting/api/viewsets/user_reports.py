@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 import redis
 from django.db.models import Q, Count
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from reporting.api.serializers.user_report import UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
 from reporting.models.reports import ReportJob
 from reporting.tasks.reports import generate_report_task

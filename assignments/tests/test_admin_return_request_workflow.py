@@ -2,11 +2,11 @@ from django.test import TestCase
 from rest_framework.test import APIClient, APIRequestFactory
 from django.urls import reverse
 from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest
-from db_inventory.permissions.assets import CanProcessReturnRequest
+from core.permissions.assets import CanProcessReturnRequest
 from assets.asset_factories import EquipmentFactory
 from users.factories.user_factories import UserFactory
 from users.models.roles import RoleAssignment
-from db_inventory.models.notifications import Notification
+from core.models.notifications import Notification
 from django.contrib.auth.models import AnonymousUser
 from assignments.services.asset_returns import create_mixed_return_request
 from sites.factories.site_factories import RoomFactory

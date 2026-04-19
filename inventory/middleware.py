@@ -36,7 +36,7 @@ class JWTAuthMiddleware(BaseMiddleware):
 
     @database_sync_to_async
     def get_user(self, raw_token):
-        from db_inventory.authentication import SessionJWTAuthentication
+        from core.authentication import SessionJWTAuthentication
         from rest_framework_simplejwt.exceptions import InvalidToken
         from rest_framework.exceptions import AuthenticationFailed
 

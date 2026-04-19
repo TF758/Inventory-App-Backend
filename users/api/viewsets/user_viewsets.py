@@ -3,7 +3,7 @@ from rest_framework import viewsets
 from rest_framework import mixins
 from rest_framework import status, views
 from django.db import transaction
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from assets.api.serializers.equipment import EquipmentSerializer
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -12,26 +12,26 @@ from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserA
 from sites.models.sites import UserPlacement, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import  UserFilter, UserPlacementFilter
-from db_inventory.mixins import NotificationMixin, ScopeFilterMixin
-from db_inventory.pagination import FlexiblePagination
-from db_inventory.permissions import UserPermission,  UserPlacementPermission, filter_queryset_by_scope, FullUserCreatePermission
+from core.filters import  UserFilter, UserPlacementFilter
+from core.mixins import NotificationMixin, ScopeFilterMixin
+from core.pagination import FlexiblePagination
+from core.permissions import UserPermission,  UserPlacementPermission, filter_queryset_by_scope, FullUserCreatePermission
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
-from db_inventory.mixins import AuditMixin
-from db_inventory.permissions.helpers import ensure_permission, filter_user_assets_by_scope
+from core.mixins import AuditMixin
+from core.permissions.helpers import ensure_permission, filter_user_assets_by_scope
 from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from django.utils import timezone
-from db_inventory.permissions.users import CanViewUserProfile
-from db_inventory.models.notifications import Notification
-from db_inventory.utils.viewset_helpers import unallocated_users_queryset
+from core.permissions.users import CanViewUserProfile
+from core.models.notifications import Notification
+from core.utils.viewset_helpers import unallocated_users_queryset
 from rest_framework import viewsets
 from rest_framework.response import Response
-from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
+from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.services.assets import user_has_active_assets
 

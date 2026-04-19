@@ -5,7 +5,7 @@ from assignments.models.asset_assignment import EquipmentAssignment
 from assets.asset_factories import EquipmentFactory
 from users.factories.user_factories import UserFactory
 from users.models.roles import RoleAssignment
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from assignments.services.asset_returns import create_mixed_return_request
 from sites.factories.site_factories import RoomFactory
 

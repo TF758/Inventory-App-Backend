@@ -1,7 +1,7 @@
 
-from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
-from db_inventory.models.notifications import Notification
-from db_inventory.models.audit import AuditLog
+from core.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
+from core.models.notifications import Notification
+from core.models.audit import AuditLog
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -9,10 +9,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
-from db_inventory.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
-from db_inventory.filters import AdminReturnRequestFilter, ReturnRequestFilter
+from core.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
+from core.filters import AdminReturnRequestFilter, ReturnRequestFilter
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
-from db_inventory.pagination import FlexiblePagination
+from core.pagination import FlexiblePagination
 from assignments.api.serializers.returns import ReturnRequestSerializer
 from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
 from users.api.serializers.self import MixedAssetReturnSerializer

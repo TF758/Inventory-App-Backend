@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from assets.models.assets import Equipment, EquipmentStatus
 from sites.models.sites import  Room
-from db_inventory.permissions.helpers import is_admin_role, is_in_scope
+from core.permissions.helpers import is_admin_role, is_in_scope
 
 class EquipmentSerializer(serializers.ModelSerializer):
     is_assigned = serializers.SerializerMethodField()

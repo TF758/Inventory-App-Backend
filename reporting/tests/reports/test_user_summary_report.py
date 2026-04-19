@@ -3,10 +3,10 @@
 from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
-from db_inventory.factories.audit_factories import AuditLogFactory
-from db_inventory.factories.security_factories import PasswordResetEventFactory
-from db_inventory.factories.session_factories import UserSessionFactory
-from db_inventory.models.audit import AuditLog
+from core.factories.audit_factories import AuditLogFactory
+from core.factories.security_factories import PasswordResetEventFactory
+from core.factories.session_factories import UserSessionFactory
+from core.models.audit import AuditLog
 from users.factories.user_factories import RoleAssignmentFactory, UserFactory
 from sites.factories.site_factories import DepartmentFactory
 from reporting.services.user_summary import build_user_summary_report

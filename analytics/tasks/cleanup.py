@@ -4,7 +4,7 @@ from pathlib import Path
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
-from db_inventory.models.security import ScheduledTaskRun
+from core.models.security import ScheduledTaskRun
 
 from django.db import transaction
 

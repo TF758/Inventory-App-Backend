@@ -5,13 +5,13 @@ from django.contrib.auth import get_user_model
 from sites.models.sites import Department, Location, Room
 from datetime import timedelta
 from django.utils import timezone
-from db_inventory.models.audit import AuditLog
-from db_inventory.models.sessions import UserSession
-from db_inventory.models.security import PasswordResetEvent
+from core.models.audit import AuditLog
+from core.models.sessions import UserSession
+from core.models.security import PasswordResetEvent
 from assets.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
 from django.db.models import Exists, OuterRef, Sum, F
 
-from db_inventory.utils.viewset_helpers import unallocated_users_queryset
+from core.utils.viewset_helpers import unallocated_users_queryset
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from analytics.utils.utils.viewset_helpers import get_return_health
 

@@ -1,11 +1,11 @@
 from rest_framework import viewsets
 from assets.models.assets import Consumable, Equipment, Component
-from db_inventory.filters import *
+from core.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
-from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
-from db_inventory.pagination import  FlexiblePagination
+from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, AuditMixin, RoleVisibilityMixin
+from core.pagination import  FlexiblePagination
 from django.db.models import Q
 from rest_framework import mixins
 from rest_framework.response import Response
@@ -13,8 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from assets.models.assets import Accessory, EquipmentStatus
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from db_inventory.permissions.assets import AssetPermission
-from db_inventory.permissions.users import RolePermission, UserPermission
+from core.permissions.assets import AssetPermission
+from core.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer

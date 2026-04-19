@@ -3,20 +3,20 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from users.models.roles import RoleAssignment
 from users.models.users import User
-from db_inventory.permissions.helpers import ensure_permission
+from core.permissions.helpers import ensure_permission
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
-from db_inventory.pagination import  FlexiblePagination
+from core.pagination import  FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
-from db_inventory.filters import RoleAssignmentFilter
-from db_inventory.permissions import RolePermission
+from core.filters import RoleAssignmentFilter
+from core.permissions import RolePermission
 from django.db.models import Q
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
-from db_inventory.permissions.constants import ROLE_HIERARCHY
+from core.permissions.constants import ROLE_HIERARCHY
 from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer, RoleWriteSerializer
 
 # --- Role Assignments CRUD ---

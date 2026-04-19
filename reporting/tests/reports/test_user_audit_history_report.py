@@ -2,8 +2,8 @@ from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
 
-from db_inventory.models.audit import AuditLog
-from db_inventory.factories.audit_factories import AuditLogFactory
+from core.models.audit import AuditLog
+from core.factories.audit_factories import AuditLogFactory
 from users.factories.user_factories import UserFactory
 from reporting.services.user_summary import build_user_audit_history_report
 from reporting.utils.report_adapters.user_summary import user_audit_history_to_workbook_spec

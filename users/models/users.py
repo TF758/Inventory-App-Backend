@@ -1,8 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.utils import timezone
-from db_inventory.utils.ids import generate_base62_identifier
-from db_inventory.models.base import PublicIDModel
+from core.utils.ids import generate_base62_identifier
+from core.models.base import PublicIDModel
 
 
 

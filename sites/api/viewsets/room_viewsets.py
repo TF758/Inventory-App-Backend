@@ -1,9 +1,9 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import *
-from db_inventory.permissions.assets import AssetPermission
-from db_inventory.permissions.users import UserPermission
+from core.filters import *
+from core.permissions.assets import AssetPermission
+from core.permissions.users import UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -16,10 +16,10 @@ from users.api.serializers.users import UserAreaSerializer
 from sites.models.sites import Room
 from sites.api.serializers.rooms import RoomListSerializer, RoomReadSerializer, RoomWriteSerializer
 from sites.permissions.sites import RoomPermission
-from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from django.db.models import Case, When, Value, IntegerField
-from db_inventory.pagination import FlexiblePagination
-from db_inventory.serializers import *
+from core.pagination import FlexiblePagination
+from core.serializers import *
 from rest_framework import mixins
 from rest_framework.views import APIView
 from rest_framework.response import Response

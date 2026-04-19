@@ -3,10 +3,10 @@ from django.utils import timezone
 from django.db.models import Count
 from sites.models.sites import UserPlacement
 from users.models.users import User
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from django.db.models import Q,  Min, Max
 from django.db.models.functions import TruncDate
-from db_inventory.models.sessions import UserSession
+from core.models.sessions import UserSession
 from django.utils import timezone
 from datetime import datetime, time
 

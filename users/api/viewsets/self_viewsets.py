@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from db_inventory.filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter, MixAssetFilter
-from db_inventory.pagination import FlexiblePagination
+from core.filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter, MixAssetFilter
+from core.pagination import FlexiblePagination
 from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
@@ -9,11 +9,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import ListModelMixin
 from users.models.users import User
 from rest_framework.generics import RetrieveAPIView
-from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user_accessories, get_user_accessories_with_meta, get_user_consumables, get_user_consumables_with_meta, get_user_equipment, get_user_equipment_assignments, get_user_equipment_with_meta
+from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user_accessories, get_user_accessories_with_meta, get_user_consumables, get_user_consumables_with_meta, get_user_equipment, get_user_equipment_assignments, get_user_equipment_with_meta
 from django.db.models import Exists, OuterRef,  Subquery, Sum,  F, IntegerField, Value
 from django.db.models.functions import Coalesce, Greatest
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
-from db_inventory.utils.asset_helpers import SelfAssetBuilder
+from core.utils.asset_helpers import SelfAssetBuilder
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from rest_framework.response import Response

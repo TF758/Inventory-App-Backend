@@ -1,19 +1,19 @@
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from assets.models.assets import  Equipment
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
-from db_inventory.mixins import AuditMixin, NotificationMixin
-from db_inventory.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
-from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
+from core.mixins import AuditMixin, NotificationMixin
+from core.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
+from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
-from db_inventory.filters import EquipmentAssignmentFilter
-from db_inventory.pagination import FlexiblePagination
-from db_inventory.models.notifications import Notification
+from core.filters import EquipmentAssignmentFilter
+from core.pagination import FlexiblePagination
+from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 

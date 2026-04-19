@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db import transaction, models
 from tqdm import tqdm
 from assets.models.assets import Accessory, Component, Consumable, Equipment
-from db_inventory.models.security import UserSession
+from core.models.security import UserSession
 from users.factories.user_factories import User
 from sites.models.sites import Department, Location, Room
 from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics

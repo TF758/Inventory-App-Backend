@@ -4,7 +4,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q, F
 
-from db_inventory.models.base import PublicIDModel
+from core.models.base import PublicIDModel
 from sites.models.sites import Room
 
 

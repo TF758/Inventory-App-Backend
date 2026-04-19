@@ -6,9 +6,9 @@ from datetime import timedelta
 from datetime import date as date_type
 import datetime
 from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
-from db_inventory.models.security import UserSession, PasswordResetEvent
+from core.models.security import UserSession, PasswordResetEvent
 from sites.models.sites import Department, Location, Room
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from django.contrib.auth import get_user_model
 from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max

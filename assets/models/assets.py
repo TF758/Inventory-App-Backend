@@ -1,4 +1,4 @@
-from db_inventory.models.base import PublicIDModel
+from core.models.base import PublicIDModel
 from django.db import models
 from sites.models.sites import Department, Location, Room
 from django.apps import apps

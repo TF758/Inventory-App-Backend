@@ -1,13 +1,13 @@
 from django.db import transaction
 from django.utils import timezone
 
-from db_inventory.models.audit import AuditLog
-from db_inventory.models.notifications import Notification
+from core.models.audit import AuditLog
+from core.models.notifications import Notification
 from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from db_inventory.permissions.helpers import  is_admin_role, is_in_scope
-from db_inventory.utils.asset_helpers import equipment_event_from_status
+from core.permissions.helpers import  is_admin_role, is_in_scope
+from core.utils.asset_helpers import equipment_event_from_status
 from assets.models.assets import Equipment, EquipmentStatus
 from assignments.models.asset_assignment import EquipmentEvent
 

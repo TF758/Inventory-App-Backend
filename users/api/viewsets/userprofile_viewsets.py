@@ -2,18 +2,18 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework import mixins
-from db_inventory.pagination import FlexiblePagination
-from db_inventory.permissions import UserPermission
+from core.pagination import FlexiblePagination
+from core.permissions import UserPermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from db_inventory.permissions.helpers import filter_user_assets_by_scope
+from core.permissions.helpers import filter_user_assets_by_scope
 from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
-from db_inventory.permissions.users import CanViewUserProfile
+from core.permissions.users import CanViewUserProfile
 from rest_framework import viewsets
 from rest_framework.response import Response
-from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
+from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.api.serializers.equipment import EquipmentSerializer
 from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer

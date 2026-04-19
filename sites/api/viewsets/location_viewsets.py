@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 from assets.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
-from db_inventory.permissions.users import RolePermission, UserPermission
+from core.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -13,20 +13,20 @@ from sites.api.serializers.locations import LocationComponentSerializer, Locatio
 from sites.models.sites import Location, Room, UserPlacement
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import *
-from db_inventory.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
+from core.filters import *
+from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from sites.permissions.sites import LocationPermission
 from django.db.models import Case, When, Value, IntegerField
-from db_inventory.pagination import FlexiblePagination
+from core.pagination import FlexiblePagination
 from django.db.models import Q
-from db_inventory.mixins import AuditMixin
+from core.mixins import AuditMixin
 from rest_framework import mixins
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
-from db_inventory.permissions.assets import AssetPermission, HasAssignmentScopePermission
+from core.permissions.assets import AssetPermission, HasAssignmentScopePermission
 
 class LocationDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [IsAuthenticated]

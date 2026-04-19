@@ -3,30 +3,30 @@ from rest_framework.serializers import ValidationError
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import EquipmentFilter
-from db_inventory.mixins import ScopeFilterMixin,EquipmentBatchMixin, AuditMixin
+from core.filters import EquipmentFilter
+from core.mixins import ScopeFilterMixin,EquipmentBatchMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
-from db_inventory.pagination import FlexiblePagination
-from db_inventory.permissions import AssetPermission, is_in_scope
+from core.pagination import FlexiblePagination
+from core.permissions import AssetPermission, is_in_scope
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from db_inventory.utils.asset_helpers import equipment_event_from_status
-from db_inventory.utils.audit import create_audit_log
+from core.utils.asset_helpers import equipment_event_from_status
+from core.utils.audit import create_audit_log
 from django.utils import timezone
-from db_inventory.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
-from db_inventory.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
-from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
+from core.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
+from core.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
+from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from assets.models.assets import Equipment, EquipmentStatus
 
 from assignments.services.equipment_assignment import AssignResult, StatusChangeResult, UnassignResult, assign_equipment, change_equipment_status, condemn_equipment, unassign_equipment
 from assignments.models.asset_assignment import EquipmentEvent
 from assets.api.serializers.equipment import EquipmentCondemnSerializer, EquipmentSerializer, EquipmentStatusChangeSerializer, EquipmentWriteSerializer
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):

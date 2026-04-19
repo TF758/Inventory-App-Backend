@@ -1,9 +1,9 @@
 from assignments.models.asset_assignment import AccessoryEvent, ConsumableEvent, EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
-from db_inventory.models.base import generate_public_id
-from db_inventory.utils.query_helpers import get_user_accessories, get_user_consumables
+from core.models.base import generate_public_id
+from core.utils.query_helpers import get_user_accessories, get_user_consumables
 from django.core.exceptions import ValidationError
 
-from db_inventory.utils.ids import generate_unique_prefixed_id
+from core.utils.ids import generate_unique_prefixed_id
 
 def build_equipment_return_items(user, equipment_public_ids, request, notes):
 

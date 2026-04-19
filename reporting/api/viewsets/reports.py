@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 import json
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import FileResponse
-from db_inventory.pagination import FlexiblePagination
+from core.pagination import FlexiblePagination
 from rest_framework import mixins, viewsets, permissions
 import os
 from reporting.api.serializers.reports import ReportJobSerializer

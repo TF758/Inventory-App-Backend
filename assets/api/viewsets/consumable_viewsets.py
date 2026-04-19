@@ -1,15 +1,15 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from db_inventory.filters import ConsumableFilter
+from core.filters import ConsumableFilter
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
-from db_inventory.pagination import FlexiblePagination
-from db_inventory.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMixin
-from db_inventory.permissions import AssetPermission, is_in_scope
+from core.pagination import FlexiblePagination
+from core.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMixin
+from core.permissions import AssetPermission, is_in_scope
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied

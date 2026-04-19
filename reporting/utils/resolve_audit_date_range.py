@@ -1,7 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
 
-from db_inventory.models.audit import AuditLog
+from core.models.audit import AuditLog
 
 MAX_YEARS = 5
 

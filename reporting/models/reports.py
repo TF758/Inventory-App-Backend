@@ -3,7 +3,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from db_inventory.models.base import PublicIDModel
+from core.models.base import PublicIDModel
 
 class ReportJob(PublicIDModel):
     """
