@@ -56,7 +56,7 @@ class DownloadReport(APIView):
         if not file_path.exists():
             raise Http404("Report file not found.")
         
-        print(job.report_file)
+
 
         return FileResponse(
             open(file_path, "rb"),
