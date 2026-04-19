@@ -1,18 +1,11 @@
-import json
-import time
 
 from celery import shared_task
-from django.conf import settings
-from django.db import transaction
-from django.utils import timezone
-import redis
-
 from data_import.services.import_builder import build_asset_import
-from db_inventory.mixins import NotificationMixin
-from db_inventory.models.security import Notification, ScheduledTaskRun
-from inventory_metrics.tasks.reports import generate_report_task
-from inventory_metrics.models.reports import ReportJob
-from inventory_metrics.utils.report_payload import wrap_report_payload
+
+from reporting.tasks.reports import generate_report_task
+from reporting.models.reports import ReportJob
+
+
 
 @shared_task(bind=True)
 def run_asset_import_task(self, report_job_id):

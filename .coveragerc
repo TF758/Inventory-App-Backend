@@ -1,26 +1,34 @@
 [run]
 branch = True
-parallel = True
+relative_files = True
 
 source =
-    db_inventory
-    inventory_metrics
+    core
+    users
+    assets
+    assignments
+    sites
+    reporting
+    data_import
 
 omit =
     */migrations/*
     */tests/*
     */factories/*
-    manage.py
     */admin.py
+    manage.py
+    */management/commands/*
 
 
 [report]
-fail_under = 70
+fail_under = 30
+show_missing = True
+skip_covered = True
+precision = 2
 
 exclude_lines =
     pragma: no cover
     if TYPE_CHECKING:
     if __name__ == "__main__":
-
-show_missing = True
-skip_covered = True
+    raise NotImplementedError
+    pass

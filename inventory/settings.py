@@ -27,8 +27,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Environment detection & configuration
 # ------------------------------------------------------------
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 IN_DOCKER = os.path.exists("/.dockerenv")
 
 # Default to local unless explicitly told otherwise
@@ -78,9 +76,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'db_inventory',
-    'inventory_metrics',
-    'data_import',
+    'core',
+
+    "assets",
+    "assignments",
+    "sites",
+    "users",
+    "reporting",
+    "analytics",
+    "data_import",
 
     'rest_framework',
     'rest_framework_simplejwt',
@@ -168,13 +172,13 @@ MIDDLEWARE = [
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "db_inventory.pagination.OptionalPagination",
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.OptionalPagination",
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "db_inventory.authentication.SessionJWTAuthentication",
+        "core.authentication.SessionJWTAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
@@ -236,7 +240,7 @@ DATABASES = {
         "PORT": env("DB_PORT", default="5432"),
     }
 }
-AUTH_USER_MODEL = 'db_inventory.User'
+AUTH_USER_MODEL = 'users.User'
 
 
 # Password validation

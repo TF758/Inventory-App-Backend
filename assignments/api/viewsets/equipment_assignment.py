@@ -1,0 +1,385 @@
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from assets.models.assets import  Equipment
+from core.models.audit import AuditLog
+from rest_framework.exceptions import ValidationError
+from django.db import transaction
+from django.utils import timezone
+from rest_framework.response import Response
+from rest_framework import status
+from core.mixins import AuditMixin, NotificationMixin
+from core.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
+from core.permissions.helpers import can_assign_asset_to_user, get_active_role
+from rest_framework import mixins, viewsets, filters
+
+from core.pagination import FlexiblePagination
+from core.models.notifications import Notification
+from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
+from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
+from assignments.assignment_filters import EquipmentAssignmentFilter
+
+class EquipmentAssignmentViewSet(
+    AuditMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    """
+    Viewset to handle Listing Equipment Assignment
+    both via list and in detail used by Site Admin
+    """
+
+    queryset = EquipmentAssignment.objects.select_related(
+        "equipment", "user", "assigned_by"
+    )
+    serializer_class = EquipmentAssignmentSerializer
+    permission_classes = [CanViewEquipmentAssignments]
+    pagination_class = FlexiblePagination
+
+    filterset_class = EquipmentAssignmentFilter
+
+    def get_object(self):
+        equipment_public_id = self.kwargs.get("equipment_id")
+
+        obj = get_object_or_404(
+            EquipmentAssignment,
+            equipment__public_id=equipment_public_id,
+        )
+
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
+    """
+    Assign an equipment to a user.
+    Uses a single mutable EquipmentAssignment per equipment.
+    """
+
+    permission_classes = [CanManageAssetCustody]
+
+    def post(self, request):
+        serializer = AssignEquipmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        assignee = serializer.validated_data["user"]
+        equipment = serializer.validated_data["equipment"]
+        notes = serializer.validated_data.get("notes", "")
+
+        # ASSET AUTHORITY
+        self.check_object_permissions(request, equipment)
+
+        # ASSIGNEE JURISDICTION
+        active_role = get_active_role(request.user)
+        if not can_assign_asset_to_user(active_role, assignee):
+            raise ValidationError(
+                "You may only assign equipment to users within your room jurisdiction."
+            )
+
+        with transaction.atomic():
+
+            #  Lock the equipment row 
+            equipment = (Equipment.objects.select_for_update().get(pk=equipment.pk))
+
+            # Final guard after lock
+            if equipment.is_assigned:
+                raise ValidationError("This equipment is already assigned")
+
+            # OPTION 1: reuse or mutate assignment row
+            assignment, created = EquipmentAssignment.objects.get_or_create(
+                equipment=equipment,
+                defaults={
+                    "user": assignee,
+                    "assigned_by": request.user,
+                    "notes": notes,
+                },
+            )
+
+            if not created:
+                assignment.user = assignee
+                assignment.assigned_by = request.user
+                assignment.assigned_at = timezone.now()
+                assignment.returned_at = None
+                assignment.notes = notes
+                assignment.save()
+            else:
+                assignment.save()
+
+            # Domain event
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=assignee,
+                event_type=EquipmentEvent.Event_Choices.ASSIGNED,
+                reported_by=request.user,
+                notes=notes or "Equipment assigned",
+            )
+
+            # Audit log
+            self.audit(
+                event_type=AuditLog.Events.ASSET_ASSIGNED,
+                target=equipment,
+                description=f"Assigned to user {assignee.email}",
+                metadata={
+                    "assigned_to_public_id": assignee.public_id,
+                    "assigned_to_email": assignee.email,
+                    "notes": notes,
+                },
+            )
+
+            self.notify(
+                recipient=assignee,
+                notif_type=AuditLog.Events.ASSET_ASSIGNED,
+                level=Notification.Level.INFO,
+                title="Equipment assigned to you",
+                message=(
+                    f"{equipment.name} has been assigned to you "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
+
+        return Response(
+            {
+                "equipment": equipment.public_id,
+                "assigned_to": assignee.public_id,
+                "assigned_at": assignment.assigned_at,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+
+class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
+    """
+    Unassign (return) an equipment from a user.
+    """
+
+    permission_classes = [CanManageAssetCustody]
+
+    def post(self, request):
+        serializer = UnassignEquipmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment = serializer.validated_data["equipment"]
+        user = serializer.validated_data["user"]
+        notes = serializer.validated_data.get("notes", "")
+
+        # ASSET AUTHORITY
+        self.check_object_permissions(request, equipment)
+
+        with transaction.atomic():
+
+            #  Lock equipment row
+            equipment = (Equipment.objects.select_for_update().get(pk=equipment.pk))
+
+            # Re-resolve assignment AFTER lock
+            assignment = equipment.active_assignment if equipment.is_assigned else None
+            if not assignment:
+                raise ValidationError("No active assignment found")
+            
+            if assignment.user != user:
+                raise ValidationError("Equipment is not assigned to this user")
+            
+            # Idempotency guard
+            if assignment.returned_at is not None:
+                raise ValidationError("This equipment is already unassigned")
+
+            # Close assignment
+            assignment.returned_at = timezone.now()
+            assignment.save(update_fields=["returned_at"])
+
+            # Domain event
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=user,
+                event_type=EquipmentEvent.Event_Choices.RETURNED,
+                reported_by=request.user,
+                notes=notes or "Equipment returned",
+            )
+
+            # Audit log
+            self.audit(
+            event_type=AuditLog.Events.ASSET_UNASSIGNED,
+            target=equipment,
+            description=f"Unassigned from user {user.email}",
+            metadata={
+                "unassigned_from_public_id": user.public_id,
+                "unassigned_from_email": user.email,
+                "notes": notes,
+            },
+        )
+            self.notify(
+                recipient=user,
+                notif_type=AuditLog.Events.ASSET_UNASSIGNED,
+                level=Notification.Level.WARNING,
+                title="Equipment returned",
+                message=(
+                    f"{equipment.name} has been unassigned from you "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
+
+        return Response(
+            {
+                "equipment": equipment.public_id,
+                "returned_from": user.public_id,
+                "returned_at": assignment.returned_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
+    """
+    Reassign equipment from one user to another.
+    Uses a single mutable EquipmentAssignment per equipment.
+    """
+
+    permission_classes = [CanManageAssetCustody]
+
+    def post(self, request):
+        serializer = ReassignEquipmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        equipment = serializer.validated_data["equipment"]
+        from_user = serializer.validated_data["from_user"]
+        to_user = serializer.validated_data["to_user"]
+        notes = serializer.validated_data.get("notes", "")
+
+     
+        self.check_object_permissions(request, equipment)
+
+      
+        active_role = get_active_role(request.user)
+        if not can_assign_asset_to_user(active_role, to_user):
+            raise ValidationError(
+                "You may only reassign equipment to users within your room jurisdiction."
+            )
+
+        with transaction.atomic():
+
+       
+            equipment = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
+
+         
+            assignment = equipment.active_assignment if equipment.is_assigned else None
+            if not assignment:
+                raise ValidationError("No active assignment found")
+
+            # Safety check
+            if assignment.user != from_user:
+                raise ValidationError(
+                    "Equipment is not assigned to from_user"
+                )
+            if from_user == to_user:
+                raise ValidationError("Equipment is already assigned to this user")
+
+            # Domain event: returned from old user
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=from_user,
+                event_type=EquipmentEvent.Event_Choices.RETURNED,
+                reported_by=request.user,
+                notes=notes or "Equipment reassigned",
+            )
+
+            # Mutate existing assignment 
+            assignment.user = to_user
+            assignment.assigned_by = request.user
+            assignment.assigned_at = timezone.now()
+            assignment.returned_at = None
+            assignment.notes = notes
+            assignment.save()
+
+            # Domain event: assigned to new user
+            EquipmentEvent.objects.create(
+                equipment=equipment,
+                user=to_user,
+                event_type=EquipmentEvent.Event_Choices.ASSIGNED,
+                reported_by=request.user,
+                notes=notes or "Equipment reassigned",
+            )
+
+            # Audit log 
+            self.audit(
+                event_type=AuditLog.Events.ASSET_REASSIGNED,
+                target=equipment,
+                description=(
+                    f"Reassigned from user {from_user.email} "
+                    f"to user {to_user.email}"
+                ),
+                metadata={
+                    "reassigned_from_public_id": from_user.public_id,
+                    "reassigned_from_email": from_user.email,
+                    "reassigned_to_public_id": to_user.public_id,
+                    "reassigned_to_email": to_user.email,
+                    "notes": notes,
+                },
+            )
+
+            # notify users
+            self.notify(
+                recipient=from_user,
+                notif_type=AuditLog.Events.ASSET_REASSIGNED,
+                level=Notification.Level.WARNING,
+                title="Equipment reassigned",
+                message=(
+                    f"{equipment.name} has been reassigned from you "
+                    f"to {to_user.get_full_name()} "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
+
+
+            self.notify(
+                recipient=to_user,
+                notif_type=AuditLog.Events.ASSET_ASSIGNED,
+                level=Notification.Level.INFO,
+                title="Equipment assigned to you",
+                message=(
+                    f"{equipment.name} has been assigned to you "
+                    f"by {request.user.get_full_name()}."
+                ),
+                entity=equipment,
+                actor=request.user,
+            )
+
+        return Response(
+            {
+                "equipment": equipment.public_id,
+                "from_user": from_user.public_id,
+                "to_user": to_user.public_id,
+                "reassigned_at": assignment.assigned_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
+    """
+    Full chronological event timeline for a piece of equipment.
+    """
+    serializer_class = EquipmentEventSerializer
+    pagination_class = FlexiblePagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ["occurred_at"]
+    # most recent first
+    ordering = ["-occurred_at"] 
+
+    def get_queryset(self):
+        equipment_id = self.kwargs.get("public_id")
+
+        return (
+            EquipmentEvent.objects.filter(
+                equipment__public_id=equipment_id
+            )
+            .select_related("user", "reported_by")
+        )
+

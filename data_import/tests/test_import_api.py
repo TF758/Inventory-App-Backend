@@ -4,9 +4,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import patch
 from django.urls import reverse
 
-from db_inventory.factories.user_factories import UserFactory
-from inventory_metrics.models.reports import ReportJob
-
+from users.factories.user_factories import UserFactory
+from reporting.models.reports import ReportJob
 
 class AssetImportAPITests(TestCase):
 

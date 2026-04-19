@@ -10,7 +10,7 @@ from django.core.asgi import get_asgi_application
 from channels.auth import AuthMiddlewareStack
 
 from inventory.middleware import JWTAuthMiddleware
-from db_inventory.routing import websocket_urlpatterns
+from core.routing import websocket_urlpatterns
 
 
 application = ProtocolTypeRouter({

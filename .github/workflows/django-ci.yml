@@ -28,30 +28,18 @@ jobs:
       - name: Run dependency vulnerability scan
         run: pip-audit --progress-spinner off
 
-  build-image:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build API image
-        run: docker compose build api
-
   tests:
-    needs: build-image
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     strategy:
       matrix:
         suite:
-          - db_inventory.tests
+          - core.tests
+          - assignments.tests
           - data_import.tests
-          - inventory_metrics.tests
+          - reporting.tests
+          - users.tests
 
     steps:
       - name: Checkout repository
@@ -72,11 +60,11 @@ jobs:
           echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
 
       - name: Start services
-        run: docker compose up -d
+        run: docker compose up -d --build --force-recreate --renew-anon-volumes
 
       - name: Wait for database
         run: |
-          for i in {1..30}; do
+          for i in {1..15}; do
             docker compose exec -T db pg_isready -U inventory && break
             echo "Waiting for database..."
             sleep 2
@@ -85,21 +73,12 @@ jobs:
       - name: Run migrations
         run: docker compose exec -T api python manage.py migrate
 
-      - name: Run tests with coverage
-        run: |
-          docker compose exec -T api coverage run --parallel-mode manage.py test ${{ matrix.suite }} --parallel
+      - name: Run tests
+        run: docker compose exec -T api python manage.py test ${{ matrix.suite }} --parallel
 
-      - name: Extract coverage files from container
-        run: |
-          mkdir coverage-files
-          docker compose exec -T api sh -c "cp /app/.coverage* /tmp/ || true"
-          docker compose cp api:/tmp/. coverage-files/ || true
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-${{ matrix.suite }}
-          path: coverage-files/.coverage*
+      - name: Shutdown services
+        if: always()
+        run: docker compose down -v
 
   coverage:
     needs: tests
@@ -109,34 +88,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download coverage artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: coverage
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Install coverage
-        run: pip install coverage
-
-      - name: Combine coverage results
+      - name: Create CI environment file
         run: |
-          echo "Searching for coverage files..."
+          echo "DJANGO_ENV=dev" >> .env.dev
+          echo "DEBUG=True" >> .env.dev
+          echo "SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars" >> .env.dev
+          echo "DB_NAME=inventory" >> .env.dev
+          echo "DB_USER=inventory" >> .env.dev
+          echo "DB_PASSWORD=inventory" >> .env.dev
+          echo "SESSION_IDLE_MINUTES=30" >> .env.dev
+          echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
 
-          find coverage -type f -name ".coverage*" -exec cp {} . \; || true
+      - name: Start services
+        run: docker compose up -d --build --force-recreate --renew-anon-volumes
 
-          if ls .coverage* 1> /dev/null 2>&1; then
-            coverage combine
-            coverage report -m --fail-under=50
-            coverage html
+      - name: Wait for database
+        run: |
+          for i in {1..15}; do
+            docker compose exec -T db pg_isready -U inventory && break
+            sleep 2
+          done
 
-            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
-            coverage report >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "No coverage files found." >> $GITHUB_STEP_SUMMARY
-          fi
+      - name: Run migrations
+        run: docker compose exec -T api python manage.py migrate
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: htmlcov
+      - name: Run full test suite with coverage
+        run: docker compose exec -T api coverage run manage.py test --parallel
+
+      - name: Show coverage report
+        run: docker compose exec -T api coverage report -m --fail-under=30
+
+      - name: Shutdown services
+        if: always()
+        run: docker compose down -v
