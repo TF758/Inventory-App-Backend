@@ -1,0 +1,46 @@
+from django.urls import path, include
+
+from core.viewsets import audit_viewsets
+from core.viewsets import auth_viewsets
+from core.viewsets import session_viewsets
+
+urlpatterns = [
+    path( "security/settings/", auth_viewsets.SecuritySettingsAPIView.as_view(), name="security_settings", ),
+    # --- Audit Logs ---
+    path( "audit-logs/", audit_viewsets.AuditLogViewSet.as_view({"get": "list"}), name="audit-log-list", ),
+    path( "audit-logs/<str:public_id>/", audit_viewsets.AuditLogViewSet.as_view({"get": "retrieve"}), name="audit-log-detail", ),
+  
+    # --- Lock / Unlock User Accounts ---
+    path( "users/<str:public_id>/lock/", auth_viewsets.UserLockViewSet.as_view({"post": "lock"}), name="user-lock", ),
+    path( "users/<str:public_id>/unlock/", auth_viewsets.UserLockViewSet.as_view({"post": "unlock"}), name="user-unlock", ),
+
+    # --- Admin Password Reset ---
+    path( "users/<str:user_public_id>/reset-password/", auth_viewsets.AdminResetUserPasswordView.as_view(), name="admin-reset-user-password", ),
+
+      # --- Admin Set Temp Pass ---
+    path( "users/<str:user_public_id>/set-temp-password/", auth_viewsets.AdminSetTemporaryPasswordView.as_view(), name="admin-set-temp-password", ),
+
+    # --- Site Admin ---
+    path( "site/rename/", auth_viewsets.SiteNameChangeAPIView.as_view(), name="site-rename", ),
+    path( "site/relocate/", auth_viewsets.SiteRelocationAPIView.as_view(), name="site-relocate", ),
+
+    # --- Site Name Change History ---
+    path( "site-name-changes/", auth_viewsets.SiteNameChangeListAPIView.as_view(), name="site-name-change-list", ),
+    path( "site-name-changes/<int:pk>/", auth_viewsets.SiteNameChangeDetailAPIView.as_view(), name="site-name-change-detail", ),
+
+    # --- Admin User Updates ---
+    path( "users/<str:public_id>/update-profile/", auth_viewsets.AdminUpdateUserView.as_view(), name="admin-update-user-profile", ),
+
+    # --- Session Activity ---
+    path( "sessions/activity/", auth_viewsets.SessionActivityAPIView.as_view(), name="session-activity", ),
+
+
+    # --- User Sessions ---
+    path( "sessions/", session_viewsets.UserSessionViewSet.as_view({"get": "list"}), name="session-list", ),
+    path( "sessions/<uuid:pk>/revoke/", session_viewsets.UserSessionViewSet.as_view({"post": "revoke"}), name="session-revoke", ),
+    path( "sessions/logout-others/", session_viewsets.UserSessionViewSet.as_view({"post": "logout_others"}), name="session-logout-others", ),
+    path( "sessions/revoke-by-ip/", session_viewsets.UserSessionViewSet.as_view({"post": "revoke_by_ip"}), name="session-revoke-by-ip", ),
+    path( "sessions/revoke-all/", session_viewsets.RevokeUserSessionsViewset.as_view({"post": "revoke_all"}), name="user-session-revoke-all", ),
+
+    
+]
