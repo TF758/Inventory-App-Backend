@@ -18,7 +18,7 @@ TEST_UA = "unittest-agent"
 
 
 @mock.patch(
-    "db_inventory.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
+    "core.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
     new=[]
 )
 class SessionTokenLoginViewTests(TestCase):
@@ -83,11 +83,11 @@ class SessionTokenLoginViewTests(TestCase):
 
 
 @mock.patch(
-    "db_inventory.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
+    "core.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
     new=[]
 )
 @mock.patch(
-    "db_inventory.viewsets.general_viewsets.RefreshAPIView.throttle_classes",
+    "core.viewsets.general_viewsets.RefreshAPIView.throttle_classes",
     new=[]
 )
 class RefreshTokenViewTests(TestCase):

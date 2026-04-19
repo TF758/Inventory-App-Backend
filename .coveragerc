@@ -3,7 +3,7 @@ branch = True
 parallel = True
 
 source =
-    db_inventory
+    core
     reporting
 
 omit =
