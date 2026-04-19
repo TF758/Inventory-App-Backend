@@ -1,14 +1,12 @@
 from rest_framework import serializers
 from django.utils import timezone
-from db_inventory.models.users import PasswordResetEvent
+from db_inventory.models.notifications import Notification
+from db_inventory.models.security import PasswordResetEvent, SecuritySettings
+from db_inventory.models.sessions import UserSession
 from users.models.users import User
-from db_inventory.models.security import Notification, SecuritySettings, UserSession
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory
 from django.contrib.auth import password_validation
-from django.conf import settings
 from db_inventory.utils.tokens import PasswordResetToken
-from django.core.mail import send_mail
-from django.contrib.auth.hashers import make_password
 from db_inventory.tasks import admin_reset_user_password
 from django.db import transaction
 

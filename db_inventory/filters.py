@@ -1,12 +1,11 @@
 from django.db import models
 import django_filters
-
 from django.db.models import Case, When, Value, IntegerField, Q, Sum, F, Value
 from django.db.models.functions import Coalesce
 from db_inventory.utils.filters import BaseAssetNameFilter
 from assets.models.assets import Accessory, Component, Consumable, Equipment
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, UserPlacement, Room

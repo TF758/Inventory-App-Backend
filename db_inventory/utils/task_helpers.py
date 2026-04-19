@@ -1,5 +1,4 @@
-
-from db_inventory.models.security import Notification
+from db_inventory.models.notifications import Notification
 
 
 def batched_notification_delete(qs, batch_size=1000):

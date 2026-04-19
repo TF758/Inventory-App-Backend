@@ -1,5 +1,4 @@
 from django.contrib import admin
-from db_inventory.models.users import PasswordResetEvent
 
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
@@ -9,7 +8,10 @@ from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEv
 from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
 from db_inventory.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
 from db_inventory.models.base import PublicIDRegistry
-from db_inventory.models.security import Notification, ScheduledTaskRun, SecuritySettings, UserSession
+from db_inventory.models.notifications import Notification
+from db_inventory.models.security import PasswordResetEvent, SecuritySettings
+from db_inventory.models.sessions import UserSession
+from db_inventory.models.tasks import ScheduledTaskRun
 from sites.models.sites import Department, Location, Room, UserPlacement
 from users.models.roles import RoleAssignment
 from users.models.users import User

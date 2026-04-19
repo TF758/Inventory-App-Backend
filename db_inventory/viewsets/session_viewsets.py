@@ -1,7 +1,7 @@
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 from db_inventory.serializers.sessions import UserSessionSerializer
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.filters import UserSessionFilter

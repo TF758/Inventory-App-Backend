@@ -1,10 +1,6 @@
 from rest_framework import serializers
-from users.models.users import User
-from db_inventory.utils.tokens import PasswordResetToken
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
-from django.conf import settings
 import logging
 
 from db_inventory.tasks import send_password_reset_email

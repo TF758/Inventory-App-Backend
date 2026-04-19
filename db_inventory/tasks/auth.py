@@ -6,8 +6,7 @@ from users.models.users import User
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.audit import AuditLog
 from datetime import timedelta
-
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 
 
 logger = logging.getLogger(__name__)

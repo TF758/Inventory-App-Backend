@@ -2,12 +2,15 @@ from celery import shared_task
 from django.conf import settings
 import logging
 import time
-from db_inventory.models.security import Notification, ScheduledTaskRun, UserSession
 from django.utils import timezone
 from datetime import timedelta
 import time
 from datetime import timedelta
 from db_inventory.utils.task_helpers import acquire_lock, batched_delete, batched_notification_delete
+from db_inventory.models.notifications import Notification
+from db_inventory.models.sessions import UserSession
+from db_inventory.models.tasks import ScheduledTaskRun
+
 
 NOTIFICATION_CLEANUP_LOCK = 842001
 TASKRUN_CLEANUP_LOCK = 842002

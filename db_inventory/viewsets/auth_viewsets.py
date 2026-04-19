@@ -6,17 +6,16 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.views import APIView
 from db_inventory.models import UserSession, AuditLog, SiteNameChangeHistory, SiteRelocationHistory
-from db_inventory.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AuditLogLightSerializer, AdminUserDemographicsSerializer, SecuritySettingsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
+from db_inventory.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AdminUserDemographicsSerializer, SecuritySettingsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from db_inventory.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from db_inventory.filters import AuditLogFilter, SiteNameChangeHistoryFilter
-from db_inventory.mixins import AuditMixin, ListDetailSerializerMixin, NotificationMixin, ScopeFilterMixin
+from db_inventory.mixins import AuditMixin, NotificationMixin
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
 from db_inventory.permissions.users import AdminUpdateUserPermission
 from db_inventory.utils.audit import create_audit_log
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from db_inventory.models.security import Notification, SecuritySettings
 from db_inventory.utils.viewset_helpers import get_users_affected_by_site
 from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
@@ -24,8 +23,11 @@ from db_inventory.authentication import SessionJWTAuthentication
 from django.utils import timezone
 from datetime import timedelta
 from db_inventory.security_policy import get_session_idle_timeout, invalidate_security_policy_cache
+from db_inventory.models.notifications import Notification
+from db_inventory.models.security import SecuritySettings
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
+
 
 class SecuritySettingsAPIView(APIView):
     """

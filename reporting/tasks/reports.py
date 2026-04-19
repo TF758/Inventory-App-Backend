@@ -6,9 +6,8 @@ from django.db import transaction
 from db_inventory.mixins import NotificationMixin
 from django.conf import settings
 import redis
-from db_inventory.models.security import Notification, ScheduledTaskRun
 import time
-
+from db_inventory.models.tasks import ScheduledTaskRun
 from reporting.report_registry import REPORT_DEFINITIONS
 from reporting.models.reports import ReportJob
 from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming

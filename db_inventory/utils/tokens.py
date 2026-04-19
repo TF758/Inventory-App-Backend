@@ -5,7 +5,7 @@ import secrets
 from datetime import timedelta
 from django.db import transaction
 from django.core.signing import SignatureExpired, BadSignature
-from db_inventory.models.users import PasswordResetEvent
+from db_inventory.models.security import PasswordResetEvent
 from users.models.users import User
 
 class PasswordResetToken:

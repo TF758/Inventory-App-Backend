@@ -4,7 +4,7 @@ from db_inventory.serializers.general import SessionTokenLoginViewSerializer, Pa
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView

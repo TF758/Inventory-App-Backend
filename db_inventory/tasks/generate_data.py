@@ -1,6 +1,5 @@
 from celery import shared_task
 import time
-from db_inventory.models.security import Notification, ScheduledTaskRun, UserSession
 from django.utils import timezone
 from datetime import timedelta
 import time
@@ -9,6 +8,9 @@ import random
 from datetime import timedelta
 from django.contrib.auth import get_user_model
 from db_inventory.utils.ids import generate_public_ids
+from db_inventory.models.notifications import Notification
+from db_inventory.models.sessions import UserSession
+from db_inventory.models.tasks import ScheduledTaskRun
 
 @shared_task(bind=True)
 def generate_notifications(self):

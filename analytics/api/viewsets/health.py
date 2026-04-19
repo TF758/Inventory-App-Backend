@@ -6,8 +6,8 @@ from sites.models.sites import Department, Location, Room
 from datetime import timedelta
 from django.utils import timezone
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.security import UserSession
-from db_inventory.models.users import PasswordResetEvent
+from db_inventory.models.sessions import UserSession
+from db_inventory.models.security import PasswordResetEvent
 from assets.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
 from django.db.models import Exists, OuterRef, Sum, F
 

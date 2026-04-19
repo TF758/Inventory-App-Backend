@@ -27,7 +27,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
 from django.utils import timezone
 from db_inventory.permissions.users import CanViewUserProfile
-from db_inventory.models.security import Notification
+from db_inventory.models.notifications import Notification
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset
 from rest_framework import viewsets
 from rest_framework.response import Response

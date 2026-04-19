@@ -14,7 +14,7 @@ from rest_framework import viewsets, filters
 from rest_framework.generics import GenericAPIView
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
-from db_inventory.models.security import Notification
+from db_inventory.models.notifications import Notification
 from assignments.api.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer, SelfReturnAccessorySerializer
 from assets.api.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
 

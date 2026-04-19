@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 
 
 

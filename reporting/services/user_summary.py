@@ -6,7 +6,7 @@ from users.models.users import User
 from db_inventory.models.audit import AuditLog
 from django.db.models import Q,  Min, Max
 from django.db.models.functions import TruncDate
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 from django.utils import timezone
 from datetime import datetime, time
 

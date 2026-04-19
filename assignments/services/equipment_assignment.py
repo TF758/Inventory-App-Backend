@@ -2,7 +2,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from db_inventory.models.audit import AuditLog
-from db_inventory.models.security import Notification
+from db_inventory.models.notifications import Notification
 from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync

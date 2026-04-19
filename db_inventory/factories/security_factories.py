@@ -2,7 +2,7 @@ import factory
 from django.utils import timezone
 from datetime import timedelta
 from users.factories.user_factories import UserFactory
-from db_inventory.models.users import PasswordResetEvent
+from db_inventory.models.security import PasswordResetEvent
 
 
 class PasswordResetEventFactory(factory.django.DjangoModelFactory):

@@ -1,4 +1,4 @@
-from db_inventory.models.security import Notification
+from db_inventory.models.notifications import Notification
 from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest
 from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from assets.api.serializers.accessories import AccessoryBatchWriteSerializer, AccessoryFullSerializer

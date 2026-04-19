@@ -1,6 +1,6 @@
 
 from db_inventory.mixins import AuditMixin, NotificationMixin, ScopeFilterMixin
-from db_inventory.models.security import Notification
+from db_inventory.models.notifications import Notification
 from db_inventory.models.audit import AuditLog
 from rest_framework import viewsets, status
 from rest_framework.response import Response
