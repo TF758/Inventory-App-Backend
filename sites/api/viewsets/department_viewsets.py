@@ -1,6 +1,5 @@
 from rest_framework import viewsets
 from assets.models.assets import Consumable, Equipment, Component
-from core.filters import *
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Count  
@@ -20,10 +19,13 @@ from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
+from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from sites.site_filters import AreaUserFilter, DepartmentFilter, LocationFilter, RoomFilter
+from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer
-from sites.models.sites import Room
+from sites.models.sites import Department, Location, Room, UserPlacement
 from sites.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
 from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
 from sites.api.serializers.rooms import RoomSerializer

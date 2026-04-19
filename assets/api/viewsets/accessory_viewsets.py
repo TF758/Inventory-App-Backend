@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from core.mixins import ScopeFilterMixin, AccessoryBatchMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.filters import AccessoryFilter
+
 from django.db.models import Case, When, Value, IntegerField
 from django.db import transaction
 from assignments.services.equipment_assignment import StatusChangeResult
@@ -19,6 +19,7 @@ from assets.api.serializers.accessories import AccessoryFullSerializer, Accessor
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from core.pagination import FlexiblePagination
 from assets.models.assets import Accessory
+from assets.asset_filters import AccessoryFilter
 
 class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 

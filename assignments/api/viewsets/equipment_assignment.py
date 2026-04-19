@@ -11,11 +11,12 @@ from core.mixins import AuditMixin, NotificationMixin
 from core.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
 from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
-from core.filters import EquipmentAssignmentFilter
+
 from core.pagination import FlexiblePagination
 from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
+from assignments.assignment_filters import EquipmentAssignmentFilter
 
 class EquipmentAssignmentViewSet(
     AuditMixin,

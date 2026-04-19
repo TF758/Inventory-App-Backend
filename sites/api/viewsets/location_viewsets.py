@@ -6,6 +6,9 @@ from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
+from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from sites.site_filters import AreaUserFilter, LocationFilter, RoomFilter
+from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer
@@ -13,7 +16,6 @@ from sites.api.serializers.locations import LocationComponentSerializer, Locatio
 from sites.models.sites import Location, Room, UserPlacement
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.filters import *
 from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from sites.permissions.sites import LocationPermission
 from django.db.models import Case, When, Value, IntegerField

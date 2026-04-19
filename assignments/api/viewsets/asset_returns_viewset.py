@@ -10,11 +10,12 @@ from rest_framework.filters import OrderingFilter
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from core.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
-from core.filters import AdminReturnRequestFilter, ReturnRequestFilter
+
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from core.pagination import FlexiblePagination
 from assignments.api.serializers.returns import ReturnRequestSerializer
 from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
+from assignments.assignment_filters import AdminReturnRequestFilter, ReturnRequestFilter
 from users.api.serializers.self import MixedAssetReturnSerializer
 
 

@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
+from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from core.permissions.helpers import ensure_permission
@@ -11,7 +12,7 @@ from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
 from core.pagination import  FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
-from core.filters import RoleAssignmentFilter
+
 from core.permissions import RolePermission
 from django.db.models import Q
 from django.db import IntegrityError

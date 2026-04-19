@@ -4,12 +4,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from core.models.sessions import UserSession
 from core.serializers.sessions import UserSessionSerializer
 from core.pagination import FlexiblePagination
-from core.filters import UserSessionFilter
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
+from core.filters import UserSessionFilter
 from users.models.users import User
 
 

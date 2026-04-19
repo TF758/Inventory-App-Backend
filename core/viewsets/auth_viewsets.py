@@ -9,7 +9,6 @@ from core.models import UserSession, AuditLog, SiteNameChangeHistory, SiteReloca
 from core.serializers.auth import AdminSetTemporaryPasswordSerializer, ChangePasswordSerializer, AdminPasswordResetSerializer, AdminUserDemographicsSerializer, SecuritySettingsSerializer, SiteNameChangeHistoryListSerializer, SiteNameChangeHistorySerializer
 from core.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
-from core.filters import AuditLogFilter, SiteNameChangeHistoryFilter
 from core.mixins import AuditMixin, NotificationMixin
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
@@ -25,6 +24,7 @@ from datetime import timedelta
 from core.security_policy import get_session_idle_timeout, invalidate_security_policy_cache
 from core.models.notifications import Notification
 from core.models.security import SecuritySettings
+from core.filters import SiteNameChangeHistoryFilter
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
 

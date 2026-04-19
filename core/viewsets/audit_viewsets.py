@@ -5,7 +5,6 @@ from core.mixins import ListDetailSerializerMixin
 from core.models.audit import AuditLog
 from core.pagination import FlexiblePagination
 from core.serializers.auth import AuditLogLightSerializer, AuditLogSerializer, NotificationSerializer
-from core.filters import AuditLogFilter
 from rest_framework.generics import ListAPIView
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
@@ -15,6 +14,7 @@ from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 
 from core.models.notifications import Notification
+from core.filters import AuditLogFilter
 
 class AuditLogViewSet(
     ListDetailSerializerMixin,

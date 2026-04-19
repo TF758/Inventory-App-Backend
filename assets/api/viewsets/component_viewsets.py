@@ -1,12 +1,13 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.filters import ComponentFilter
+
 from core.mixins import ScopeFilterMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from assets.models.assets import Component
 from core.pagination import FlexiblePagination
 from assets.api.serializers.components import ComponentSerializer, ComponentWriteSerializer
+from assets.asset_filters import ComponentFilter
 
 
 

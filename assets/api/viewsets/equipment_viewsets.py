@@ -3,7 +3,6 @@ from rest_framework.serializers import ValidationError
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.filters import EquipmentFilter
 from core.mixins import ScopeFilterMixin,EquipmentBatchMixin, AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework.response import Response
@@ -27,6 +26,7 @@ from assignments.models.asset_assignment import EquipmentEvent
 from assets.api.serializers.equipment import EquipmentCondemnSerializer, EquipmentSerializer, EquipmentStatusChangeSerializer, EquipmentWriteSerializer
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from core.models.audit import AuditLog
+from assets.asset_filters import EquipmentFilter
 from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):

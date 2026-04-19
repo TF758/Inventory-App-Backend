@@ -1,7 +1,6 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.filters import ConsumableFilter
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework import status
 from rest_framework.response import Response
@@ -18,6 +17,7 @@ from assignments.services.equipment_assignment import StatusChangeResult
 from assets.api.serializers.consumables import BatchConsumableHardDeleteSerializer, BatchConsumableSoftDeleteSerializer, ConsumableAreaReaSerializer, ConsumableWriteSerializer
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from assets.models.assets import Consumable
+from assets.asset_filters import ConsumableFilter
 from sites.models.sites import Room
 
 

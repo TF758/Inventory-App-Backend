@@ -5,6 +5,8 @@ from rest_framework import status, views
 from django.db import transaction
 from core.models.audit import AuditLog
 from assets.api.serializers.equipment import EquipmentSerializer
+from sites.site_filters import UserPlacementFilter
+from users.users_filters import UserFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from users.api.serializers.roles import RoleWriteSerializer
@@ -12,7 +14,6 @@ from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserA
 from sites.models.sites import UserPlacement, Room, Department, Location
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.filters import  UserFilter, UserPlacementFilter
 from core.mixins import NotificationMixin, ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from core.permissions import UserPermission,  UserPlacementPermission, filter_queryset_by_scope, FullUserCreatePermission
