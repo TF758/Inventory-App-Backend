@@ -7,8 +7,9 @@ from tqdm import tqdm  # progress bars
 from django.contrib.auth.hashers import make_password
 
 from db_inventory.models.assets import Accessory, Component, Consumable, Equipment
-from db_inventory.factories.asset_factories import AccessoryFactory, ComponentFactory, ConsumableFactory, EquipmentFactory
+
 from db_inventory.tests.test_audit_logs import User
+from assets.asset_factories import AccessoryFactory, ComponentFactory, ConsumableFactory, EquipmentFactory
 from sites.models.sites import Department, Location, Room, UserPlacement
 from users.factories.user_factories import AdminUserFactory
 from users.models.roles import RoleAssignment

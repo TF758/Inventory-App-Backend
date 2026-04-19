@@ -1,9 +1,6 @@
 import token
 from rest_framework_simplejwt.views import TokenObtainPairView
 from db_inventory.serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer
-from db_inventory.serializers.equipment import EquipmentBatchtWriteSerializer
-from db_inventory.serializers.consumables import ConsumableBatchWriteSerializer
-from db_inventory.serializers.accessories import AccessoryBatchWriteSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
@@ -26,6 +23,9 @@ from db_inventory.models.audit import AuditLog
 from django.db.models import Q
 from django.conf import settings
 from db_inventory.security_policy import *
+from assets.api.serializers.accessories import AccessoryBatchWriteSerializer
+from assets.api.serializers.consumables import ConsumableBatchWriteSerializer
+from assets.api.serializers.equipment import EquipmentBatchtWriteSerializer
 
 
 

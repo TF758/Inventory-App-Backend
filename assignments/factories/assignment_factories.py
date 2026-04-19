@@ -1,8 +1,8 @@
 import factory
 from django.utils import timezone
 from assignments.models.asset_assignment import ( EquipmentAssignment, AccessoryAssignment, ConsumableIssue, )
-from .user_factories import UserFactory
-from .asset_factories import EquipmentFactory, AccessoryFactory, ConsumableFactory
+from assets.asset_factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
+from users.factories.user_factories import UserFactory
 
 
 class EquipmentAssignmentFactory(factory.django.DjangoModelFactory):

@@ -7,6 +7,10 @@ from db_inventory.permissions.assets import AssetPermission
 from db_inventory.permissions.users import UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
+from assets.api.serializers.accessories import AccessoryFullSerializer
+from assets.api.serializers.components import ComponentSerializer
+from assets.api.serializers.consumables import ConsumableAreaReaSerializer
+from assets.api.serializers.equipment import EquipmentSerializer
 from users.models.roles import RoleAssignment
 from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer

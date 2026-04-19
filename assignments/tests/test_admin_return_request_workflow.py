@@ -1,9 +1,10 @@
 from django.test import TestCase
 from rest_framework.test import APIClient, APIRequestFactory
 from django.urls import reverse
-from db_inventory.factories import EquipmentFactory, UserFactory
 from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest
 from db_inventory.permissions.assets import CanProcessReturnRequest
+from assets.asset_factories import EquipmentFactory
+from users.factories.user_factories import UserFactory
 from users.models.roles import RoleAssignment
 from db_inventory.models.security import Notification
 from django.contrib.auth.models import AnonymousUser

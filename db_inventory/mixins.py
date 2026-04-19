@@ -1,13 +1,13 @@
 from db_inventory.models.security import Notification
 from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest
 from db_inventory.models.assets import Component, Consumable, EquipmentStatus
+from assets.api.serializers.accessories import AccessoryBatchWriteSerializer, AccessoryFullSerializer
+from assets.api.serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
+from assets.api.serializers.equipment import EquipmentBatchtWriteSerializer, EquipmentSerializer
 from users.models.roles import RoleAssignment
 from .permissions import filter_queryset_by_scope
 from db_inventory.models import AuditLog, Equipment, Accessory
 from django.db import transaction
-from .serializers.equipment import EquipmentBatchtWriteSerializer,EquipmentSerializer
-from .serializers.accessories import AccessoryFullSerializer, AccessoryBatchWriteSerializer
-from  .serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from collections import Counter
 from django.utils.text import capfirst
 from channels.layers import get_channel_layer

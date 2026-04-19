@@ -4,6 +4,7 @@ from rest_framework import mixins
 from rest_framework import status, views
 from django.db import transaction
 from db_inventory.models.audit import AuditLog
+from assets.api.serializers.equipment import EquipmentSerializer
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from users.api.serializers.roles import RoleWriteSerializer
@@ -30,10 +31,9 @@ from db_inventory.models.security import Notification
 from db_inventory.utils.viewset_helpers import unallocated_users_queryset
 from rest_framework import viewsets
 from rest_framework.response import Response
-from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
-from db_inventory.services.assets import user_has_active_assets
+from assets.services.assets import user_has_active_assets
 
 
 class UserModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):

@@ -1,9 +1,9 @@
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
-from db_inventory.factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
 from django.utils import timezone
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment, ReturnRequest, ReturnRequestItem
+from assets.asset_factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
 from users.factories.user_factories import UserFactory
 
 

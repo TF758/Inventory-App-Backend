@@ -3,7 +3,7 @@
 
 from data_import.services.base_importer import BaseAssetImporter
 from db_inventory.models.assets import Equipment, EquipmentStatus
-from db_inventory.serializers.equipment import EquipmentWriteSerializer
+from assets.api.serializers.equipment import EquipmentWriteSerializer
 
 
 class EquipmentImporter(BaseAssetImporter):

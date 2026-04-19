@@ -12,7 +12,6 @@ from db_inventory.permissions.assets import CanManageAssetCustody, CanViewEquipm
 from db_inventory.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
 from db_inventory.filters import EquipmentAssignmentFilter
-
 from db_inventory.pagination import FlexiblePagination
 from db_inventory.models.security import Notification
 from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer

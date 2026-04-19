@@ -3,9 +3,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 from db_inventory.models.assets import  AssetAgreementItem
-
-from db_inventory.factories.asset_factories import EquipmentFactory
 from db_inventory.factories.agreement_factories import AssetAgreementFactory, AssetAgreementItemFactory
+from assets.asset_factories import EquipmentFactory
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from users.factories.user_factories import UserFactory
 from users.models.roles import RoleAssignment

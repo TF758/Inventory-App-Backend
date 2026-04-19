@@ -2,7 +2,7 @@
 
 from data_import.services.base_importer import BaseAssetImporter
 from db_inventory.models.assets import Accessory
-from db_inventory.serializers.accessories import AccessoryWriteSerializer
+from assets.api.serializers.accessories import AccessoryWriteSerializer
 
 
 class AccessoryImporter(BaseAssetImporter):

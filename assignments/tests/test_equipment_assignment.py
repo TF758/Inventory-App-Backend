@@ -1,5 +1,5 @@
 from assignments.models.asset_assignment import EquipmentAssignment
-from db_inventory.factories.asset_factories import EquipmentFactory
+from assets.asset_factories import EquipmentFactory
 from users.factories.user_factories import UserFactory, UserPlacementFactory
 from users.models.roles import RoleAssignment
 from assignments.tests.assignments_test_bases import EquipmentAssignmentAPITestBase

@@ -13,9 +13,9 @@ from rest_framework.mixins import RetrieveModelMixin
 from db_inventory.permissions.users import CanViewUserProfile
 from rest_framework import viewsets
 from rest_framework.response import Response
-from db_inventory.serializers.equipment import EquipmentSerializer
 from db_inventory.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
+from assets.api.serializers.equipment import EquipmentSerializer
 from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from users.models.users import User
 

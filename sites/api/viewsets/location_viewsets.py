@@ -1,11 +1,11 @@
 from rest_framework import viewsets
-from db_inventory.serializers.equipment import EquipmentSerializer, EquipmentSerializer
-from db_inventory.serializers.consumables import ConsumableAreaReaSerializer
-from db_inventory.serializers.accessories import AccessoryFullSerializer
 from db_inventory.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
 from db_inventory.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
+from assets.api.serializers.accessories import AccessoryFullSerializer
+from assets.api.serializers.consumables import ConsumableAreaReaSerializer
+from assets.api.serializers.equipment import EquipmentSerializer
 from users.models.roles import RoleAssignment
 from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer

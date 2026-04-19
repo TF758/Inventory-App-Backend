@@ -2,8 +2,8 @@ import factory
 from django.utils import timezone
 from datetime import timedelta
 from db_inventory.models.assets import AssetAgreement, AssetAgreementItem
+from assets.asset_factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
 from sites.factories.site_factories import DepartmentFactory
-from .asset_factories import EquipmentFactory, AccessoryFactory, ConsumableFactory
 
 
 class AssetAgreementFactory(factory.django.DjangoModelFactory):

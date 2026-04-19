@@ -5,13 +5,9 @@ from assignments.models.asset_assignment import (
     ReturnRequest,
     ReturnRequestItem,
 )
+from assignments.factories.assignment_factories import AccessoryAssignmentFactory, ConsumableIssueFactory, EquipmentAssignmentFactory
+from users.factories.user_factories import UserFactory
 
-from .user_factories import UserFactory
-from .assignment_factories import (
-    EquipmentAssignmentFactory,
-    AccessoryAssignmentFactory,
-    ConsumableIssueFactory,
-)
 
 
 class ReturnRequestFactory(factory.django.DjangoModelFactory):
