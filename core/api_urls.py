@@ -17,9 +17,9 @@ urlpatterns = [
     # ----------------------------
     # Core Modules
     # ----------------------------
-    path("auth/", include("db_inventory.urls.auth_urls")),
+    path("auth/", include("core.urls.auth_urls")),
 
-    path("", include("db_inventory.notifications.urls")),
+    path("", include("core.notifications.urls")),
 
     # ----------------------------
     # Auth / Session

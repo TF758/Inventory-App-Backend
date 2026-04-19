@@ -27,8 +27,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Environment detection & configuration
 # ------------------------------------------------------------
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 IN_DOCKER = os.path.exists("/.dockerenv")
 
 # Default to local unless explicitly told otherwise
@@ -174,13 +172,13 @@ MIDDLEWARE = [
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "db_inventory.pagination.OptionalPagination",
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.OptionalPagination",
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "db_inventory.authentication.SessionJWTAuthentication",
+        "core.authentication.SessionJWTAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
