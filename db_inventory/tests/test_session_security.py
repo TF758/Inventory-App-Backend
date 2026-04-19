@@ -1,10 +1,10 @@
-from db_inventory.models.security import SecuritySettings, UserSession
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.urls import reverse
 from django.test import TestCase
 from rest_framework_simplejwt.tokens import AccessToken
-
+from db_inventory.models.security import SecuritySettings
+from db_inventory.models.sessions import UserSession
 from users.factories.user_factories import UserFactory
 
 

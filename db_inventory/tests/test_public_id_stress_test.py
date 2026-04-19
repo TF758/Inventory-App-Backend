@@ -3,8 +3,9 @@ from concurrent.futures import ThreadPoolExecutor
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
-from db_inventory.models import Accessory
-from db_inventory.factories.asset_factories import AccessoryFactory
+from assets.asset_factories import AccessoryFactory
+from assets.models.assets import Accessory
+
 
 
 

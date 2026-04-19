@@ -8,7 +8,6 @@ from django.urls import reverse
 from unittest import mock
 from django.core.cache import cache
 from rest_framework_simplejwt.tokens import AccessToken
-
 from db_inventory.models import UserSession
 from db_inventory.security_policy import get_session_absolute_lifetime, get_session_idle_timeout
 from db_inventory.models.security import SecuritySettings

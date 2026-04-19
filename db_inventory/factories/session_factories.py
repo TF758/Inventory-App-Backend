@@ -1,4 +1,4 @@
-from db_inventory.models.security import UserSession
+from db_inventory.models.sessions import UserSession
 import factory
 from django.utils import timezone
 from datetime import timedelta

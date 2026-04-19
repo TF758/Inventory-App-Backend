@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 from unittest.mock import patch
 from db_inventory.utils.tokens import PasswordResetToken
 from db_inventory.models.security import PasswordResetEvent
-from db_inventory.tests.test_audit_logs import User
+from users.models.users import User
 from users.factories.user_factories import UserFactory
 
 

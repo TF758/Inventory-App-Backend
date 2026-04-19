@@ -1,16 +1,11 @@
 from rest_framework import viewsets
-from db_inventory.models import Accessory
-from db_inventory.serializers.accessories import *
 from db_inventory.mixins import ScopeFilterMixin, AccessoryBatchMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from db_inventory.filters import AccessoryFilter
 from django.db.models import Case, When, Value, IntegerField
 from django.db import transaction
-from db_inventory.serializers.accessories import BatchAccessorySoftDeleteSerializer, BatchAccessoryHardDeleteSerializer
-from db_inventory.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from assignments.services.equipment_assignment import StatusChangeResult
-from ...pagination import FlexiblePagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -19,6 +14,11 @@ from db_inventory.mixins import AuditMixin
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
+
+from assets.api.serializers.accessories import AccessoryFullSerializer, AccessoryWriteSerializer, BatchAccessoryHardDeleteSerializer, BatchAccessorySoftDeleteSerializer
+from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
+from db_inventory.pagination import FlexiblePagination
+from assets.models.assets import Accessory
 
 class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 

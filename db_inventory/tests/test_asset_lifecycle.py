@@ -1,15 +1,10 @@
 from django.test import TestCase
 from django.utils import timezone
 from unittest.mock import patch
-
 from db_inventory.models.audit import AuditLog
-from db_inventory.services.assets import (
-    hard_delete_asset,
-    restore_asset,
-    soft_delete_asset,
-)
 from assignments.services.equipment_assignment import StatusChangeResult
-from db_inventory.factories.asset_factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
+from assets.asset_factories import AccessoryFactory, ConsumableFactory, EquipmentFactory
+from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from users.factories.user_factories import AdminUserFactory
 
 
@@ -23,11 +18,11 @@ class _BaseAssetLifecycleTest():
 
         # --- Patch permissions ---
         self.soft_patch = patch(
-            "db_inventory.services.assets.can_soft_delete_asset",
+            "assets.services.assets.can_soft_delete_asset",
             return_value=True,
         )
         self.hard_patch = patch(
-            "db_inventory.services.assets.can_hard_delete_asset",
+            "assets.services.assets.can_hard_delete_asset",
             return_value=True,
         )
 

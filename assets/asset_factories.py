@@ -1,7 +1,6 @@
-from db_inventory.models import Equipment, Component, Accessory, Consumable
 import factory
 from faker import Faker
-
+from assets.models.assets import Accessory, Component, Consumable, Equipment
 from sites.factories.site_factories import RoomFactory
 
 

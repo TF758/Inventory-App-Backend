@@ -3,10 +3,10 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
-
 from django.test import TransactionTestCase
-from db_inventory.factories.asset_factories import EquipmentFactory
 from db_inventory.models.audit import AuditLog
+from assets.asset_factories import EquipmentFactory
+from assets.models.assets import Equipment
 from users.factories.user_factories import AdminUserFactory, UserFactory
 from users.models.roles import RoleAssignment
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
@@ -152,8 +152,7 @@ class AuditLogTests(TransactionTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        # The equipment should be fully removed from DB
-        from db_inventory.models import Equipment
+
         self.assertFalse(Equipment.objects.filter(public_id=equip_public_id).exists())
 
         # The audit log entry should still exist
