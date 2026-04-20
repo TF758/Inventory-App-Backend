@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from assets.models.assets import Accessory, Component, Consumable, Equipment
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
-from core.models.security import UserSession
+from core.models.sessions import UserSession
 from core.models.security import PasswordResetEvent
 from sites.models.sites import Department, Location, Room
 from users.factories.user_factories import User
