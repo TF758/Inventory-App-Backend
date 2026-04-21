@@ -13,8 +13,11 @@ class AccessoryImporter(BaseAssetImporter):
     def normalize_row(self, row: dict) -> dict:
         row = super().normalize_row(row)
 
-        serial = row.get("serial_number") or None
-        row["serial_number"] = serial
+        serial = row.get("serial_number")
+        if serial:
+            serial = serial.strip()
+
+        row["serial_number"] = serial or None
 
         try:
             row["quantity"] = int(row.get("quantity"))
@@ -41,4 +44,5 @@ class AccessoryImporter(BaseAssetImporter):
         return Accessory.objects.filter(
             name=(row.get("name") or "").strip(),
             serial_number=row.get("serial_number"),
+            room=room,
         ).exists()

@@ -2,7 +2,7 @@ import csv
 from dataclasses import dataclass, field
 
 from django.core.files.storage import default_storage
-
+from django.db import transaction
 from sites.models.sites import Room
 from core.permissions.helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
 import pandas as pd
@@ -105,6 +105,9 @@ class BaseAssetImporter:
         # -----------------------------
         for index, raw_row in enumerate(rows, start=2):
 
+            if self._is_blank_row(raw_row):
+                continue
+
             try:
                 row_data = self.normalize_row(raw_row)
 
@@ -113,7 +116,6 @@ class BaseAssetImporter:
 
                 dedupe_key = self.get_file_dedupe_key(row_data, room)
 
-                # duplicate in file
                 if dedupe_key in self.seen_keys:
                     result.add_skipped(
                         index,
@@ -124,7 +126,6 @@ class BaseAssetImporter:
 
                 self.seen_keys.add(dedupe_key)
 
-                # duplicate in database
                 if self.exists_in_db(row_data, room):
                     result.add_skipped(
                         index,
@@ -145,7 +146,9 @@ class BaseAssetImporter:
                     )
                     continue
 
-                serializer.save()
+                with transaction.atomic():
+                    serializer.save()
+
                 result.add_imported()
 
             except PermissionError as exc:
@@ -160,7 +163,6 @@ class BaseAssetImporter:
                     f"Unexpected error: {exc}",
                     raw_row,
                 )
-
         return self.to_payload(result)
 
     def to_payload(self, result: ImportResult) -> dict:

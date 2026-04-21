@@ -14,8 +14,12 @@ class EquipmentImporter(BaseAssetImporter):
     def normalize_row(self, row: dict) -> dict:
         row = super().normalize_row(row)
 
-        serial = row.get("serial_number") or None
-        row["serial_number"] = serial
+        serial = row.get("serial_number")
+
+        if serial:
+            serial = serial.strip()
+
+        row["serial_number"] = serial or None
 
         status = (row.get("status") or "").strip().upper()
         valid_statuses = {choice for choice, _ in EquipmentStatus.choices}
@@ -37,9 +41,11 @@ class EquipmentImporter(BaseAssetImporter):
         name = (row.get("name") or "").strip().lower()
         serial = (row.get("serial_number") or "").strip().lower()
 
-        return ( name, serial)
+        return (name, serial, room.public_id)
+
     def exists_in_db(self, row: dict, room):
         return Equipment.objects.filter(
             name=(row.get("name") or "").strip(),
             serial_number=row.get("serial_number"),
+            room=room,
         ).exists()
