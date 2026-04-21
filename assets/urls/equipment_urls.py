@@ -15,7 +15,7 @@ urlpatterns = [
     path("batch-status-change/", equipment_viewsets.BatchEquipmentStatusChangeView.as_view(), name="batch-equipment-status-change"),
     path("batch-soft-delete/", equipment_viewsets.BatchEquipmentSoftDeleteView.as_view(), name="batch-equipment-soft-delete"),
 
-    path("equipments-import/", equipment_viewsets.EquipmentBatchImportView.as_view(), name="equipment-batch-import"),
+    path("equipment-import/", equipment_viewsets.EquipmentBatchImportView.as_view(), name="equipment-batch-import"),
 
     path("<str:public_id>/status/", equipment_viewsets.EquipmentStatusChangeView.as_view(), name="update-equipment-status"),
     path("<str:public_id>/condemn/", equipment_viewsets.EquipmentCondemnView.as_view(), name="condemn-equipment"),
