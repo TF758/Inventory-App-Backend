@@ -1,4 +1,6 @@
 # reports/models.py
+from tkinter.messagebox import CANCEL
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -17,6 +19,7 @@ class ReportJob(PublicIDModel):
         RUNNING = "running"
         DONE = "done"
         FAILED = "failed"
+        CANCELLED = "cancelled"
 
     class ReportType(models.TextChoices):
         USER_SUMMARY = "user_summary", "User Summary"
