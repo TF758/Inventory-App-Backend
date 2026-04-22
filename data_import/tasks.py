@@ -1,7 +1,7 @@
 
 from celery import shared_task
 from data_import.services.import_builder import build_asset_import
-
+from django.utils import timezone
 from reporting.tasks.reports import generate_report_task
 from reporting.models.reports import ReportJob
 
@@ -9,19 +9,62 @@ from reporting.models.reports import ReportJob
 
 @shared_task(bind=True)
 def run_asset_import_task(self, report_job_id):
-
     job = ReportJob.objects.select_related("user").get(id=report_job_id)
+
+    job.status = ReportJob.Status.RUNNING
+    job.started_at = timezone.now()
+    job.save(update_fields=["status", "started_at"])
 
     params = job.params
 
-    raw_data = build_asset_import(
-        asset_type=params["asset_type"],
-        stored_file_name=params["stored_file_name"],
-        generated_by=job.user,
-    )
+    try:
+        raw_data = build_asset_import(
+            asset_type=params["asset_type"],
+            stored_file_name=params["stored_file_name"],
+            generated_by=job.user,
+            job=job,
+        )
 
-    # store result for report generation
-    job.result_payload = raw_data
-    job.save(update_fields=["result_payload"])
+        job.refresh_from_db()
 
-    generate_report_task.delay(job.id)
+        if job.status != ReportJob.Status.CANCELLED:
+            job.result_payload = raw_data
+            job.status = ReportJob.Status.DONE
+            job.finished_at = timezone.now()
+            job.error = ""
+            job.save(update_fields=["result_payload", "status", "finished_at", "error"])
+
+            generate_report_task.delay(job.id)
+
+    except ValueError as exc:
+        job.status = ReportJob.Status.FAILED
+        job.finished_at = timezone.now()
+        job.error = str(exc)
+        job.result_payload = {
+            "summary": {
+                "total_rows": 0,
+                "imported_rows": 0,
+                "skipped_rows": 0,
+                "failed_rows": 0,
+            },
+            "issues": [],
+            "fatal_error": str(exc),
+        }
+        job.save(update_fields=["status", "finished_at", "error", "result_payload"])
+
+    except Exception as exc:
+        job.status = ReportJob.Status.FAILED
+        job.finished_at = timezone.now()
+        job.error = f"Unexpected import error: {exc}"
+        job.result_payload = {
+            "summary": {
+                "total_rows": 0,
+                "imported_rows": 0,
+                "skipped_rows": 0,
+                "failed_rows": 0,
+            },
+            "issues": [],
+            "fatal_error": "Unexpected import error.",
+        }
+        job.save(update_fields=["status", "finished_at", "error", "result_payload"])
+        raise

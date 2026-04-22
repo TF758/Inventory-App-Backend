@@ -57,8 +57,9 @@ class BaseAssetImporter:
     allowed_headers = set()
     serializer_class = None
 
-    def __init__(self, *, user):
+    def __init__(self, user, job=None):
         self.user = user
+        self.job = job
         self.seen_keys = set()
 
     def run(self, *, stored_file_name: str) -> dict:
@@ -104,6 +105,13 @@ class BaseAssetImporter:
         # Process rows
         # -----------------------------
         for index, raw_row in enumerate(rows, start=2):
+
+            # cancellation check every 10 rows
+            if self.job and index % 10 == 0:
+                self.job.refresh_from_db()
+
+                if self.job.status == "CANCELLED":
+                    break
 
             if self._is_blank_row(raw_row):
                 continue

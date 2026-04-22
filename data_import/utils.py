@@ -15,37 +15,17 @@ import pandas as pd
 
 def load_and_normalize_csv(file_obj):
 
-    # Always start with a clean pointer
     file_obj.seek(0)
 
-    # First attempt: normal comma CSV
     df = pd.read_csv(
         file_obj,
         dtype=str,
-        sep=",",
-        encoding="utf-8-sig",
+        encoding="utf-8-sig",     # removes BOM
+        sep=None,                 # auto-detect delimiter
+        engine="python",
         skip_blank_lines=True,
+        keep_default_na=False,
     )
-    df = df.fillna("")
-
-    # If pandas treated the first row as header incorrectly
-    required = {"name", "brand", "model", "serial_number", "status", "room"}
-
-    detected_headers = {c.lower().strip() for c in df.columns}
-
-    if not required.issubset(detected_headers):
-
-        # Reset file pointer and force header detection
-        file_obj.seek(0)
-
-        df = pd.read_csv(
-            file_obj,
-            dtype=str,
-            sep=",",
-            encoding="utf-8-sig",
-            header=0,
-            skip_blank_lines=True,
-        )
 
     if df.empty:
         raise ValueError("CSV file must include a header row.")
@@ -63,12 +43,10 @@ def load_and_normalize_csv(file_obj):
     # Remove Excel junk columns
     df = df.loc[:, ~df.columns.str.contains("^unnamed", case=False)]
 
-    # Trim whitespace
+    # Trim whitespace in cells
     df = df.apply(lambda col: col.str.strip() if col.dtype == "object" else col)
 
-    # Remove empty rows
-    df = df.dropna(how="all")
-
-    # print("Detected columns:", df.columns.tolist())
+    # Remove fully blank rows
+    df = df[df.apply(lambda row: any(str(v).strip() for v in row), axis=1)]
 
     return df
