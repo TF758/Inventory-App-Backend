@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from django.core.files.storage import default_storage
 from django.db import transaction
 from sites.models.sites import Room
-from core.permissions.helpers import has_hierarchy_permission, is_in_scope, is_viewer_role
+from core.permissions.helpers import has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 import pandas as pd
 import io
 
@@ -207,22 +207,31 @@ class BaseAssetImporter:
         return room
 
     def check_write_permission(self, room):
+
         active_role = getattr(self.user, "active_role", None)
 
         if not active_role:
             raise PermissionError("User has no active role.")
 
-        if active_role.role == "SITE_ADMIN":
+        role_name = active_role.role
+
+        # SITE_ADMIN always allowed
+        if role_name == "SITE_ADMIN":
             return
 
-        if is_viewer_role(active_role.role):
-            raise PermissionError("User does not have permission to import assets.")
+        # Viewer roles cannot import
+        if is_viewer_role(role_name):
+            raise PermissionError("Viewer roles cannot import assets.")
 
-        if not has_hierarchy_permission(active_role.role, "ROOM_CLERK"):
-            raise PermissionError(
-                "User does not have sufficient role to import assets."
-            )
+        # Must be admin role
+        if not is_admin_role(role_name):
+            raise PermissionError("Only admin roles can import assets.")
+        
+        # Clerks cannot import
+        if role_name == "ROOM_CLERK":
+            raise PermissionError("Room clerks cannot import assets.")
 
+        # Must be within scope
         if not is_in_scope(active_role, room=room):
             raise PermissionError(
                 f"User is out of scope for room '{room.public_id}'."

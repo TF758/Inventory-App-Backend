@@ -18,7 +18,7 @@ class BaseImporterTests(TestCase):
 
         role = RoleAssignment.objects.create(
             user=cls.user,
-            role="ROOM_CLERK",
+            role="ROOM_ADMIN",
             room=cls.room,
         )
 
@@ -180,3 +180,55 @@ class BaseImporterTests(TestCase):
         result = importer.run(stored_file_name=file_name)
 
         self.assertEqual(result["summary"]["imported_rows"], 1)
+
+
+
+    def test_mixed_scope_rows_import_correctly(self):
+
+        other_room = RoomFactory(location=self.room.location)
+
+        csv_content = (
+            "name,brand,model,serial_number,status,room\n"
+            f"Laptop1,Dell,XPS,123,OK,{self.room.public_id}\n"
+            f"Laptop2,Dell,XPS,456,OK,{other_room.public_id}\n"
+        )
+
+        file_name = self._create_csv("mixed_scope.csv", csv_content)
+
+        importer = EquipmentImporter(user=self.user)
+
+        result = importer.run(stored_file_name=file_name)
+
+        self.assertEqual(result["summary"]["imported_rows"], 1)
+        self.assertEqual(result["summary"]["skipped_rows"], 1)
+    
+
+    def test_equipment_same_serial_different_rooms_rejected(self):
+
+        other_room = RoomFactory(location=self.room.location)
+
+        RoleAssignment.objects.all().delete()
+
+        role = RoleAssignment.objects.create(
+            user=self.user,
+            role="LOCATION_ADMIN",
+            location=self.room.location,
+        )
+
+        self.user.active_role = role
+        self.user.save()
+
+        csv_content = (
+            "name,brand,model,serial_number,status,room\n"
+            f"Laptop,Dell,XPS,123,OK,{self.room.public_id}\n"
+            f"Laptop,Dell,XPS,123,OK,{other_room.public_id}\n"
+        )
+
+        file_name = self._create_csv("cross_room.csv", csv_content)
+
+        importer = EquipmentImporter(user=self.user)
+
+        result = importer.run(stored_file_name=file_name)
+
+        self.assertEqual(result["summary"]["imported_rows"], 1)
+        self.assertEqual(result["summary"]["failed_rows"], 1)

@@ -18,7 +18,7 @@ class EquipmentImporterTests(TestCase):
 
         role = RoleAssignment.objects.create(
             user=cls.user,
-            role="ROOM_CLERK",
+            role="ROOM_ADMIN",
             room=cls.room,
         )
 
