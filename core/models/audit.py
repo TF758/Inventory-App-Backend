@@ -102,6 +102,7 @@ class AuditLog(PublicIDModel):
         USER_MOVED = "user_moved"
         USER_ASSIGNED = "user_assigned"
         EXPORT_GENERATED = "export_generated"
+        ASSET_IMPORT_STARTED = "asset_import_started"
         ASSET_CONDEMNED = "asset_condemned"
         ASSET_RESTOCKED = "asset_restocked"
         ASSET_ASSIGNED = "asset_assigned"

@@ -10,13 +10,15 @@ from django.shortcuts import get_object_or_404
 from data_import.tasks import run_asset_import_task
 from data_import.utils import store_import_upload
 from data_import.serializers import AssetImportRequestSerializer
+from core.mixins import AuditMixin, NotificationMixin
+from core.models.audit import AuditLog
 from reporting.models.reports import ReportJob
 import csv
 from django.http import HttpResponse
 
 
 
-class AssetImportCreateView(APIView):
+class AssetImportCreateView(NotificationMixin, AuditMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -39,6 +41,29 @@ class AssetImportCreateView(APIView):
         )
 
         run_asset_import_task.delay(job.id)
+
+        self.notify(
+            recipient=request.user,
+            notif_type="asset_import_started",
+            title="Import started",
+            message="Your import is being processed. A report will be available shortly.",
+            entity=job,
+            meta={
+                "job_id": job.public_id,
+                "asset_type": asset_type,
+            },
+        )
+
+        self.audit(
+            event_type=AuditLog.Events.ASSET_IMPORT_STARTED,
+            target=job,
+            description=f"{asset_type.title()} import started",
+            metadata={
+                "job_id": job.public_id,
+                "asset_type": asset_type,
+                "file_name": uploaded_file.name,
+            },
+        )
 
         return Response(
             {
