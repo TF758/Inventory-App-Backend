@@ -4,7 +4,7 @@ from sites.models.sites import Department
 
 from django.conf import settings
 import redis
-from core.models.security import ScheduledTaskRun
+from core.models.tasks import ScheduledTaskRun
 import time
 from django.db import DatabaseError
 

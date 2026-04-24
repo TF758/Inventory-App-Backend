@@ -6,7 +6,8 @@ from datetime import timedelta
 from datetime import date as date_type
 import datetime
 from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
-from core.models.security import UserSession, PasswordResetEvent
+from core.models.security import PasswordResetEvent
+from core.models.sessions import UserSession
 from sites.models.sites import Department, Location, Room
 from core.models.audit import AuditLog
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
