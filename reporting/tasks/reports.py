@@ -41,7 +41,6 @@ def normalize_datetimes(obj):
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True)
 def generate_report_task(self, report_job_id: int):
-
     start_ts = time.monotonic()
 
     run = ScheduledTaskRun.objects.create(
@@ -53,47 +52,64 @@ def generate_report_task(self, report_job_id: int):
     job = None
 
     try:
-
         job = ReportJob.objects.select_related("user").get(id=report_job_id)
 
         definition = REPORT_DEFINITIONS.get(job.report_type)
-
         if not definition:
             raise RuntimeError(f"Unknown report type: {job.report_type}")
 
         builder = definition["builder"]
         renderer = definition["renderer"]
 
+        # ---------------------------------
+        # Mark job running
+        # ---------------------------------
         with transaction.atomic():
             job.status = ReportJob.Status.RUNNING
             job.started_at = timezone.now()
             job.save(update_fields=["status", "started_at"])
 
-
+        # ---------------------------------
+        # Build payload
+        # ---------------------------------
         builder_params = definition["param_map"](job.params, job.user)
 
-
         if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
-            raw_data = job.result_payload
+            payload = job.result_payload
         else:
-            raw_data = builder(**builder_params)
+            payload = builder(**builder_params)
 
-        raw_data = normalize_datetimes(raw_data)
+        payload = normalize_datetimes(payload)
 
-        if raw_data is None:
+        if payload is None:
             raise RuntimeError("Report payload is empty")
 
+        # ---------------------------------
+        # Enforce new canonical schema
+        # ---------------------------------
+        if not isinstance(payload, dict):
+            raise RuntimeError("Report payload must be a dict")
 
-        extra_meta = {
-            "generated_by": job.user.get_username(),
-        }
+        if "meta" not in payload:
+            raise RuntimeError("Report payload missing 'meta'")
 
-        payload = wrap_report_payload(
-            report_type=job.report_type,
-            data=raw_data,
-            extra_meta=extra_meta,
-        )
+        if "data" not in payload:
+            raise RuntimeError("Report payload missing 'data'")
 
+        if not isinstance(payload["meta"], dict):
+            raise RuntimeError("'meta' must be a dict")
+
+        if not isinstance(payload["data"], dict):
+            raise RuntimeError("'data' must be a dict")
+
+        # Optional system metadata
+        payload["meta"].setdefault("report_type", job.report_type)
+        payload["meta"].setdefault("generated_by", job.user.get_username())
+        payload["meta"].setdefault("schema_version", 1)
+
+        # ---------------------------------
+        # Render workbook
+        # ---------------------------------
         workbook_spec = renderer(payload)
 
         if definition.get("streaming", False):
@@ -101,6 +117,9 @@ def generate_report_task(self, report_job_id: int):
         else:
             wb = render_workbook(workbook_spec)
 
+        # ---------------------------------
+        # Save file
+        # ---------------------------------
         buffer = io.BytesIO()
         wb.save(buffer)
         buffer.seek(0)
@@ -109,7 +128,6 @@ def generate_report_task(self, report_job_id: int):
             report_type=job.report_type,
             public_id=job.public_id,
         )
-
         filename = f"{filename}.xlsx"
 
         file_path = settings.REPORTS_DIR / filename
@@ -119,8 +137,10 @@ def generate_report_task(self, report_job_id: int):
 
         job.report_file = filename
 
+        # ---------------------------------
+        # Mark complete
+        # ---------------------------------
         with transaction.atomic():
-
             job.status = ReportJob.Status.DONE
             job.finished_at = timezone.now()
 
@@ -133,7 +153,6 @@ def generate_report_task(self, report_job_id: int):
             )
 
             if not job.notification_sent:
-
                 notifier.notify(
                     recipient=job.user,
                     notif_type="report_ready",
@@ -154,7 +173,6 @@ def generate_report_task(self, report_job_id: int):
         run.message = f"ReportJob {job.public_id} completed"
 
     except Exception as exc:
-
         if job:
             with transaction.atomic():
                 job.status = ReportJob.Status.FAILED
@@ -168,6 +186,5 @@ def generate_report_task(self, report_job_id: int):
         raise
 
     finally:
-
         run.duration_ms = int((time.monotonic() - start_ts) * 1000)
         run.save()
