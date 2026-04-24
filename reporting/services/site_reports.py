@@ -148,26 +148,11 @@ def build_site_audit_log_report(
     generated_by=None,
 ) -> dict:
     """
-    Build a Site Audit Log Report.
-
-    Collects audit log entries associated with a site scope
-    (department, location, or room) within a given time window.
-
-    Parameters
-    ----------
-    site : dict
-        {
-            "siteType": "department | location | room",
-            "siteId": "<public_id>"
-        }
-
-    audit_period_days : int
-        Time window for audit logs. Allowed values:
-        30, 60, 90, 120.
-
-    generated_by : User | None
-        User who triggered the report (optional).
-
+    Build Site Audit Log Report using canonical payload:
+    {
+        "meta": {},
+        "data": {}
+    }
     """
 
     site_filter_field_map = {
@@ -187,7 +172,7 @@ def build_site_audit_log_report(
         "user_created": "User Created",
         "user_updated": "User Updated",
         "user_deleted": "User Deleted",
-        "password_reset": "Password Reset", #nosec
+        "password_reset": "Password Reset",
         "role_assigned": "Role Assigned",
         "user_moved": "User Moved",
     }
@@ -211,15 +196,12 @@ def build_site_audit_log_report(
         .order_by("-created_at")
     )
 
-    payload = {
-        "logs": []
-    }
+    rows = []
 
     for log in logs:
-
         local_time = timezone.localtime(log.created_at).replace(tzinfo=None)
 
-        payload["logs"].append({
+        rows.append({
             "date": local_time.strftime("%Y-%m-%d"),
             "time": local_time.strftime("%H:%M:%S"),
             "action": EVENT_LABELS.get(
@@ -239,4 +221,22 @@ def build_site_audit_log_report(
             "audit_reference": log.public_id,
         })
 
-    return payload
+    return {
+        "meta": {
+            "report_name": "Site Audit Log Report",
+            "site_type": site_type,
+            "site_id": site_id,
+            "audit_period_days": audit_period_days,
+            "generated_by": str(generated_by) if generated_by else None,
+            "generated_at": timezone.now().isoformat(),
+        },
+        "data": {
+            "summary": {
+                "log_count": len(rows),
+                "audit_period_days": audit_period_days,
+            },
+            "tables": {
+                "Audit Logs": rows,
+            },
+        },
+    }

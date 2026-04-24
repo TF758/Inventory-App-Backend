@@ -70,7 +70,10 @@ def site_audit_log_to_workbook_spec(payload: dict) -> dict:
     spec = {}
 
     meta = payload["meta"]
-    logs = payload["data"]["logs"]
+    data = payload["data"]
+
+    summary = data["summary"]
+    logs = data["tables"].get("Audit Logs", [])
 
     # -----------------------------
     # Report Info
@@ -84,7 +87,7 @@ def site_audit_log_to_workbook_spec(payload: dict) -> dict:
             ["Site ID", meta.get("site_id", "N/A")],
             ["Site Name", meta.get("site_name", "N/A")],
             ["Audit Period (days)", meta.get("audit_period_days", "N/A")],
-            ["Total Events", len(logs)],
+            ["Total Events", summary.get("log_count", 0)],
         ],
     }
 

@@ -30,32 +30,11 @@ def build_user_summary_report(
     generated_by=None,
 ) -> dict:
     """
-    Build a User Summary Report.
-
-    This service function gathers user-related data and returns a structured
-    dictionary that can later be rendered into a report by the report renderer.
-
-    Parameters
-    ----------
-    user_identifier : str
-        The identifier used to locate the user. This can be either:
-        - User.public_id
-        - User.email
-
-    sections : list[str]
-        A list of report sections to include in the output. Only the requested
-        sections will be queried and included in the result.
-
-        Allowed values:
-            - "demographics"
-            - "loginStats"
-            - "roleSummary"
-            - "auditSummary"
-            - "passwordevents"
-
-    generated_by : User | None
-        The user who triggered report generation. This is optional and may be
-        used for metadata or auditing purposes.
+    Build User Summary Report using canonical payload:
+    {
+        "meta": {},
+        "data": {}
+    }
     """
 
     user = (
@@ -69,7 +48,7 @@ def build_user_summary_report(
     data = {}
 
     # -------------------------------------------------
-    # Demographics Section
+    # Demographics
     # -------------------------------------------------
     if "demographics" in sections:
 
@@ -85,7 +64,8 @@ def build_user_summary_report(
             "email": user.email,
             "job_title": user.job_title,
             "current_location": (
-                f"{current_location.room.name} @ {current_location.room.location.name}"
+                f"{current_location.room.name} @ "
+                f"{current_location.room.location.name}"
                 if current_location else None
             ),
             "current_active_role": (
@@ -95,7 +75,7 @@ def build_user_summary_report(
         }
 
     # -------------------------------------------------
-    # Login Statistics
+    # Login Stats
     # -------------------------------------------------
     if "loginStats" in sections:
 
@@ -126,8 +106,8 @@ def build_user_summary_report(
         data["auditSummary"] = {
             "total": logs.count(),
             "events": {
-                e["event_type"]: e["count"]
-                for e in event_counts
+                row["event_type"]: row["count"]
+                for row in event_counts
             },
         }
 
@@ -157,7 +137,7 @@ def build_user_summary_report(
         ]
 
     # -------------------------------------------------
-    # Password Event Summary
+    # Password Events
     # -------------------------------------------------
     if "passwordevents" in sections:
 
@@ -165,10 +145,22 @@ def build_user_summary_report(
 
         data["passwordevents"] = {
             "total_password_reset_events": resets.count(),
-            "active_reset_tokens": resets.filter(is_active=True).count(),
+            "active_reset_tokens": resets.filter(
+                is_active=True
+            ).count(),
         }
 
-    return data
+    return {
+        "meta": {
+            "report_name": "User Summary Report",
+            "generated_at": timezone.now().isoformat(),
+            "generated_by": str(generated_by) if generated_by else None,
+            "user_identifier": user_identifier,
+            "user_public_id": user.public_id,
+            "user_email": user.email,
+        },
+        "data": data,
+    }
 
 def generate_user_audit_history_rows(logs):
     """
@@ -191,7 +183,6 @@ def generate_user_audit_history_rows(logs):
             log.ip_address,
             log.user_agent,
         ]
-
 def build_user_audit_history_report(
     *,
     user_identifier: str,
@@ -201,14 +192,12 @@ def build_user_audit_history_report(
     generated_by=None,
 ) -> dict:
     """
-    Build a User Audit History Report.
+    Build User Audit History Report using canonical payload:
 
-    Returns:
-        {
-            report_info: {...},
-            audit_stats: {...},
-            history: [...]
-        }
+    {
+        "meta": {...},
+        "data": {...}
+    }
     """
 
     # -------------------------------------------------
@@ -271,40 +260,42 @@ def build_user_audit_history_report(
     )
 
     audit_stats = {
-        s["event_type"]: s["count"]
-        for s in stats_qs
-        if s["count"] > 0
+        row["event_type"]: row["count"]
+        for row in stats_qs
+        if row["count"] > 0
     }
 
     # -------------------------------------------------
-    # History Rows
+    # History Rows (generator preserved for streaming)
     # -------------------------------------------------
 
     history_rows = generate_user_audit_history_rows(logs)
 
     # -------------------------------------------------
-    # Report Metadata
-    # -------------------------------------------------
-
-    report_info = {
-        "generated_by": generated_by.get_username() if generated_by else None,
-        "generated_at": timezone.now(),
-        "user_public_id": user.public_id,
-        "user_email": user.email,
-        "user_full_name": user.get_full_name(),
-        "start_date": start_date,
-        "end_date": end_date,
-        "total_events": total_rows,
-    }
-
-    # -------------------------------------------------
-    # Return Builder Payload
+    # Return Canonical Payload
     # -------------------------------------------------
 
     return {
-        "report_info": report_info,
-        "audit_stats": audit_stats,
-        "history_rows": history_rows,
+        "meta": {
+            "report_name": "User Audit History Report",
+            "generated_at": timezone.now().isoformat(),
+            "generated_by": (
+                generated_by.get_username()
+                if generated_by else None
+            ),
+            "user_public_id": user.public_id,
+            "user_email": user.email,
+            "user_full_name": user.get_full_name(),
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        "data": {
+            "summary": {
+                "total_events": total_rows,
+                **audit_stats,
+            },
+            "history_rows": history_rows,
+        },
     }
 
 LOGIN_EVENT_TYPES = [
@@ -323,16 +314,37 @@ def build_user_login_history_report(
     start_date,
     end_date,
     generated_by=None,
-):
-    
+) -> dict:
+    """
+    Build User Login History Report using canonical payload:
+
+    {
+        "meta": {...},
+        "data": {...}
+    }
+    """
+
+    # -------------------------------------------------
+    # Normalize Dates
+    # -------------------------------------------------
+
     if isinstance(start_date, str):
         start_date = date.fromisoformat(start_date)
 
     if isinstance(end_date, str):
         end_date = date.fromisoformat(end_date)
 
-    start_dt = timezone.make_aware(datetime.combine(start_date, time.min))
-    end_dt   = timezone.make_aware(datetime.combine(end_date, time.max))
+    start_dt = timezone.make_aware(
+        datetime.combine(start_date, time.min)
+    )
+
+    end_dt = timezone.make_aware(
+        datetime.combine(end_date, time.max)
+    )
+
+    # -------------------------------------------------
+    # Locate User
+    # -------------------------------------------------
 
     user = (
         User.objects.filter(public_id=user_identifier).first()
@@ -341,8 +353,10 @@ def build_user_login_history_report(
 
     if not user:
         raise ValueError("User not found")
-    
 
+    # -------------------------------------------------
+    # Base Queries
+    # -------------------------------------------------
 
     logs = AuditLog.objects.filter(
         Q(user=user) | Q(user_public_id=user.public_id),
@@ -351,28 +365,45 @@ def build_user_login_history_report(
         event_type__in=LOGIN_EVENT_TYPES,
     )
 
-
     sessions = UserSession.objects.filter(
         user=user,
         created_at__gte=start_dt,
         created_at__lte=end_dt,
     )
 
-    login_count = logs.filter(event_type=AuditLog.Events.LOGIN).count()
-    logout_count = logs.filter(event_type=AuditLog.Events.LOGOUT).count()
-    failed_login_count = logs.filter(event_type=AuditLog.Events.LOGIN_FAILED).count()
+    # -------------------------------------------------
+    # Summary Stats
+    # -------------------------------------------------
+
+    login_count = logs.filter(
+        event_type=AuditLog.Events.LOGIN
+    ).count()
+
+    logout_count = logs.filter(
+        event_type=AuditLog.Events.LOGOUT
+    ).count()
+
+    failed_login_count = logs.filter(
+        event_type=AuditLog.Events.LOGIN_FAILED
+    ).count()
 
     total_attempts = login_count + failed_login_count
 
     login_success_ratio = (
         round((login_count / total_attempts) * 100, 2)
-        if total_attempts > 0
-        else 0
+        if total_attempts > 0 else 0
     )
 
-    first_login = logs.order_by("created_at").values_list("created_at", flat=True).first()
-    last_login = logs.values_list("created_at", flat=True).first()
+    first_login = (
+        logs.order_by("created_at")
+        .values_list("created_at", flat=True)
+        .first()
+    )
 
+    last_login = (
+        logs.values_list("created_at", flat=True)
+        .first()
+    )
 
     data = {}
 
@@ -381,13 +412,27 @@ def build_user_login_history_report(
         "total_logouts": logout_count,
         "failed_logins": failed_login_count,
         "login_success_ratio_percent": login_success_ratio,
-        "unique_ips": logs.exclude(ip_address__isnull=True).values("ip_address").distinct().count(),
-        "unique_devices": logs.exclude(user_agent__isnull=True).values("user_agent").distinct().count(),
+        "unique_ips": (
+            logs.exclude(ip_address__isnull=True)
+            .values("ip_address")
+            .distinct()
+            .count()
+        ),
+        "unique_devices": (
+            logs.exclude(user_agent__isnull=True)
+            .values("user_agent")
+            .distinct()
+            .count()
+        ),
         "first_login": first_login,
         "last_login": last_login,
     }
 
-    history = [
+    # -------------------------------------------------
+    # Login History
+    # -------------------------------------------------
+
+    data["login_history"] = [
         {
             "timestamp": log.created_at,
             "event_type": log.event_type,
@@ -401,18 +446,28 @@ def build_user_login_history_report(
         for log in logs
     ]
 
-
-    data["login_history"] = history
+    # -------------------------------------------------
+    # Session Stats
+    # -------------------------------------------------
 
     data["session_stats"] = {
         "total_sessions": sessions.count(),
-        "active_sessions": sessions.filter(status=UserSession.Status.ACTIVE).count(),
-        "revoked_sessions": sessions.filter(status=UserSession.Status.REVOKED).count(),
-        "expired_sessions": sessions.filter(status=UserSession.Status.EXPIRED).count(),
+        "active_sessions": sessions.filter(
+            status=UserSession.Status.ACTIVE
+        ).count(),
+        "revoked_sessions": sessions.filter(
+            status=UserSession.Status.REVOKED
+        ).count(),
+        "expired_sessions": sessions.filter(
+            status=UserSession.Status.EXPIRED
+        ).count(),
     }
 
+    # -------------------------------------------------
+    # IP Breakdown
+    # -------------------------------------------------
 
-    ip_breakdown = list(
+    data["ip_breakdown"] = list(
         logs.values("ip_address")
         .annotate(
             count=Count("id"),
@@ -422,35 +477,44 @@ def build_user_login_history_report(
         .order_by("-count")
     )
 
+    # -------------------------------------------------
+    # Device Breakdown
+    # -------------------------------------------------
 
-    data["ip_breakdown"] = ip_breakdown
-
-    device_breakdown = list(
+    data["device_breakdown"] = list(
         logs.values("user_agent")
         .annotate(count=Count("id"))
         .order_by("-count")
     )
 
-    data["device_breakdown"] = device_breakdown
+    # -------------------------------------------------
+    # Timeline
+    # -------------------------------------------------
 
-    timeline = list(
+    data["login_timeline"] = list(
         logs.annotate(day=TruncDate("created_at"))
         .values("day")
         .annotate(count=Count("id"))
         .order_by("day")
     )
 
-
-    data["login_timeline"] = timeline
+    # -------------------------------------------------
+    # Return Canonical Payload
+    # -------------------------------------------------
 
     return {
-        "target_user": {
-            "public_id": user.public_id,
-            "email": user.email,
-            "full_name": user.get_full_name(),
+        "meta": {
+            "report_name": "User Login History Report",
+            "generated_at": timezone.now().isoformat(),
+            "generated_by": (
+                generated_by.get_username()
+                if generated_by else None
+            ),
+            "user_public_id": user.public_id,
+            "user_email": user.email,
+            "user_full_name": user.get_full_name(),
+            "start_date": start_date,
+            "end_date": end_date,
         },
-        "start_date": start_date,
-        "end_date": end_date,
-        "generated_by": generated_by.get_username() if generated_by else None,
         "data": data,
     }
