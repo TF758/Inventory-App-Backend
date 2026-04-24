@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from analytics.utils.utils.viewset_helpers import build_site_filter
 
+
 def build_site_asset_report(
     *,
     site_type: str,
@@ -15,32 +16,14 @@ def build_site_asset_report(
     generated_by=None,
 ) -> dict:
     """
-    Build a Site Asset Report.
-
-    This service gathers asset data (equipment/accessories/consumables) associated with a specific site scope
-    (department, location, or room). It returns structured data that can
-    later be rendered into an Excel report.
-
-    Parameters
-    ----------
-    site_type : str
-        Scope of the report. One of:
-            - department
-            - location
-            - room
-
-    site_id : str
-        Public ID of the site object.
-
-    asset_types : list[str]
-        Types of assets to include in the report:
-            - equipment
-            - component
-            - consumable
-            - accessory
-
-    generated_by : User | None
-        Optional user that triggered the report.
+    Build Site Asset Report payload using canonical structure:
+    {
+        "meta": {},
+        "data": {
+            "summary": {},
+            "tables": {}
+        }
+    }
     """
 
     site_model_map = {
@@ -68,22 +51,52 @@ def build_site_asset_report(
         },
         "consumable": {
             "model": Consumable,
-            "fields": ["name", "description", "quantity", "public_id", "room_id"],
+            "fields": [
+                "name",
+                "description",
+                "quantity",
+                "public_id",
+                "room_id",
+            ],
         },
         "accessory": {
             "model": Accessory,
-            "fields": ["name", "serial_number", "quantity", "public_id", "room_id"],
+            "fields": [
+                "name",
+                "serial_number",
+                "quantity",
+                "public_id",
+                "room_id",
+            ],
         },
     }
 
+    # ---------------------------------
+    # Resolve Site
+    # ---------------------------------
     site_model = site_model_map[site_type]
     site_obj = site_model.objects.get(public_id=site_id)
 
     payload = {
-        "assets": {},
-        "totals": {},
+        "meta": {
+            "report_name": "Site Asset Report",
+            "site_type": site_type,
+            "site_id": site_id,
+            "site_name": site_obj.name,
+            "generated_at": timezone.now().isoformat(),
+            "generated_by": str(generated_by) if generated_by else None,
+        },
+        "data": {
+            "summary": {},
+            "tables": {},
+        },
     }
 
+    grand_total = 0
+
+    # ---------------------------------
+    # Build Tables
+    # ---------------------------------
     for asset_type in asset_types:
 
         asset_info = asset_model_map.get(asset_type)
@@ -97,11 +110,9 @@ def build_site_asset_report(
             build_site_filter(site_type, site_obj, model)
         )
 
-        payload["totals"][asset_type] = qs.count()
-        payload["assets"][asset_type] = []
+        rows = []
 
         for obj in qs:
-
             row = {}
 
             for field in fields:
@@ -115,7 +126,17 @@ def build_site_asset_report(
                 else:
                     row[field] = getattr(obj, field, None)
 
-            payload["assets"][asset_type].append(row)
+            rows.append(row)
+
+        count = len(rows)
+        grand_total += count
+
+        sheet_name = asset_type.title()
+
+        payload["data"]["summary"][f"{asset_type}_count"] = count
+        payload["data"]["tables"][sheet_name] = rows
+
+    payload["data"]["summary"]["grand_total"] = grand_total
 
     return payload
 
