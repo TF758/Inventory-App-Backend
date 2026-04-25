@@ -68,7 +68,7 @@ class ReportJobAdmin(admin.ModelAdmin):
             return "-"
 
         return format_html(
-            '<a href="/metrics/reports/{}/download/" target="_blank">Download</a>',
+            '<a href="/reports/{}/download/" target="_blank">Download</a>',
             obj.public_id,
         )
 
