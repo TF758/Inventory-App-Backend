@@ -50,7 +50,7 @@ class AssetHistoryReport(APIView):
         job = ReportJob.objects.create(
             user=request.user,
             report_type=ReportJob.ReportType.ASSET_HISTORY,
-            params=serializer.validated_data,
+            params=serializer.data,
         )
 
         generate_report_task.delay(job.id)
