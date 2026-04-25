@@ -17,7 +17,6 @@ class UserSummaryReportTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-
         cls.user = UserFactory(
             email="user@example.com",
             fname="John",
@@ -25,8 +24,43 @@ class UserSummaryReportTests(TestCase):
         )
 
         cls.other_user = UserFactory()
-    def test_login_stats_counts_sessions_correctly(self):
 
+    def _meta(self):
+        return {
+            "report_name": "User Summary Report",
+            "generated_at": timezone.now(),
+            "generated_by": "tester",
+            "user_identifier": self.user.email,
+            "user_public_id": self.user.public_id,
+            "user_email": self.user.email,
+        }
+
+    # -------------------------
+    # Builder tests
+    # -------------------------
+
+    def test_builder_returns_requested_sections_only(self):
+        result = build_user_summary_report(
+            user_identifier=self.user.email,
+            sections=["demographics"],
+            generated_by=None,
+        )
+
+        self.assertIn("meta", result)
+        self.assertIn("data", result)
+        self.assertIn("demographics", result["data"])
+        self.assertNotIn("loginStats", result["data"])
+        self.assertNotIn("auditSummary", result["data"])
+
+    def test_builder_raises_if_user_not_found(self):
+        with self.assertRaises(ValueError):
+            build_user_summary_report(
+                user_identifier="nonexistent@example.com",
+                sections=["demographics"],
+                generated_by=None,
+            )
+
+    def test_login_stats_counts_sessions_correctly(self):
         UserSessionFactory.create_batch(
             2,
             user=self.user,
@@ -39,69 +73,16 @@ class UserSummaryReportTests(TestCase):
         result = build_user_summary_report(
             user_identifier=self.user.email,
             sections=["loginStats"],
+            generated_by=None,
         )
 
-        stats = result["loginStats"]
+        stats = result["data"]["loginStats"]
 
         self.assertEqual(stats["active_sessions"], 2)
         self.assertEqual(stats["revoked_sessions"], 1)
         self.assertEqual(stats["expired_sessions"], 1)
-
-    # -------------------------
-    # Builder tests
-    # -------------------------
-
-    def test_builder_returns_requested_sections_only(self):
-
-        result = build_user_summary_report(
-            user_identifier=self.user.email,
-            sections=["demographics"],
-            generated_by=None,
-        )
-
-        self.assertIn("demographics", result)
-        self.assertNotIn("loginStats", result)
-        self.assertNotIn("auditSummary", result)
-
-
-    def test_builder_raises_if_user_not_found(self):
-
-        with self.assertRaises(ValueError):
-
-            build_user_summary_report(
-                user_identifier="nonexistent@example.com",
-                sections=["demographics"],
-                generated_by=None,
-            )
-
-
-    def test_login_stats_counts_sessions_correctly(self):
-
-        UserSessionFactory(user=self.user, status="active")
-        UserSessionFactory(user=self.user, status="revoked")
-        UserSessionFactory(user=self.user, status="expired")
-
-        UserSessionFactory(
-            user=self.user,
-            status="active",
-            last_used_at=timezone.now(),
-        )
-
-        result = build_user_summary_report(
-            user_identifier=self.user.email,
-            sections=["loginStats"],
-            generated_by=None,
-        )
-
-        stats = result["loginStats"]
-
-        self.assertEqual(stats["active_sessions"], 2)
-        self.assertEqual(stats["revoked_sessions"], 1)
-        self.assertEqual(stats["expired_sessions"], 1)
-
 
     def test_login_frequency_last_30_days(self):
-
         UserSessionFactory(
             user=self.user,
             last_used_at=timezone.now() - timedelta(days=10),
@@ -118,17 +99,27 @@ class UserSummaryReportTests(TestCase):
             generated_by=None,
         )
 
-        stats = result["loginStats"]
+        stats = result["data"]["loginStats"]
 
-        self.assertEqual(stats["login_frequency_last_30_days"], 1)
-
+        self.assertEqual(
+            stats["login_frequency_last_30_days"],
+            1,
+        )
 
     def test_audit_summary_aggregates_events(self):
-
         AuditLog.objects.bulk_create([
-            AuditLogFactory(user=self.user, event_type="login"),
-            AuditLogFactory(user=self.user, event_type="login"),
-            AuditLogFactory(user=self.user, event_type="logout"),
+            AuditLogFactory(
+                user=self.user,
+                event_type="login",
+            ),
+            AuditLogFactory(
+                user=self.user,
+                event_type="login",
+            ),
+            AuditLogFactory(
+                user=self.user,
+                event_type="logout",
+            ),
         ])
 
         result = build_user_summary_report(
@@ -137,15 +128,13 @@ class UserSummaryReportTests(TestCase):
             generated_by=None,
         )
 
-        audit = result["auditSummary"]
+        audit = result["data"]["auditSummary"]
 
         self.assertEqual(audit["total"], 3)
         self.assertEqual(audit["events"]["login"], 2)
         self.assertEqual(audit["events"]["logout"], 1)
 
-
     def test_role_summary_scope_resolution(self):
-
         dept = DepartmentFactory(name="IT")
 
         RoleAssignmentFactory(
@@ -160,16 +149,21 @@ class UserSummaryReportTests(TestCase):
             generated_by=None,
         )
 
-        roles = result["roleSummary"]
+        roles = result["data"]["roleSummary"]
 
         self.assertEqual(len(roles), 1)
         self.assertEqual(roles[0]["scope"], "IT")
 
-
     def test_password_event_counts(self):
+        PasswordResetEventFactory(
+            user=self.user,
+            is_active=True,
+        )
 
-        PasswordResetEventFactory(user=self.user, is_active=True)
-        PasswordResetEventFactory(user=self.user, is_active=False)
+        PasswordResetEventFactory(
+            user=self.user,
+            is_active=False,
+        )
 
         result = build_user_summary_report(
             user_identifier=self.user.email,
@@ -177,20 +171,41 @@ class UserSummaryReportTests(TestCase):
             generated_by=None,
         )
 
-        pw = result["passwordevents"]
+        pw = result["data"]["passwordevents"]
 
-        self.assertEqual(pw["total_password_reset_events"], 2)
-        self.assertEqual(pw["active_reset_tokens"], 1)
+        self.assertEqual(
+            pw["total_password_reset_events"],
+            2,
+        )
 
+        self.assertEqual(
+            pw["active_reset_tokens"],
+            1,
+        )
+
+    def test_builder_handles_user_with_no_activity(self):
+        result = build_user_summary_report(
+            user_identifier=self.user.email,
+            sections=["loginStats", "auditSummary"],
+        )
+
+        self.assertEqual(
+            result["data"]["loginStats"]["active_sessions"],
+            0,
+        )
+
+        self.assertEqual(
+            result["data"]["auditSummary"]["total"],
+            0,
+        )
 
     # -------------------------
     # Renderer tests
     # -------------------------
 
     def test_renderer_generates_expected_sheets(self):
-
         payload = {
-            "meta": {},
+            "meta": self._meta(),
             "data": {
                 "demographics": {
                     "full_name": "John Doe",
@@ -207,11 +222,9 @@ class UserSummaryReportTests(TestCase):
         self.assertIn("Role Summary", spec)
         self.assertIn("Password Events", spec)
 
-
     def test_renderer_handles_missing_sections_gracefully(self):
-
         payload = {
-            "meta": {},
+            "meta": self._meta(),
             "data": {},
         }
 
@@ -222,11 +235,9 @@ class UserSummaryReportTests(TestCase):
             "No login statistics available.",
         )
 
-
     def test_renderer_formats_demographic_keys(self):
-
         payload = {
-            "meta": {},
+            "meta": self._meta(),
             "data": {
                 "demographics": {
                     "full_name": "John Doe",
@@ -240,14 +251,3 @@ class UserSummaryReportTests(TestCase):
 
         self.assertEqual(header, "Full Name")
         self.assertEqual(value, "John Doe")
-    
-
-    def test_builder_handles_user_with_no_activity(self):
-
-        result = build_user_summary_report(
-            user_identifier=self.user.email,
-            sections=["loginStats", "auditSummary"],
-        )
-
-        self.assertEqual(result["loginStats"]["active_sessions"], 0)
-        self.assertEqual(result["auditSummary"]["total"], 0)
