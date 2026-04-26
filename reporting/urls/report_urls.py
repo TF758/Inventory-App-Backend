@@ -2,6 +2,7 @@ from django.urls import path, include
 
 from django.urls import re_path
 
+from reporting.api.viewsets.inventory_reports import InventorySummaryReport
 from reporting.api.viewsets.asset_reports import AssetHistoryReport
 from reporting.api.viewsets.reports import DownloadReport, MyReportJobViewSet, ReportJobAdminViewSet
 from reporting.api.viewsets.site_reports import SiteAssetExcelReportAPIView, SiteAuditLogReportAPIView
@@ -47,5 +48,6 @@ urlpatterns = [
     path( "user-audit-history/preview/", UserAuditHistoryPreview.as_view(), name="user-audit-history-preview", ),
     path("user-login-history/", UserLoginHistoryReport.as_view(), name="user-login-history-report"),
     path("asset-history/", AssetHistoryReport.as_view(), name="asset-history-report"),
+    path( "inventory-summary/", InventorySummaryReport.as_view(), name="inventory-summary-report", ),
     
 ]

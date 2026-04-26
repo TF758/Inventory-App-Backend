@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from analytics.utils.utils.viewset_helpers import build_site_filter
 
+
 def build_site_asset_report(
     *,
     site_type: str,
@@ -15,32 +16,14 @@ def build_site_asset_report(
     generated_by=None,
 ) -> dict:
     """
-    Build a Site Asset Report.
-
-    This service gathers asset data (equipment/accessories/consumables) associated with a specific site scope
-    (department, location, or room). It returns structured data that can
-    later be rendered into an Excel report.
-
-    Parameters
-    ----------
-    site_type : str
-        Scope of the report. One of:
-            - department
-            - location
-            - room
-
-    site_id : str
-        Public ID of the site object.
-
-    asset_types : list[str]
-        Types of assets to include in the report:
-            - equipment
-            - component
-            - consumable
-            - accessory
-
-    generated_by : User | None
-        Optional user that triggered the report.
+    Build Site Asset Report payload using canonical structure:
+    {
+        "meta": {},
+        "data": {
+            "summary": {},
+            "tables": {}
+        }
+    }
     """
 
     site_model_map = {
@@ -68,22 +51,52 @@ def build_site_asset_report(
         },
         "consumable": {
             "model": Consumable,
-            "fields": ["name", "description", "quantity", "public_id", "room_id"],
+            "fields": [
+                "name",
+                "description",
+                "quantity",
+                "public_id",
+                "room_id",
+            ],
         },
         "accessory": {
             "model": Accessory,
-            "fields": ["name", "serial_number", "quantity", "public_id", "room_id"],
+            "fields": [
+                "name",
+                "serial_number",
+                "quantity",
+                "public_id",
+                "room_id",
+            ],
         },
     }
 
+    # ---------------------------------
+    # Resolve Site
+    # ---------------------------------
     site_model = site_model_map[site_type]
     site_obj = site_model.objects.get(public_id=site_id)
 
     payload = {
-        "assets": {},
-        "totals": {},
+        "meta": {
+            "report_name": "Site Asset Report",
+            "site_type": site_type,
+            "site_id": site_id,
+            "site_name": site_obj.name,
+            "generated_at": timezone.now().isoformat(),
+            "generated_by": str(generated_by) if generated_by else None,
+        },
+        "data": {
+            "summary": {},
+            "tables": {},
+        },
     }
 
+    grand_total = 0
+
+    # ---------------------------------
+    # Build Tables
+    # ---------------------------------
     for asset_type in asset_types:
 
         asset_info = asset_model_map.get(asset_type)
@@ -97,11 +110,9 @@ def build_site_asset_report(
             build_site_filter(site_type, site_obj, model)
         )
 
-        payload["totals"][asset_type] = qs.count()
-        payload["assets"][asset_type] = []
+        rows = []
 
         for obj in qs:
-
             row = {}
 
             for field in fields:
@@ -115,7 +126,17 @@ def build_site_asset_report(
                 else:
                     row[field] = getattr(obj, field, None)
 
-            payload["assets"][asset_type].append(row)
+            rows.append(row)
+
+        count = len(rows)
+        grand_total += count
+
+        sheet_name = asset_type.title()
+
+        payload["data"]["summary"][f"{asset_type}_count"] = count
+        payload["data"]["tables"][sheet_name] = rows
+
+    payload["data"]["summary"]["grand_total"] = grand_total
 
     return payload
 
@@ -127,26 +148,11 @@ def build_site_audit_log_report(
     generated_by=None,
 ) -> dict:
     """
-    Build a Site Audit Log Report.
-
-    Collects audit log entries associated with a site scope
-    (department, location, or room) within a given time window.
-
-    Parameters
-    ----------
-    site : dict
-        {
-            "siteType": "department | location | room",
-            "siteId": "<public_id>"
-        }
-
-    audit_period_days : int
-        Time window for audit logs. Allowed values:
-        30, 60, 90, 120.
-
-    generated_by : User | None
-        User who triggered the report (optional).
-
+    Build Site Audit Log Report using canonical payload:
+    {
+        "meta": {},
+        "data": {}
+    }
     """
 
     site_filter_field_map = {
@@ -166,7 +172,7 @@ def build_site_audit_log_report(
         "user_created": "User Created",
         "user_updated": "User Updated",
         "user_deleted": "User Deleted",
-        "password_reset": "Password Reset", #nosec
+        "password_reset": "Password Reset",
         "role_assigned": "Role Assigned",
         "user_moved": "User Moved",
     }
@@ -190,15 +196,12 @@ def build_site_audit_log_report(
         .order_by("-created_at")
     )
 
-    payload = {
-        "logs": []
-    }
+    rows = []
 
     for log in logs:
-
         local_time = timezone.localtime(log.created_at).replace(tzinfo=None)
 
-        payload["logs"].append({
+        rows.append({
             "date": local_time.strftime("%Y-%m-%d"),
             "time": local_time.strftime("%H:%M:%S"),
             "action": EVENT_LABELS.get(
@@ -218,4 +221,22 @@ def build_site_audit_log_report(
             "audit_reference": log.public_id,
         })
 
-    return payload
+    return {
+        "meta": {
+            "report_name": "Site Audit Log Report",
+            "site_type": site_type,
+            "site_id": site_id,
+            "audit_period_days": audit_period_days,
+            "generated_by": str(generated_by) if generated_by else None,
+            "generated_at": timezone.now().isoformat(),
+        },
+        "data": {
+            "summary": {
+                "log_count": len(rows),
+                "audit_period_days": audit_period_days,
+            },
+            "tables": {
+                "Audit Logs": rows,
+            },
+        },
+    }

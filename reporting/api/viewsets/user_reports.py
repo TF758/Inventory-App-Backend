@@ -9,7 +9,7 @@ from core.models.audit import AuditLog
 from reporting.api.serializers.user_report import UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
 from reporting.models.reports import ReportJob
 from reporting.tasks.reports import generate_report_task
-from reporting.utils import resolve_audit_date_range
+from reporting.utils.resolve_audit_date_range import resolve_audit_date_range
 from reporting.utils.excel_renderer import estimate_excel_size_mb
 
 redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
@@ -109,7 +109,7 @@ class UserAuditHistoryReport(APIView):
 class UserAuditHistoryPreview(APIView):
     permission_classes = [IsAuthenticated]
 
-    PREVIEW_LIMIT = 100
+    PREVIEW_LIMIT = 20
 
     def post(self, request):
 

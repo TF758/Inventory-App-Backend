@@ -2,6 +2,8 @@
 
 from data_import.renderers import asset_import_to_workbook_spec
 from data_import.services.import_builder import build_asset_import
+from reporting.services.inventory_reports import build_inventory_summary_report
+from reporting.utils.report_adapters.inevntory_reports import inventory_summary_to_workbook_spec
 from reporting.services.asset_reports import build_asset_history_report
 from reporting.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from reporting.services.user_summary import build_user_audit_history_report, build_user_login_history_report, build_user_summary_report
@@ -122,6 +124,18 @@ def asset_history_params(params, user):
         "end_date": params.get("end_date"),
         "generated_by": user,
     }
+
+def inventory_summary_params(params, user):
+    """
+    Map stored ReportJob.params → inventory summary
+    builder arguments.
+    """
+    return {
+        "scope": params["scope"],
+        "scope_id": params.get("scope_id"),
+        "generated_by": user,
+    }
+
 # ---------------------------------------------------------
 # Report definitions
 # ---------------------------------------------------------
@@ -169,6 +183,11 @@ REPORT_DEFINITIONS = {
     "builder": build_asset_history_report,
     "renderer": asset_history_to_workbook_spec,
     "param_map": asset_history_params,
-}
+},
+  "inventory_summary": {
+        "builder": build_inventory_summary_report,
+        "renderer": inventory_summary_to_workbook_spec,
+        "param_map": inventory_summary_params,
+    },
 
 }
