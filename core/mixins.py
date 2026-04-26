@@ -1,5 +1,5 @@
 from core.models.notifications import Notification
-from assignments.models.asset_assignment import EquipmentAssignment, ReturnRequest
+from assignments.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableEvent, EquipmentAssignment, ReturnRequest
 from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from assets.api.serializers.accessories import AccessoryBatchWriteSerializer, AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
@@ -523,11 +523,6 @@ class AccessoryDashboardMixin:
         return max(self.MIN_PERIOD_DAYS, min(period, self.MAX_PERIOD_DAYS))
 
     def build_dashboard_response(self, rooms, period):
-        from .models import (
-            Accessory,
-            AccessoryAssignment,
-            AccessoryEvent,
-        )
 
         since = timezone.now() - timedelta(days=period)
 
@@ -620,11 +615,7 @@ class ConsumableDashboardMixin:
         return max(self.MIN_PERIOD_DAYS, min(period, self.MAX_PERIOD_DAYS))
 
     def build_dashboard_response(self, rooms, period):
-        from .models import (
-            Consumable,
-            ConsumableIssue,
-            ConsumableEvent,
-        )
+
 
         since = timezone.now() - timedelta(days=period)
 
