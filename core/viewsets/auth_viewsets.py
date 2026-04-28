@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
 from core.permissions.users import AdminUpdateUserPermission
 from core.utils.audit import create_audit_log
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from core.utils.viewset_helpers import get_users_affected_by_site
 from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
@@ -25,6 +25,7 @@ from core.security_policy import get_session_idle_timeout, invalidate_security_p
 from core.models.notifications import Notification
 from core.models.security import SecuritySettings
 from core.filters import SiteNameChangeHistoryFilter
+from core.serializers.audit import SiteNameChangeSerializer, SiteRelocationSerializer
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
 
@@ -226,7 +227,7 @@ class SiteNameChangeDetailAPIView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = SiteNameChangeHistorySerializer   
 
-class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
+class SiteNameChangeAPIView( AuditMixin, NotificationMixin, GenericAPIView ):
     """
     POST-only endpoint to rename a Department, Location, or Room.
 
@@ -235,20 +236,21 @@ class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
     - Reason is mandatory
     """
 
-    permission_classes = [IsAuthenticated]  
+    permission_classes = [IsAuthenticated]
+    serializer_class = SiteNameChangeSerializer
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
-        site_type = request.data.get("site_type")
-        public_id = request.data.get("public_id")
-        new_name = request.data.get("new_name")
-        reason = request.data.get("reason")
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
+        data = serializer.validated_data
+        
 
-        if not all([site_type, public_id, new_name, reason]):
-            raise ValidationError(
-                "site_type, public_id, new_name, and reason are required."
-            )
+        site_type = data["site_type"]
+        public_id = data["public_id"]
+        new_name = data["new_name"]
+        reason = data["reason"]
 
         model_map = {
             "department": Department,
@@ -256,9 +258,7 @@ class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
             "room": Room,
         }
 
-        model = model_map.get(site_type)
-        if not model:
-            raise ValidationError("Invalid site_type. Must be department, location, or room.")
+        model = model_map[site_type]
 
         try:
             obj = model.objects.select_for_update().get(public_id=public_id)
@@ -266,8 +266,12 @@ class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
             raise NotFound("Site not found.")
 
         old_name = obj.name
+
         if old_name == new_name:
-            return Response({"detail": "Name unchanged."}, status=200)
+            return Response(
+                {"detail": "Name unchanged."},
+                status=status.HTTP_200_OK,
+            )
 
         # --------------------
         # Perform rename
@@ -291,18 +295,18 @@ class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
         )
 
         self.audit(
-                event_type=AuditLog.Events.SITE_RENAMED,
-                target=obj,
-                description="Site name changed",
-                metadata={
-                    "change_type": "site_rename",
-                    "old_name": old_name,
-                    "new_name": new_name,
-                    "reason": reason,
-                    "site_type": site_type,
-                },
-            )
-        
+            event_type=AuditLog.Events.SITE_RENAMED,
+            target=obj,
+            description="Site name changed",
+            metadata={
+                "change_type": "site_rename",
+                "old_name": old_name,
+                "new_name": new_name,
+                "reason": reason,
+                "site_type": site_type,
+            },
+        )
+
         affected_users = get_users_affected_by_site(obj)
 
         for user in affected_users:
@@ -327,39 +331,36 @@ class SiteNameChangeAPIView(AuditMixin, NotificationMixin, APIView):
                 "old_name": old_name,
                 "new_name": new_name,
             },
-            status=200,
+            status=status.HTTP_200_OK,
         )
 
 
-class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
+class SiteRelocationAPIView(AuditMixin, NotificationMixin, GenericAPIView):
     """
     POST-only endpoint to relocate:
     - Location → Department
     - Room → Location
     """
 
-    permission_classes = [IsAuthenticated]  
+    permission_classes = [IsAuthenticated]
+    serializer_class = SiteRelocationSerializer
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
-        site_type = request.data.get("site_type")
-        object_public_id = request.data.get("object_public_id")
-        target_site = request.data.get("target_site")
-        target_public_id = request.data.get("target_public_id")
-        reason = request.data.get("reason")
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not all([site_type, object_public_id, target_site, target_public_id, reason]):
-            raise ValidationError("All fields are required.")
+        data = serializer.validated_data
+
+        site_type = data["site_type"]
+        object_public_id = data["object_public_id"]
+        target_site = data["target_site"]
+        target_public_id = data["target_public_id"]
+        reason = data["reason"]
 
         # --------------------
-        # Validate relocation intent
+        # Relocate Location -> Department
         # --------------------
-
-        if site_type == "location" and target_site != "department":
-            raise ValidationError("Locations can only be moved under a department.")
-
-        if site_type == "room" and target_site != "location":
-            raise ValidationError("Rooms can only be moved under a location.")
 
         if site_type == "location":
             try:
@@ -370,16 +371,30 @@ class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
                 raise NotFound("Location not found.")
 
             try:
-                target = Department.objects.get(public_id=target_public_id)
+                target = Department.objects.get(
+                    public_id=target_public_id
+                )
             except Department.DoesNotExist:
                 raise NotFound("Target department not found.")
 
             from_parent = obj.department
+
             if from_parent == target:
-                return Response({"detail": "Location already under this department."})
+                return Response(
+                    {
+                        "detail": (
+                            "Location already under this department."
+                        )
+                    },
+                    status=status.HTTP_200_OK,
+                )
 
             obj.department = target
             obj.save(update_fields=["department"])
+
+        # --------------------
+        # Relocate Room -> Location
+        # --------------------
 
         elif site_type == "room":
             try:
@@ -390,13 +405,23 @@ class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
                 raise NotFound("Room not found.")
 
             try:
-                target = Location.objects.get(public_id=target_public_id)
+                target = Location.objects.get(
+                    public_id=target_public_id
+                )
             except Location.DoesNotExist:
                 raise NotFound("Target location not found.")
 
             from_parent = obj.location
+
             if from_parent == target:
-                return Response({"detail": "Room already under this location."})
+                return Response(
+                    {
+                        "detail": (
+                            "Room already under this location."
+                        )
+                    },
+                    status=status.HTTP_200_OK,
+                )
 
             obj.location = target
             obj.save(update_fields=["location"])
@@ -413,8 +438,12 @@ class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
             object_public_id=obj.public_id,
             object_name=obj.name,
 
-            from_parent_public_id=from_parent.public_id if from_parent else "",
-            from_parent_name=from_parent.name if from_parent else "",
+            from_parent_public_id=(
+                from_parent.public_id if from_parent else ""
+            ),
+            from_parent_name=(
+                from_parent.name if from_parent else ""
+            ),
 
             to_parent_public_id=target.public_id,
             to_parent_name=target.name,
@@ -429,24 +458,27 @@ class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
         # --------------------
 
         self.audit(
-                event_type=AuditLog.Events.SITE_RELOCATED,
-                target=obj,
-                description="Site relocated",
-                metadata={
-                    "change_type": "site_relocation",
-                    "site_type": site_type,
+            event_type=AuditLog.Events.SITE_RELOCATED,
+            target=obj,
+            description="Site relocated",
+            metadata={
+                "change_type": "site_relocation",
+                "site_type": site_type,
 
-                    "from_parent_public_id": from_parent.public_id if from_parent else None,
-                    "from_parent_name": from_parent.name if from_parent else None,
+                "from_parent_public_id": (
+                    from_parent.public_id if from_parent else None
+                ),
+                "from_parent_name": (
+                    from_parent.name if from_parent else None
+                ),
 
-                    "to_parent_public_id": target.public_id,
-                    "to_parent_name": target.name,
+                "to_parent_public_id": target.public_id,
+                "to_parent_name": target.name,
 
-                    "reason": reason,
-                },
-            )
-        
-        
+                "reason": reason,
+            },
+        )
+
         affected_users = get_users_affected_by_site(obj)
 
         for user in affected_users:
@@ -469,10 +501,12 @@ class SiteRelocationAPIView(AuditMixin,NotificationMixin, APIView):
                 "status": "relocation complete",
                 "site_type": site_type,
                 "object_public_id": obj.public_id,
-                "from_parent": from_parent.public_id if from_parent else None,
+                "from_parent": (
+                    from_parent.public_id if from_parent else None
+                ),
                 "to_parent": target.public_id,
             },
-            status=200,
+            status=status.HTTP_200_OK,
         )
 
 
