@@ -137,7 +137,7 @@ Nginx ─── Reverse Proxy / TLS
 ```bash
 git clone <repository-url>
 cd arms-backend
-cp .env.example .env
+cp .env.example .env.dev
 docker-compose up -d
 ```
 
