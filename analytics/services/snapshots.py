@@ -255,12 +255,12 @@ def generate_daily_return_metrics(for_date=None):
 
     with transaction.atomic():
 
-        requests = ReturnRequest.objects.all()
+        requests = ReturnRequest.objects.filter(requested_at__lte=end)
         items = ReturnRequestItem.objects.all()
 
 
         processed_today = requests.filter(
-            processed_at__date=for_date,
+            processed_at__range=(start, end),
             processed_at__isnull=False
         ).annotate(
             duration=ExpressionWrapper(
@@ -276,6 +276,12 @@ def generate_daily_return_metrics(for_date=None):
 
         avg_seconds = to_seconds(duration_agg["avg_duration"])
         max_seconds = to_seconds(duration_agg["max_duration"])
+
+        start = timezone.make_aware(
+            datetime.datetime.combine(for_date, datetime.datetime.min.time())
+        )
+        end = start + timedelta(days=1)
+                
 
         # -----------------------------------
         # Create snapshot
@@ -297,9 +303,9 @@ def generate_daily_return_metrics(for_date=None):
                 # -------------------------
                 # Activity (last 24h)
                 # -------------------------
-                "requests_created_last_24h": requests.filter( requested_at__gte=last_24h ).count(),
+                "requests_created_today": requests.filter(requested_at__range=(start, end)).count(),
 
-                "requests_processed_last_24h": requests.filter( processed_at__gte=last_24h ).count(),
+                "requests_processed_today": requests.filter(processed_at__range=(start, end)).count(),
 
                 # -------------------------
                 # Item-level

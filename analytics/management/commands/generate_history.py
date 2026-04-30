@@ -326,8 +326,8 @@ class Command(BaseCommand):
                     partial_requests=partial,
                     completed_requests=completed,
 
-                    requests_created_last_24h=created_24h,
-                    requests_processed_last_24h=processed_24h,
+                    requests_created_today=created_24h,
+                    requests_processed_today=processed_24h,
 
                     total_items=total_items,
                     pending_items=pending_items,

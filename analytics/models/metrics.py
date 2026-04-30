@@ -89,8 +89,8 @@ class DailyReturnMetrics(models.Model):
     partial_requests = models.PositiveIntegerField(default=0)
     completed_requests = models.PositiveIntegerField(default=0)
 
-    requests_created_last_24h = models.PositiveIntegerField(default=0)
-    requests_processed_last_24h = models.PositiveIntegerField(default=0)
+    requests_created_today = models.PositiveIntegerField(default=0)
+    requests_processed_today = models.PositiveIntegerField(default=0)
 
     total_items = models.PositiveIntegerField(default=0)
     pending_items = models.PositiveIntegerField(default=0)
