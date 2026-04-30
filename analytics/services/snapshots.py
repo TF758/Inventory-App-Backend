@@ -250,12 +250,14 @@ def generate_daily_return_metrics(for_date=None):
     if for_date is None:
         for_date = timezone.localdate()
 
-    now = timezone.now()
-    last_24h = now - timedelta(hours=24)
+    start = timezone.make_aware(
+        datetime.datetime.combine(for_date, datetime.datetime.min.time())
+    )
+    end = start + timedelta(days=1)
 
     with transaction.atomic():
 
-        requests = ReturnRequest.objects.filter(requested_at__lte=end)
+        requests = ReturnRequest.objects.filter(requested_at__lt=end)
         items = ReturnRequestItem.objects.all()
 
 
@@ -277,11 +279,6 @@ def generate_daily_return_metrics(for_date=None):
         avg_seconds = to_seconds(duration_agg["avg_duration"])
         max_seconds = to_seconds(duration_agg["max_duration"])
 
-        start = timezone.make_aware(
-            datetime.datetime.combine(for_date, datetime.datetime.min.time())
-        )
-        end = start + timedelta(days=1)
-                
 
         # -----------------------------------
         # Create snapshot
@@ -303,9 +300,9 @@ def generate_daily_return_metrics(for_date=None):
                 # -------------------------
                 # Activity (last 24h)
                 # -------------------------
-                "requests_created_today": requests.filter(requested_at__range=(start, end)).count(),
+                "requests_created_today": requests.filter(requested_at__gte=start,requested_at__lt=end,).count(),
 
-                "requests_processed_today": requests.filter(processed_at__range=(start, end)).count(),
+                "requests_processed_today": requests.filter(processed_at__gte=start,processed_at__lt=end,).count(),
 
                 # -------------------------
                 # Item-level
@@ -351,7 +348,7 @@ def generate_daily_auth_metrics(for_date=None):
                 # Login metrics
                 # ------------------------
                 "total_logins":
-                    AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__range=(start, end) ).count(),
+                    AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__gte=start,created_at__lt=end, ).count(),
 
                 "unique_users_logged_in":
                     AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__range=(start, end) ).values("user_id").distinct().count(),

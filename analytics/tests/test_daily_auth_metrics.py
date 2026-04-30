@@ -6,7 +6,7 @@ from core.models.audit import AuditLog
 from core.models.sessions import UserSession
 from core.models.security import PasswordResetEvent
 from users.factories.user_factories import UserFactory
-
+import datetime
 import uuid
 
 def simulate_session_revoke(self, user):
@@ -300,3 +300,29 @@ class TestDailyAuthMetrics(TestCase):
 
         self.assertEqual(metrics.active_password_resets, 1)
         self.assertEqual(metrics.expired_password_resets, 1)
+    
+
+    def test_login_day_boundary_inclusion(self):
+        start = timezone.make_aware(
+            datetime.datetime.combine(self.today, datetime.datetime.min.time())
+        )
+        end = start + timezone.timedelta(days=1)
+
+        # exactly at start → should count
+        AuditLog.objects.create(
+            event_type=AuditLog.Events.LOGIN,
+            user=self.user1,
+            created_at=start
+        )
+
+        # exactly at end → should NOT count
+        AuditLog.objects.create(
+            event_type=AuditLog.Events.LOGIN,
+            user=self.user2,
+            created_at=end
+        )
+
+        generate_daily_auth_metrics()
+        metrics = DailyAuthMetrics.objects.first()
+
+        self.assertEqual(metrics.total_logins, 1)
