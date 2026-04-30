@@ -359,38 +359,66 @@ def generate_daily_auth_metrics(for_date=None):
                 # ------------------------
                 # Session metrics
                 # ------------------------
+
+                # Active = overlap logic (state over time)
                 "active_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.ACTIVE ).count(),
+                    UserSession.objects.filter(
+                        status=UserSession.Status.ACTIVE,
+                        created_at__lte=end,
+                        expires_at__gte=start,
+                    ).count(),
 
+                # Revoked = event-based (from AuditLog)
                 "revoked_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.REVOKED ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.SESSION_REVOKED,
+                        created_at__range=(start, end),
+                    ).count(),
 
+                # Expired = event-based (from AuditLog)
                 "expired_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.EXPIRED ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.SESSION_EXPIRED,
+                        created_at__range=(start, end),
+                    ).count(),
 
+                # Users with multiple sessions (still overlap-based)
                 "users_multiple_active_sessions":
                     UserSession.objects.filter(
-                        status=UserSession.Status.ACTIVE
+                        status=UserSession.Status.ACTIVE,
+                        created_at__lte=end,
+                        expires_at__gte=start,
                     ).values("user_id").annotate(
                         count=Count("id")
                     ).filter(
                         count__gt=1
                     ).count(),
 
+                # Users affected by revocations (event-based)
                 "users_with_revoked_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.REVOKED ).values("user_id").distinct().count(),
-
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.SESSION_REVOKED,
+                        created_at__range=(start, end),
+                    ).values("user_id").distinct().count(),
                 # ------------------------
                 # Password reset metrics
                 # ------------------------
                 "password_resets_started":
-                    PasswordResetEvent.objects.filter( created_at__range=(start, end) ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
+                        created_at__range=(start, end),
+                    ).count(),
+
 
                 "password_resets_completed":
-                    PasswordResetEvent.objects.filter( used_at__range=(start, end) ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.PASSWORD_RESET_COMPLETED,
+                        created_at__range=(start, end),
+                    ).count(),
 
                 "active_password_resets":
                     PasswordResetEvent.objects.filter( used_at__isnull=True, expires_at__gt=now ).count(),
+
                 "expired_password_resets":
                     PasswordResetEvent.objects.filter( used_at__isnull=True, expires_at__lt=now ).count(),
             },

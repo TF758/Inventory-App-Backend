@@ -29,10 +29,7 @@ urlpatterns = [
     path("refresh/", general_viewsets.RefreshAPIView.as_view(), name="session_refresh"),
 
   
-    # ----------------------------
-    # Utility
-    # ----------------------------
-    path("serializer-fields/", general_viewsets.SerializerFieldsView.as_view(), name="get-serializer-fields"),
+
 
     # ----------------------------
     # Password Reset
