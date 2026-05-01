@@ -120,6 +120,9 @@ jobs:
           DB_PASSWORD=inventory
           DB_HOST=db
           DB_PORT=5432
+
+          SESSION_IDLE_MINUTES=30
+          SESSION_ABSOLUTE_HOURS=8
           EOF
 
       - name: Build images
