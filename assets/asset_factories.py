@@ -3,8 +3,6 @@ from faker import Faker
 from assets.models.assets import Accessory, Component, Consumable, Equipment
 from sites.factories.site_factories import RoomFactory
 
-
-
 fake = Faker()
 
 class EquipmentFactory(factory.django.DjangoModelFactory):

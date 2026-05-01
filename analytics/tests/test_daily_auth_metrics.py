@@ -196,16 +196,18 @@ class TestDailyAuthMetrics(TestCase):
 
 
     def test_sessions_should_be_scoped_to_day(self):
-        yesterday = self.now - timezone.timedelta(days=1)
+        start = timezone.make_aware(
+            datetime.datetime.combine(self.today, datetime.datetime.min.time())
+        )
 
         UserSession.objects.create(
             user=self.user1,
             refresh_token_hash=str(uuid.uuid4()),
             status=UserSession.Status.ACTIVE,
-            created_at=yesterday,
-            expires_at=yesterday + timezone.timedelta(hours=2),
-            absolute_expires_at=yesterday + timezone.timedelta(hours=3),
-        )
+            created_at=start - timezone.timedelta(hours=3),
+            expires_at=start - timezone.timedelta(hours=1), 
+            absolute_expires_at=start - timezone.timedelta(hours=1),
+)
 
         self.simulate_login(self.user2)
 
