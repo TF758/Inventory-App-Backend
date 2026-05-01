@@ -119,10 +119,10 @@ jobs:
           done
 
       - name: Run migrations
-        run: docker compose exec -T api python manage.py migrate
+        run: docker compose run --rm api python manage.py migrate
 
       - name: Run full test suite with coverage
-        run: docker compose exec -T api coverage run manage.py test --parallel
+        run: docker compose run --rm api coverage run manage.py test --parallel
 
       - name: Show coverage report
         run: docker compose exec -T api coverage report -m --fail-under=30
