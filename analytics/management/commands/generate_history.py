@@ -148,16 +148,16 @@ class Command(BaseCommand):
                     schema_version=1,
 
                     total_users=total_users,
-                    active_users_last_24h=noise(active_users, 0.15),
+                    active_users_today=noise(active_users, 0.15),
                     active_users_last_7d=noise(active_users, 0.1),
-                    new_users_last_24h=random.randint(0, max(1, total_users // 200)),
+                    new_users_today=random.randint(0, max(1, total_users // 200)),
                     locked_users=random.randint(0, max(1, total_users // 500)),
 
                     total_sessions=trend(baseline_sessions, days_ago, DAYS),
                     active_sessions=active_sessions,
-                    revoked_sessions=random.randint(0, active_sessions // 8),
-                    expired_sessions_last_24h=random.randint(0, active_sessions // 6),
-                    unique_users_logged_in_last_24h=noise(active_users, 0.1),
+                    revoked_sessions_today=random.randint(0, active_sessions // 8),
+                    expired_sessions_today=random.randint(0, active_sessions // 6),
+                    unique_users_logged_in_today=noise(active_users, 0.1),
 
                     total_equipment=baseline_equipment,
                     equipment_ok=noise(int(baseline_equipment * 0.9), 0.05),
@@ -199,7 +199,7 @@ class Command(BaseCommand):
                     lockouts=lockouts,
 
                     active_sessions=active_sessions,
-                    revoked_sessions=random.randint(0, active_sessions // 6),
+                    revoked_sessions_today=random.randint(0, active_sessions // 6),
                     expired_sessions=random.randint(0, active_sessions // 4),
 
                     password_resets_started=random.randint(0, max(1, active_users // 150)),
