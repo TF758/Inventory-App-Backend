@@ -57,12 +57,14 @@ jobs:
           echo "DJANGO_ENV=dev" >> .env.dev
           echo "DEBUG=True" >> .env.dev
           echo "SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars" >> .env.dev
+
+          echo "POSTGRES_DB=inventory" >> .env.dev
+          echo "POSTGRES_USER=inventory" >> .env.dev
+          echo "POSTGRES_PASSWORD=inventory" >> .env.dev
+
           echo "DB_NAME=inventory" >> .env.dev
           echo "DB_USER=inventory" >> .env.dev
           echo "DB_PASSWORD=inventory" >> .env.dev
-          echo "SESSION_IDLE_MINUTES=30" >> .env.dev
-          echo "SESSION_ABSOLUTE_HOURS=8" >> .env.dev
-
       - name: Start services
         run: docker compose up -d --build --force-recreate --renew-anon-volumes
 
