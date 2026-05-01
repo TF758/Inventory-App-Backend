@@ -68,7 +68,6 @@ jobs:
 
           SESSION_IDLE_MINUTES=30
           SESSION_ABSOLUTE_HOURS=8
-
           EOF
 
       - name: Build images
