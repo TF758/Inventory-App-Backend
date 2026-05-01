@@ -1,8 +1,6 @@
-# ARMS — Enterprise Asset & Inventory Management Backend
+# ARMS — Asset & Resource Management System
 
-> Scalable backend platform for managing assets, inventory, assignments, audits, and reporting across multi-site organizations.
-
-Built for organizations that need stronger operational control than spreadsheets or fragmented tools can provide.
+> REST API application backend for managing assets, inventory, assignments, audits, and reporting across multi-site organizations.
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue)
 ![Django](https://img.shields.io/badge/Django-5.x-green)
@@ -14,40 +12,30 @@ Built for organizations that need stronger operational control than spreadsheets
 
 ## Overview
 
-ARMS is a production-ready backend system designed for organizations that manage equipment, consumables, accessories, and operational assets across multiple departments, locations, and rooms.
+ARMS (Asset and Resource Management System) is a backend system designed for organizations that manage equipment, consumables, accessories, and operational assets across multiple departments, locations, and rooms.
 
-It centralizes asset ownership, assignment workflows, stock visibility, reporting, and compliance processes into one secure API platform.
+It centralizes asset ownership, assignment workflows, stock visibility, reporting, and compliance processes into one API platform.
 
-The system is especially suited for environments where assets move frequently, accountability matters, and leadership requires automated operational reporting.
+## Why I built ARMS
 
-### Ideal Use Cases
+At work, a lot of our inventory is tracked in spreadsheets. That works at first, but once assets start moving between departments, rooms, and people, things get messy fast.
 
-- Schools / Universities
-- Government agencies
-- Healthcare institutions
-- Multi-branch private companies
-- Warehouses / Logistics operations
-- NGOs / Enterprise operations teams
+You end up asking the same questions over and over:
 
----
+- What do we actually own?
+- Who has it right now?
+- Where is it supposed to be?
 
-## Why ARMS Exists
+Most inventory tools that solve this properly are either expensive or too rigid for how we operate.
 
-Many organizations still manage inventory using spreadsheets, email chains, or disconnected legacy systems.
+So I built ARMS as a backend system to handle:
 
-This creates problems such as:
+- asset tracking across locations
+- assignment and return workflows
+- audit history for accountability
+- and reporting that’s actually useful
 
-- Missing or untracked equipment
-- Poor ownership accountability
-- No audit trail for asset movement
-- Slow manual reporting processes
-- Inconsistent stock visibility across sites
-- Difficult return / reassignment workflows
-- Weak operational oversight
-
-ARMS solves this through structured workflows, centralized data, secure access controls, and automated reporting.
-
----
+A big focus was making sure actions are traceable, since auditability is important in our environment.
 
 ## Core Features
 
@@ -91,14 +79,11 @@ ARMS solves this through structured workflows, centralized data, secure access c
 
 ## Engineering Highlights
 
-- Modular monolith architecture using Django apps by business domain
+- Seperated domain architecture using Django apps by business domain.
 - Asynchronous task processing with Celery + Redis
-- PostgreSQL-backed relational data model
 - Role-based permissions system with active role switching
 - Soft delete + historical audit retention patterns
-- Scalable reporting pipelines for heavy exports
-- Redis-backed caching, queues, and real-time channels
-- Production-ready Dockerized deployment stack
+- Docker ready deployment
 
 ---
 
@@ -137,7 +122,7 @@ Nginx ─── Reverse Proxy / TLS
 ```bash
 git clone <repository-url>
 cd arms-backend
-cp .env.example .env
+cp .env.example .env.dev
 docker-compose up -d
 ```
 
@@ -206,14 +191,14 @@ Interactive OpenAPI documentation is included for development, testing, and fron
 - ReDoc Reference Docs: `/redoc/`
 - OpenAPI Schema: `/schema/`
 
-Supports authenticated endpoint testing via JWT Bearer tokens directly in Swagger UI.
-
 ## Environment Configuration
 
 The project auto-loads environment files based on runtime context:
 
 - `.env.dev` → Docker development environment
 - `.env.local` → Local machine execution
-- `.env.example` → Starter template for new setups
+- `.env.example` → Starter template for new setups. This env shows all the setting required for the app to functions.
+
+For more details on what each env settign does, see the env README (todo)
 
 When running via Docker, the application defaults to `.env.dev`.

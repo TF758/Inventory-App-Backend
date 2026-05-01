@@ -23,11 +23,15 @@ User = get_user_model()
 
 def generate_daily_system_metrics(for_date=None):
     if for_date is None:
-        for_date = timezone.localdate()  
+        for_date = timezone.localdate()
 
     now = timezone.now()
-    last_24h = now - timedelta(hours=24)
     last_7d = now - timedelta(days=7)
+
+    start = timezone.make_aware(
+        datetime.datetime.combine(for_date, datetime.datetime.min.time())
+    )
+    end = start + timedelta(days=1)
 
     base_equipment = Equipment.objects.filter(is_deleted=False)
     base_consumables = Consumable.objects.filter(is_deleted=False)
@@ -47,45 +51,102 @@ def generate_daily_system_metrics(for_date=None):
             defaults={
                 "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
 
+                # -------------------------
                 # User metrics
+                # -------------------------
                 "total_users": User.objects.count(),
-                "human_users": User.objects.filter(is_system_user=False).count(),
-                "system_users": User.objects.filter(is_system_user=True).count(),
-                "active_users_last_24h": User.objects.filter(last_login__gte=last_24h).count(),
-                "active_users_last_7d": User.objects.filter(last_login__gte=last_7d).count(),
-                "new_users_last_24h": User.objects.filter(date_joined__gte=last_24h).count(),
-                "locked_users": User.objects.filter(is_locked=True).count(),
 
-                # Session metrics
-                "total_sessions": UserSession.objects.count(),
-                "active_sessions": UserSession.objects.filter(status=UserSession.Status.ACTIVE).count(),
-                "revoked_sessions": UserSession.objects.filter(status=UserSession.Status.REVOKED).count(),
-                "expired_sessions_last_24h": UserSession.objects.filter(
-                    status=UserSession.Status.EXPIRED,
-                    expires_at__gte=last_24h,
+                "human_users": User.objects.filter(
+                    is_system_user=False ).count(),
+
+                "system_users": User.objects.filter(
+                    is_system_user=True ).count(),
+
+                "active_users_today": User.objects.filter(
+                    last_login__gte=start,
+                    last_login__lt=end,
                 ).count(),
-                "unique_users_logged_in_last_24h": UserSession.objects.filter(
-                    last_used_at__gte=last_24h
+
+                "active_users_last_7d": User.objects.filter(
+                    last_login__gte=last_7d ).count(),
+
+                "new_users_today": User.objects.filter(
+                    date_joined__gte=start,
+                    date_joined__lt=end,
+                ).count(),
+
+                "locked_users": User.objects.filter(
+                    is_locked=True ).count(),
+
+                # -------------------------
+                # Session metrics
+                # -------------------------
+                "total_sessions": UserSession.objects.count(),
+
+                # Active sessions = overlap logic
+                "active_sessions": UserSession.objects.filter(
+                    status=UserSession.Status.ACTIVE,
+                    created_at__lt=end,
+                    expires_at__gte=start,
+                ).count(),
+
+                # Revoked = event-based
+                "revoked_sessions_today": AuditLog.objects.filter(
+                    event_type=AuditLog.Events.SESSION_REVOKED,
+                    created_at__gte=start,
+                    created_at__lt=end,
+                ).count(),
+
+                # Expired = state-based within day window
+                "expired_sessions_today": UserSession.objects.filter(
+                    status=UserSession.Status.EXPIRED,
+                    expires_at__gte=start,
+                    expires_at__lt=end,
+                ).count(),
+
+                # Unique users active via sessions
+                "unique_users_logged_in_today": UserSession.objects.filter(
+                    last_used_at__gte=start,
+                    last_used_at__lt=end,
                 ).values("user_id").distinct().count(),
 
-                
-
+                # -------------------------
                 # Inventory metrics
+                # -------------------------
                 "total_equipment": base_equipment.count(),
-                "equipment_ok": active_equipment.filter(status=EquipmentStatus.OK).count(),
-                "equipment_under_repair": active_equipment.filter(status=EquipmentStatus.UNDER_REPAIR).count(),
-                "equipment_damaged": active_equipment.filter(status=EquipmentStatus.DAMAGED).count(),
+
+                "equipment_ok": active_equipment.filter( status=EquipmentStatus.OK ).count(),
+
+                "equipment_under_repair": active_equipment.filter( status=EquipmentStatus.UNDER_REPAIR ).count(),
+
+                "equipment_damaged": active_equipment.filter(
+                    status=EquipmentStatus.DAMAGED
+                ).count(),
 
                 "total_components": Component.objects.count(),
-                "total_components_quantity": Component.objects.aggregate(total=Sum("quantity"))["total"] or 0,
 
-               # Consumables
+                "total_components_quantity":
+                    Component.objects.aggregate(
+                        total=Sum("quantity")
+                    )["total"] or 0,
+
+                # Consumables
                 "total_consumables": base_consumables.count(),
-                "total_consumables_quantity": base_consumables.aggregate( total=Sum("quantity") )["total"] or 0,
+
+                "total_consumables_quantity":
+                    base_consumables.aggregate(
+                        total=Sum("quantity")
+                    )["total"] or 0,
 
                 # Accessories
                 "total_accessories": base_accessories.count(),
-                "total_accessories_quantity": base_accessories.aggregate( total=Sum("quantity") )["total"] or 0, },)
+
+                "total_accessories_quantity":
+                    base_accessories.aggregate(
+                        total=Sum("quantity")
+                    )["total"] or 0,
+            },
+        )
 
     return created
 
@@ -250,17 +311,19 @@ def generate_daily_return_metrics(for_date=None):
     if for_date is None:
         for_date = timezone.localdate()
 
-    now = timezone.now()
-    last_24h = now - timedelta(hours=24)
+    start = timezone.make_aware(
+        datetime.datetime.combine(for_date, datetime.datetime.min.time())
+    )
+    end = start + timedelta(days=1)
 
     with transaction.atomic():
 
-        requests = ReturnRequest.objects.all()
+        requests = ReturnRequest.objects.filter(requested_at__lt=end)
         items = ReturnRequestItem.objects.all()
 
 
         processed_today = requests.filter(
-            processed_at__date=for_date,
+            processed_at__range=(start, end),
             processed_at__isnull=False
         ).annotate(
             duration=ExpressionWrapper(
@@ -276,6 +339,7 @@ def generate_daily_return_metrics(for_date=None):
 
         avg_seconds = to_seconds(duration_agg["avg_duration"])
         max_seconds = to_seconds(duration_agg["max_duration"])
+
 
         # -----------------------------------
         # Create snapshot
@@ -297,9 +361,9 @@ def generate_daily_return_metrics(for_date=None):
                 # -------------------------
                 # Activity (last 24h)
                 # -------------------------
-                "requests_created_last_24h": requests.filter( requested_at__gte=last_24h ).count(),
+                "requests_created_today": requests.filter(requested_at__gte=start,requested_at__lt=end,).count(),
 
-                "requests_processed_last_24h": requests.filter( processed_at__gte=last_24h ).count(),
+                "requests_processed_today": requests.filter(processed_at__gte=start,processed_at__lt=end,).count(),
 
                 # -------------------------
                 # Item-level
@@ -345,7 +409,7 @@ def generate_daily_auth_metrics(for_date=None):
                 # Login metrics
                 # ------------------------
                 "total_logins":
-                    AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__range=(start, end) ).count(),
+                    AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__gte=start,created_at__lt=end, ).count(),
 
                 "unique_users_logged_in":
                     AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__range=(start, end) ).values("user_id").distinct().count(),
@@ -359,38 +423,67 @@ def generate_daily_auth_metrics(for_date=None):
                 # ------------------------
                 # Session metrics
                 # ------------------------
+
+                # Active = overlap logic (state over time)
                 "active_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.ACTIVE ).count(),
+                    UserSession.objects.filter(
+                        status=UserSession.Status.ACTIVE,
+                        created_at__lte=end,
+                        expires_at__gte=start,
+                    ).count(),
 
-                "revoked_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.REVOKED ).count(),
+                # Revoked = event-based (from AuditLog)
+                "revoked_sessions_today":
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.SESSION_REVOKED,
+                        created_at__range=(start, end),
+                    ).count(),
 
+                # Expired = event-based (from AuditLog)
                 "expired_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.EXPIRED ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.SESSION_EXPIRED,
+                        created_at__range=(start, end),
+                    ).count(),
 
+                # Users with multiple sessions (still overlap-based)
                 "users_multiple_active_sessions":
                     UserSession.objects.filter(
-                        status=UserSession.Status.ACTIVE
+                        status=UserSession.Status.ACTIVE,
+                        created_at__lte=end,
+                        expires_at__gte=start,
                     ).values("user_id").annotate(
                         count=Count("id")
                     ).filter(
                         count__gt=1
                     ).count(),
 
-                "users_with_revoked_sessions":
-                    UserSession.objects.filter( status=UserSession.Status.REVOKED ).values("user_id").distinct().count(),
-
+                # Users affected by revocations (event-based)
+                "users_with_revoked_sessions_today":
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.SESSION_REVOKED,
+                        created_at__gte=start,
+                        created_at__lt=end,
+                    ).values("user_id").distinct().count(),
                 # ------------------------
                 # Password reset metrics
                 # ------------------------
                 "password_resets_started":
-                    PasswordResetEvent.objects.filter( created_at__range=(start, end) ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
+                        created_at__range=(start, end),
+                    ).count(),
+
 
                 "password_resets_completed":
-                    PasswordResetEvent.objects.filter( used_at__range=(start, end) ).count(),
+                    AuditLog.objects.filter(
+                        event_type=AuditLog.Events.PASSWORD_RESET_COMPLETED,
+                        created_at__range=(start, end),
+                    ).count(),
 
                 "active_password_resets":
                     PasswordResetEvent.objects.filter( used_at__isnull=True, expires_at__gt=now ).count(),
+
                 "expired_password_resets":
                     PasswordResetEvent.objects.filter( used_at__isnull=True, expires_at__lt=now ).count(),
             },

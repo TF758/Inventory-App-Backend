@@ -9,17 +9,17 @@ class DailySystemMetrics(models.Model):
     total_users = models.PositiveIntegerField(default=0)
     human_users = models.PositiveIntegerField(default=0)
     system_users = models.PositiveIntegerField(default=0)
-    active_users_last_24h = models.PositiveIntegerField(default=0)
+    active_users_today = models.PositiveIntegerField(default=0)
     active_users_last_7d = models.PositiveIntegerField(default=0)
-    new_users_last_24h = models.PositiveIntegerField(default=0)
+    new_users_today = models.PositiveIntegerField(default=0)
     locked_users = models.PositiveIntegerField(default=0)
 
     # Session metrics
     total_sessions = models.PositiveIntegerField(default=0)
     active_sessions = models.PositiveIntegerField(default=0)
-    revoked_sessions = models.PositiveIntegerField(default=0)
-    expired_sessions_last_24h = models.PositiveIntegerField(default=0)
-    unique_users_logged_in_last_24h = models.PositiveIntegerField(default=0)
+    revoked_sessions_today = models.PositiveIntegerField(default=0)
+    expired_sessions_today = models.PositiveIntegerField(default=0)
+    unique_users_logged_in_today = models.PositiveIntegerField(default=0)
 
     # Inventory metrics
     total_equipment = models.PositiveIntegerField(default=0)
@@ -56,10 +56,10 @@ class DailyAuthMetrics(models.Model):
 
     # Sessions
     active_sessions = models.PositiveIntegerField(default=0)
-    revoked_sessions = models.PositiveIntegerField(default=0)
+    revoked_sessions_today = models.PositiveIntegerField(default=0)
     expired_sessions = models.PositiveIntegerField(default=0)
     users_multiple_active_sessions = models.PositiveIntegerField(default=0)
-    users_with_revoked_sessions = models.PositiveIntegerField(default=0)
+    users_with_revoked_sessions_today = models.PositiveIntegerField(default=0)
 
     # Password resets
     password_resets_started = models.PositiveIntegerField(default=0)
@@ -89,8 +89,8 @@ class DailyReturnMetrics(models.Model):
     partial_requests = models.PositiveIntegerField(default=0)
     completed_requests = models.PositiveIntegerField(default=0)
 
-    requests_created_last_24h = models.PositiveIntegerField(default=0)
-    requests_processed_last_24h = models.PositiveIntegerField(default=0)
+    requests_created_today = models.PositiveIntegerField(default=0)
+    requests_processed_today = models.PositiveIntegerField(default=0)
 
     total_items = models.PositiveIntegerField(default=0)
     pending_items = models.PositiveIntegerField(default=0)

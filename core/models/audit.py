@@ -119,6 +119,9 @@ class AuditLog(PublicIDModel):
         STOCK_USED = "stock_used"
         RETURN_REQUESTED = "return_requested"
 
+        SESSION_REVOKED = "session_revoked"
+        SESSION_EXPIRED = "session_expired"
+
 
         NOISE_EVENTS = [
             LOGIN,

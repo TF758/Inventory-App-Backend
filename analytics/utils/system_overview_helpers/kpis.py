@@ -80,10 +80,10 @@ def build_system_kpis():
         # User activity
         # -------------------------
         "active_users_24h": {
-            "value": today.active_users_last_24h,
+            "value": today.active_users_today,
             "delta": safe_delta(
-                today.active_users_last_24h,
-                yesterday.active_users_last_24h if yesterday else None,
+                today.active_users_today,
+                yesterday.active_users_today if yesterday else None,
             ),
         },
 
@@ -119,18 +119,18 @@ def build_system_kpis():
         },
 
         "returns_created_24h": {
-            "value": return_today.requests_created_last_24h if return_today else 0,
+            "value": return_today.requests_created_today if return_today else 0,
             "delta": safe_delta(
-                return_today.requests_created_last_24h if return_today else None,
-                return_yesterday.requests_created_last_24h if return_yesterday else None,
+                return_today.requests_created_today if return_today else None,
+                return_yesterday.requests_created_today if return_yesterday else None,
             ),
         },
 
         "returns_processed_24h": {
-            "value": return_today.requests_processed_last_24h if return_today else 0,
+            "value": return_today.requests_processed_today if return_today else 0,
             "delta": safe_delta(
-                return_today.requests_processed_last_24h if return_today else None,
-                return_yesterday.requests_processed_last_24h if return_yesterday else None,
+                return_today.requests_processed_today if return_today else None,
+                return_yesterday.requests_processed_today if return_yesterday else None,
             ),
         },
 

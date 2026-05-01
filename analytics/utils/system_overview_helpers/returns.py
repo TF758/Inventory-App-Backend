@@ -21,8 +21,8 @@ def build_return_flow_trends(*, days: int, granularity: str):
         .annotate(period=truncate_date("date", granularity))
         .values("period")
         .annotate(
-            requests_created=Sum("requests_created_last_24h"),
-            requests_processed=Sum("requests_processed_last_24h"),
+            requests_created=Sum("requests_created_today"),
+            requests_processed=Sum("requests_processed_today"),
         )
         .order_by("period")
     )

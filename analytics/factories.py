@@ -18,17 +18,17 @@ class DailySystemMetricsFactory(factory.django.DjangoModelFactory):
 
     # User metrics
     total_users = fuzzy.FuzzyInteger(5_000, 15_000)
-    active_users_last_24h = fuzzy.FuzzyInteger(1_000, 5_000)
+    active_users_today = fuzzy.FuzzyInteger(1_000, 5_000)
     active_users_last_7d = fuzzy.FuzzyInteger(2_000, 10_000)
-    new_users_last_24h = fuzzy.FuzzyInteger(10, 200)
+    new_users_today = fuzzy.FuzzyInteger(10, 200)
     locked_users = fuzzy.FuzzyInteger(0, 50)
 
     # Session metrics
     total_sessions = fuzzy.FuzzyInteger(10_000, 50_000)
     active_sessions = fuzzy.FuzzyInteger(5_000, 25_000)
-    revoked_sessions = fuzzy.FuzzyInteger(0, 1_000)
-    expired_sessions_last_24h = fuzzy.FuzzyInteger(0, 500)
-    unique_users_logged_in_last_24h = fuzzy.FuzzyInteger(800, 4_000)
+    revoked_sessions_today = fuzzy.FuzzyInteger(0, 1_000)
+    expired_sessions_today = fuzzy.FuzzyInteger(0, 500)
+    unique_users_logged_in_today = fuzzy.FuzzyInteger(800, 4_000)
 
     # Inventory metrics
     total_equipment = fuzzy.FuzzyInteger(1_000, 5_000)
@@ -62,10 +62,10 @@ class DailyAuthMetricsFactory(factory.django.DjangoModelFactory):
 
     # Sessions
     active_sessions = fuzzy.FuzzyInteger(100, 5_000)
-    revoked_sessions = fuzzy.FuzzyInteger(0, 500)
+    revoked_sessions_today = fuzzy.FuzzyInteger(0, 500)
     expired_sessions = fuzzy.FuzzyInteger(0, 500)
     users_multiple_active_sessions = fuzzy.FuzzyInteger(0, 200)
-    users_with_revoked_sessions = fuzzy.FuzzyInteger(0, 100)
+    users_with_revoked_sessions_today = fuzzy.FuzzyInteger(0, 100)
 
     # Password resets
     password_resets_started = fuzzy.FuzzyInteger(0, 100)

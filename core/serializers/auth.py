@@ -203,14 +203,22 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             user.force_password_change = False
             user.save(update_fields=["password", "force_password_change"])
 
-            # Mark token used
             event.mark_used()
 
-            # Revoke active sessions
-            UserSession.objects.filter(
+            revoked_count = UserSession.objects.filter(
                 user=user,
                 status=UserSession.Status.ACTIVE
             ).update(status=UserSession.Status.REVOKED)
+
+        view = self.context.get("view")
+
+        if revoked_count and view:
+            view.audit(
+                event_type=AuditLog.Events.SESSION_REVOKED,
+                target=user,
+                description="Sessions revoked due to password reset",
+                metadata={"count": revoked_count},
+            )
 
         return user
 

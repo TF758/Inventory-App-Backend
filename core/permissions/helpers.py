@@ -5,6 +5,7 @@ from django.db.models import Q
 from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment, EquipmentStatus
 from assignments.models.asset_assignment import ReturnRequest
 from core.models.audit import AuditLog
+from core.utils.scope.policies import POLICY_REGISTRY
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, UserPlacement
@@ -193,206 +194,238 @@ def ensure_permission(user: User, required_role: str,
             f"Active role lacks {required_role} permission for this resource."
         )
 
-def filter_queryset_by_scope(user: User, queryset, model_class):
+# def filter_queryset_by_scope_legacy_version(user: User, queryset, model_class):
+#     """
+#     Restrict a queryset to the subset of records the user's active role
+#     has scope over (based on department, location, or room).
+
+#     Returns:
+#         QuerySet: The filtered queryset containing only records within scope.
+#     """
+#     active_role = get_active_role(user)
+#     if not active_role:
+#         return queryset.none()
+
+#     if active_role.role == "SITE_ADMIN":
+#         return queryset
+
+#     q = Q()
+
+#     if model_class == Room:
+#         if active_role.room:
+#             q |= Q(pk=active_role.room.pk)
+#         elif active_role.location:
+#             q |= Q(location=active_role.location)
+#         elif active_role.department:
+#             q |= Q(location__department=active_role.department)
+
+#     elif model_class == Location:
+#         if active_role.room:
+#             return queryset.none()
+#         if active_role.location:
+#             q |= Q(pk=active_role.location.pk)
+#         elif active_role.department:
+#             q |= Q(department=active_role.department)
+
+#     elif model_class == Department:
+#         if active_role.room or active_role.location:
+#             return queryset.none()
+#         if active_role.department:
+#             q |= Q(pk=active_role.department.pk)
+
+#     elif model_class == AuditLog:
+#         if active_role.room:
+#             q |= Q(room=active_role.room)
+#         elif active_role.location:
+#             q |= Q(location=active_role.location)
+#         elif active_role.department:
+#             q |= Q(department=active_role.department)
+
+#     # elif model_class in (Equipment, Accessory, Consumable):
+#     #     if active_role.room:
+#     #         q |= Q(room=active_role.room)
+#     #     elif active_role.location:
+#     #         q |= Q(room__location=active_role.location)
+#     #     elif active_role.department:
+#     #         q |= Q(room__location__department=active_role.department)
+
+#     elif model_class == Equipment:
+#         scope_q = Q()
+#         assignment_q = Q(
+#             active_assignment__user=user,
+#             active_assignment__returned_at__isnull=True,
+#         )
+
+#         if active_role.room:
+#             scope_q |= Q(room=active_role.room)
+#         elif active_role.location:
+#             scope_q |= Q(room__location=active_role.location)
+#         elif active_role.department:
+#             scope_q |= Q(room__location__department=active_role.department)
+
+#         q |= scope_q | assignment_q
+
+#     elif model_class == Accessory:
+#         scope_q = Q()
+#         assignment_q = Q(
+#             assignments__user=user,
+#             assignments__returned_at__isnull=True,
+#             assignments__quantity__gt=0,
+#         )
+
+#         if active_role.room:
+#             scope_q |= Q(room=active_role.room)
+#         elif active_role.location:
+#             scope_q |= Q(room__location=active_role.location)
+#         elif active_role.department:
+#             scope_q |= Q(room__location__department=active_role.department)
+
+#         q |= scope_q | assignment_q
+
+#     elif model_class == Consumable:
+#         scope_q = Q()
+#         assignment_q = Q(
+#             issues__user=user,
+#             issues__returned_at__isnull=True,
+#             issues__quantity__gt=0,
+#         )
+
+#         if active_role.room:
+#             scope_q |= Q(room=active_role.room)
+#         elif active_role.location:
+#             scope_q |= Q(room__location=active_role.location)
+#         elif active_role.department:
+#             scope_q |= Q(room__location__department=active_role.department)
+
+#         q |= scope_q | assignment_q
+
+#     elif model_class == Component:
+#         if active_role.room:
+#             q |= Q(equipment__room=active_role.room)
+#         elif active_role.location:
+#             q |= Q(equipment__room__location=active_role.location)
+#         elif active_role.department:
+#             q |= Q(equipment__room__location__department=active_role.department)
+
+#     elif model_class == RoleAssignment:
+#         if active_role.room:
+#             q |= Q(room=active_role.room)
+#         elif active_role.location:
+#             q |= Q(location=active_role.location) | Q(room__location=active_role.location)
+#         elif active_role.department:
+#             q |= (
+#                 Q(department=active_role.department)
+#                 | Q(location__department=active_role.department)
+#                 | Q(room__location__department=active_role.department)
+#             )
+#     elif model_class == AssetAgreement:
+
+#         if active_role.room:
+#             q |= Q(room=active_role.room)
+
+#         elif active_role.location:
+#             q |= Q(location=active_role.location) | Q(room__location=active_role.location)
+
+#         elif active_role.department:
+#             q |= (
+#                 Q(department=active_role.department)
+#                 | Q(location__department=active_role.department)
+#                 | Q(room__location__department=active_role.department)
+#             )
+
+#     elif model_class == ReturnRequest:
+
+#         if active_role.room:
+#             q |= Q(
+#                 requester__user_placements__is_current=True,
+#                 requester__user_placements__room=active_role.room
+#             )
+
+#         elif active_role.location:
+#             q |= Q(
+#                 requester__user_placements__is_current=True,
+#                 requester__user_placements__room__location=active_role.location
+#             )
+
+#         elif active_role.department:
+#             q |= Q(
+#                 requester__user_placements__is_current=True,
+#                 requester__user_placements__room__location__department=active_role.department
+#             )
+
+#     elif model_class == AssetAgreementItem:
+
+#         if active_role.room:
+#             q |= Q(agreement__room=active_role.room)
+
+#         elif active_role.location:
+#             q |= Q(agreement__location=active_role.location)
+
+#         elif active_role.department:
+#             q |= Q(agreement__department=active_role.department)
+
+#     elif model_class == UserPlacement:
+#         if active_role.department:
+#             q |= Q(room__location__department=active_role.department)
+#         elif active_role.location:
+#             q |= Q(room__location=active_role.location)
+#         elif active_role.room:
+#             q |= Q(room=active_role.room)
+
+#     elif model_class.__name__ == "User":
+#         user_q = Q()
+#         if active_role.department:
+#             user_q |= Q(role_assignments__department=active_role.department)
+#             user_q |= Q(user_placements__room__location__department=active_role.department)
+#         elif active_role.location:
+#             user_q |= Q(role_assignments__location=active_role.location)
+#             user_q |= Q(user_placements__room__location=active_role.location)
+#         elif active_role.room:
+#             user_q |= Q(role_assignments__room=active_role.room)
+#             user_q |= Q(user_placements__room=active_role.room)
+
+#         if active_role.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
+#             user_q |= Q(active_role__isnull=True,
+#                         created_by__role_assignments__department=active_role.department)
+
+#         if active_role.role == "SITE_ADMIN":
+#             user_q |= Q()
+
+#         q |= user_q
+
+#     return queryset.filter(q).distinct()
+
+def filter_queryset_by_scope(user, queryset, model_class):
     """
     Restrict a queryset to the subset of records the user's active role
     has scope over (based on department, location, or room).
 
+    This function delegates filtering to model-specific scope policies.
+
+    Behavior:
+        - No active role → empty queryset
+        - SITE_ADMIN → full access
+        - Otherwise → use registered policy
+        - No policy → deny (empty queryset)
+
     Returns:
-        QuerySet: The filtered queryset containing only records within scope.
+        QuerySet filtered according to scope rules
     """
-    active_role = get_active_role(user)
-    if not active_role:
+    role = get_active_role(user)
+
+    if not role:
         return queryset.none()
 
-    if active_role.role == "SITE_ADMIN":
+    if role.role == "SITE_ADMIN":
         return queryset
 
-    q = Q()
+    policy_cls = POLICY_REGISTRY.get(model_class)
 
-    if model_class == Room:
-        if active_role.room:
-            q |= Q(pk=active_role.room.pk)
-        elif active_role.location:
-            q |= Q(location=active_role.location)
-        elif active_role.department:
-            q |= Q(location__department=active_role.department)
+    if not policy_cls:
+        return queryset.none()
 
-    elif model_class == Location:
-        if active_role.room:
-            return queryset.none()
-        if active_role.location:
-            q |= Q(pk=active_role.location.pk)
-        elif active_role.department:
-            q |= Q(department=active_role.department)
-
-    elif model_class == Department:
-        if active_role.room or active_role.location:
-            return queryset.none()
-        if active_role.department:
-            q |= Q(pk=active_role.department.pk)
-
-    elif model_class == AuditLog:
-        if active_role.room:
-            q |= Q(room=active_role.room)
-        elif active_role.location:
-            q |= Q(location=active_role.location)
-        elif active_role.department:
-            q |= Q(department=active_role.department)
-
-    # elif model_class in (Equipment, Accessory, Consumable):
-    #     if active_role.room:
-    #         q |= Q(room=active_role.room)
-    #     elif active_role.location:
-    #         q |= Q(room__location=active_role.location)
-    #     elif active_role.department:
-    #         q |= Q(room__location__department=active_role.department)
-
-    elif model_class == Equipment:
-        scope_q = Q()
-        assignment_q = Q(
-            active_assignment__user=user,
-            active_assignment__returned_at__isnull=True,
-        )
-
-        if active_role.room:
-            scope_q |= Q(room=active_role.room)
-        elif active_role.location:
-            scope_q |= Q(room__location=active_role.location)
-        elif active_role.department:
-            scope_q |= Q(room__location__department=active_role.department)
-
-        q |= scope_q | assignment_q
-
-    elif model_class == Accessory:
-        scope_q = Q()
-        assignment_q = Q(
-            assignments__user=user,
-            assignments__returned_at__isnull=True,
-            assignments__quantity__gt=0,
-        )
-
-        if active_role.room:
-            scope_q |= Q(room=active_role.room)
-        elif active_role.location:
-            scope_q |= Q(room__location=active_role.location)
-        elif active_role.department:
-            scope_q |= Q(room__location__department=active_role.department)
-
-        q |= scope_q | assignment_q
-
-    elif model_class == Consumable:
-        scope_q = Q()
-        assignment_q = Q(
-            issues__user=user,
-            issues__returned_at__isnull=True,
-            issues__quantity__gt=0,
-        )
-
-        if active_role.room:
-            scope_q |= Q(room=active_role.room)
-        elif active_role.location:
-            scope_q |= Q(room__location=active_role.location)
-        elif active_role.department:
-            scope_q |= Q(room__location__department=active_role.department)
-
-        q |= scope_q | assignment_q
-
-    elif model_class == Component:
-        if active_role.room:
-            q |= Q(equipment__room=active_role.room)
-        elif active_role.location:
-            q |= Q(equipment__room__location=active_role.location)
-        elif active_role.department:
-            q |= Q(equipment__room__location__department=active_role.department)
-
-    elif model_class == RoleAssignment:
-        if active_role.room:
-            q |= Q(room=active_role.room)
-        elif active_role.location:
-            q |= Q(location=active_role.location) | Q(room__location=active_role.location)
-        elif active_role.department:
-            q |= (
-                Q(department=active_role.department)
-                | Q(location__department=active_role.department)
-                | Q(room__location__department=active_role.department)
-            )
-    elif model_class == AssetAgreement:
-
-        if active_role.room:
-            q |= Q(room=active_role.room)
-
-        elif active_role.location:
-            q |= Q(location=active_role.location) | Q(room__location=active_role.location)
-
-        elif active_role.department:
-            q |= (
-                Q(department=active_role.department)
-                | Q(location__department=active_role.department)
-                | Q(room__location__department=active_role.department)
-            )
-
-    elif model_class == ReturnRequest:
-
-        if active_role.room:
-            q |= Q(
-                requester__user_placements__is_current=True,
-                requester__user_placements__room=active_role.room
-            )
-
-        elif active_role.location:
-            q |= Q(
-                requester__user_placements__is_current=True,
-                requester__user_placements__room__location=active_role.location
-            )
-
-        elif active_role.department:
-            q |= Q(
-                requester__user_placements__is_current=True,
-                requester__user_placements__room__location__department=active_role.department
-            )
-
-    elif model_class == AssetAgreementItem:
-
-        if active_role.room:
-            q |= Q(agreement__room=active_role.room)
-
-        elif active_role.location:
-            q |= Q(agreement__location=active_role.location)
-
-        elif active_role.department:
-            q |= Q(agreement__department=active_role.department)
-
-    elif model_class == UserPlacement:
-        if active_role.department:
-            q |= Q(room__location__department=active_role.department)
-        elif active_role.location:
-            q |= Q(room__location=active_role.location)
-        elif active_role.room:
-            q |= Q(room=active_role.room)
-
-    elif model_class.__name__ == "User":
-        user_q = Q()
-        if active_role.department:
-            user_q |= Q(role_assignments__department=active_role.department)
-            user_q |= Q(user_placements__room__location__department=active_role.department)
-        elif active_role.location:
-            user_q |= Q(role_assignments__location=active_role.location)
-            user_q |= Q(user_placements__room__location=active_role.location)
-        elif active_role.room:
-            user_q |= Q(role_assignments__room=active_role.room)
-            user_q |= Q(user_placements__room=active_role.room)
-
-        if active_role.role in ["DEPARTMENT_ADMIN", "LOCATION_ADMIN", "ROOM_ADMIN"]:
-            user_q |= Q(active_role__isnull=True,
-                        created_by__role_assignments__department=active_role.department)
-
-        if active_role.role == "SITE_ADMIN":
-            user_q |= Q()
-
-        q |= user_q
-
-    return queryset.filter(q).distinct()
+    policy = policy_cls(user, queryset)
+    return policy.apply()
 
 def is_viewer_role(role: str) -> bool:
     """

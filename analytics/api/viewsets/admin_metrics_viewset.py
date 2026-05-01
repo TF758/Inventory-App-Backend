@@ -48,7 +48,7 @@ class LoginMetricsOverview(APIView):
         # Status-based
         total_sessions = UserSession.objects.count()
         active_sessions = UserSession.objects.filter(status=UserSession.Status.ACTIVE).count()
-        revoked_sessions = UserSession.objects.filter(status=UserSession.Status.REVOKED).count()
+        revoked_sessions_today = UserSession.objects.filter(status=UserSession.Status.REVOKED).count()
         expired_sessions = UserSession.objects.filter(status=UserSession.Status.EXPIRED).count()
 
         # Time-based session creation = "logins"
@@ -100,7 +100,7 @@ class LoginMetricsOverview(APIView):
         data = {
             "total_sessions": total_sessions,
             "active_sessions": active_sessions,
-            "revoked_sessions": revoked_sessions,
+            "revoked_sessions_today": revoked_sessions_today,
             "expired_sessions": expired_sessions,
 
             "sessions_last_24h": sessions_last_24h,
@@ -175,7 +175,7 @@ class SecurityMetricsOverview(APIView):
         locked_users = User.objects.filter(is_locked=True).count()
 
         # 4. Users with revoked sessions
-        users_with_revoked_sessions = (
+        users_with_revoked_sessions_today = (
             UserSession.objects.filter(status=UserSession.Status.REVOKED)
             .values('user')
             .distinct()
@@ -218,7 +218,7 @@ class SecurityMetricsOverview(APIView):
             "users_multiple_active_sessions": users_multiple_active_sessions,
             "users_force_password_change": users_force_password_change,
             "locked_users": locked_users,
-            "users_with_revoked_sessions": users_with_revoked_sessions,
+            "users_with_revoked_sessions_today": users_with_revoked_sessions_today,
             "users_with_expired_sessions_last_7_days": users_with_recent_expired_sessions,
             "system_users_count": system_users_count,
             "active_password_resets": active_password_resets,

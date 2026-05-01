@@ -8,7 +8,6 @@ from core.models.sessions import UserSession
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
-from core.utils.serializers import get_serializer_field_info
 from rest_framework.serializers import Serializer
 import logging
 import secrets
@@ -98,6 +97,14 @@ class SessionTokenLoginView(TokenObtainPairView):
                     if oldest_session:
                         oldest_session.status = UserSession.Status.REVOKED
                         oldest_session.save(update_fields=["status"])
+
+                        AuditLog.objects.create(
+                            event_type=AuditLog.Events.SESSION_REVOKED,
+                            user=user,
+                            user_public_id=str(user.public_id),
+                            user_email=user.email,
+                            metadata={"reason": "max_concurrent_sessions"},
+                        )
 
                 session = UserSession.objects.create(
                     user=user,
@@ -238,6 +245,12 @@ class RefreshAPIView(APIView):
                     session_family=session.session_family
                 ).update(status=UserSession.Status.REVOKED)
 
+                AuditLog.objects.create(
+                    event_type=AuditLog.Events.SESSION_REVOKED,
+                    user=session.user,
+                    metadata={"reason": "refresh_token_reuse", "family": str(session.session_family)},
+                )
+
                 resp = Response(
                     {"detail": "Invalid or expired session."},
                     status=status.HTTP_401_UNAUTHORIZED,
@@ -252,6 +265,13 @@ class RefreshAPIView(APIView):
 
                 session.status = UserSession.Status.EXPIRED
                 session.save(update_fields=["status"])
+
+                AuditLog.objects.create(
+                    event_type=AuditLog.Events.SESSION_EXPIRED,
+                    user=session.user,
+                    user_public_id=str(session.user.public_id),
+                    user_email=session.user.email,
+                )
 
                 resp = Response(
                     {"detail": "Invalid or expired session."},
@@ -269,6 +289,12 @@ class RefreshAPIView(APIView):
 
                 session.status = UserSession.Status.REVOKED
                 session.save(update_fields=["status"])
+
+                AuditLog.objects.create(
+                    event_type=AuditLog.Events.SESSION_REVOKED,
+                    user=session.user,
+                    metadata={"reason": "user_agent_mismatch"},
+                )
 
                 resp = Response(
                     {"detail": "Invalid or expired session."},
@@ -288,6 +314,12 @@ class RefreshAPIView(APIView):
                     user=user,
                     status=UserSession.Status.ACTIVE,
                 ).update(status=UserSession.Status.REVOKED)
+
+                AuditLog.objects.create(
+                    event_type=AuditLog.Events.SESSION_REVOKED,
+                    user=user,
+                    metadata={"reason": "account_locked"},
+                )
 
                 resp = Response(
                     {
@@ -493,53 +525,6 @@ class LogoutAPIView(APIView):
 
         return response
 
-def get_serializer_field_info(serializer_class: Serializer):
-        """Return cleaned up metadata for serializer fields"""
-        serializer = serializer_class()
-
-        field_info = {}
-        for field_name, field in serializer.fields.items():
-            field_info[field_name] = {
-                "label": field.label or field_name.replace("_", " ").title(),
-                "type": field.__class__.__name__,
-                "required": field.required,
-                "read_only": field.read_only,
-                "write_only": field.write_only,
-                "help_text": field.help_text or "",
-                "max_length": getattr(field, "max_length", None),
-            }
-        return field_info
-
-class SerializerFieldsView(APIView):
-
-    """Used to return data about a model field using it's respective serializer in batch processes"""
-    """
-    Return field metadata for a given model serializer.
-    Pass `serializer_name` as query param (e.g., EquipmentBatchWriteSerializer)
-    """
-
-    serializer_map = {
-        "equipment": EquipmentBatchtWriteSerializer,
-        "consumable": ConsumableBatchWriteSerializer,
-        "accessory": AccessoryBatchWriteSerializer,
-    }
-
-    def get(self, request):
-        serializer_key = request.query_params.get("serializer")
-        if not serializer_key:
-            return Response(
-                {"error": "Query param 'serializer' is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer_class = self.serializer_map.get(serializer_key.lower())
-        if not serializer_class:
-            return Response(
-                {"error": f"No serializer found for '{serializer_key}'"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        return Response(get_serializer_field_info(serializer_class))
 
 class PasswordResetRequestView(AuditMixin, APIView):
 
@@ -549,7 +534,15 @@ class PasswordResetRequestView(AuditMixin, APIView):
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+
+        event = serializer.save()
+
+        if event:
+            self.audit(
+                event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
+                target=event.user,
+                description="Password reset requested",
+            )
 
         return Response(
             {"detail": "If an account exists, a password reset email has been sent."},
@@ -566,7 +559,7 @@ class PasswordResetConfirmView(AuditMixin, APIView):
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+
 
         user = serializer.save()
 

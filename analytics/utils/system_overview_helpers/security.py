@@ -31,8 +31,8 @@ def build_session_trends(*, days: int, granularity: str):
         base
         .values("period")
         .annotate(
-            revoked_sessions=Sum("revoked_sessions"),
-            expired_sessions=Sum("expired_sessions_last_24h"),
+            revoked_sessions_today=Sum("revoked_sessions_today"),
+            expired_sessions=Sum("expired_sessions_today"),
         )
     )
 
@@ -45,7 +45,7 @@ def build_session_trends(*, days: int, granularity: str):
         {
             "date": row.period.isoformat(),
             "active_sessions": row.active_sessions,
-            "revoked_sessions": events_by_period[row.period]["revoked_sessions"],
+            "revoked_sessions_today": events_by_period[row.period]["revoked_sessions_today"],
             "expired_sessions": events_by_period[row.period]["expired_sessions"],
         }
         for row in snapshot_qs.order_by("period")
