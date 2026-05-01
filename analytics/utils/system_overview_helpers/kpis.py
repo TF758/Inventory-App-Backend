@@ -80,10 +80,10 @@ def build_system_kpis():
         # User activity
         # -------------------------
         "active_users_24h": {
-            "value": today.active_users_last_24h,
+            "value": today.active_users_today,
             "delta": safe_delta(
-                today.active_users_last_24h,
-                yesterday.active_users_last_24h if yesterday else None,
+                today.active_users_today,
+                yesterday.active_users_today if yesterday else None,
             ),
         },
 

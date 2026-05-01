@@ -121,9 +121,9 @@ class TestDailyAuthMetrics(TestCase):
         metrics = DailyAuthMetrics.objects.first()
 
         self.assertEqual(metrics.active_sessions, 2)
-        self.assertEqual(metrics.revoked_sessions, 1)
+        self.assertEqual(metrics.revoked_sessions_today, 1)
         self.assertEqual(metrics.users_multiple_active_sessions, 1)
-        self.assertEqual(metrics.users_with_revoked_sessions, 1)
+        self.assertEqual(metrics.users_with_revoked_sessions_today, 1)
 
     def test_snapshot_created_once(self):
         generate_daily_auth_metrics()
@@ -221,8 +221,8 @@ class TestDailyAuthMetrics(TestCase):
 
         metrics = DailyAuthMetrics.objects.first()
 
-        self.assertEqual(metrics.revoked_sessions, 2)
-        self.assertEqual(metrics.users_with_revoked_sessions, 2)
+        self.assertEqual(metrics.revoked_sessions_today, 2)
+        self.assertEqual(metrics.users_with_revoked_sessions_today, 2)
     
     def test_session_revoked_scoped_to_day(self):
         yesterday = self.now - timezone.timedelta(days=1)
@@ -236,7 +236,7 @@ class TestDailyAuthMetrics(TestCase):
         self.simulate_session_revoke(self.user2)
         generate_daily_auth_metrics()
         metrics = DailyAuthMetrics.objects.first()
-        self.assertEqual(metrics.revoked_sessions, 1)
+        self.assertEqual(metrics.revoked_sessions_today, 1)
     
 
     def simulate_session_expired(self, user):
