@@ -5,16 +5,17 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django_celery_beat.models import CrontabSchedule, PeriodicTask
 
+
 class Command(BaseCommand):
     help = "Setup periodic Celery Beat tasks for automated data generation"
 
     def handle(self, *args, **options):
-        self.stdout.write("Setting up periodic data Celery Beat schedules...")
+        self.stdout.write(self.style.WARNING("Setting up periodic data Celery Beat schedules...\n"))
 
         def upsert_task(name: str, task: str, cron_expr: str):
             minute, hour, day, month, dow = cron_expr.split()
 
-            schedule, _ = CrontabSchedule.objects.get_or_create(
+            schedule, schedule_created = CrontabSchedule.objects.get_or_create(
                 minute=minute,
                 hour=hour,
                 day_of_month=day,
@@ -23,7 +24,7 @@ class Command(BaseCommand):
                 timezone=settings.TIME_ZONE,
             )
 
-            PeriodicTask.objects.update_or_create(
+            periodic_task, created = PeriodicTask.objects.update_or_create(
                 name=name,
                 defaults={
                     "task": task,
@@ -34,8 +35,18 @@ class Command(BaseCommand):
                 },
             )
 
+            # Feedback output
+            status = "CREATED" if created else "UPDATED"
+            schedule_status = "new schedule" if schedule_created else "existing schedule"
+
+            self.stdout.write(
+                f"[{status}] {name}\n"
+                f"  → task: {task}\n"
+                f"  → cron: {cron_expr} ({schedule_status})\n"
+            )
+
         # ------------------------------------------------------------------
-        # Daily system metrics snapshots (automated, non-user tasks)
+        # Daily system metrics snapshots
         # ------------------------------------------------------------------
         upsert_task(
             name="Generate daily system metrics snapshot",
@@ -61,7 +72,6 @@ class Command(BaseCommand):
             cron_expr=settings.DAILY_SYSTEM_METRICS_CRON,
         )
 
-
         self.stdout.write(
-            self.style.SUCCESS("Periodic data Celery Beat tasks configured.")
+            self.style.SUCCESS("\n✔ Periodic data Celery Beat tasks configured successfully.")
         )
