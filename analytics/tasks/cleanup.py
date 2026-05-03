@@ -5,11 +5,11 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from core.models.tasks import ScheduledTaskRun
-
 from django.db import transaction
-
 from reporting.models.reports import ReportJob
+import logging
 
+logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True)
@@ -71,6 +71,13 @@ def delete_old_reports(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+
+        logger.exception(
+        "delete_old_reports_failed",
+            extra={
+                "task": "delete_old_reports",
+            },
+        )
         raise
 
     finally:
