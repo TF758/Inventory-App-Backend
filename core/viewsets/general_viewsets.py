@@ -175,14 +175,6 @@ class SessionTokenLoginView(TokenObtainPairView):
         # -------------------------
         # Response
         # -------------------------
-        logger.info(
-            "user_login_success",
-            extra={
-                "user_id": user.pk,
-                "ip": ip,
-                "user_agent": user_agent,
-            }
-        )
         response_data = {
             "access": access_token,
             "public_id": str(user.public_id),

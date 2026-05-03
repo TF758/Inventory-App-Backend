@@ -13,11 +13,15 @@ from reporting.models.reports import ReportJob
 from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming
 from reporting.utils.report_payload import wrap_report_payload
 
-
 redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
 from datetime import datetime
 from django.utils.timezone import is_aware
+
+import logging
+from django.core.files.storage import default_storage
+
+logger = logging.getLogger(__name__)
 
 def normalize_datetimes(obj):
     """
@@ -38,7 +42,6 @@ def normalize_datetimes(obj):
             return obj.replace(tzinfo=None)
         return obj
     return obj
-
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True)
 def generate_report_task(self, report_job_id: int):
     start_ts = time.monotonic()
@@ -85,7 +88,7 @@ def generate_report_task(self, report_job_id: int):
             raise RuntimeError("Report payload is empty")
 
         # ---------------------------------
-        # Enforce new canonical schema
+        # Enforce schema
         # ---------------------------------
         if not isinstance(payload, dict):
             raise RuntimeError("Report payload must be a dict")
@@ -102,7 +105,6 @@ def generate_report_task(self, report_job_id: int):
         if not isinstance(payload["data"], dict):
             raise RuntimeError("'data' must be a dict")
 
-        # Optional system metadata
         payload["meta"].setdefault("report_type", job.report_type)
         payload["meta"].setdefault("generated_by", job.user.get_username())
         payload["meta"].setdefault("schema_version", 1)
@@ -173,6 +175,15 @@ def generate_report_task(self, report_job_id: int):
         run.message = f"ReportJob {job.public_id} completed"
 
     except Exception as exc:
+        logger.exception(
+            "generate_report_task_failed",
+            extra={
+                "job_id": getattr(job, "id", None),
+                "report_type": getattr(job, "report_type", None),
+                "user_id": getattr(job, "user_id", None),
+            },
+        )
+
         if job:
             with transaction.atomic():
                 job.status = ReportJob.Status.FAILED

@@ -52,6 +52,10 @@ def send_password_reset_email(self, email: str):
     token_service = PasswordResetToken()
     event = token_service.generate_token(user_public_id=user.public_id)
     if not event:
+        logger.warning(
+            "password_reset_token_generation_skipped_cooldown",
+            extra={"user_id": user.pk},
+        )
         return
     token = event.token
 
@@ -72,8 +76,11 @@ def send_password_reset_email(self, email: str):
         )
     except Exception:
         logger.exception(
-            "Failed to send password reset email for user %s",
-            user.public_id,
+            "password_reset_email_send_failed",
+            extra={
+                "user_id": user.pk,
+                "user_public_id": str(user.public_id),
+            },
         )
         raise
 
@@ -95,27 +102,44 @@ def admin_reset_user_password(self, *, user_public_id: str, admin_public_id: str
     )
 
     if not event:
+        logger.warning(
+            "admin_password_reset_token_generation_skipped",
+            extra={
+                "user_id": user.pk,
+                "admin_id": admin.pk,
+            },
+        )
         return
-
-    user.force_password_change = True
-    user.save(update_fields=["force_password_change"])
-
 
 
     reset_link = f"{settings.FRONTEND_URL}/password-reset?token={event.token}"
 
-    send_mail(
-        subject="Administrator-Initiated Password Reset",
-        message=(
-            "An administrator has initiated a password reset for your account.\n\n"
-            "This link expires in 10 minutes:\n\n"
-            f"{reset_link}\n\n"
-            "If you did not expect this, contact support immediately."
-        ),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            subject="Administrator-Initiated Password Reset",
+            message=(
+                "An administrator has initiated a password reset for your account.\n\n"
+                "This link expires in 10 minutes:\n\n"
+                f"{reset_link}\n\n"
+                "If you did not expect this, contact support immediately."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception(
+            "admin_password_reset_email_send_failed",
+            extra={
+                "user_id": user.pk,
+                "admin_id": admin.pk,
+            },
+        )
+        raise
+
+    # only chnage user if email goes through
+    user.force_password_change = True
+    user.save(update_fields=["force_password_change"])
 
     AuditLog.objects.create(
         user=admin,
