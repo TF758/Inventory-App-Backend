@@ -497,3 +497,35 @@ USERSESSION_EXPIRE_CRON=env(
 
 SESSION_EXPIRED_RETENTION_DAYS = env.int("SESSION_EXPIRED_RETENTION_DAYS", default=5)
 SESSION_REVOKED_RETENTION_DAYS = env.int("SESSION_REVOKED_RETENTION_DAYS", default=20)
+
+
+# LOGGING
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "formatters": {
+        "detailed": {
+            "()": "core.logging.SafeExtraFormatter",
+            "format": (
+                "%(asctime)s | %(levelname)s | %(name)s | "
+                "%(filename)s:%(lineno)d (%(funcName)s) | %(message)s"
+            ),
+        },
+    },
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "detailed",
+        },
+    },
+
+    "loggers": {
+        "arms": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
