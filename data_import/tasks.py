@@ -4,6 +4,10 @@ from data_import.services.import_builder import build_asset_import
 from django.utils import timezone
 from reporting.tasks.reports import generate_report_task
 from reporting.models.reports import ReportJob
+import logging
+from django.core.files.storage import default_storage
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -34,9 +38,36 @@ def run_asset_import_task(self, report_job_id):
             job.error = ""
             job.save(update_fields=["result_payload", "status", "finished_at", "error"])
 
+            # DEBUG: downstream task trigger
+            logger.debug(
+                "asset_import_triggered_report_generation",
+                extra={"job_id": job.id},
+            )
+
             generate_report_task.delay(job.id)
+            if default_storage.exists(params["stored_file_name"]):
+                default_storage.delete(params["stored_file_name"])
+
+        else:
+            # Optional visibility into cancellation
+            logger.info(
+                "asset_import_cancelled",
+                extra={
+                    "job_id": job.id,
+                    "user_id": job.user_id,
+                },
+            )
 
     except ValueError as exc:
+        # Controlled / validation failure
+        logger.warning(
+            "asset_import_validation_failed",
+            extra={
+                "job_id": job.id,
+                "user_id": job.user_id,
+            },
+        )
+
         job.status = ReportJob.Status.FAILED
         job.finished_at = timezone.now()
         job.error = str(exc)
@@ -53,6 +84,15 @@ def run_asset_import_task(self, report_job_id):
         job.save(update_fields=["status", "finished_at", "error", "result_payload"])
 
     except Exception as exc:
+        # Unexpected failure
+        logger.exception(
+            "asset_import_task_failed",
+            extra={
+                "job_id": job.id,
+                "user_id": job.user_id,
+            },
+        )
+
         job.status = ReportJob.Status.FAILED
         job.finished_at = timezone.now()
         job.error = f"Unexpected import error: {exc}"
@@ -67,4 +107,5 @@ def run_asset_import_task(self, report_job_id):
             "fatal_error": "Unexpected import error.",
         }
         job.save(update_fields=["status", "finished_at", "error", "result_payload"])
+
         raise
