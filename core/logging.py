@@ -1,4 +1,6 @@
 import logging
+import uuid
+from core.request_context import get_request_id
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -19,19 +21,33 @@ class SafeExtraFormatter(logging.Formatter):
         'exc_text', 'stack_info', 'lineno', 'funcName',
         'created', 'msecs', 'relativeCreated', 'thread',
         'threadName', 'processName', 'process',
-        'message', 'asctime'
+        'message', 'asctime', 'taskName'
     }
 
     def format(self, record):
+        if not hasattr(record, "request_id"):
+            record.request_id = None
+
         message = super().format(record)
 
         extra = {
-            key: value
+            key: str(value) if isinstance(value, uuid.UUID) else value
             for key, value in record.__dict__.items()
             if key not in self.STANDARD_ATTRS
+            and key != "request_id"
         }
 
         if extra:
-            return f"{message} | extra={extra}"
+            if record.exc_info:
+                parts = message.split("\n", 1)
+                return f"{parts[0]} | extra={extra}\n{parts[1]}"
+            else:
+                return f"{message} | extra={extra}"
 
         return message
+    
+
+class RequestIDFilter:
+    def filter(self, record):
+        record.request_id = get_request_id()
+        return True

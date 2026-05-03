@@ -164,6 +164,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
 
+    "core.middleware.RequestIDMiddleware",
+
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -508,8 +510,7 @@ LOGGING = {
         "detailed": {
             "()": "core.logging.SafeExtraFormatter",
             "format": (
-                "%(asctime)s | %(levelname)s | %(name)s | "
-                "%(filename)s:%(lineno)d (%(funcName)s) | %(message)s"
+               "%(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d (%(funcName)s) | %(message)s | request_id=%(request_id)s"
             ),
         },
     },
@@ -518,6 +519,7 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "detailed",
+             "filters": ["request_id"],
         },
     },
 
@@ -528,4 +530,10 @@ LOGGING = {
             "propagate": False,
         },
     },
+
+    "filters": {
+    "request_id": {
+        "()": "core.logging.RequestIDFilter",
+    },
+},
 }
