@@ -500,6 +500,9 @@ USERSESSION_EXPIRE_CRON=env(
 SESSION_EXPIRED_RETENTION_DAYS = env.int("SESSION_EXPIRED_RETENTION_DAYS", default=5)
 SESSION_REVOKED_RETENTION_DAYS = env.int("SESSION_REVOKED_RETENTION_DAYS", default=20)
 
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
 
 # LOGGING
 LOGGING = {
@@ -521,11 +524,22 @@ LOGGING = {
             "formatter": "detailed",
              "filters": ["request_id"],
         },
+        "file": 
+        {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(LOGS_DIR / "app.log"),
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,  # keep 30 days
+            "formatter": "detailed",
+            "filters": ["request_id"],
+            "encoding": "utf-8",
+        },
     },
 
     "loggers": {
         "arms": {
-            "handlers": ["console"],
+            "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": False,
         },
