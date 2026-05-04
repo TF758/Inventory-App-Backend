@@ -530,19 +530,39 @@ LOGGING = {
             "filename": str(LOGS_DIR / "app.log"),
             "when": "midnight",
             "interval": 1,
-            "backupCount": 30,  # keep 30 days
+            "backupCount": 30,  
+            "level": "INFO",
             "formatter": "detailed",
             "filters": ["request_id"],
             "encoding": "utf-8",
         },
+        "error_file": {
+        "class": "logging.handlers.TimedRotatingFileHandler",
+        "filename": str(LOGS_DIR / "error.log"),
+        "when": "midnight",
+        "backupCount": 30,
+        "level": "ERROR", 
+        "formatter": "detailed",
+        "filters": ["request_id"],
+        "encoding": "utf-8",
+        },  
     },
 
     "loggers": {
         "arms": {
-            "handlers": ["console", "file"],
+            "handlers": ["console", "file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
+        "django.request": {
+        "handlers": ["error_file"],
+        "level": "ERROR",
+        "propagate": False,
+    },
+    "root": {
+        "handlers": ["file", "error_file"],
+        "level": "INFO",
+    },
     },
 
     "filters": {
