@@ -57,6 +57,13 @@ class Command(BaseCommand):
                 "skip": options["skip_cleaners"],
                 "kwargs": {},
             },
+
+            {
+                "label": "🧾 Setup logging maintenance tasks",
+                "command": "setup_logging_tasks",
+                "skip": options.get("skip_logging", False),
+                "kwargs": {},
+            },
         ]
 
         for step in steps:

@@ -503,6 +503,40 @@ SESSION_REVOKED_RETENTION_DAYS = env.int("SESSION_REVOKED_RETENTION_DAYS", defau
 LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
+# -------------------------------------------------
+# Logging configuration (env-driven)
+# -------------------------------------------------
+
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+
+# --- App log rotation ---
+LOG_FILE_WHEN = env("LOG_FILE_WHEN", default="midnight")
+LOG_FILE_INTERVAL = env.int("LOG_FILE_INTERVAL", default=1)
+LOG_FILE_BACKUP_COUNT = env.int("LOG_FILE_BACKUP_COUNT", default=30)
+
+# --- Error log rotation ---
+LOG_ERROR_WHEN = env("LOG_ERROR_WHEN", default="midnight")
+LOG_ERROR_INTERVAL = env.int("LOG_ERROR_INTERVAL", default=1)
+LOG_ERROR_BACKUP_COUNT = env.int("LOG_ERROR_BACKUP_COUNT", default=30)
+
+# Optional
+LOG_TO_CONSOLE = env.bool("LOG_TO_CONSOLE", default=True)
+
+# --- Logging task config ---
+
+LOG_ARCHIVE_AFTER_DAYS=env.int("LOG_ARCHIVE_AFTER_DAYS", default=7)
+LOG_DELETE_AFTER_DAYS=env.int("LOG_DELETE_AFTER_DAYS", default=7)
+
+
+# Option A: Cron (production)
+LOG_ARCHIVE_CRON = env(
+    "LOG_ARCHIVE_CRON",
+    default="15 2 * * *",
+)
+LOG_ARCHIVE_USE_INTERVAL = False
+
+# Option B: Interval (testing)
+LOG_ARCHIVE_INTERVAL_SECONDS = 30
 
 # LOGGING
 LOGGING = {
@@ -513,61 +547,72 @@ LOGGING = {
         "detailed": {
             "()": "core.logging.SafeExtraFormatter",
             "format": (
-               "%(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d (%(funcName)s) | %(message)s | request_id=%(request_id)s"
+                "%(asctime)s | %(levelname)s | %(name)s | "
+                "%(filename)s:%(lineno)d (%(funcName)s) | "
+                "%(message)s | request_id=%(request_id)s"
             ),
         },
     },
 
     "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "detailed",
-             "filters": ["request_id"],
-        },
-        "file": 
-        {
+        **(
+            {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "detailed",
+                    "filters": ["request_id"],
+                }
+            } if LOG_TO_CONSOLE else {}
+        ),
+
+        "file": {
             "class": "logging.handlers.TimedRotatingFileHandler",
             "filename": str(LOGS_DIR / "app.log"),
-            "when": "midnight",
-            "interval": 1,
-            "backupCount": 30,  
-            "level": "INFO",
+            "when": LOG_FILE_WHEN,
+            "interval": LOG_FILE_INTERVAL,
+            "backupCount": LOG_FILE_BACKUP_COUNT,
+            "level": LOG_LEVEL,
             "formatter": "detailed",
             "filters": ["request_id"],
             "encoding": "utf-8",
         },
+
         "error_file": {
-        "class": "logging.handlers.TimedRotatingFileHandler",
-        "filename": str(LOGS_DIR / "error.log"),
-        "when": "midnight",
-        "backupCount": 30,
-        "level": "ERROR", 
-        "formatter": "detailed",
-        "filters": ["request_id"],
-        "encoding": "utf-8",
-        },  
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(LOGS_DIR / "error.log"),
+            "when": LOG_ERROR_WHEN,
+            "interval": LOG_ERROR_INTERVAL,
+            "backupCount": LOG_ERROR_BACKUP_COUNT,
+            "level": "ERROR",
+            "formatter": "detailed",
+            "filters": ["request_id"],
+            "encoding": "utf-8",
+        },
     },
 
     "loggers": {
         "arms": {
-            "handlers": ["console", "file", "error_file"],
-            "level": "INFO",
+            "handlers": ["file", "error_file"] + (["console"] if LOG_TO_CONSOLE else []),
+            "level": LOG_LEVEL,
             "propagate": False,
         },
+
         "django.request": {
-        "handlers": ["error_file"],
-        "level": "ERROR",
-        "propagate": False,
+            "handlers": ["error_file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
+
+    # ✅ FIXED: root must be top-level
     "root": {
         "handlers": ["file", "error_file"],
-        "level": "INFO",
-    },
+        "level": LOG_LEVEL,
     },
 
     "filters": {
-    "request_id": {
-        "()": "core.logging.RequestIDFilter",
+        "request_id": {
+            "()": "core.logging.RequestIDFilter",
+        },
     },
-},
 }
