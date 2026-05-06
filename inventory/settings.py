@@ -533,10 +533,6 @@ LOG_ARCHIVE_CRON = env(
     "LOG_ARCHIVE_CRON",
     default="15 2 * * *",
 )
-LOG_ARCHIVE_USE_INTERVAL = False
-
-# Option B: Interval (testing)
-LOG_ARCHIVE_INTERVAL_SECONDS = 30
 
 # LOGGING
 LOGGING = {
@@ -604,7 +600,7 @@ LOGGING = {
         },
     },
 
-    # ✅ FIXED: root must be top-level
+ 
     "root": {
         "handlers": ["file", "error_file"],
         "level": LOG_LEVEL,

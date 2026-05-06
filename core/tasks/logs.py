@@ -1,6 +1,9 @@
 import gzip
+import logging
+import re
 import shutil
 import time
+
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -9,7 +12,6 @@ from django.conf import settings
 
 from core.models.tasks import ScheduledTaskRun
 
-import logging
 
 logger = logging.getLogger("arms.logs")
 
@@ -28,7 +30,9 @@ def archive_logs(self):
     archive_dir = logs_dir / "archive"
     archive_dir.mkdir(exist_ok=True)
 
-    cutoff = datetime.now() - timedelta(days=settings.LOG_ARCHIVE_AFTER_DAYS)
+    cutoff = datetime.now() - timedelta(
+        days=settings.LOG_ARCHIVE_AFTER_DAYS
+    )
 
     archived = 0
     skipped = 0
@@ -41,13 +45,38 @@ def archive_logs(self):
             if name in ("app.log", "error.log"):
                 continue
 
-            # Only process rotated logs
-            if not name.endswith(".log"):
+            # Skip directories
+            if file.is_dir():
                 continue
 
+            # Match:
+            # app.log.2026-05-04
+            # app.log.2026-05-04_18-31-22
+            # error.log.2026-05-04
+            # error.log.2026-05-04_18-31-22
+            match = re.search(
+                r"(\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?)$",
+                name,
+            )
+
+            if not match:
+                skipped += 1
+                continue
+
+            date_str = match.group(1)
+
             try:
-                date_str = name.split(".")[0]  # YYYY-MM-DD
-                file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                if "_" in date_str:
+                    file_date = datetime.strptime(
+                        date_str,
+                        "%Y-%m-%d_%H-%M-%S",
+                    )
+                else:
+                    file_date = datetime.strptime(
+                        date_str,
+                        "%Y-%m-%d",
+                    )
+
             except Exception:
                 skipped += 1
                 continue
@@ -56,7 +85,10 @@ def archive_logs(self):
                 skipped += 1
                 continue
 
-            gz_path = archive_dir / f"{name}.gz"
+            month_bucket = archive_dir / file_date.strftime("%Y-%m")
+            month_bucket.mkdir(exist_ok=True)
+
+            gz_path = month_bucket / f"{name}.gz"
 
             with open(file, "rb") as f_in:
                 with gzip.open(gz_path, "wb") as f_out:
@@ -66,7 +98,9 @@ def archive_logs(self):
             archived += 1
 
         run.status = ScheduledTaskRun.Status.SUCCESS
-        run.message = f"archived={archived}, skipped={skipped}"
+        run.message = (
+            f"archived={archived}, skipped={skipped}"
+        )
 
         logger.info(
             "log_archive_completed",
@@ -87,11 +121,16 @@ def archive_logs(self):
 
         logger.exception(
             "log_archive_failed",
-            extra={"error": str(exc)},
+            extra={
+                "error": str(exc),
+            },
         )
 
         raise
 
     finally:
-        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+        run.duration_ms = int(
+            (time.monotonic() - start_ts) * 1000
+        )
+
         run.save()
