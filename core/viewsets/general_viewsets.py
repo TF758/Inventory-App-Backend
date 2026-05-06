@@ -130,7 +130,6 @@ class SessionTokenLoginView(TokenObtainPairView):
         # Generate access token
         # -------------------------
         try:
-            raise Exception ("This is a bad login test")
             access_token_obj = AccessToken.for_user(user)
 
             access_token_obj.set_exp(
