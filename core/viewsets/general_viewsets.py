@@ -8,8 +8,6 @@ from core.models.sessions import UserSession
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
-from rest_framework.serializers import Serializer
-import logging
 import secrets
 from django.db import IntegrityError, transaction
 from rest_framework.exceptions import APIException
@@ -22,13 +20,10 @@ from core.models.audit import AuditLog
 from django.db.models import Q
 from django.conf import settings
 from core.security_policy import *
-from assets.api.serializers.accessories import AccessoryBatchWriteSerializer
-from assets.api.serializers.consumables import ConsumableBatchWriteSerializer
-from assets.api.serializers.equipment import EquipmentBatchtWriteSerializer
+from core.logging import get_logger
 
 
-
-logger = logging.getLogger(__name__) 
+logger = get_logger(__name__)
 
 class SessionTokenLoginView(TokenObtainPairView):
     serializer_class = SessionTokenLoginViewSerializer
@@ -69,8 +64,11 @@ class SessionTokenLoginView(TokenObtainPairView):
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
             logger.exception(
-                "Refresh token hashing failed",
-                extra={"user_id": user.pk},
+                "refresh_token_hashing_failed",
+                extra={
+                    "user_id": user.pk,
+                    "has_user_agent": bool(user_agent),
+                },
             )
             raise APIException("Authentication failed.")
 
@@ -119,8 +117,12 @@ class SessionTokenLoginView(TokenObtainPairView):
 
         except Exception:
             logger.exception(
-                "Session creation failed",
-                extra={"user_id": user.pk},
+                "session_creation_failed",
+                extra={
+                    "user_id": user.pk,
+                    "active_sessions_count": active_sessions.count(),
+                    "max_sessions": policy.max_concurrent_sessions,
+                },
             )
             raise APIException("Authentication failed.")
 
@@ -141,12 +143,15 @@ class SessionTokenLoginView(TokenObtainPairView):
             access_token = str(access_token_obj)
 
         except Exception:
-            session.delete()
 
             logger.exception(
-                "Access token generation failed",
-                extra={"user_id": user.pk},
+                "access_token_generation_failed",
+                extra={
+                    "user_id": user.pk,
+                    "session_id": session.id,
+                    },
             )
+            session.delete()
             raise APIException("Authentication failed.")
 
         # -------------------------
@@ -363,8 +368,11 @@ class RefreshAPIView(APIView):
 
             except Exception:
                 logger.exception(
-                    "Refresh token rotation failed",
-                    extra={"session_id": str(session.id)},
+                    "refresh_token_rotation_failed",
+                    extra={
+                        "session_id": str(session.id),
+                        "user_id": session.user_id,
+                    },
                 )
                 return Response(
                     {"detail": "Internal server error."},
@@ -380,8 +388,11 @@ class RefreshAPIView(APIView):
 
             except Exception:
                 logger.exception(
-                    "Access token generation failed",
-                    extra={"session_id": str(session.id)},
+                    "access_token_generation_failed",
+                    extra={
+                        "session_id": str(session.id),
+                        "user_id": user.pk,
+                    },
                 )
                 return Response(
                     {"detail": "Internal server error."},
@@ -423,7 +434,12 @@ class RefreshAPIView(APIView):
             return response
 
         except Exception:
-            logger.exception("Refresh flow failed")
+            logger.exception(
+                "refresh_flow_failed",
+                extra={
+                    "has_refresh_cookie": bool(request.COOKIES.get("refresh")),
+                },
+            )
 
             return Response(
                 {"detail": "Internal server error."},
@@ -455,7 +471,12 @@ class LogoutAPIView(APIView):
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
-            logger.exception("Logout refresh token hashing failed")
+            logger.exception(
+                "logout_refresh_token_hashing_failed",
+                extra={
+                    "has_refresh_cookie": bool(raw_refresh),
+                },
+            )
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -495,8 +516,10 @@ class LogoutAPIView(APIView):
 
         except Exception:
             logger.exception(
-                "Logout session revoke failed",
-                extra={"session_id": str(session.id)},
+                "logout_session_revoke_failed",
+                extra={
+                    "session_id": str(getattr(session, "id", None)),
+                },
             )
             return Response(
                 {"detail": "Internal server error."},
@@ -514,7 +537,13 @@ class LogoutAPIView(APIView):
                 user_agent=user_agent,
             )
         except Exception:
-            logger.warning("Logout audit log failed")
+            logger.warning(
+            "logout_audit_log_failed",
+            extra={
+                "user_id": session.user_id,
+                "session_id": str(session.id),
+            },
+        )
 
         response = Response(
             {"detail": "Successfully logged out."},

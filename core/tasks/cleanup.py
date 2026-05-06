@@ -106,6 +106,13 @@ def auto_read_stale_notifications(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+
+        logger.exception(
+            "auto_read_stale_notifications_failed",
+            extra={
+                "task": "auto_read_stale_notifications",
+            },
+        )
         raise
 
     finally:
@@ -175,6 +182,12 @@ def auto_soft_delete_notifications(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+        "auto_soft_delete_notifications_failed",
+            extra={
+                "task": "auto_soft_delete_notifications",
+            },
+        )
         raise
 
     finally:
@@ -185,6 +198,10 @@ def auto_soft_delete_notifications(self):
 def cleanup_notifications(self):
     # Prevent concurrent cleanups
     if not acquire_lock(NOTIFICATION_CLEANUP_LOCK):
+        logger.debug(
+        "cleanup_notifications_skipped_lock",
+        extra={"task": "cleanup_notifications"},
+    )
         return {"skipped": "cleanup already running"}
 
     start_ts = time.monotonic()
@@ -248,6 +265,12 @@ def cleanup_notifications(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+        "cleanup_notifications_failed",
+        extra={
+                "task": "cleanup_notifications",
+            },
+        )
         raise
 
     finally:
@@ -309,6 +332,12 @@ def cleanup_scheduled_task_runs(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "cleanup_scheduled_task_runs_failed",
+            extra={
+                "task": "cleanup_scheduled_task_runs",
+            },
+        )
         raise
 
     finally:
@@ -320,6 +349,10 @@ def cleanup_scheduled_task_runs(self):
 @shared_task(bind=True)
 def cleanup_user_sessions(self):
     if not acquire_lock(USERSESSION_CLEANUP_LOCK):
+        logger.debug(
+            "cleanup_user_sessions_skipped_lock",
+            extra={"task": "cleanup_user_sessions"},
+        )
         return {"skipped": "cleanup already running"}
 
     start_ts = time.monotonic()
@@ -361,6 +394,12 @@ def cleanup_user_sessions(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "cleanup_user_sessions_failed",
+            extra={
+                "task": "cleanup_user_sessions",
+            },
+        )
         raise
 
     finally:
@@ -403,6 +442,13 @@ def expire_user_sessions(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "expire_user_sessions_failed",
+            extra={
+                "task": "expire_user_sessions",
+            },
+        )
+
         raise
 
     finally:

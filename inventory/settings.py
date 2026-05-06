@@ -17,6 +17,9 @@ from datetime import timedelta
 import environ 
 import os
 import sys
+from core.env import validate_required_env_vars
+
+validate_required_env_vars()
 
 IS_TESTING = "test" in sys.argv
 
@@ -43,7 +46,7 @@ if env_file.exists():
 else:
     print(f"Warning: env file not found: {env_file}")
 
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-secret")
+SECRET_KEY = env("SECRET_KEY")
 
 
 
@@ -163,6 +166,8 @@ else:
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
+    "core.middleware.RequestIDMiddleware",
 
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -432,11 +437,9 @@ NOTIF_INFO_PURGE_DAYS = env.int("NOTIF_INFO_PURGE_DAYS", default=3)
 NOTIF_WARNING_PURGE_DAYS = env.int("NOTIF_WARNING_PURGE_DAYS", default=7)
 NOTIF_CRITICAL_PURGE_DAYS = env.int("NOTIF_CRITICAL_PURGE_DAYS", default=30)
 
-try:
-    SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
-    SESSION_ABSOLUTE_HOURS = int(os.environ["SESSION_ABSOLUTE_HOURS"])
-except KeyError as e:
-    raise RuntimeError(f"Missing required env var: {e}")
+SESSION_IDLE_MINUTES = env.int( "SESSION_IDLE_MINUTES", default=30, )
+
+SESSION_ABSOLUTE_HOURS = env.int( "SESSION_ABSOLUTE_HOURS", default=12, )
 
 SESSION_IDLE_TIMEOUT = timedelta(minutes=SESSION_IDLE_MINUTES)
 SESSION_ABSOLUTE_LIFETIME = timedelta(hours=SESSION_ABSOLUTE_HOURS)
@@ -497,3 +500,116 @@ USERSESSION_EXPIRE_CRON=env(
 
 SESSION_EXPIRED_RETENTION_DAYS = env.int("SESSION_EXPIRED_RETENTION_DAYS", default=5)
 SESSION_REVOKED_RETENTION_DAYS = env.int("SESSION_REVOKED_RETENTION_DAYS", default=20)
+
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+# -------------------------------------------------
+# Logging configuration (env-driven)
+# -------------------------------------------------
+
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+
+# --- App log rotation ---
+LOG_FILE_WHEN = env("LOG_FILE_WHEN", default="midnight")
+LOG_FILE_INTERVAL = env.int("LOG_FILE_INTERVAL", default=1)
+LOG_FILE_BACKUP_COUNT = env.int("LOG_FILE_BACKUP_COUNT", default=30)
+
+# --- Error log rotation ---
+LOG_ERROR_WHEN = env("LOG_ERROR_WHEN", default="midnight")
+LOG_ERROR_INTERVAL = env.int("LOG_ERROR_INTERVAL", default=1)
+LOG_ERROR_BACKUP_COUNT = env.int("LOG_ERROR_BACKUP_COUNT", default=30)
+
+# Optional
+LOG_TO_CONSOLE = env.bool("LOG_TO_CONSOLE", default=True)
+
+# --- Logging task config ---
+
+LOG_ARCHIVE_AFTER_DAYS=env.int("LOG_ARCHIVE_AFTER_DAYS", default=7)
+LOG_DELETE_AFTER_DAYS=env.int("LOG_DELETE_AFTER_DAYS", default=7)
+
+
+# Option A: Cron (production)
+LOG_ARCHIVE_CRON = env(
+    "LOG_ARCHIVE_CRON",
+    default="15 2 * * *",
+)
+
+# LOGGING
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "formatters": {
+        "detailed": {
+            "()": "core.logging.SafeExtraFormatter",
+            "format": (
+                "%(asctime)s | %(levelname)s | %(name)s | "
+                "%(filename)s:%(lineno)d (%(funcName)s) | "
+                "%(message)s | request_id=%(request_id)s"
+            ),
+        },
+    },
+
+    "handlers": {
+        **(
+            {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "detailed",
+                    "filters": ["request_id"],
+                }
+            } if LOG_TO_CONSOLE else {}
+        ),
+
+        "file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(LOGS_DIR / "app.log"),
+            "when": LOG_FILE_WHEN,
+            "interval": LOG_FILE_INTERVAL,
+            "backupCount": LOG_FILE_BACKUP_COUNT,
+            "level": LOG_LEVEL,
+            "formatter": "detailed",
+            "filters": ["request_id"],
+            "encoding": "utf-8",
+        },
+
+        "error_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": str(LOGS_DIR / "error.log"),
+            "when": LOG_ERROR_WHEN,
+            "interval": LOG_ERROR_INTERVAL,
+            "backupCount": LOG_ERROR_BACKUP_COUNT,
+            "level": "ERROR",
+            "formatter": "detailed",
+            "filters": ["request_id"],
+            "encoding": "utf-8",
+        },
+    },
+
+    "loggers": {
+        "arms": {
+            "handlers": ["file", "error_file"] + (["console"] if LOG_TO_CONSOLE else []),
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+
+        "django.request": {
+            "handlers": ["error_file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+
+ 
+    "root": {
+        "handlers": ["file", "error_file"],
+        "level": LOG_LEVEL,
+    },
+
+    "filters": {
+        "request_id": {
+            "()": "core.logging.RequestIDFilter",
+        },
+    },
+}

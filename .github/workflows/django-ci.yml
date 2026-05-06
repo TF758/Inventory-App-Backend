@@ -25,8 +25,21 @@ jobs:
       - name: Run Bandit
         run: python -m bandit -r . -c .bandit -ll
 
+      # Twisted is used indirectly via Daphne/Channels.
+      # CVE-2026-42304 affects twisted.names DNS handling.
+      # Current application does not expose DNS services.
+      # Temporary ignore until stable upstream fix is available.
+      #
+      # References:
+      # https://nvd.nist.gov/general/cve-process
+      # https://www.fortinet.com/uk/resources/cyberglossary/cve
+
       - name: Run pip-audit
-        run: python -m pip_audit -r requirements.txt --progress-spinner off
+        run: |
+          python -m pip_audit \
+            -r requirements.txt \
+            --progress-spinner off \
+            --ignore-vuln CVE-2026-42304
 
   tests:
     runs-on: ubuntu-latest

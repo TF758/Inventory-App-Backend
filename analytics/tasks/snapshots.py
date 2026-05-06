@@ -1,14 +1,15 @@
 from celery import shared_task
 from django.utils import timezone
 from sites.models.sites import Department
-
 from django.conf import settings
 import redis
 from core.models.tasks import ScheduledTaskRun
 import time
 from django.db import DatabaseError
-
 from analytics.services.snapshots import generate_daily_auth_metrics, generate_daily_department_snapshot, generate_daily_return_metrics, generate_daily_system_metrics
+import logging
+
+logger = logging.getLogger(__name__)
 
 redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
@@ -37,6 +38,10 @@ def run_daily_system_metrics_snapshot(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "run_daily_system_metrics_snapshot_failed",
+            extra={"task": "run_daily_system_metrics_snapshot"},
+        )
         raise
 
     finally:
@@ -81,6 +86,13 @@ def run_daily_department_snapshots(self):
             except Exception as exc:
                 # Do NOT fail the entire task for one bad department
                 error_count += 1
+                logger.exception(
+                    "run_daily_department_snapshot_department_failed",
+                    extra={
+                        "department_id": department.id,
+                        "task": "run_daily_department_snapshots",
+                    },
+                )
 
         run.status = ScheduledTaskRun.Status.SUCCESS
         run.message = (
@@ -93,6 +105,10 @@ def run_daily_department_snapshots(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "run_daily_department_snapshots_failed",
+            extra={"task": "run_daily_department_snapshots"},
+        )
         raise
 
     finally:
@@ -130,6 +146,10 @@ def run_daily_auth_metrics_snapshot(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "run_daily_auth_metrics_snapshot_failed",
+            extra={"task": "run_daily_auth_metrics_snapshot"},
+        )
         raise
 
     finally:
@@ -164,6 +184,10 @@ def run_daily_return_metrics_snapshot(self):
     except Exception as exc:
         run.status = ScheduledTaskRun.Status.FAILED
         run.message = str(exc)
+        logger.exception(
+            "run_daily_return_metrics_snapshot_failed",
+            extra={"task": "run_daily_return_metrics_snapshot"},
+        )
         raise
 
     finally:
