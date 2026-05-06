@@ -17,6 +17,9 @@ from datetime import timedelta
 import environ 
 import os
 import sys
+from core.env import validate_required_env_vars
+
+validate_required_env_vars()
 
 IS_TESTING = "test" in sys.argv
 
@@ -43,7 +46,7 @@ if env_file.exists():
 else:
     print(f"Warning: env file not found: {env_file}")
 
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-secret")
+SECRET_KEY = env("SECRET_KEY")
 
 
 
@@ -434,11 +437,9 @@ NOTIF_INFO_PURGE_DAYS = env.int("NOTIF_INFO_PURGE_DAYS", default=3)
 NOTIF_WARNING_PURGE_DAYS = env.int("NOTIF_WARNING_PURGE_DAYS", default=7)
 NOTIF_CRITICAL_PURGE_DAYS = env.int("NOTIF_CRITICAL_PURGE_DAYS", default=30)
 
-try:
-    SESSION_IDLE_MINUTES = int(os.environ["SESSION_IDLE_MINUTES"])
-    SESSION_ABSOLUTE_HOURS = int(os.environ["SESSION_ABSOLUTE_HOURS"])
-except KeyError as e:
-    raise RuntimeError(f"Missing required env var: {e}")
+SESSION_IDLE_MINUTES = env.int( "SESSION_IDLE_MINUTES", default=30, )
+
+SESSION_ABSOLUTE_HOURS = env.int( "SESSION_ABSOLUTE_HOURS", default=12, )
 
 SESSION_IDLE_TIMEOUT = timedelta(minutes=SESSION_IDLE_MINUTES)
 SESSION_ABSOLUTE_LIFETIME = timedelta(hours=SESSION_ABSOLUTE_HOURS)

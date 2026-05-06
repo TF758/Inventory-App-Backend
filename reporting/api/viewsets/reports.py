@@ -16,7 +16,6 @@ from reporting.api.serializers.reports import ReportJobSerializer
 from reporting.filters import ReportJobFilter
 from reporting.models.reports import ReportJob
 
-redis_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
 
 
 class DownloadReport(APIView):

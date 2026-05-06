@@ -1,10 +1,10 @@
 # Logging
 
-The Inventory System implements a comprehensive multi-layer logging architecture combining operational system logging with immutable audit trails for security and compliance.
+The Inventory System uses separate application and audit logging systems for monitoring, troubleshooting, and audit tracking.
 
 ## Overview
 
-The logging system operates on two distinct levels:
+The logging system has two parts:
 
 1. **Application Logging**: Operational and debug logs for system monitoring and troubleshooting
 2. **Audit Logging**: Immutable records of user actions and system events for compliance and security
@@ -13,7 +13,7 @@ The logging system operates on two distinct levels:
 
 ### Configuration
 
-Application logging is configured via `settings.py` and environment variables, allowing runtime tuning without code changes.
+Application logging is configured through `settings.py` and environment variables.
 
 #### Environment Variables
 
@@ -74,7 +74,7 @@ Two separate log handlers are configured:
 
 ### Log Format
 
-All logs use a detailed format with structured context:
+All logs use a consistent format:
 
 ```
 %(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d (%(funcName)s) | %(message)s | request_id=%(request_id)s
@@ -92,7 +92,7 @@ The `RequestIDFilter` automatically injects a request ID into every log record:
 
 - Format: `DBG-{10 hex digits}`
 - Set via `RequestIDMiddleware` at request entry
-- Included in every log record for distributed tracing
+- Included in every log record to correlate related requests and events
 - Useful for correlating logs across services
 
 ### Logger Instantiation
@@ -112,13 +112,13 @@ logger.info("import_started", extra={
 })
 ```
 
-All extra fields are automatically captured and included in the structured log output.
+Extra fields are included in the log output automatically.
 
 ## Log Archival and Maintenance
 
 ### Automatic Log Archival
 
-The `archive_logs` Celery task manages log file lifecycle:
+The archive_logs Celery task handles log archival and cleanup:
 
 1. **Detection**: Identifies rotated log files by date pattern
 2. **Archival**: Compresses logs older than `LOG_ARCHIVE_AFTER_DAYS` to `logs/archive/`
@@ -184,7 +184,7 @@ LOG_DELETE_AFTER_DAYS = 7               # Delete archived logs after 7 days
 
 ### Overview
 
-The `AuditLog` model provides immutable, tamper-proof audit trails for all significant user and system actions.
+The `AuditLog` model provides immutable audit records for significant user and system actions.
 
 ### AuditLog Model
 
@@ -283,7 +283,7 @@ The mixin automatically resolves scope hierarchy:
 # If target has department → captures department
 ```
 
-This enables filtering and reporting by organizational unit.
+This allows audit logs to be filtered by department, location, or room.
 
 #### Event Constants
 
@@ -357,7 +357,7 @@ GET /api/audit-logs/?created_at__gte=2026-05-01
 #### Access Control
 
 - Audit logs are read-only (no modification after creation)
-- Typically accessible only to administrators
+- Audit log access should be restricted to administrators.
 - Consider separate database backup for legal holds
 
 ## Scheduled Tasks (ScheduledTaskRun)
@@ -388,7 +388,7 @@ class ScheduledTaskRun(models.Model):
 - `cleanup_notifications` - Soft delete and purge old notifications
 - `cleanup_sessions` - Remove expired user sessions
 - `daily_metrics` - Calculate system metrics
-- Task runs are queryable for monitoring task health
+- Task runs can be queried for failures, execution history, and duration metrics.
 
 ### Monitoring
 
