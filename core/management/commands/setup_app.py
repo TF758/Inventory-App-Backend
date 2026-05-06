@@ -60,7 +60,7 @@ class Command(BaseCommand):
 
             {
                 "label": "🧾 Setup logging maintenance tasks",
-                "command": "setup_logging_tasks",
+                "command": "setup_logger",
                 "skip": options.get("skip_logging", False),
                 "kwargs": {},
             },
