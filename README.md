@@ -138,7 +138,7 @@ Create admin user:
 docker-compose exec api python manage.py createsuperuser
 ```
 
-### Full Application Setup
+### Full Application Setup + Fake Data
 
 The `setup_app` command runs a complete initialization pipeline:
 
@@ -154,8 +154,9 @@ docker-compose exec api python manage.py setup_app
 | 2    | `backfill_public_id_registry` | Ensures all public IDs are registered                       |
 | 3    | `generate_history`            | Creates historical analytics data                           |
 | 4    | `generate_asset_return_data`  | Generates sample return request data                        |
-| 5    | `generate_periodic_data`      | Sets up periodic task data                                  |
+| 5    | `generate_periodic_data`      | Sets up daily anaytics gathering                            |
 | 6    | `setup_db_cleaners`           | Configures automated cleanup schedulers                     |
+| 7    | `setup_loggers`               | Configures system loggers                                   |
 
 **Options:**
 
@@ -202,3 +203,33 @@ The project auto-loads environment files based on runtime context:
 For more details on what each env settign does, see the env README (todo)
 
 When running via Docker, the application defaults to `.env.dev`.
+
+## Logging
+
+The application implements a multi-level logging system for comprehensive observability and audit trails:
+
+### Application Logging (System-level)
+
+The system uses Python's standard logging framework with file rotation and console output. Logs are written to `logs/app.log` and `logs/error.log` with configurable rotation policies.
+
+**Key features:**
+
+- Environment-driven configuration (log level, rotation, retention)
+- Request ID tracking for distributed tracing
+- Automatic log archival after configurable retention period
+- Structured logging with extra context fields
+
+For detailed configuration and setup instructions, see [Logging Documentation](docs/logging.md).
+
+### Audit Logging (Application-level)
+
+User and system actions are tracked via the `AuditLog` model for security and compliance:
+
+- **Immutable Records**: Audit logs cannot be modified or deleted
+- **Event Tracking**: User logins, data modifications, permission changes
+- **Scope Tracking**: Department, location, and room-level context
+- **Metadata Capture**: IP addresses, user agents, request IDs, and custom event data
+
+Audit logs are captured automatically via the `AuditMixin` in viewsets. The `ScheduledTaskRun` model tracks execution of scheduled tasks and maintenance operations, providing visibility into system operations.
+
+For detailed information about audit logging, configuration, and the `AuditMixin`, see [Logging Documentation](docs/logging.md).
