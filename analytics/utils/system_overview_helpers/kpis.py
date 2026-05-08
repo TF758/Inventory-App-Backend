@@ -79,7 +79,7 @@ def build_system_kpis():
         # -------------------------
         # User activity
         # -------------------------
-        "active_users_24h": {
+        "active_users_today": {
             "value": today.active_users_today,
             "delta": safe_delta(
                 today.active_users_today,
@@ -118,7 +118,7 @@ def build_system_kpis():
             ),
         },
 
-        "returns_created_24h": {
+        "requests_created_today": {
             "value": return_today.requests_created_today if return_today else 0,
             "delta": safe_delta(
                 return_today.requests_created_today if return_today else None,
@@ -126,7 +126,7 @@ def build_system_kpis():
             ),
         },
 
-        "returns_processed_24h": {
+        "requests_processed_today": {
             "value": return_today.requests_processed_today if return_today else 0,
             "delta": safe_delta(
                 return_today.requests_processed_today if return_today else None,

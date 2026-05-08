@@ -7,6 +7,7 @@ from assets.api.serializers.accessories import AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from sites.api.serializers.rooms import RoomReadSerializer
 from sites.site_filters import AreaUserFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
@@ -402,3 +403,133 @@ class LocationEquipmentAssignmentViewSet(
         ).filter(
             equipment__room__location__public_id=location_id
         )
+
+class LocationOverviewAssetsView(APIView):
+    """
+    Aggregate preview endpoint for the location overview page.
+
+    Returns lightweight capped datasets for:
+    - users
+    - rooms
+    - equipment
+    - consumables
+    - accessories
+
+    Intended for overview/dashboard UI usage only.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    light_limit = 20
+
+    def get(self, request, public_id):
+        location = get_object_or_404(
+            Location,
+            public_id=public_id,
+        )
+
+        users_qs = (
+            UserPlacement.objects
+            .filter(
+                is_current=True,
+                room__location=location,
+            )
+            .select_related(
+                "user",
+                "room",
+                "room__location",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        rooms_qs = (
+            Room.objects
+            .filter(
+                location=location,
+            )
+            .select_related(
+                "location",
+                "location__department",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        equipment_qs = (
+            Equipment.objects
+            .filter(
+                room__location=location,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        consumables_qs = (
+            Consumable.objects
+            .filter(
+                room__location=location,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        accessories_qs = (
+            Accessory.objects
+            .filter(
+                room__location=location,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .prefetch_related(
+                "assignments",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        return Response({
+        "users": UserAreaSerializer(
+            users_qs,
+            many=True,
+            exclude_department=True,
+            exclude_location=True,
+        ).data,
+
+        "rooms": RoomReadSerializer(
+            rooms_qs,
+            many=True,
+        ).data,
+
+        "equipment": EquipmentSerializer(
+            equipment_qs,
+            many=True,
+            exclude_department=True,
+            exclude_location=True,
+        ).data,
+
+        "consumables": ConsumableAreaReaSerializer(
+            consumables_qs,
+            many=True,
+            exclude_department=True,
+            exclude_location=True,
+        ).data,
+
+        "accessories": AccessoryFullSerializer(
+            accessories_qs,
+            many=True,
+            exclude_department=True,
+            exclude_location=True,
+        ).data,
+    })

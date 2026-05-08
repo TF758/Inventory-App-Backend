@@ -121,8 +121,8 @@ Nginx ─── Reverse Proxy / TLS
 
 ```bash
 git clone <repository-url>
-cd arms-backend
-cp .env.example .env.dev
+cd <into root>
+cp .env.example .env.dev #copy contents of env.example into a new env file .env..dev
 docker-compose up -d
 ```
 

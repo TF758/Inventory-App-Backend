@@ -43,4 +43,6 @@ urlpatterns = [
 
     # --- Room Roles ---
     path( "<str:public_id>/roles/", room_viewsets.RoomRolesViewSet.as_view({"get": "list"}), name="room-roles", ),
+
+    path( "<str:public_id>/overview-assets/", room_viewsets.RoomOverviewAssetsView.as_view(), name="room-asset-overview", ),
 ]

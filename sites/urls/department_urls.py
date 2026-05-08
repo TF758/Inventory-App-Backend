@@ -47,5 +47,8 @@ urlpatterns = [
 
     # --- Department Rooms ---
     path( "<str:public_id>/rooms/", department_viewsets.DepartmentRoomsViewSet.as_view({"get": "list"}), name="department-rooms", ), 
+
+     # --- Department asset overview, aggrgate function for dashbaords ---
+    path( "<str:public_id>/overview-assets/", department_viewsets.DepartmentOverviewAssetsView.as_view(), name="department-asset-overview", ), 
     
 ]

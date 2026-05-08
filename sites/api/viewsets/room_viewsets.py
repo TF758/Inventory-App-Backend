@@ -391,3 +391,131 @@ class RoomEquipmentAssignmentViewSet(
         ).filter(
             equipment__room__public_id=room_id
         )
+
+class RoomOverviewAssetsView(APIView):
+    """
+    Aggregate preview endpoint for the room overview page.
+
+    Returns lightweight capped datasets for:
+    - users
+    - equipment
+    - consumables
+    - accessories
+    - components
+
+    Intended for overview/dashboard UI usage only.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    light_limit = 20
+
+    def get(self, request, public_id):
+        room = get_object_or_404(
+            Room,
+            public_id=public_id,
+        )
+
+        users_qs = (
+            UserPlacement.objects
+            .filter(
+                is_current=True,
+                room=room,
+            )
+            .select_related(
+                "user",
+                "room",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        equipment_qs = (
+            Equipment.objects
+            .filter(
+                room=room,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        consumables_qs = (
+            Consumable.objects
+            .filter(
+                room=room,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        accessories_qs = (
+            Accessory.objects
+            .filter(
+                room=room,
+                is_deleted=False,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+            .prefetch_related(
+                "assignments",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        components_qs = (
+            Component.objects
+            .filter(
+                equipment__room=room,
+            )
+            .select_related(
+                "equipment",
+                "equipment__room",
+            )
+            .order_by("-id")[: self.light_limit]
+        )
+
+        return Response({
+            "users": UserAreaSerializer(
+                users_qs,
+                many=True,
+                exclude_department=True,
+                exclude_location=True,
+                exclude_room=True,
+            ).data,
+
+            "equipment": EquipmentSerializer(
+                equipment_qs,
+                many=True,
+                exclude_department=True,
+                exclude_location=True,
+                exclude_room=True,
+            ).data,
+
+            "consumables": ConsumableAreaReaSerializer(
+                consumables_qs,
+                many=True,
+                exclude_department=True,
+                exclude_location=True,
+                exclude_room=True,
+            ).data,
+
+            "accessories": AccessoryFullSerializer(
+                accessories_qs,
+                many=True,
+                exclude_department=True,
+                exclude_location=True,
+                exclude_room=True,
+            ).data,
+        })
