@@ -126,17 +126,29 @@ cp .env.example .env.dev #copy contents of env.example into a new env file .env.
 docker-compose up -d
 ```
 
+Note: beat won't start because table hasn't been created on DB
+
 Run migrations:
 
 ```bash
 docker-compose exec api python manage.py migrate
 ```
 
-Create admin user:
+Restart Container
+
+```bash
+docker-compose restart
+```
+
+All containers should be running
+
+(optional)Create admin user:
 
 ```bash
 docker-compose exec api python manage.py createsuperuser
 ```
+
+and follow steps
 
 ### Full Application Setup + Fake Data
 
@@ -144,6 +156,22 @@ The `setup_app` command runs a complete initialization pipeline:
 
 ```bash
 docker-compose exec api python manage.py setup_app
+```
+
+## Accessing the Application
+
+Once the containers are running, the API will be available at:
+
+- API Base URL(example): `http://localhost:8000/api/`
+- Django Admin: `http://localhost:8000/admin/`
+- Swagger UI: `http://localhost:8000/docs/`
+- ReDoc: `http://localhost:8000/redoc/`
+- OpenAPI Schema: `http://localhost:8000/schema/`
+
+Example health check:
+
+```bash
+curl http://localhost:8000/api/health/
 ```
 
 **What it does:**
