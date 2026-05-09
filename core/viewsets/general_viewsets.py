@@ -22,7 +22,8 @@ from django.conf import settings
 from core.security_policy import *
 from core.logging import get_logger
 from users.models import User
-from core.services.security.login_failures import validate_user_not_locked, register_failed_login, reset_failed_logins
+from core.services.security.login_failures import validate_user_not_locked, register_failed_login, reset_failed_logins, is_temporarily_locked
+from rest_framework.exceptions import AuthenticationFailed
 
 
 logger = get_logger(__name__)

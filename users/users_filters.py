@@ -1,4 +1,5 @@
 import django_filters
+from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField, Q, Sum, F, Value
 from users.models.users import User
 
@@ -11,6 +12,8 @@ class UserFilter(django_filters.FilterSet):
     is_active = django_filters.BooleanFilter()
     is_system_user = django_filters.BooleanFilter()
     is_locked = django_filters.BooleanFilter()
+
+    is_actually_locked = django_filters.BooleanFilter( method="filter_is_actually_locked" )
 
     last_login = django_filters.DateFromToRangeFilter()
     date_joined = django_filters.DateFromToRangeFilter()
@@ -26,6 +29,7 @@ class UserFilter(django_filters.FilterSet):
             "is_active",
             "is_system_user",
             "is_locked",
+            "is_actually_locked",
             "date_joined",
             "last_login",
             "q",
@@ -57,6 +61,26 @@ class UserFilter(django_filters.FilterSet):
                 "starts_with_order", "lname"
             )
         return queryset
+    
+
+    def filter_is_actually_locked(
+        self,
+        queryset,
+        name,
+        value,
+    ):
+
+        now = timezone.now()
+
+        locked_q = (
+            Q(is_locked=True)
+            | Q(locked_until__gt=now)
+        )
+
+        if value:
+            return queryset.filter(locked_q)
+
+        return queryset.exclude(locked_q)
 
 
     def filter_q(self, queryset, name, value):

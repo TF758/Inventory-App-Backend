@@ -174,13 +174,13 @@ class UserLockViewSet(AuditMixin, viewsets.GenericViewSet):
             public_id=public_id,
         )
 
-        is_temp_locked = (
+        has_lock_state = (
             user.locked_until is not None
         )
 
         if (
             not user.is_locked
-            and not is_temp_locked
+            and not has_lock_state
         ):
 
             return Response(
