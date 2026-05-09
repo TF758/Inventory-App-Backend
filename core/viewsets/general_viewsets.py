@@ -21,11 +21,14 @@ from django.db.models import Q
 from django.conf import settings
 from core.security_policy import *
 from core.logging import get_logger
+from users.models import User
+from core.services.security.login_failures import validate_user_not_locked, register_failed_login, reset_failed_logins
 
 
 logger = get_logger(__name__)
 
 class SessionTokenLoginView(TokenObtainPairView):
+
     serializer_class = SessionTokenLoginViewSerializer
     permission_classes = [AllowAny]
     throttle_classes = [LoginThrottle]
@@ -37,32 +40,156 @@ class SessionTokenLoginView(TokenObtainPairView):
         ip = request.META.get("REMOTE_ADDR")
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
 
-        # -------------------------
-        # Authenticate user
-        # -------------------------
+        email = request.data.get("email")
+
+        # -----------------------------------------
+        # Load security policy
+        # -----------------------------------------
+
+        policy = SecuritySettings.load()
+
+        # -----------------------------------------
+        # Resolve user (if exists)
+        # -----------------------------------------
+
+        user = User.objects.filter(
+            email__iexact=email
+        ).first()
+
+        # -----------------------------------------
+        # Pre-auth lock validation
+        # -----------------------------------------
+
         try:
-            serializer.is_valid(raise_exception=True)
-        except Exception as exc:
+
+            if user:
+                validate_user_not_locked(user)
+
+        except AuthenticationFailed as exc:
+
             AuditLog.objects.create(
-                event_type=AuditLog.Events.LOGIN_FAILED,
-                description="Login failed",
-                metadata={"reason": str(exc)},
+                event_type=AuditLog.Events.ACCOUNT_LOCKED,
+                user=user,
+                user_public_id=str(user.public_id),
+                user_email=user.email,
+                description="Login attempt on locked account",
+                metadata={
+                    "reason": str(exc),
+                    "attempted_login": True,
+                    "lock_type": (
+                        "temporary"
+                        if is_temporarily_locked(user)
+                        else "permanent"
+                    ),
+                },
                 ip_address=ip,
                 user_agent=user_agent,
             )
+
+            raise
+
+        # -----------------------------------------
+        # Authenticate user
+        # -----------------------------------------
+
+        try:
+
+            serializer.is_valid(raise_exception=True)
+
+        except Exception as exc:
+
+            lock_result = None
+
+            # -----------------------------------------
+            # Register failed login attempt
+            # -----------------------------------------
+
+            if user:
+
+                lock_result = register_failed_login(
+                    user=user,
+                    policy=policy,
+                )
+
+            # -----------------------------------------
+            # Failed login audit
+            # -----------------------------------------
+
+            AuditLog.objects.create(
+                event_type=AuditLog.Events.LOGIN_FAILED,
+                user=user,
+                user_public_id=(
+                    str(user.public_id)
+                    if user else ""
+                ),
+                user_email=(
+                    user.email
+                    if user else email
+                ),
+                description="Invalid login credentials",
+                metadata={
+                    "reason": str(exc),
+                },
+                ip_address=ip,
+                user_agent=user_agent,
+            )
+
+            # -----------------------------------------
+            # Account lock audit
+            # -----------------------------------------
+
+            if (
+                lock_result
+                and (
+                    lock_result["temporarily_locked"]
+                    or lock_result["permanently_locked"]
+                )
+            ):
+
+                AuditLog.objects.create(
+                    event_type=AuditLog.Events.ACCOUNT_LOCKED,
+                    user=user,
+                    user_public_id=str(user.public_id),
+                    user_email=user.email,
+                    description="Account locked after failed login attempts",
+                    metadata={
+                        "lock_type": (
+                            "permanent"
+                            if lock_result["permanently_locked"]
+                            else "temporary"
+                        ),
+                        "failed_attempts":
+                        lock_result["failed_attempts"],
+                    },
+                    ip_address=ip,
+                    user_agent=user_agent,
+                )
+
             raise
 
         user = serializer.user
         now = timezone.now()
 
-        # -------------------------
+        # -----------------------------------------
+        # Reset failed login tracking
+        # -----------------------------------------
+
+        reset_failed_logins(user)
+
+        # -----------------------------------------
         # Generate refresh token
-        # -------------------------
+        # -----------------------------------------
+
         raw_refresh = secrets.token_urlsafe(64)
 
         try:
-            hashed_refresh = UserSession.hash_token(raw_refresh)
+
+            hashed_refresh = UserSession.hash_token(
+                raw_refresh
+            )
+
         except Exception:
+
             logger.exception(
                 "refresh_token_hashing_failed",
                 extra={
@@ -70,38 +197,71 @@ class SessionTokenLoginView(TokenObtainPairView):
                     "has_user_agent": bool(user_agent),
                 },
             )
-            raise APIException("Authentication failed.")
 
-        # -------------------------
-        # Create session (atomic)
-        # -------------------------
+            raise APIException(
+                "Authentication failed."
+            )
+
+        # -----------------------------------------
+        # Create session
+        # -----------------------------------------
+
         try:
+
             with transaction.atomic():
 
-                ua_hash = UserSession.hash_user_agent(user_agent)
-                device_name = request.headers.get("X-Device-Name")
+                ua_hash = UserSession.hash_user_agent(
+                    user_agent
+                )
 
-                # Load security policy
-                policy = SecuritySettings.load()
+                device_name = request.headers.get(
+                    "X-Device-Name"
+                )
 
-                # Enforce max concurrent sessions
                 active_sessions = UserSession.objects.filter(
                     user=user,
                     status=UserSession.Status.ACTIVE,
                 ).order_by("created_at")
 
-                if active_sessions.count() >= policy.max_concurrent_sessions:
+                # -----------------------------------------
+                # Enforce concurrent session policy
+                # -----------------------------------------
+
+                if (
+                    active_sessions.count()
+                    >= policy.max_concurrent_sessions
+                ):
+
                     oldest_session = active_sessions.first()
+
                     if oldest_session:
-                        oldest_session.status = UserSession.Status.REVOKED
-                        oldest_session.save(update_fields=["status"])
+
+                        oldest_session.status = (
+                            UserSession.Status.REVOKED
+                        )
+
+                        oldest_session.save(
+                            update_fields=["status"]
+                        )
 
                         AuditLog.objects.create(
-                            event_type=AuditLog.Events.SESSION_REVOKED,
+                            event_type=(
+                                AuditLog.Events
+                                .SESSION_REVOKED
+                            ),
                             user=user,
-                            user_public_id=str(user.public_id),
+                            user_public_id=str(
+                                user.public_id
+                            ),
                             user_email=user.email,
-                            metadata={"reason": "max_concurrent_sessions"},
+                            description=(
+                                "Session revoked due to "
+                                "maximum concurrent sessions"
+                            ),
+                            metadata={
+                                "reason":
+                                "max_concurrent_sessions",
+                            },
                         )
 
                 session = UserSession.objects.create(
@@ -109,36 +269,56 @@ class SessionTokenLoginView(TokenObtainPairView):
                     refresh_token_hash=hashed_refresh,
                     device_name=device_name,
                     last_ip_address=ip,
-                    expires_at=now + get_session_idle_timeout(),
-                    absolute_expires_at=now + get_session_absolute_lifetime(),
+                    expires_at=(
+                        now +
+                        get_session_idle_timeout()
+                    ),
+                    absolute_expires_at=(
+                        now +
+                        get_session_absolute_lifetime()
+                    ),
                     user_agent_hash=ua_hash,
                     ip_address=ip,
                 )
 
         except Exception:
+
             logger.exception(
                 "session_creation_failed",
                 extra={
                     "user_id": user.pk,
-                    "active_sessions_count": active_sessions.count(),
-                    "max_sessions": policy.max_concurrent_sessions,
+                    "max_sessions":
+                    policy.max_concurrent_sessions,
                 },
             )
-            raise APIException("Authentication failed.")
 
-        # -------------------------
+            raise APIException(
+                "Authentication failed."
+            )
+
+        # -----------------------------------------
         # Generate access token
-        # -------------------------
+        # -----------------------------------------
+
         try:
+
             access_token_obj = AccessToken.for_user(user)
 
             access_token_obj.set_exp(
                 lifetime=get_access_token_lifetime()
             )
 
-            access_token_obj["session_id"] = str(session.id)
-            access_token_obj["abs_exp"] = int(session.absolute_expires_at.timestamp())
-            access_token_obj["idle_exp"] = int(session.expires_at.timestamp())
+            access_token_obj["session_id"] = str(
+                session.id
+            )
+
+            access_token_obj["abs_exp"] = int(
+                session.absolute_expires_at.timestamp()
+            )
+
+            access_token_obj["idle_exp"] = int(
+                session.expires_at.timestamp()
+            )
 
             access_token = str(access_token_obj)
 
@@ -149,20 +329,27 @@ class SessionTokenLoginView(TokenObtainPairView):
                 extra={
                     "user_id": user.pk,
                     "session_id": session.id,
-                    },
+                },
             )
-            session.delete()
-            raise APIException("Authentication failed.")
 
-        # -------------------------
+            session.delete()
+
+            raise APIException(
+                "Authentication failed."
+            )
+
+        # -----------------------------------------
         # Update last login
-        # -------------------------
+        # -----------------------------------------
+
         user.last_login = now
+
         user.save(update_fields=["last_login"])
 
-        # -------------------------
+        # -----------------------------------------
         # Successful login audit
-        # -------------------------
+        # -----------------------------------------
+
         AuditLog.objects.create(
             event_type=AuditLog.Events.LOGIN,
             user=user,
@@ -172,17 +359,26 @@ class SessionTokenLoginView(TokenObtainPairView):
             user_agent=user_agent,
         )
 
-        # -------------------------
+        # -----------------------------------------
         # Response
-        # -------------------------
+        # -----------------------------------------
+
         response_data = {
             "access": access_token,
             "public_id": str(user.public_id),
-            "role_id": user.active_role.public_id if user.active_role else None,
-            "force_password_change": user.force_password_change,
+            "role_id": (
+                user.active_role.public_id
+                if user.active_role
+                else None
+            ),
+            "force_password_change":
+            user.force_password_change,
         }
 
-        response = Response(response_data, status=status.HTTP_200_OK)
+        response = Response(
+            response_data,
+            status=status.HTTP_200_OK,
+        )
 
         response.set_cookie(
             key="refresh",
@@ -191,11 +387,13 @@ class SessionTokenLoginView(TokenObtainPairView):
             secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE,
             path="/",
-            max_age=int(get_session_absolute_lifetime().total_seconds()),
+            max_age=int(
+                get_session_absolute_lifetime()
+                .total_seconds()
+            ),
         )
 
-        return response   
-    
+        return response 
 class RefreshAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
