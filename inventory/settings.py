@@ -17,14 +17,12 @@ from datetime import timedelta
 import environ 
 import os
 import sys
-from core.env import validate_required_env_vars
-
-validate_required_env_vars()
 
 IS_TESTING = "test" in sys.argv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 # ------------------------------------------------------------
 # Environment detection & configuration
@@ -47,6 +45,11 @@ else:
     print(f"Warning: env file not found: {env_file}")
 
 SECRET_KEY = env("SECRET_KEY")
+
+from core.env import validate_required_env_vars
+
+validate_required_env_vars()
+
 
 
 
