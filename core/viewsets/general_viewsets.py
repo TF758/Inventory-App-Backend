@@ -395,6 +395,7 @@ class SessionTokenLoginView(TokenObtainPairView):
         )
 
         return response 
+    
 class RefreshAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []

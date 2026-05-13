@@ -13,7 +13,7 @@ urlpatterns = [
     # ----------------------------
     # Core Modules
     # ----------------------------
-    path("", include("users.urls.users_urls")),
     path("self/", include("users.urls.self_profile_urls")),
+    path("", include("users.urls.users_urls")),
 
 ]
