@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.views import APIView
 from core.pagination import FlexiblePagination
 from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
@@ -52,7 +53,43 @@ class SelfUserProfileViewSet(RetrieveModelMixin, GenericViewSet):
 
     def get_object(self):
         return self.queryset.get(pk=self.request.user.pk)
-    
+
+class SelfAssetsOverviewView(APIView):
+    """
+    Lightweight hydration endpoint for self asset dashboard.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+
+        equipment_qs = ( get_user_equipment_with_meta(request.user) .order_by("-assigned_at")[:10] )
+
+        accessories_qs = ( get_user_accessories_with_meta(request.user) .order_by("-assigned_at")[:10] )
+
+        consumables_qs = ( get_user_consumables_with_meta(request.user) .order_by("-assigned_at")[:10] )
+        equipment_data = SelfAssignedEquipmentSerializer( equipment_qs, many=True, ).data
+
+        accessories_data = SelfAccessoryAssignmentSerializer( accessories_qs, many=True, ).data
+
+        consumables_data = SelfConsumableIssueSerializer( consumables_qs, many=True, ).data
+
+        return Response({
+            "equipment": {
+                "count": equipment_qs.count(),
+                "results": equipment_data,
+            },
+
+            "accessories": {
+                "count": accessories_qs.count(),
+                "results": accessories_data,
+            },
+
+            "consumables": {
+                "count": consumables_qs.count(),
+                "results": consumables_data,
+            },
+        })    
 
 class SelfAssignedEquipmentViewSet(ListModelMixin, GenericViewSet):
     """
