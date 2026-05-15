@@ -76,7 +76,9 @@ def generate_daily_system_metrics(for_date=None):
                 ).count(),
 
                 "locked_users": User.objects.filter(
-                    is_locked=True ).count(),
+                    Q(is_locked=True)
+                    | Q(locked_until__gt=timezone.now())
+                ).count(),
 
                 # -------------------------
                 # Session metrics
@@ -414,11 +416,9 @@ def generate_daily_auth_metrics(for_date=None):
                 "unique_users_logged_in":
                     AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN, created_at__range=(start, end) ).values("user_id").distinct().count(),
 
-                "failed_logins":
-                    AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN_FAILED, created_at__range=(start, end) ).count(),
+                "failed_logins": AuditLog.objects.filter( event_type=AuditLog.Events.LOGIN_FAILED, created_at__gte=start, created_at__lt=end, ).count(),
 
-                "lockouts":
-                    AuditLog.objects.filter( event_type=AuditLog.Events.ACCOUNT_LOCKED, created_at__range=(start, end) ).count(),
+                "lockouts": AuditLog.objects.filter( event_type=AuditLog.Events.ACCOUNT_LOCKED, created_at__gte=start, created_at__lt=end, ).count(),
 
                 # ------------------------
                 # Session metrics
@@ -436,14 +436,16 @@ def generate_daily_auth_metrics(for_date=None):
                 "revoked_sessions_today":
                     AuditLog.objects.filter(
                         event_type=AuditLog.Events.SESSION_REVOKED,
-                        created_at__range=(start, end),
+                        created_at__gte=start,
+                        created_at__lt=end,
                     ).count(),
 
                 # Expired = event-based (from AuditLog)
                 "expired_sessions":
                     AuditLog.objects.filter(
                         event_type=AuditLog.Events.SESSION_EXPIRED,
-                        created_at__range=(start, end),
+                        created_at__gte=start,
+                        created_at__lt=end,
                     ).count(),
 
                 # Users with multiple sessions (still overlap-based)
@@ -471,14 +473,16 @@ def generate_daily_auth_metrics(for_date=None):
                 "password_resets_started":
                     AuditLog.objects.filter(
                         event_type=AuditLog.Events.PASSWORD_RESET_REQUESTED,
-                        created_at__range=(start, end),
+                        created_at__gte=start,
+                        created_at__lt=end,
                     ).count(),
 
 
                 "password_resets_completed":
                     AuditLog.objects.filter(
                         event_type=AuditLog.Events.PASSWORD_RESET_COMPLETED,
-                        created_at__range=(start, end),
+                        created_at__gte=start,
+                        created_at__lt=end,
                     ).count(),
 
                 "active_password_resets":

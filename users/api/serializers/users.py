@@ -7,16 +7,60 @@ from django.db import transaction
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 class UserReadSerializerFull(serializers.ModelSerializer):
-    """Serilziers known information about a user"""
 
-    current_role = serializers.CharField(source='active_role.get_role_id', read_only=True)
+    current_role = serializers.CharField(
+        source="active_role.get_role_id",
+        read_only=True,
+    )
+
+    is_actually_locked = serializers.SerializerMethodField()
 
     class Meta:
         model = User
+
         fields = [
-            'public_id',  'email', 'fname', 'lname', 'job_title', 'last_login', 'is_active', 'is_locked', 'current_role', 'force_password_change',
+            "public_id",
+
+            "email",
+            "fname",
+            "lname",
+
+            "job_title",
+
+            "last_login",
+
+            "is_active",
+            "is_locked",
+
+            "is_actually_locked",
+
+            "failed_login_attempts",
+            "locked_until",
+            "locked_reason",
+
+            "current_role",
+
+            "force_password_change",
         ]
-        read_only_fields = ('public_id', 'last_login')
+
+        read_only_fields = (
+            "public_id",
+            "last_login",
+            "is_actually_locked",
+            "failed_login_attempts",
+            "locked_until",
+            "locked_reason",
+        )
+
+    def get_is_actually_locked(self, obj):
+
+        return (
+            obj.is_locked
+            or (
+                obj.locked_until is not None
+                and obj.locked_until > timezone.now()
+            )
+        )
 
 
 class UserWriteSerializer(serializers.ModelSerializer):

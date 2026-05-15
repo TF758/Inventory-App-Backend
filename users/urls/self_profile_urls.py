@@ -13,7 +13,7 @@ urlpatterns = [
     # User Viewing thier own profile and assets
 
     path( "", self_viewsets.SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile" ),
-
+    path( "assets-overview/", self_viewsets.SelfAssetsOverviewView.as_view(), name="self-assets-overview", ),
     path( "assets/", self_viewsets.SelfAllAssetsViewSet.as_view({"get": "list"}), name="self-user-assets", ),
 
     path( "assets/return/", asset_returns_viewset.MixedAssetReturnViewSet.as_view({"post": "create"}), name="self-return-assets", ),

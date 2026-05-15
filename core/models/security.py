@@ -4,21 +4,38 @@ from django.utils import timezone
 from django.core.cache import cache
 from users.models.users import User
 
-
 class SecuritySettings(models.Model):
     """
     Global security policy configuration (singleton).
     """
+
+    # ---------------------------------------------------
+    # Session Security
+    # ---------------------------------------------------
 
     session_idle_minutes = models.PositiveIntegerField(default=30)
     session_absolute_hours = models.PositiveIntegerField(default=12)
 
     max_concurrent_sessions = models.PositiveIntegerField(default=5)
 
-    lockout_attempts = models.PositiveIntegerField(default=5)
-    lockout_duration_minutes = models.PositiveIntegerField(default=15)
-
     revoke_sessions_on_password_change = models.BooleanField(default=True)
+
+    # ---------------------------------------------------
+    # Login Protection
+    # ---------------------------------------------------
+
+    enable_account_lockout = models.BooleanField( default=False, help_text="Temporarily lock accounts after repeated failed logins." )
+    lockout_attempts = models.PositiveIntegerField( default=5, help_text="Failed attempts before temporary lockout." )
+
+    lockout_duration_minutes = models.PositiveIntegerField( default=15, help_text="Temporary lockout duration." )
+
+    reset_failed_attempts_after_minutes = models.PositiveIntegerField( default=30, help_text="Rolling window for failed login attempts." )
+
+    permanent_lock_threshold = models.PositiveIntegerField( default=20, help_text="Escalate to admin unlock after repeated abuse." )
+
+    # ---------------------------------------------------
+    # Audit / Metadata
+    # ---------------------------------------------------
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -32,10 +49,10 @@ class SecuritySettings(models.Model):
         """
         Enforce singleton behavior.
         """
-        self.pk = 1  # force primary key
+        self.pk = 1
+
         super().save(*args, **kwargs)
 
-        # invalidate cache
         cache.delete(self.CACHE_KEY)
 
     def delete(self, *args, **kwargs):
@@ -54,14 +71,14 @@ class SecuritySettings(models.Model):
         if settings_obj:
             return settings_obj
 
-        obj, created = cls.objects.get_or_create(pk=1)
+        obj, _ = cls.objects.get_or_create(pk=1)
+
         cache.set(cls.CACHE_KEY, obj, 300)
 
         return obj
 
     def __str__(self):
         return "System Security Settings"
-
 
 class PasswordResetEvent(models.Model):
     user = models.ForeignKey(User,on_delete=models.CASCADE,related_name="password_reset_events")

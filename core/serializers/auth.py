@@ -358,12 +358,22 @@ class NotificationSerializer(serializers.ModelSerializer):
         }
 
 class SecuritySettingsSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = SecuritySettings
+
         fields = [
             "session_idle_minutes",
             "session_absolute_hours",
+
             "max_concurrent_sessions",
+
+            "enable_account_lockout",
+
             "lockout_attempts",
             "lockout_duration_minutes",
+
+            "permanent_lock_threshold",
+
+            "reset_failed_attempts_after_minutes",
         ]

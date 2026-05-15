@@ -70,7 +70,15 @@ class SecuritySettingsAPIView(APIView):
 class UserLockViewSet(AuditMixin, viewsets.GenericViewSet):
     """
     Admin-only ViewSet to lock or unlock user accounts.
-    Locking automatically revokes all active sessions.
+
+    Locking:
+    - revokes all active sessions
+    - prevents future logins
+    - blocks active authenticated sessions
+
+    Unlocking:
+    - clears all lock state
+    - resets failed login tracking
     """
 
     queryset = User.objects.all()
@@ -79,61 +87,151 @@ class UserLockViewSet(AuditMixin, viewsets.GenericViewSet):
     @action(detail=True, methods=["post"])
     def lock(self, request, public_id=None):
 
-        user = get_object_or_404(User, public_id=public_id)
+        user = get_object_or_404(
+            User,
+            public_id=public_id,
+        )
 
         if user.is_locked:
+
             return Response(
-                {"detail": "User account is already locked."},
+                {
+                    "detail":
+                    "User account is already locked."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.is_locked = True
-        user.save(update_fields=["is_locked"])
+        reason = request.data.get(
+            "reason",
+            "Locked by administrator",
+        )
 
-        # revoke active sessions
+        # -----------------------------------------
+        # Apply administrative lock
+        # -----------------------------------------
+
+        user.is_locked = True
+        user.locked_reason = reason
+
+        # Clear temporary lock state
+        user.locked_until = None
+        user.failed_login_attempts = 0
+        user.last_failed_login_at = None
+
+        user.save(update_fields=[
+            "is_locked",
+            "locked_reason",
+            "locked_until",
+            "failed_login_attempts",
+            "last_failed_login_at",
+        ])
+
+        # -----------------------------------------
+        # Revoke active sessions
+        # -----------------------------------------
+
         revoked = UserSession.objects.filter(
             user=user,
-            status=UserSession.Status.ACTIVE
-        ).update(status=UserSession.Status.REVOKED)
+            status=UserSession.Status.ACTIVE,
+        ).update(
+            status=UserSession.Status.REVOKED
+        )
 
-        # audit event
+        # -----------------------------------------
+        # Audit event
+        # -----------------------------------------
+
         self.audit(
             event_type=AuditLog.Events.ACCOUNT_LOCKED,
             target=user,
-            description="User account locked by administrator",
+            description=(
+                "User account locked "
+                "by administrator"
+            ),
             metadata={
-                "revoked_sessions": revoked
+                "lock_type": "administrative",
+                "reason": reason,
+                "revoked_sessions": revoked,
             },
         )
 
         return Response(
-            {"detail": f"User {user.email} has been locked and logged out."},
+            {
+                "detail": (
+                    f"User {user.email} has been "
+                    "locked and logged out."
+                )
+            },
             status=status.HTTP_200_OK,
         )
 
     @action(detail=True, methods=["post"])
     def unlock(self, request, public_id=None):
 
-        user = get_object_or_404(User, public_id=public_id)
+        user = get_object_or_404(
+            User,
+            public_id=public_id,
+        )
 
-        if not user.is_locked:
+        has_lock_state = (
+            user.locked_until is not None
+        )
+
+        if (
+            not user.is_locked
+            and not has_lock_state
+        ):
+
             return Response(
-                {"detail": "User account is not locked."},
+                {
+                    "detail":
+                    "User account is not locked."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.is_locked = False
-        user.save(update_fields=["is_locked"])
+        # -----------------------------------------
+        # Clear all lock state
+        # -----------------------------------------
 
-        # audit event
+        user.is_locked = False
+        user.locked_until = None
+        user.failed_login_attempts = 0
+        user.last_failed_login_at = None
+        user.locked_reason = ""
+
+        user.save(update_fields=[
+            "is_locked",
+            "locked_until",
+            "failed_login_attempts",
+            "last_failed_login_at",
+            "locked_reason",
+        ])
+
+        # -----------------------------------------
+        # Audit event
+        # -----------------------------------------
+
         self.audit(
             event_type=AuditLog.Events.ACCOUNT_UNLOCKED,
             target=user,
-            description="User account unlocked by administrator",
+            description=(
+                "User account unlocked "
+                "by administrator"
+            ),
+            metadata={
+                "unlock_type": "administrative",
+            },
         )
 
         return Response(
-            {"detail": f"User {user.email} has been unlocked."},
+            {
+                "detail": (
+                    f"User {user.email} "
+                    "has been unlocked."
+                )
+            },
             status=status.HTTP_200_OK,
         )
 

@@ -81,7 +81,74 @@ class SessionTokenLoginViewTests(TestCase):
             sessions[1].user_agent_hash,
         )
 
+    def test_failed_login_increments_counter(
+            self,
+            ):
 
+            user = self._create_active_user()
+
+            response = self.client.post(
+                self.url,
+                {
+                    "email": user.email,
+                    "password": "WrongPassword!",
+                },
+                format="json",
+            )
+
+            self.assertEqual(
+                response.status_code,
+                401,
+            )
+
+            user.refresh_from_db()
+
+            self.assertEqual(
+                user.failed_login_attempts,
+                1,
+            )
+
+            self.assertIsNotNone(
+                user.last_failed_login_at,
+            )
+
+    def test_successful_login_resets_failed_login_tracking( self, ):
+
+        user = self._create_active_user()
+
+        user.failed_login_attempts = 3
+
+        user.save(
+            update_fields=[
+                "failed_login_attempts",
+            ],
+        )
+
+        response = self.client.post(
+            self.url,
+            {
+                "email": user.email,
+                "password": "StrongPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        user.refresh_from_db()
+
+        self.assertEqual(
+            user.failed_login_attempts,
+            0,
+        )
+
+        self.assertIsNone(
+            user.last_failed_login_at,
+        )
+        
 @mock.patch(
     "core.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
     new=[]

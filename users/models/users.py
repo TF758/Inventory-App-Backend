@@ -49,6 +49,15 @@ class User(AbstractBaseUser, PermissionsMixin, PublicIDModel):
     date_joined = models.DateTimeField(default=timezone.now)
     last_login = models.DateTimeField(blank=True, null=True)
 
+    failed_login_attempts = models.PositiveIntegerField(default=0)
+
+    last_failed_login_at = models.DateTimeField( null=True, blank=True, )
+
+    locked_until = models.DateTimeField( null=True, blank=True, )
+
+    locked_reason = models.CharField( max_length=255, blank=True, )
+
+    locked_by = models.ForeignKey( "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="locked_users", )
     objects = CustomUserManager()
 
     USERNAME_FIELD = 'email'
@@ -65,6 +74,18 @@ class User(AbstractBaseUser, PermissionsMixin, PublicIDModel):
         models.Index(fields=["role"]),
         models.Index(fields=["is_active"]),
     ]
+
+    @property
+    def is_temporarily_locked(self):
+        return (
+            self.locked_until is not None
+            and self.locked_until > timezone.now()
+        )
+
+
+    @property
+    def is_account_locked(self):
+        return self.is_locked or self.is_temporarily_locked
 
 
     def __str__(self):

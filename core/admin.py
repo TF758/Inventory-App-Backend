@@ -90,6 +90,8 @@ class SecuritySettingsAdmin(admin.ModelAdmin):
         "max_concurrent_sessions",
         "lockout_attempts",
         "lockout_duration_minutes",
+        "enable_account_lockout",
+        "permanent_lock_threshold",
     )
 
     fieldsets = (
@@ -107,9 +109,12 @@ class SecuritySettingsAdmin(admin.ModelAdmin):
         (
             "Account Security",
             {
-                "fields": (
+                 "fields": (
+                    "enable_account_lockout",
                     "lockout_attempts",
                     "lockout_duration_minutes",
+                    "permanent_lock_threshold",
+                    "reset_failed_attempts_after_minutes",
                 )
             },
         ),
@@ -341,25 +346,136 @@ class RoleAssignmentAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+
     ordering = ("email",)
-    list_display = ("email", "fname", "lname","active_role", "public_id", "is_active",'is_locked', "created_by","is_system_user", "force_password_change" )
-    search_fields = ("email", "fname", "lname", "public_id")
-    readonly_fields = ("public_id",)
+
+    list_display = (
+        "email",
+        "fname",
+        "lname",
+        "active_role",
+        "public_id",
+        "is_active",
+        "is_locked",
+        "failed_login_attempts",
+        "locked_until",
+        "created_by",
+        "is_system_user",
+        "force_password_change",
+    )
+
+    list_filter = (
+        "is_active",
+        "is_locked",
+        "is_staff",
+        "is_superuser",
+        "is_system_user",
+        "force_password_change",
+    )
+
+    search_fields = (
+        "email",
+        "fname",
+        "lname",
+        "public_id",
+    )
+
+    readonly_fields = (
+        "public_id",
+        "failed_login_attempts",
+        "last_failed_login_at",
+        "locked_until",
+    )
 
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
-        ("Personal info", {"fields": ("fname", "lname", "job_title", "role")}),
-        ("Permissions", {"fields": ("is_active", 'is_locked', "is_staff", "is_superuser", "groups", "user_permissions")}),
-        ("Important dates", {"fields": ("last_login", "date_joined")}),
+        (
+            None,
+            {
+                "fields": (
+                    "email",
+                    "password",
+                )
+            },
+        ),
+
+        (
+            "Personal info",
+            {
+                "fields": (
+                    "fname",
+                    "lname",
+                    "job_title",
+                    "role",
+                )
+            },
+        ),
+
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
+
+        (
+            "Security",
+            {
+                "fields": (
+                    "is_locked",
+                    "locked_reason",
+                    "failed_login_attempts",
+                    "last_failed_login_at",
+                    "locked_until",
+                    "force_password_change",
+                )
+            },
+        ),
+
+        (
+            "System",
+            {
+                "fields": (
+                    "public_id",
+                    "created_by",
+                    "is_system_user",
+                )
+            },
+        ),
+
+        (
+            "Important dates",
+            {
+                "fields": (
+                    "last_login",
+                    "date_joined",
+                )
+            },
+        ),
     )
 
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": ("email", "fname", "lname", "password1", "password2", "is_staff", "is_superuser"),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "email",
+                    "fname",
+                    "lname",
+                    "password1",
+                    "password2",
+                    "is_staff",
+                    "is_superuser",
+                ),
+            },
+        ),
     )
-
 
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
