@@ -5,6 +5,7 @@ from rest_framework import status, views
 from django.db import transaction
 from core.models.audit import AuditLog
 from assets.api.serializers.equipment import EquipmentSerializer
+from assignments.assignment_filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter
 from sites.site_filters import UserPlacementFilter
 from users.users_filters import UserFilter
 from users.models.roles import RoleAssignment
@@ -449,10 +450,63 @@ class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
         )
 
         return queryset
-    
+
+class UserAssetsAggregateView(APIView):
+    permission_classes = [UserPermission]
+
+    def get(self, request, user_public_id):
+
+        user = get_user(user_public_id)
+
+        equipment_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_equipment(user),
+            "room"
+        )
+
+        accessory_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_accessories(user),
+            "accessory__room"
+        )
+
+        consumable_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_consumables(user),
+            "consumable__room"
+        )
+
+        equipment_data = EquipmentSerializer(
+            equipment_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        accessory_data = UserAccessoryAssignmentSerializer(
+            accessory_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        consumable_data = UserConsumableIssueSerializer(
+            consumable_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        return Response({
+            "equipment": equipment_data,
+            "accessories": accessory_data,
+            "consumables": consumable_data,
+        })
+        
 class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = EquipmentSerializer
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfEquipmentFilter
+
 
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
@@ -470,6 +524,9 @@ class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserAccessoryAssignmentSerializer
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfAccessoryFilter
 
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
@@ -494,6 +551,9 @@ class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericView
 class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserConsumableIssueSerializer
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfConsumableFilter
 
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])

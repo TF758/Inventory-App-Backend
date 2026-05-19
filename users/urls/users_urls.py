@@ -27,6 +27,8 @@ urlpatterns = [
     # Profile
     path("profile/<str:public_id>/", user_viewsets.UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
 
+    path("<str:user_public_id>/assets/", user_viewsets.UserAssetsAggregateView.as_view(), name="user-assets"),
+
     # Assets
     path("<str:user_public_id>/equipment/", user_viewsets.UserEquipmentViewSet.as_view({"get": "list"})),
     path("<str:user_public_id>/accessories/", user_viewsets.UserAccessoryAssignmentViewSet.as_view({"get": "list"})),
