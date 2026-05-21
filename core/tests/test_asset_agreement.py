@@ -19,9 +19,7 @@ class AssetAgreementPermissionTests(TestCase):
         self.location = LocationFactory(department=self.department)
         self.room = RoomFactory(location=self.location)
 
-        self.agreement = AssetAgreementFactory(
-            department=self.department
-        )
+        self.agreement = AssetAgreementFactory( department=self.department )
 
         self.list_url = reverse("agreements")
 
@@ -50,11 +48,8 @@ class AssetAgreementPermissionTests(TestCase):
     def test_room_admin_can_view_agreements(self):
 
         user = UserFactory()
-
         self._assign_role(user, "ROOM_ADMIN", room=self.room)
-
         response = self.client.get(self.list_url)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_room_admin_cannot_create_agreement(self):
@@ -87,21 +82,17 @@ class AssetAgreementPermissionTests(TestCase):
     def test_location_admin_cannot_delete_agreement(self):
 
         user = UserFactory()
-
         self._assign_role(user, "LOCATION_ADMIN", location=self.location)
 
         response = self.client.delete(self.detail_url)
-
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_department_admin_can_delete_agreement(self):
 
         user = UserFactory()
-
         self._assign_role(user, "DEPARTMENT_ADMIN", department=self.department)
 
         response = self.client.delete(self.detail_url)
-
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
 class AssetAgreementScopeTests(TestCase):
@@ -116,9 +107,7 @@ class AssetAgreementScopeTests(TestCase):
         self.location = LocationFactory(department=self.department)
         self.room = RoomFactory(location=self.location)
 
-        self.agreement = AssetAgreementFactory(
-            department=self.department
-        )
+        self.agreement = AssetAgreementFactory( department=self.department )
 
         self.url = reverse("agreements")
 
