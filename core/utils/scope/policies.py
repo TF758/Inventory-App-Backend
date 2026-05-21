@@ -313,6 +313,7 @@ class AssetAgreementItemScopePolicy(BaseScopePolicy):
     """
 
     def apply(self):
+
         if self.scope.is_site_admin():
             return self.queryset
 
@@ -320,13 +321,32 @@ class AssetAgreementItemScopePolicy(BaseScopePolicy):
             return self.queryset.none()
 
         if self.scope.level == "room":
-            q = Q(agreement__room=self.scope.obj)
+
+            q = Q(
+                agreement__room=self.scope.obj
+            )
 
         elif self.scope.level == "location":
-            q = Q(agreement__location=self.scope.obj)
+
+            q = (
+                Q(agreement__location=self.scope.obj)
+                |
+                Q(agreement__room__location=self.scope.obj)
+            )
 
         elif self.scope.level == "department":
-            q = Q(agreement__department=self.scope.obj)
+
+            q = (
+                Q(agreement__department=self.scope.obj)
+                |
+                Q(
+                    agreement__location__department=self.scope.obj
+                )
+                |
+                Q(
+                    agreement__room__location__department=self.scope.obj
+                )
+            )
 
         else:
             return self.queryset.none()
