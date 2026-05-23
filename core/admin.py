@@ -2,22 +2,14 @@ from django.contrib import admin
 
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from django.contrib.contenttypes.admin import GenericTabularInline
 from core.security_policy import invalidate_security_policy_cache
-from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
-from assets.models.assets import Accessory, Component, Consumable, Equipment
-from assets.models.agreements import AssetAgreement, AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreementItem
 from core.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
 from core.models.base import PublicIDRegistry
 from core.models.notifications import Notification
 from core.models.security import PasswordResetEvent, SecuritySettings
 from core.models.sessions import UserSession
 from core.models.tasks import ScheduledTaskRun
-from sites.models.sites import Department, Location, Room, UserPlacement
-from users.models.roles import RoleAssignment
-from users.models.users import User
 
-# Simple models
 
 
 

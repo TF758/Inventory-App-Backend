@@ -1,7 +1,7 @@
 from rest_framework.permissions import BasePermission
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.models.assets import Equipment
-from assets.models.agreements import AssetAgreement, AssetAgreementItem
+from agreements.models.agreements import AssetAgreement, AssetAgreementItem
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from sites.models.sites import Department, Location, Room

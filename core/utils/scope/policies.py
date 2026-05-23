@@ -4,7 +4,7 @@ from assets.models.assets import Accessory,Component, Consumable, Equipment
 from assignments.models.asset_assignment import ReturnRequest
 from core.models.audit import AuditLog
 from core.utils.scope.base import BaseScopePolicy
-from assets.models.agreements import AgreementCoverage, AssetAgreement, AssetAgreementItem
+from agreements.models.agreements import AgreementCoverage, AssetAgreement, AssetAgreementItem
 from sites.models.sites import Department, Location, Room, UserPlacement
 
 from users.models.roles import RoleAssignment
