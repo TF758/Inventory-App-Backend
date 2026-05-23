@@ -11,6 +11,7 @@ class Command(BaseCommand):
 
         steps = [
             ("Government / site data", "generate_govt_data"),
+            ( "Agreement data", "generate_agreement_data", ),
             ("Equipment history", "generate_equipment_history"),
             ("Accessory history", "generate_accessory_history"),
             ("Consumable data", "generate_consumable_history"),
