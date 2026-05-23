@@ -1,6 +1,6 @@
 
 from core.mixins import ScopeFilterMixin
-from assets.models.assets import AssetAgreement, AssetAgreementItem
+from assets.models.agreements import AssetAgreement, AssetAgreementItem
 from core.serializers.agreement import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, AssetAgreementSerializer, AssetAgreementWriteSerializer
 from rest_framework import viewsets
 from rest_framework.decorators import action
