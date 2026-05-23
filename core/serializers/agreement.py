@@ -2,8 +2,9 @@
 from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
+from assets.models.assets import Accessory, Consumable, Equipment
 from core.permissions.helpers import has_asset_custody_scope
+from assets.models.agreements import AssetAgreement, AssetAgreementItem
 from sites.models.sites import Department, Location, Room
 
 

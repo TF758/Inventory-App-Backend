@@ -5,7 +5,8 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.admin import GenericTabularInline
 from core.security_policy import invalidate_security_policy_cache
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent, ReturnRequest, ReturnRequestItem
-from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
+from assets.models.assets import Accessory, Component, Consumable, Equipment
+from assets.models.agreements import AssetAgreement, AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreementItem
 from core.models.audit import AuditLog, SiteNameChangeHistory, SiteRelocationHistory
 from core.models.base import PublicIDRegistry
 from core.models.notifications import Notification
@@ -657,64 +658,3 @@ class AuditLogAdmin(admin.ModelAdmin):
     #     # No department → restrict 
 
     # -----------------------------
-# Agreement Items Inline
-# -----------------------------
-
-class AssetAgreementItemInline(admin.TabularInline):
-
-    model = AssetAgreementItem
-    extra = 1
-
-    autocomplete_fields = [
-        "equipment",
-        "consumable",
-        "accessory",
-    ]
-
-    fields = (
-        "equipment",
-        "consumable",
-        "accessory",
-        "quantity",
-    )
-
-
-# -----------------------------
-# Agreement Admin
-# -----------------------------
-
-@admin.register(AssetAgreement)
-class AssetAgreementAdmin(admin.ModelAdmin):
-
-    list_display = (
-        "public_id",
-        "name",
-        "agreement_type",
-        "vendor",
-        "expiry_date",
-        "department",
-        "location",
-        "room",
-    )
-
-    list_filter = (
-        "agreement_type",
-      
-    )
-
-    search_fields = (
-        "public_id",
-        "name",
-        "vendor",
-        "reference_number",
-    )
-
-    readonly_fields = (
-        "public_id",
-    )
-
-    inlines = [
-        AssetAgreementItemInline
-    ]
-
-    ordering = ("-start_date",)

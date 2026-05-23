@@ -1,9 +1,10 @@
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment
+from assets.models.assets import Accessory,Component, Consumable, Equipment
 from assignments.models.asset_assignment import ReturnRequest
 from core.models.audit import AuditLog
 from core.utils.scope.base import BaseScopePolicy
+from assets.models.agreements import AgreementCoverage, AssetAgreement, AssetAgreementItem
 from sites.models.sites import Department, Location, Room, UserPlacement
 
 from users.models.roles import RoleAssignment
@@ -241,34 +242,6 @@ class RoleAssignmentScopePolicy(BaseScopePolicy):
 
         return self.queryset.none()
 
-
-@register(AssetAgreement)
-class AssetAgreementScopePolicy(BaseScopePolicy):
-
-    def apply(self):
-        if self.scope.is_site_admin():
-            return self.queryset
-
-        role = self.role
-
-        if role.room:
-            return self.queryset.filter(room=role.room).distinct()
-
-        if role.location:
-            return self.queryset.filter(
-                Q(location=role.location) |
-                Q(room__location=role.location)
-            ).distinct()
-
-        if role.department:
-            return self.queryset.filter(
-                Q(department=role.department)
-                | Q(location__department=role.department)
-                | Q(room__location__department=role.department)
-            ).distinct()
-
-        return self.queryset.none()
-
 @register(ReturnRequest)
 class ReturnRequestScopePolicy(BaseScopePolicy):
     """
@@ -298,54 +271,6 @@ class ReturnRequestScopePolicy(BaseScopePolicy):
             q = Q(
                 requester__user_placements__is_current=True,
                 requester__user_placements__room__location__department=self.scope.obj,
-            )
-
-        else:
-            return self.queryset.none()
-
-        return self.queryset.filter(q).distinct()
-
-
-@register(AssetAgreementItem)
-class AssetAgreementItemScopePolicy(BaseScopePolicy):
-    """
-    Scope agreement items through their parent agreement.
-    """
-
-    def apply(self):
-
-        if self.scope.is_site_admin():
-            return self.queryset
-
-        if not self.scope.level:
-            return self.queryset.none()
-
-        if self.scope.level == "room":
-
-            q = Q(
-                agreement__room=self.scope.obj
-            )
-
-        elif self.scope.level == "location":
-
-            q = (
-                Q(agreement__location=self.scope.obj)
-                |
-                Q(agreement__room__location=self.scope.obj)
-            )
-
-        elif self.scope.level == "department":
-
-            q = (
-                Q(agreement__department=self.scope.obj)
-                |
-                Q(
-                    agreement__location__department=self.scope.obj
-                )
-                |
-                Q(
-                    agreement__room__location__department=self.scope.obj
-                )
             )
 
         else:
@@ -420,5 +345,184 @@ class UserScopePolicy(BaseScopePolicy):
                 active_role__isnull=True,
                 created_by__role_assignments__department=self.role.department,
             )
+
+        return self.queryset.filter(q).distinct()
+
+@register(AssetAgreement)
+class AssetAgreementScopePolicy(BaseScopePolicy):
+
+    def apply(self):
+        if self.scope.is_site_admin():
+            return self.queryset
+        role = self.role
+        if role.room:
+            q = (
+                Q(
+                    coverages__scope_type="GLOBAL"
+                )
+                |
+                Q(
+                    coverages__room=role.room
+                )
+                |
+                Q(
+                    coverages__location=role.room.location
+                )
+                |
+                Q(
+                    coverages__department=role.room.location.department
+                )
+            )
+
+        elif role.location:
+
+            q = (
+                Q(
+                    coverages__scope_type="GLOBAL"
+                )
+                |
+                Q(
+                    coverages__location=role.location
+                )
+                |
+                Q(
+                    coverages__department=role.location.department
+                )
+            )
+
+        elif role.department:
+
+            q = (
+                Q(
+                    coverages__scope_type="GLOBAL"
+                )
+                |
+                Q(
+                    coverages__department=role.department
+                )
+            )
+
+        else:
+            return self.queryset.none()
+
+        return self.queryset.filter(q).distinct()
+
+@register(AssetAgreementItem)
+class AssetAgreementItemScopePolicy(BaseScopePolicy):
+
+    def apply(self):
+
+        if self.scope.is_site_admin():
+            return self.queryset
+
+        role = self.role
+
+        if role.room:
+
+            q = (
+                Q(
+                    agreement__coverages__scope_type="GLOBAL"
+                )
+                |
+                Q(
+                    agreement__coverages__room=role.room
+                )
+                |
+                Q(
+                    agreement__coverages__location=role.room.location
+                )
+                |
+                Q(
+                    agreement__coverages__department=
+                    role.room.location.department
+                )
+            )
+
+        elif role.location:
+
+            q = (
+                Q(
+                    agreement__coverages__scope_type="GLOBAL"
+                )
+                |
+                Q(
+                    agreement__coverages__location=role.location
+                )
+                |
+                Q(
+                    agreement__coverages__department=
+                    role.location.department
+                )
+            )
+
+        elif role.department:
+
+            q = (
+                Q(
+                    agreement__coverages__scope_type="GLOBAL"
+                )
+                |
+                Q(
+                    agreement__coverages__department=
+                    role.department
+                )
+            )
+
+        else:
+            return self.queryset.none()
+
+        return self.queryset.filter(q).distinct()
+
+@register(AgreementCoverage)
+class AgreementCoverageScopePolicy(BaseScopePolicy):
+    """
+    Scope agreement coverages through organizational applicability.
+    """
+
+    def apply(self):
+
+        if self.scope.is_site_admin():
+            return self.queryset
+
+        role = self.role
+
+        if role.room:
+
+            q = (
+                Q(scope_type="GLOBAL")
+                |
+                Q(room=role.room)
+                |
+                Q(location=role.room.location)
+                |
+                Q(
+                    department=
+                    role.room.location.department
+                )
+            )
+
+        elif role.location:
+
+            q = (
+                Q(scope_type="GLOBAL")
+                |
+                Q(location=role.location)
+                |
+                Q(
+                    department=
+                    role.location.department
+                )
+            )
+
+        elif role.department:
+
+            q = (
+                Q(scope_type="GLOBAL")
+                |
+                Q(department=role.department)
+            )
+
+        else:
+            return self.queryset.none()
 
         return self.queryset.filter(q).distinct()
