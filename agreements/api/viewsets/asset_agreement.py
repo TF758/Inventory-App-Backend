@@ -7,9 +7,9 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from assets.api.serializers.agreement_coverage import AgreementCoverageSerializer, AgreementCoverageWriteSerializer
-from assets.api.serializers.agreement_history import AgreementHistorySerializer, AgreementItemHistorySerializer
-from assets.api.serializers.asset_agreement import AssetAgreementWriteSerializer
+from agreements.api.serialziers.agreement_coverage import AgreementCoverageSerializer, AgreementCoverageWriteSerializer
+from agreements.api.serialziers.agreement_history import AgreementHistorySerializer, AgreementItemHistorySerializer
+from agreements.api.serialziers.asset_agreement import AssetAgreementWriteSerializer
 from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement
 from assets.models.assets import AssetAgreementItem
 from core.mixins import ScopeFilterMixin
