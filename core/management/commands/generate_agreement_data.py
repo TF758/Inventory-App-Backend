@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from tqdm import tqdm
 
-from assets.models.agreements import (
+from agreements.models.agreements import (
     AssetAgreement,
     AgreementCoverage,
     AssetAgreementItem,
@@ -356,7 +356,7 @@ class Command(BaseCommand):
             except Exception:
                 continue
 
-        # ----------------------------------
+            # ----------------------------------
         # Agreement Items
         # ----------------------------------
 
@@ -394,16 +394,54 @@ class Command(BaseCommand):
 
                     item = AssetAgreementItem(
                         agreement=agreement,
+                        coverage_start=agreement.start_date,
+                        coverage_end=agreement.expiry_date,
                     )
 
+                    # -------------------------
+                    # Asset Binding
+                    # -------------------------
+
                     if isinstance(asset, Equipment):
+
                         item.equipment = asset
 
+                        item.quantity = 1
+
                     elif isinstance(asset, Consumable):
+
                         item.consumable = asset
 
+                        item.quantity = random.randint(1, 25)
+
                     elif isinstance(asset, Accessory):
+
                         item.accessory = asset
+
+                        item.quantity = random.randint(1, 10)
+
+                    # -------------------------
+                    # Snapshot Fields
+                    # -------------------------
+
+                    item.asset_name_snapshot = (
+                        getattr(asset, "name", "")
+                        or ""
+                    )
+
+                    item.asset_public_id_snapshot = (
+                        getattr(asset, "public_id", "")
+                        or ""
+                    )
+
+                    item.asset_serial_snapshot = (
+                        getattr(asset, "serial_number", "")
+                        or ""
+                    )
+
+                    # -------------------------
+                    # Validation
+                    # -------------------------
 
                     item.full_clean()
 

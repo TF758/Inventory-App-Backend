@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from assets.models.agreements import AgreementHistory, AgreementItemHistory
+from agreements.models.agreements import AgreementHistory, AgreementItemHistory
 
 
 

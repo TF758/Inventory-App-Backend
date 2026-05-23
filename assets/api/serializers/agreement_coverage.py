@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from assets.models.agreements import AgreementCoverage, CoverageScopeType
+from agreements.models.agreements import AgreementCoverage, CoverageScopeType
 from sites.models.sites import Department, Location, Room
 
 class AgreementCoverageSerializer(serializers.ModelSerializer):

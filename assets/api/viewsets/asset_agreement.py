@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from assets.api.serializers.agreement_coverage import AgreementCoverageSerializer, AgreementCoverageWriteSerializer
 from assets.api.serializers.agreement_history import AgreementHistorySerializer, AgreementItemHistorySerializer
 from assets.api.serializers.asset_agreement import AssetAgreementWriteSerializer
-from assets.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement
+from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement
 from assets.models.assets import AssetAgreementItem
 from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
