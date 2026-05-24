@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from assets.models.assets import AssetAgreement
+
+from agreements.models.agreements import AssetAgreement
 from sites.models.sites import Department
 
 

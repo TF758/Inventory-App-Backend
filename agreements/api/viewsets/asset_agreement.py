@@ -1,20 +1,16 @@
 from datetime import timedelta
-
 from django.db.models import Count
 from django.utils.timezone import now
-
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
 from agreements.api.serialziers.agreement_coverage import AgreementCoverageSerializer, AgreementCoverageWriteSerializer
 from agreements.api.serialziers.agreement_history import AgreementHistorySerializer, AgreementItemHistorySerializer
-from agreements.api.serialziers.asset_agreement import AssetAgreementWriteSerializer
-from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement
-from assets.models.assets import AssetAgreementItem
+from agreements.api.serialziers.asset_agreement import AssetAgreementSerializer, AssetAgreementWriteSerializer
+from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement, AssetAgreementItem
 from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
-from core.serializers.agreement import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, AssetAgreementSerializer
+from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer
 
 
 class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
