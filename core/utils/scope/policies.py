@@ -349,63 +349,58 @@ class UserScopePolicy(BaseScopePolicy):
         return self.queryset.filter(q).distinct()
 
 @register(AssetAgreement)
-class AssetAgreementScopePolicy(BaseScopePolicy):
+class AssetAgreementScopePolicy( BaseScopePolicy ):
 
     def apply(self):
+
+        # --------------------------------
+        # Site Admin
+        # --------------------------------
+
         if self.scope.is_site_admin():
             return self.queryset
+
         role = self.role
+
+        # --------------------------------
+        # Room Scoped Users
+        # --------------------------------
+
         if role.room:
-            q = (
-                Q(
-                    coverages__scope_type="GLOBAL"
+
+            return (
+                self.queryset.filter(
+                    managing_department=
+                    role.room.location.department
                 )
-                |
-                Q(
-                    coverages__room=role.room
-                )
-                |
-                Q(
-                    coverages__location=role.room.location
-                )
-                |
-                Q(
-                    coverages__department=role.room.location.department
-                )
+                .distinct()
             )
+
+        # --------------------------------
+        # Location Scoped Users
+        # --------------------------------
 
         elif role.location:
 
-            q = (
-                Q(
-                    coverages__scope_type="GLOBAL"
+            return (
+                self.queryset.filter(
+                    managing_department=
+                    role.location.department
                 )
-                |
-                Q(
-                    coverages__location=role.location
-                )
-                |
-                Q(
-                    coverages__department=role.location.department
-                )
+                .distinct()
             )
 
         elif role.department:
 
-            q = (
-                Q(
-                    coverages__scope_type="GLOBAL"
+            return (
+                self.queryset.filter(
+                    managing_department=
+                    role.department
                 )
-                |
-                Q(
-                    coverages__department=role.department
-                )
+                .distinct()
             )
+        return self.queryset.none()
 
-        else:
-            return self.queryset.none()
-
-        return self.queryset.filter(q).distinct()
 
 @register(AssetAgreementItem)
 class AssetAgreementItemScopePolicy(BaseScopePolicy):

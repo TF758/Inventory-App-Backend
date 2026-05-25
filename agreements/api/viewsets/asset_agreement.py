@@ -50,32 +50,74 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
         agreement = self.get_object()
 
+        queryset = (
+            agreement.coverages
+            .select_related(
+                "department",
+                "location",
+                "room",
+            )
+            .order_by("id")
+        )
+
+        queryset = self.filter_queryset(
+            queryset
+        )
+
+        page = self.paginate_queryset(
+            queryset
+        )
+
         serializer = AgreementCoverageSerializer(
-            agreement.coverages.all(),
+            page if page is not None else queryset,
             many=True,
             context={"request": request},
         )
 
-        return Response(serializer.data)
+        if page is not None:
+
+            return self.get_paginated_response(
+                serializer.data
+            )
+
+        return Response(
+            serializer.data
+        )
 
     @action(detail=True, methods=["get"])
     def items(self, request, public_id=None):
 
         agreement = self.get_object()
 
-        items = agreement.items.select_related(
-            "equipment",
-            "consumable",
-            "accessory",
+        queryset = (
+            agreement.items
+            .select_related(
+                "equipment",
+                "consumable",
+                "accessory",
+            )
+            .order_by("id")
         )
+
+        queryset = self.filter_queryset( queryset )
+
+        page = self.paginate_queryset( queryset )
 
         serializer = AssetAgreementItemSerializer(
-            items,
+            page if page is not None else queryset,
             many=True,
-            context={"request": request},
+            context={
+                "request": request,
+            },
         )
 
-        return Response(serializer.data)
+        if page is not None:
+
+            return self.get_paginated_response(
+                serializer.data
+            )
+
+        return Response( serializer.data )
 
     # -------------------------
     # Agreement History
@@ -185,8 +227,6 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
         .order_by("id")
     )
 
-    # permission_classes = [AssetAgreementPermission]
-
     pagination_class = FlexiblePagination
 
     lookup_field = "public_id"
@@ -196,71 +236,79 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
     # -------------------------
 
     def get_serializer_class(self):
-
         if self.action == "attach":
             return AssetAgreementItemWriteSerializer
-
         return AssetAgreementItemSerializer
 
+    # -------------------------
+    # List
+    # -------------------------
 
     def list(self, request):
 
-        queryset = self.filter_queryset(
-            self.get_queryset()
-        )
+        queryset = self.filter_queryset( self.get_queryset() )
 
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset( queryset )
 
         serializer = self.get_serializer(
             page if page is not None else queryset,
             many=True,
-            context={"request": request},
+            context={
+                "request": request
+            },
         )
 
         if page is not None:
             return self.get_paginated_response(
-                serializer.data
-            )
+                serializer.data )
 
-        return Response(serializer.data)
+        return Response(
+            serializer.data
+        )
 
     # -------------------------
     # Retrieve
     # -------------------------
 
-    def retrieve(self, request, public_id=None):
+    def retrieve( self, request, public_id=None, ):
 
         item = self.get_object()
-
         serializer = self.get_serializer(
             item,
-            context={"request": request},
+            context={
+                "request": request
+            },
         )
 
-        return Response(serializer.data)
+        return Response( serializer.data )
 
     # -------------------------
     # Attach Asset
     # -------------------------
 
-    @action(detail=False, methods=["post"])
+    @action(
+        detail=False,
+        methods=["post"],
+    )
     def attach(self, request):
 
         serializer = self.get_serializer(
             data=request.data,
-            context={"request": request},
+            context={
+                "request": request
+            },
         )
 
-        serializer.is_valid(
-            raise_exception=True
-        )
+        serializer.is_valid( raise_exception=True )
 
         item = serializer.save()
 
         response_serializer = (
             AssetAgreementItemSerializer(
                 item,
-                context={"request": request},
+                context={
+                    "request": request
+                },
             )
         )
 
@@ -273,8 +321,15 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
     # Detach Asset
     # -------------------------
 
-    @action(detail=True, methods=["post"])
-    def detach(self, request, public_id=None):
+    @action(
+        detail=True,
+        methods=["post"],
+    )
+    def detach(
+        self,
+        request,
+        public_id=None,
+    ):
 
         item = self.get_object()
 
@@ -285,8 +340,8 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
                 "detail":
                 "Asset detached from agreement."
             },
-            status=status.HTTP_200_OK,)
-
+            status=status.HTTP_200_OK,
+        )
 class AgreementHistoryViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ):
 
     queryset = (

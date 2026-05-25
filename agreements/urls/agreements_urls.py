@@ -40,10 +40,10 @@ urlpatterns = [
     # -------------------------
     # Agreement Coverage
     # -------------------------
+    path( "coverages/<str:public_id>/", AgreementCoverageViewSet.as_view({ "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy", }), name="coverage-detail", ),
 
     path( "coverages/", AgreementCoverageViewSet.as_view({ "get": "list", "post": "create", }), name="coverages", ),
 
-    path( "coverages/<str:public_id>/", AgreementCoverageViewSet.as_view({ "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy", }), name="coverage-detail", ),
 
     # -------------------------
     # Agreement Items

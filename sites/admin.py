@@ -1,7 +1,44 @@
 from django.contrib import admin
 from sites.models.sites import Department, Location, Room, UserPlacement
 
-admin.site.register(Department)
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "name",
+        "public_id",
+        "location_count",
+        "room_count",
+    )
+
+    search_fields = (
+        "name",
+        "public_id",
+        "description",
+    )
+
+    readonly_fields = (
+        "public_id",
+    )
+
+    fields = (
+        "name",
+        "description",
+        "img_link",
+        "public_id",
+    )
+
+    def location_count(self, obj):
+        return obj.locations.count()
+
+    location_count.short_description = "Locations"
+
+    def room_count(self, obj):
+        return Room.objects.filter(
+            location__department=obj
+        ).count()
+
+    room_count.short_description = "Rooms"
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):

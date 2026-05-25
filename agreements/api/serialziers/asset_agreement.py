@@ -60,16 +60,19 @@ class AssetAgreementSerializer(serializers.ModelSerializer):
         return obj.coverages.count()
 
 
-class AssetAgreementWriteSerializer(serializers.ModelSerializer):
+class AssetAgreementWriteSerializer( serializers.ModelSerializer ):
 
-    managing_department = serializers.SlugRelatedField(
-        slug_field="public_id",
-        queryset=Department.objects.all(),
-        required=False,
-        allow_null=True,
+    managing_department = (
+        serializers.SlugRelatedField(
+            slug_field="public_id",
+            queryset=Department.objects.all(),
+            required=False,
+            allow_null=True,
+        )
     )
 
     class Meta:
+
         model = AssetAgreement
 
         fields = [
@@ -87,3 +90,61 @@ class AssetAgreementWriteSerializer(serializers.ModelSerializer):
             "notes",
             "managing_department",
         ]
+
+
+    # -------------------------
+    # Validation
+    # -------------------------
+
+    def validate(self, attrs):
+
+        expiry_date = attrs.get(
+            "expiry_date"
+        )
+
+        renewal_date = attrs.get(
+            "renewal_date"
+        )
+
+        start_date = attrs.get(
+            "start_date"
+        )
+
+        # -------------------------
+        # Renewal Before Expiry
+        # -------------------------
+
+        if (
+            renewal_date and
+            expiry_date and
+            renewal_date > expiry_date
+        ):
+
+            raise serializers.ValidationError({
+                "renewal_date":
+                (
+                    "Renewal date cannot "
+                    "be after expiry date."
+                )
+            })
+
+
+        # -------------------------
+        # Expiry After Start
+        # -------------------------
+
+        if (
+            start_date and
+            expiry_date and
+            expiry_date < start_date
+        ):
+
+            raise serializers.ValidationError({
+                "expiry_date":
+                (
+                    "Expiry date cannot "
+                    "be before start date."
+                )
+            })
+
+        return attrs
