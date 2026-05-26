@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from assets.models.assets import Accessory, Consumable, Equipment
 from core.permissions.helpers import has_asset_custody_scope
 from agreements.models.agreements import AssetAgreement, AssetAgreementItem
-from inventory.agreements.services.coverage import can_attach_asset_to_agreement
+from agreements.services.coverage import can_attach_asset_to_agreement
 
 
 

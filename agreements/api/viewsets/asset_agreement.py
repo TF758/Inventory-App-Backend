@@ -1,4 +1,5 @@
 from datetime import timedelta
+from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.utils.timezone import now
 from rest_framework import viewsets
@@ -10,7 +11,8 @@ from agreements.api.serialziers.asset_agreement import AssetAgreementSerializer,
 from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement, AssetAgreementItem
 from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
-from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer
+from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, resolve_asset_by_public_id
+from agreements.services.coverage import can_attach_asset_to_agreement
 
 
 class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
@@ -181,6 +183,63 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
         serializer = self.get_serializer( queryset, many=True, context={"request": request}, )
 
         return Response(serializer.data)
+
+
+    @action(
+        detail=False,
+        methods=["get"],
+    )
+    def applicable(self, request):
+
+        asset_public_id = (
+            request.query_params.get(
+                "asset_public_id"
+            )
+        )
+
+        if not asset_public_id:
+
+            raise ValidationError(
+                {
+                    "asset_public_id":
+                    "This field is required."
+                }
+            )
+
+        asset = resolve_asset_by_public_id(
+            asset_public_id
+        )
+
+        queryset = [
+            agreement
+            for agreement in self.get_queryset()
+            if can_attach_asset_to_agreement(
+                agreement=agreement,
+                asset=asset,
+            )
+        ]
+
+        page = self.paginate_queryset(
+            queryset
+        )
+
+        serializer = self.get_serializer(
+            page if page is not None else queryset,
+            many=True,
+            context={
+                "request": request,
+            },
+        )
+
+        if page is not None:
+
+            return self.get_paginated_response(
+                serializer.data
+            )
+
+        return Response(
+            serializer.data
+        )
 
 class AgreementCoverageViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 

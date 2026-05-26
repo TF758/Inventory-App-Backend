@@ -1,4 +1,4 @@
-from agreements.models import (
+from agreements.models.agreements import (
     AgreementCoverage,
     CoverageScopeType,
 )

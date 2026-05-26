@@ -16,6 +16,8 @@ urlpatterns = [
 
     path( "expiring/", AssetAgreementViewSet.as_view({ "get": "expiring", }), name="expiring-agreements", ),
 
+    path( "applicable/", AssetAgreementViewSet.as_view({ "get": "applicable", }), name="applicable-agreements", ),
+
     # =================================================
     # Coverage Rules
     # =================================================
