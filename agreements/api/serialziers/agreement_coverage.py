@@ -1,6 +1,9 @@
 from rest_framework import serializers
-from agreements.models.agreements import AgreementCoverage, CoverageScopeType
+from agreements.models.agreements import AgreementCoverage, AssetAgreement, CoverageScopeType
 from sites.models.sites import Department, Location, Room
+from django.core.exceptions import (
+    ValidationError as DjangoValidationError
+)
 
 class AgreementCoverageSerializer(serializers.ModelSerializer):
 
@@ -51,7 +54,12 @@ class AgreementCoverageSerializer(serializers.ModelSerializer):
         }
 
 
-class AgreementCoverageWriteSerializer(serializers.ModelSerializer):
+class AgreementCoverageWriteSerializer( serializers.ModelSerializer ):
+
+    agreement = serializers.SlugRelatedField(
+        slug_field="public_id",
+        queryset=AssetAgreement.objects.all(),
+    )
 
     department = serializers.SlugRelatedField(
         slug_field="public_id",
@@ -75,6 +83,7 @@ class AgreementCoverageWriteSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
+
         model = AgreementCoverage
 
         fields = [
@@ -86,6 +95,49 @@ class AgreementCoverageWriteSerializer(serializers.ModelSerializer):
             "notes",
         ]
 
+    def create(self, validated_data):
+
+        try:
+            return super().create(
+                validated_data
+            )
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(
+                e.message_dict
+                if hasattr(e, "message_dict")
+                else {
+                    "non_field_errors":
+                    e.messages
+                }
+            )
+
+    def update( self, instance, validated_data, ):
+
+        for attr, value in validated_data.items():
+
+            setattr(
+                instance,
+                attr,
+                value,
+            )
+
+        try:
+
+            instance.save()
+
+        except DjangoValidationError as e:
+
+            raise serializers.ValidationError(
+                e.message_dict
+                if hasattr(e, "message_dict")
+                else {
+                    "non_field_errors":
+                    e.messages
+                }
+            )
+
+        return instance
+        
     def validate(self, attrs):
 
         scope_type = attrs.get("scope_type")

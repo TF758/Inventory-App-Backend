@@ -182,10 +182,7 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
         return Response(serializer.data)
 
-class AgreementCoverageViewSet(
-    ScopeFilterMixin,
-    viewsets.ModelViewSet,
-):
+class AgreementCoverageViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
     queryset = (
         AgreementCoverage.objects
@@ -299,7 +296,61 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
             },
         )
 
-        serializer.is_valid( raise_exception=True )
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        validated_data = (
+            serializer.validated_data
+        )
+
+        agreement = validated_data[
+            "agreement"
+        ]
+
+        # --------------------------------
+        # Resolve Asset
+        # --------------------------------
+
+        asset = (
+            validated_data.get(
+                "equipment"
+            )
+            or
+            validated_data.get(
+                "accessory"
+            )
+            or
+            validated_data.get(
+                "consumable"
+            )
+        )
+
+        # --------------------------------
+        # Eligibility Check
+        # --------------------------------
+
+        if not can_attach_asset_to_agreement(
+            agreement=agreement,
+            asset=asset,
+        ):
+
+            raise ValidationError(
+                {
+                    "non_field_errors": [
+                        (
+                            "This asset does not "
+                            "fall within the "
+                            "agreement coverage "
+                            "scope."
+                        )
+                    ]
+                }
+            )
+
+        # --------------------------------
+        # Save
+        # --------------------------------
 
         item = serializer.save()
 

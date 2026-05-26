@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from assets.models.assets import Accessory, Consumable, Equipment
 from core.permissions.helpers import has_asset_custody_scope
 from agreements.models.agreements import AssetAgreement, AssetAgreementItem
+from inventory.agreements.services.coverage import can_attach_asset_to_agreement
 
 
 
@@ -96,7 +97,9 @@ class AssetAgreementItemWriteSerializer( serializers.ModelSerializer ):
 
         request = self.context["request"]
 
-        asset_public_id = attrs.pop("asset_public_id")
+        asset_public_id = attrs.pop(
+            "asset_public_id"
+        )
 
         asset = resolve_asset_by_public_id(
             asset_public_id
@@ -104,10 +107,32 @@ class AssetAgreementItemWriteSerializer( serializers.ModelSerializer ):
 
         role = request.user.active_role
 
-        # Authorization validation
-        if not has_asset_custody_scope(role, asset):
+        # -------------------------
+        # Custody Authorization
+        # -------------------------
+
+        if not has_asset_custody_scope(
+            role,
+            asset,
+        ):
             raise serializers.ValidationError(
                 "Asset outside of your scope."
+            )
+
+        # -------------------------
+        # Coverage Eligibility
+        # -------------------------
+
+        if not can_attach_asset_to_agreement(
+            agreement=attrs["agreement"],
+            asset=asset,
+        ):
+            raise serializers.ValidationError(
+                (
+                    "This asset does not "
+                    "fall within the agreement "
+                    "coverage scope."
+                )
             )
 
         attrs["asset"] = asset
