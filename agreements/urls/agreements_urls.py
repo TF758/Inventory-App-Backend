@@ -18,6 +18,8 @@ urlpatterns = [
 
     path( "applicable/", AssetAgreementViewSet.as_view({ "get": "applicable", }), name="applicable-agreements", ),
 
+    path( "by-asset/", AssetAgreementViewSet.as_view({ "get": "by_asset", }), name="agreements-by-asset", ),
+
     # =================================================
     # Coverage Rules
     # =================================================

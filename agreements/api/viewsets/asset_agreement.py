@@ -13,6 +13,7 @@ from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, resolve_asset_by_public_id
 from agreements.services.coverage import can_attach_asset_to_agreement
+from assets.models.assets import Accessory, Consumable, Equipment
 
 
 class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
@@ -240,6 +241,101 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
         return Response(
             serializer.data
         )
+        
+    # -------------------------
+    # Agreements By Asset
+    # -------------------------
+
+    @action(
+        detail=False,
+        methods=["get"],
+    )
+    def by_asset(self, request):
+
+        asset_public_id = (
+            request.query_params.get(
+                "asset_public_id"
+            )
+        )
+
+        if not asset_public_id:
+
+            raise ValidationError({
+                "asset_public_id":
+                "This field is required."
+            })
+
+        # --------------------------------
+        # Resolve Asset
+        # --------------------------------
+
+        asset = resolve_asset_by_public_id(
+            asset_public_id
+        )
+
+        # --------------------------------
+        # Query Agreements
+        # --------------------------------
+
+        queryset = (
+            AssetAgreement.objects.none()
+        )
+
+        if isinstance(asset, Equipment):
+
+            queryset = (
+                self.get_queryset().filter(
+                    items__equipment=asset
+                )
+            )
+
+        elif isinstance(asset, Consumable):
+
+            queryset = (
+                self.get_queryset().filter(
+                    items__consumable=asset
+                )
+            )
+
+        elif isinstance(asset, Accessory):
+
+            queryset = (
+                self.get_queryset().filter(
+                    items__accessory=asset
+                )
+            )
+
+        queryset = (
+            queryset
+            .distinct()
+            .order_by("name")
+        )
+
+        # --------------------------------
+        # Pagination
+        # --------------------------------
+
+        page = self.paginate_queryset(
+            queryset
+        )
+
+        serializer = self.get_serializer(
+            page if page is not None else queryset,
+            many=True,
+            context={
+                "request": request
+            },
+        )
+
+        if page is not None:
+
+            return self.get_paginated_response(
+                serializer.data
+            )
+
+        return Response(
+            serializer.data
+        )    
 
 class AgreementCoverageViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
@@ -452,6 +548,7 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
             },
             status=status.HTTP_200_OK,
         )
+    
 class AgreementHistoryViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet, ):
 
     queryset = (
