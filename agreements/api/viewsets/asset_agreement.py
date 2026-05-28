@@ -20,15 +20,18 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
     queryset = (
         AssetAgreement.objects
-        .select_related("managing_department")
-        .prefetch_related(
-            "coverages",
-            "items",
-            "history",
+        .select_related(
+            "managing_department"
         )
         .annotate(
-            item_count=Count("items", distinct=True),
-            coverage_count=Count("coverages", distinct=True),
+            item_count=Count(
+                "items",
+                distinct=True,
+            ),
+            coverage_count=Count(
+                "coverages",
+                distinct=True,
+            ),
         )
         .order_by("id")
     )
