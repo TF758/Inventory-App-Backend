@@ -1,6 +1,6 @@
 from datetime import timedelta
 from django.core.exceptions import ValidationError
-from django.db.models import Count
+from django.db.models import Q, Count
 from django.utils.timezone import now
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from agreements.api.serialziers.agreement_coverage import AgreementCoverageSerializer, AgreementCoverageWriteSerializer
 from agreements.api.serialziers.agreement_history import AgreementHistorySerializer, AgreementItemHistorySerializer
 from agreements.api.serialziers.asset_agreement import AssetAgreementSerializer, AssetAgreementWriteSerializer
-from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement, AssetAgreementItem
+from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement, AssetAgreementItem, CoverageScopeType
 from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, resolve_asset_by_public_id
@@ -187,38 +187,68 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
 
     @action(
-        detail=False,
-        methods=["get"],
+    detail=False,
+    methods=["get"],
     )
     def applicable(self, request):
 
-        asset_public_id = (
-            request.query_params.get(
-                "asset_public_id"
-            )
+        asset_public_id = request.query_params.get(
+            "asset_public_id"
         )
 
         if not asset_public_id:
 
-            raise ValidationError(
-                {
-                    "asset_public_id":
-                    "This field is required."
-                }
-            )
+            raise ValidationError({
+                "asset_public_id":
+                "This field is required."
+            })
 
         asset = resolve_asset_by_public_id(
             asset_public_id
         )
 
-        queryset = [
-            agreement
-            for agreement in self.get_queryset()
-            if can_attach_asset_to_agreement(
-                agreement=agreement,
-                asset=asset,
+        room = getattr(
+            asset,
+            "room",
+            None,
+        )
+
+        if not room:
+
+            return self.get_paginated_response([])
+
+        location = room.location
+
+        department = (
+            location.department
+            if location
+            else None
+        )
+
+        queryset = (
+            self.get_queryset()
+            .filter(
+                Q(
+                    coverages__scope_type=CoverageScopeType.GLOBAL,
+                )
+                |
+                Q(
+                    coverages__scope_type=CoverageScopeType.ROOM,
+                    coverages__room=room,
+                )
+                |
+                Q(
+                    coverages__scope_type=CoverageScopeType.LOCATION,
+                    coverages__location=location,
+                )
+                |
+                Q(
+                    coverages__scope_type=CoverageScopeType.DEPARTMENT,
+                    coverages__department=department,
+                )
             )
-        ]
+            .distinct()
+        )
 
         page = self.paginate_queryset(
             queryset
@@ -240,7 +270,7 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
 
         return Response(
             serializer.data
-        )
+    )
         
     # -------------------------
     # Agreements By Asset

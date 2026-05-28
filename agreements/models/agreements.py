@@ -169,6 +169,9 @@ class AgreementCoverage(PublicIDModel):
         indexes = [
             models.Index(fields=["public_id"]),
             models.Index(fields=["scope_type"]),
+            models.Index(fields=["scope_type", "department"]),
+            models.Index(fields=["scope_type", "location"]),
+            models.Index(fields=["scope_type", "room"]),
         ]
 
         constraints = [
