@@ -1,5 +1,5 @@
 from datetime import timedelta
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.db.models import Q, Count
 from django.utils.timezone import now
 from rest_framework import viewsets
