@@ -30,9 +30,9 @@ class AgreementLifecycleService:
 
         AgreementHistory.objects.create(
             agreement=agreement,
-            event_type="EXPIRED",
+            event_type=AgreementHistory.EventType.EXPIRED,
             previous_status=previous_status,
-            new_status="EXPIRED",
+            new_status=AssetAgreement.Status.EXPIRED,
             previous_expiry_date=agreement.expiry_date,
             new_expiry_date=agreement.expiry_date,
             previous_renewal_date=agreement.renewal_date,

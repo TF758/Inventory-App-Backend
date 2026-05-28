@@ -122,6 +122,27 @@ class AuditLog(PublicIDModel):
         SESSION_REVOKED = "session_revoked"
         SESSION_EXPIRED = "session_expired"
 
+        AGREEMENT_CREATED = "agreement_created"
+        AGREEMENT_UPDATED = "agreement_updated"
+        AGREEMENT_TERMINATED = "agreement_terminated"
+        AGREEMENT_RENEWED = "agreement_renewed"
+        AGREEMENT_EXTENDED = "agreement_extended"
+
+        AGREEMENT_COVERAGE_CREATED = ( "agreement_coverage_created" )
+
+        AGREEMENT_COVERAGE_UPDATED = ( "agreement_coverage_updated" )
+
+        AGREEMENT_COVERAGE_REMOVED = ( "agreement_coverage_removed" )
+        AGREEMENT_ITEM_ATTACHED = ( "agreement_item_attached" )
+
+        AGREEMENT_ITEM_DETACHED = ( "agreement_item_detached" )
+
+        AGREEMENT_ITEM_INVALIDATED = ( "agreement_item_invalidated" )
+
+        AGREEMENT_ITEM_REINSTATED = ( "agreement_item_reinstated" )
+
+        AGREEMENT_COVERAGE_EXPIRED = ( "agreement_coverage_expired" )
+
 
         NOISE_EVENTS = [
             LOGIN,

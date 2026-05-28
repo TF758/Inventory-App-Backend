@@ -65,6 +65,20 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
         )
 
         agreement = serializer.save()
+        # --------------------------------
+        # Create History Record
+        # --------------------------------
+
+        AgreementHistory.objects.create(
+            agreement=agreement,
+            event_type=AgreementHistory.EventType.CREATED,
+            new_status=agreement.status,
+            new_expiry_date=agreement.expiry_date,
+            new_renewal_date=agreement.renewal_date,
+            notes="Agreement created.",
+            user=request.user,
+            user_email=request.user.email,
+        )
 
         # --------------------------------
         # Audit Log
