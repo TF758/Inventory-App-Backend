@@ -9,7 +9,7 @@ from agreements.api.serialziers.agreement_coverage import AgreementCoverageSeria
 from agreements.api.serialziers.agreement_history import AgreementHistorySerializer, AgreementItemHistorySerializer
 from agreements.api.serialziers.asset_agreement import AssetAgreementSerializer, AssetAgreementWriteSerializer
 from agreements.models.agreements import AgreementCoverage, AgreementHistory, AgreementItemHistory, AssetAgreement, AssetAgreementItem, CoverageScopeType
-from core.mixins import ScopeFilterMixin
+from core.mixins import AuditMixin, ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer, resolve_asset_by_public_id
 from agreements.services.coverage import can_attach_asset_to_agreement
@@ -50,6 +50,68 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
         ]:
             return AssetAgreementWriteSerializer
         return AssetAgreementSerializer
+    
+    def create(self, request, *args, **kwargs):
+
+        serializer = self.get_serializer(
+            data=request.data,
+            context={
+                "request": request
+            },
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        agreement = serializer.save()
+
+        # --------------------------------
+        # Audit Log
+        # --------------------------------
+
+        self.audit(
+            AuditLog.Events.AGREEMENT_CREATED,
+            target=agreement,
+            description=(
+                f"{request.user.email} created "
+                f"agreement "
+                f"{agreement.public_id}"
+            ),
+            metadata={
+                "agreement_public_id":
+                    agreement.public_id,
+
+                "agreement_name":
+                    agreement.name,
+
+                "agreement_type":
+                    agreement.agreement_type,
+
+                "agreement_status":
+                    agreement.status,
+
+                "vendor":
+                    agreement.vendor,
+
+                "performed_by":
+                    request.user.email,
+            },
+        )
+
+        response_serializer = (
+            AssetAgreementSerializer(
+                agreement,
+                context={
+                    "request": request
+                },
+            )
+        )
+
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get"])
     def coverages(self, request, public_id=None):
@@ -397,9 +459,137 @@ class AgreementCoverageViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
         ]:
             return AgreementCoverageWriteSerializer
         return AgreementCoverageSerializer
+    
+       # -------------------------
+    # Create
+    # -------------------------
+
+    def create(self, request, *args, **kwargs):
+
+        serializer = self.get_serializer(
+            data=request.data,
+            context={
+                "request": request
+            },
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        coverage = serializer.save()
+
+        # --------------------------------
+        # Resolve Scope Label
+        # --------------------------------
+
+        scope_target = (
+            coverage.department
+            or coverage.location
+            or coverage.room
+            or "GLOBAL"
+        )
+
+        # --------------------------------
+        # Audit Log
+        # --------------------------------
+
+        self.audit(
+            AuditLog.Events.AGREEMENT_COVERAGE_CREATED,
+            target=coverage,
+            description=(
+                f"{request.user.email} added "
+                f"{coverage.scope_type} coverage "
+                f"to agreement "
+                f"{coverage.agreement.public_id}"
+            ),
+            metadata={
+                "agreement_public_id":
+                    coverage.agreement.public_id,
+
+                "agreement_name":
+                    coverage.agreement.name,
+
+                "coverage_public_id":
+                    coverage.public_id,
+
+                "scope_type":
+                    coverage.scope_type,
+
+                "scope_target":
+                    str(scope_target),
+
+                "performed_by":
+                    request.user.email,
+            },
+        )
+
+        response_serializer = (
+            AgreementCoverageSerializer(
+                coverage,
+                context={
+                    "request": request
+                },
+            )
+        )
+
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    # -------------------------
+    # Destroy
+    # -------------------------
+
+    def destroy( self, request, *args, **kwargs, ):
+
+        coverage = self.get_object()
+
+        scope_target = (
+            coverage.department
+            or coverage.location
+            or coverage.room
+            or "GLOBAL"
+        )
+
+        # --------------------------------
+        # Audit Log
+        # --------------------------------
+
+        self.audit(
+            AuditLog.Events.AGREEMENT_COVERAGE_REMOVED,
+            target=coverage,
+            description=(
+                f"{request.user.email} removed "
+                f"{coverage.scope_type} coverage "
+                f"from agreement "
+                f"{coverage.agreement.public_id}"
+            ),
+            metadata={
+                "agreement_public_id":
+                    coverage.agreement.public_id,
+                "agreement_name":
+                    coverage.agreement.name,
+                "coverage_public_id":
+                    coverage.public_id,
+                "scope_type":
+                    coverage.scope_type,
+                "scope_target":
+                    str(scope_target),
+                "performed_by":
+                    request.user.email,
+            },
+        )
+
+        coverage.delete()
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
+        )
 
 
-class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
+class AssetAgreementItemViewSet(AuditMixin, ScopeFilterMixin, viewsets.GenericViewSet, ):
 
     queryset = (
         AssetAgreementItem.objects
@@ -550,6 +740,33 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
                 },
             )
         )
+        self.audit(
+            AuditLog.Events.AGREEMENT_ITEM_ATTACHED,
+            target=item,
+            description=(
+                f"Attached asset "
+                f"{asset.public_id} "
+                f"to agreement "
+                f"{agreement.public_id}"
+            ),
+            metadata={
+                "agreement_public_id":
+                    agreement.public_id,
+                "agreement_name":
+                    agreement.name,
+                "asset_public_id":
+                    asset.public_id,
+                "asset_name":
+                    getattr(asset, "name", ""),
+                "asset_type":
+                    item.asset_type,
+                "agreement_item_public_id":
+                    item.public_id,
+                "performed_by":
+                    request.user.email,
+            },
+        )
+        
 
         return Response(
             response_serializer.data,
@@ -571,6 +788,48 @@ class AssetAgreementItemViewSet( ScopeFilterMixin, viewsets.GenericViewSet, ):
     ):
 
         item = self.get_object()
+
+        asset = item.asset
+
+        agreement = item.agreement
+
+        # --------------------------------
+        # Audit Log
+        # --------------------------------
+
+        self.audit(
+            AuditLog.Events.AGREEMENT_ITEM_DETACHED,
+            target=item,
+            description=(
+                f"{request.user.email} detached asset "
+                f"{asset.public_id} "
+                f"from agreement "
+                f"{agreement.public_id}"
+            ),
+            metadata={
+                "agreement_public_id":
+                    agreement.public_id,
+
+                "agreement_name":
+                    agreement.name,
+
+                "asset_public_id":
+                    asset.public_id,
+
+                "asset_name":
+                    getattr(asset, "name", ""),
+
+                "asset_type":
+                    item.asset_type,
+
+                "agreement_item_public_id":
+                    item.public_id,
+
+                "performed_by":
+                    request.user.email,
+            },
+        )
+
 
         item.delete()
 
