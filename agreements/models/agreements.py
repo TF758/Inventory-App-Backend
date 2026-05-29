@@ -644,6 +644,7 @@ class AgreementHistory(models.Model):
         EXTENDED = "EXTENDED", "Extended"
         TERMINATED = "TERMINATED", "Terminated"
         STATUS_CHANGED = "STATUS_CHANGED", "Status Changed"
+        EXPIRED = "EXPIRED", "Expired"
 
     agreement = models.ForeignKey(
         AssetAgreement,
