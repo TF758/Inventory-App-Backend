@@ -1,6 +1,8 @@
 from django.urls import path
-
-from agreements.api.viewsets.asset_agreement import ( AgreementCoverageViewSet, AgreementHistoryViewSet, AgreementItemHistoryViewSet, AssetAgreementItemViewSet, AssetAgreementViewSet, )
+from agreements.api.viewsets.agreement_coverage import AgreementCoverageViewSet
+from agreements.api.viewsets.agreement_item import AssetAgreementItemViewSet
+from agreements.api.viewsets.asset_agreement import AssetAgreementViewSet
+from agreements.api.viewsets.history import AgreementHistoryViewSet, AgreementItemHistoryViewSet
 
 urlpatterns = [
 

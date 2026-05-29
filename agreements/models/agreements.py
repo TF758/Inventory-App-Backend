@@ -652,41 +652,19 @@ class AgreementHistory(models.Model):
         related_name="history",
     )
 
-    event_type = models.CharField(
-        max_length=30,
-        choices=EventType.choices,
-        db_index=True,
-    )
+    event_type = models.CharField( max_length=30, choices=EventType.choices, db_index=True, )
 
-    previous_status = models.CharField(
-        max_length=20,
-        blank=True,
-    )
+    previous_status = models.CharField( max_length=20, blank=True, )
 
-    new_status = models.CharField(
-        max_length=20,
-        blank=True,
-    )
+    new_status = models.CharField( max_length=20, blank=True, )
 
-    previous_expiry_date = models.DateField(
-        null=True,
-        blank=True,
-    )
+    previous_expiry_date = models.DateField( null=True, blank=True, )
 
-    new_expiry_date = models.DateField(
-        null=True,
-        blank=True,
-    )
+    new_expiry_date = models.DateField( null=True, blank=True, )
 
-    previous_renewal_date = models.DateField(
-        null=True,
-        blank=True,
-    )
+    previous_renewal_date = models.DateField( null=True, blank=True, )
 
-    new_renewal_date = models.DateField(
-        null=True,
-        blank=True,
-    )
+    new_renewal_date = models.DateField( null=True, blank=True, )
 
     notes = models.TextField(blank=True)
 
@@ -714,8 +692,12 @@ class AgreementItemHistory(models.Model):
     """
     Historical lifecycle events for agreement item membership.
 
-    Tracks how assets move through agreement coverage
-    over time for auditing and operational traceability.
+    Currently, attachment and removal actions are
+    primarily tracked through AuditLog entries.
+
+    This model remains in place for future agreement
+    item lifecycle events should additional history
+    tracking be required.
     """
 
     class EventType(models.TextChoices):
