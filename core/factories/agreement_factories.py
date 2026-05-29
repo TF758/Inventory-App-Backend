@@ -5,6 +5,7 @@ import factory
 from django.utils import timezone
 
 from agreements.models.agreements import (
+    AgreementStatus,
     AssetAgreement,
     AssetAgreementItem,
     AgreementCoverage,
@@ -77,6 +78,30 @@ class AssetAgreementFactory(
     managing_department = factory.SubFactory(
         DepartmentFactory
     )
+
+
+    class Params:
+
+        expired = factory.Trait(
+            start_date=(
+                timezone.now().date()
+                - timedelta(days=365)
+            ),
+            expiry_date=(
+                timezone.now().date()
+                - timedelta(days=1)
+            ),
+            renewal_date=(
+                timezone.now().date()
+                - timedelta(days=31)
+            ),
+            status=AgreementStatus.EXPIRED,
+        )
+
+        no_expiry = factory.Trait(
+            expiry_date=None,
+            renewal_date=None,
+        )
 
 
 # -----------------------------------------------------
