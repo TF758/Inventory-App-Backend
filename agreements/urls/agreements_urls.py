@@ -3,6 +3,7 @@ from agreements.api.viewsets.agreement_coverage import AgreementCoverageViewSet
 from agreements.api.viewsets.agreement_item import AssetAgreementItemViewSet
 from agreements.api.viewsets.asset_agreement import AssetAgreementViewSet
 from agreements.api.viewsets.history import AgreementHistoryViewSet, AgreementItemHistoryViewSet
+from agreements.api.viewsets.agreement_lifecycle import AgreementLifecycleViewSet
 
 urlpatterns = [
 
@@ -22,6 +23,15 @@ urlpatterns = [
 
     path( "by-asset/", AssetAgreementViewSet.as_view({ "get": "by_asset", }), name="agreements-by-asset", ),
 
+    # =================================================
+    # Agreement Lifecycle
+    # =================================================
+
+    path( "<str:public_id>/terminate/", AgreementLifecycleViewSet.as_view({ "post": "terminate", }), name="agreement-terminate", ),
+
+    path( "<str:public_id>/extend/", AgreementLifecycleViewSet.as_view({ "post": "extend", }), name="agreement-extend", ),
+
+    path( "<str:public_id>/renew/", AgreementLifecycleViewSet.as_view({ "post": "renew", }), name="agreement-renew", ),
     # =================================================
     # Coverage Rules
     # =================================================
