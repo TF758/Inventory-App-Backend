@@ -47,10 +47,10 @@ class ScopeFilterMixin:
         #     raise PermissionDenied("Location-level roles cannot access this endpoint.")
 
         # Only filter for list action
-        if self.action == "list":
-            return filter_queryset_by_scope(self.request.user, queryset, model_class)
+        # if self.action == "list":
+        return filter_queryset_by_scope(self.request.user, queryset, model_class)
 
-        return queryset
+        # return queryset
 
 class RoleVisibilityMixin:
     """

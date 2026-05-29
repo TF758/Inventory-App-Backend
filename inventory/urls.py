@@ -21,6 +21,7 @@ urlpatterns = [
     # Domain endpoints
     path("analytics/", include("analytics.urls.analytics_url")),
     path("assets/", include("assets.urls.asset_urls")),
+    path("agreements/", include("agreements.urls.agreements_urls")),
     path("assignments/", include("assignments.urls.assignment_urls")),
     path("reports/", include("reporting.urls.report_urls")),
     path("sites/", include("sites.urls.site_urls")),

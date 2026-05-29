@@ -2,7 +2,7 @@
 from typing import Optional
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
-from assets.models.assets import Accessory, AssetAgreement, AssetAgreementItem, Component, Consumable, Equipment, EquipmentStatus
+from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from assignments.models.asset_assignment import ReturnRequest
 from core.models.audit import AuditLog
 from core.utils.scope.policies import POLICY_REGISTRY

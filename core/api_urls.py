@@ -1,6 +1,5 @@
 from django.urls import path, include
 
-from core.viewsets import agreement_viewsets
 
 from .viewsets import *
 
@@ -39,45 +38,4 @@ urlpatterns = [
     path("change-password/", auth_viewsets.ChangePasswordView.as_view(), name="password_change"),
     path("reset-password/validate-token/", general_viewsets.PasswordResetValidateView.as_view(), name="password-reset-validate"),
 
-
-        # ----------------------------
-    # Agreements
-    # ----------------------------
-
-    path("agreements/", agreement_viewsets.AssetAgreementViewSet.as_view({
-        "get": "list",
-        "post": "create"
-    }), name="agreements"),
-
-    path("agreements/expiring/", agreement_viewsets.AssetAgreementViewSet.as_view({
-        "get": "expiring"
-    }), name="agreements-expiring"),
-
-    path("agreements/<str:public_id>/assets/", agreement_viewsets.AssetAgreementViewSet.as_view({
-        "get": "assets"
-    }), name="agreement-assets"),
-
-    path("agreements/<str:public_id>/", agreement_viewsets.AssetAgreementViewSet.as_view({
-        "get": "retrieve",
-        "put": "update",
-        "patch": "partial_update",
-        "delete": "destroy"
-    }), name="agreement-detail"),
-
-
-    # ----------------------------
-    # Agreement Items
-    # ----------------------------
-
-    path("agreement-items/", agreement_viewsets.AssetAgreementItemViewSet.as_view({
-        "get": "list",
-        "post": "create"
-    }), name="agreement-items"),
-
-    path("agreement-items/<int:pk>/", agreement_viewsets.AssetAgreementItemViewSet.as_view({
-        "get": "retrieve",
-        "put": "update",
-        "patch": "partial_update",
-        "delete": "destroy"
-    }), name="agreement-item-detail"),
 ]
