@@ -45,8 +45,6 @@ def run_asset_import_task(self, report_job_id):
             )
 
             generate_report_task.delay(job.id)
-            if default_storage.exists(params["stored_file_name"]):
-                default_storage.delete(params["stored_file_name"])
 
         else:
             # Optional visibility into cancellation
@@ -109,3 +107,7 @@ def run_asset_import_task(self, report_job_id):
         job.save(update_fields=["status", "finished_at", "error", "result_payload"])
 
         raise
+
+    finally:
+        if default_storage.exists(params["stored_file_name"]):
+            default_storage.delete(params["stored_file_name"])
