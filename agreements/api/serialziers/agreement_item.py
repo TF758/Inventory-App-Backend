@@ -5,6 +5,7 @@ from assets.models.assets import Accessory, Consumable, Equipment
 from core.permissions.helpers import has_asset_custody_scope
 from agreements.models.agreements import AssetAgreement, AssetAgreementItem
 from agreements.services.coverage import can_attach_asset_to_agreement
+from agreements.service import is_asset_already_attached
 
 
 
@@ -134,7 +135,20 @@ class AssetAgreementItemWriteSerializer( serializers.ModelSerializer ):
                     "coverage scope."
                 )
             )
+        # -------------------------
+        # Duplicate Check
+        # -------------------------
 
+        if is_asset_already_attached(
+            agreement=attrs["agreement"],
+            asset=asset,
+        ):
+            raise serializers.ValidationError(
+                (
+                    "This asset is already "
+                    "attached to this agreement."
+                )
+            )
         attrs["asset"] = asset
 
         return attrs

@@ -2,7 +2,8 @@
 from django.db import transaction
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from agreements.models.agreements import ( AgreementStatus, AssetAgreement, AgreementHistory, )
+from agreements.models.agreements import ( AgreementStatus, AssetAgreement, AgreementHistory, AssetAgreementItem, )
+from assets.models.assets import Accessory, Consumable, Equipment
 
 
 class AgreementLifecycleService:
@@ -285,3 +286,65 @@ class AgreementLifecycleService:
 
         return agreement
 
+
+
+def is_asset_already_attached(
+    agreement: AssetAgreement,
+    asset,
+) -> bool:
+    """
+    Returns True if the asset is already
+    attached to the agreement.
+    """
+
+    if isinstance(asset, Equipment):
+        return AssetAgreementItem.objects.filter(
+            agreement=agreement,
+            equipment=asset,
+        ).exists()
+
+    if isinstance(asset, Accessory):
+        return AssetAgreementItem.objects.filter(
+            agreement=agreement,
+            accessory=asset,
+        ).exists()
+
+    if isinstance(asset, Consumable):
+        return AssetAgreementItem.objects.filter(
+            agreement=agreement,
+            consumable=asset,
+        ).exists()
+
+    return False
+
+def get_attached_agreement_ids(asset):
+    """
+    Returns agreement ids already attached
+    to the supplied asset.
+    """
+
+    if isinstance(asset, Equipment):
+        return AssetAgreementItem.objects.filter(
+            equipment=asset,
+        ).values_list(
+            "agreement_id",
+            flat=True,
+        )
+
+    if isinstance(asset, Accessory):
+        return AssetAgreementItem.objects.filter(
+            accessory=asset,
+        ).values_list(
+            "agreement_id",
+            flat=True,
+        )
+
+    if isinstance(asset, Consumable):
+        return AssetAgreementItem.objects.filter(
+            consumable=asset,
+        ).values_list(
+            "agreement_id",
+            flat=True,
+        )
+
+    return AssetAgreement.objects.none()

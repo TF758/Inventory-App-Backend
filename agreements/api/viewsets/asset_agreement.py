@@ -13,6 +13,7 @@ from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, resolve_asset_by_public_id
 from assets.models.assets import Accessory, Consumable, Equipment
+from agreements.service import get_attached_agreement_ids
 
 
 class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
@@ -302,7 +303,14 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
             if location
             else None
         )
-
+        attached_ids = get_attached_agreement_ids(
+            asset
+        )
+        print(
+            "Attached:",
+            list(attached_ids)
+        )
+    
         queryset = (
             self.get_queryset()
             .filter(
@@ -326,6 +334,29 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
                 )
             )
             .distinct()
+        )
+        print(
+        "Before exclude:",
+        queryset.count()
+        )
+
+        queryset = queryset.exclude( id__in=attached_ids, )
+
+        print(
+            "After exclude:",
+            queryset.count()
+        )
+        print(
+            "Attached Agreements:",
+            list(
+                AssetAgreement.objects.filter(
+                    id__in=attached_ids
+                ).values(
+                    "id",
+                    "public_id",
+                    "name",
+                )
+            )
         )
 
         page = self.paginate_queryset(

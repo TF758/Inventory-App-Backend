@@ -7,7 +7,8 @@ from core.mixins import AuditMixin, ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, AssetAgreementItemWriteSerializer
 from agreements.services.coverage import can_attach_asset_to_agreement
-
+from core.models.audit import AuditLog
+from rest_framework import status
 
 
 class AssetAgreementItemViewSet(AuditMixin, ScopeFilterMixin, viewsets.GenericViewSet, ):
@@ -97,56 +98,16 @@ class AssetAgreementItemViewSet(AuditMixin, ScopeFilterMixin, viewsets.GenericVi
         # Resolve Asset
         # --------------------------------
 
-        asset = (
-            validated_data.get(
-                "equipment"
-            )
-            or
-            validated_data.get(
-                "accessory"
-            )
-            or
-            validated_data.get(
-                "consumable"
-            )
-        )
-
-        # --------------------------------
-        # Eligibility Check
-        # --------------------------------
-
-        if not can_attach_asset_to_agreement(
-            agreement=agreement,
-            asset=asset,
-        ):
-
-            raise ValidationError(
-                {
-                    "non_field_errors": [
-                        (
-                            "This asset does not "
-                            "fall within the "
-                            "agreement coverage "
-                            "scope."
-                        )
-                    ]
-                }
-            )
-
-        # --------------------------------
-        # Save
-        # --------------------------------
+        asset = validated_data["asset"]
 
         item = serializer.save()
 
-        response_serializer = (
-            AssetAgreementItemSerializer(
-                item,
-                context={
-                    "request": request
-                },
-            )
+
+        response_serializer = AssetAgreementItemSerializer(
+            item,
+            context={"request": request},
         )
+
         self.audit(
             AuditLog.Events.AGREEMENT_ITEM_ATTACHED,
             target=item,
