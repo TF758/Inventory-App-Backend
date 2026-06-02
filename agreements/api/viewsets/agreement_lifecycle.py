@@ -8,6 +8,8 @@ from agreements.models.agreements import (
 from core.mixins import ( AuditMixin, ScopeFilterMixin, )
 from agreements.service import AgreementLifecycleService
 from core.models.audit import AuditLog
+from agreements.api.serialziers.agreement_lifecycle import ExtendAgreementSerializer, RenewAgreementSerializer
+
 
 
 class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericViewSet, ):
@@ -69,8 +71,10 @@ class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericV
     def extend( self, request, public_id=None, ):
 
         agreement = self.get_object()
+        previous_expiry_date = agreement.expiry_date
 
         serializer = ( ExtendAgreementSerializer( data=request.data ) )
+
 
         serializer.is_valid( raise_exception=True )
 
@@ -92,11 +96,6 @@ class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericV
                 ),
             )
         )
-        agreement = (
-            AgreementLifecycleService
-            .extend_agreement(...)
-        )
-
         self.audit(
             AuditLog.Events.AGREEMENT_EXTENDED,
             target=agreement,
@@ -111,13 +110,13 @@ class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericV
 
                 "agreement_name":
                     agreement.name,
+
                 "new_expiry_date":
-                    str(
-                        agreement.expiry_date
-                    ),
-                "previous_expiry_date": str(
-                        agreement.expiry_date
-                    ),
+                    str(agreement.expiry_date),
+
+                "previous_expiry_date":
+                    str(previous_expiry_date),
+
                 "performed_by":
                     request.user.email,
             },
@@ -142,6 +141,7 @@ class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericV
                 data=request.data
             )
         )
+
 
         serializer.is_valid( raise_exception=True )
         previous_expiry_date = ( agreement.expiry_date )

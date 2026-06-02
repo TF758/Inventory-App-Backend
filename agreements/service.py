@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from agreements.models.agreements import ( AgreementStatus, AssetAgreement, AgreementHistory, AssetAgreementItem, )
 from assets.models.assets import Accessory, Consumable, Equipment
-
+from django.utils import timezone
 
 class AgreementLifecycleService:
 
@@ -143,6 +143,11 @@ class AgreementLifecycleService:
             raise ValidationError(
                 "Agreement has no expiry date to extend."
             )
+        
+        if agreement.status == AgreementStatus.EXPIRED:
+            raise ValidationError(
+                "Expired agreements must be renewed rather than extended."
+            )
 
         if new_expiry_date <= agreement.expiry_date:
 
@@ -205,14 +210,22 @@ class AgreementLifecycleService:
 
         previous_status = ( agreement.status )
 
-        if ( agreement.status == AgreementStatus.TERMINATED ):
-            raise ValidationError( "Terminated agreements cannot be renewed." )
-        
+        if not new_renewal_date:
+            raise ValidationError(
+                "Renewal date is required."
+            )
+
+        # Cannot renew terminated agreements
+        if agreement.status == AgreementStatus.TERMINATED:
+            raise ValidationError(
+                "Terminated agreements cannot be renewed."
+            )
+
+        # New expiry must be later than current expiry
         if (
             previous_expiry_date
             and
-            new_expiry_date
-            <= previous_expiry_date
+            new_expiry_date <= previous_expiry_date
         ):
             raise ValidationError(
                 (
@@ -222,6 +235,25 @@ class AgreementLifecycleService:
                 )
             )
 
+        # Renewal date cannot be in the past
+        if (
+            new_renewal_date
+            and
+            new_renewal_date < timezone.localdate()
+        ):
+            raise ValidationError(
+                "Renewal date cannot be earlier than today."
+            )
+
+        # Renewal date must be before expiry date
+        if (
+            new_renewal_date
+            and
+            new_renewal_date >= new_expiry_date
+        ):
+            raise ValidationError(
+                "Renewal date must be before expiry date."
+            )
         agreement.expiry_date = (
             new_expiry_date
         )
