@@ -235,3 +235,6 @@ localhost.crt
 # Security scan outputs
 gitleaks.json
 gitleaks-*.json
+
+trivy-fs.json
+trivy-image.json
