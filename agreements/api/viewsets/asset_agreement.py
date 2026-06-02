@@ -9,14 +9,15 @@ from agreements.api.serialziers.agreement_coverage import AgreementCoverageSeria
 from agreements.api.serialziers.agreement_history import AgreementHistorySerializer
 from agreements.api.serialziers.asset_agreement import AssetAgreementSerializer, AssetAgreementWriteSerializer
 from agreements.models.agreements import  AgreementHistory, AssetAgreement,  CoverageScopeType
-from core.mixins import ScopeFilterMixin
+from core.mixins import AuditMixin, ScopeFilterMixin
+from core.models.audit import AuditLog
 from core.pagination import FlexiblePagination
 from agreements.api.serialziers.agreement_item import AssetAgreementItemSerializer, resolve_asset_by_public_id
 from assets.models.assets import Accessory, Consumable, Equipment
 from agreements.service import get_attached_agreement_ids
+from rest_framework import status
 
-
-class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
+class AssetAgreementViewSet( AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
 
     queryset = (
         AssetAgreement.objects

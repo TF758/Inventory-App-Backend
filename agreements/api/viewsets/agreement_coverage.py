@@ -2,12 +2,13 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from agreements.api.serialziers.agreement_coverage import AgreementCoverageSerializer, AgreementCoverageWriteSerializer
 from agreements.models.agreements import AgreementCoverage
-from core.mixins import ScopeFilterMixin
+from core.mixins import AuditMixin, ScopeFilterMixin
 from core.pagination import FlexiblePagination
+from core.models.audit import AuditLog
+from rest_framework import status
 
 
-
-class AgreementCoverageViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
+class AgreementCoverageViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
 
     queryset = (
         AgreementCoverage.objects
