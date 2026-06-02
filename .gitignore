@@ -227,3 +227,11 @@ staticfiles/
 
 logs/
 *.log
+
+# Local TLS certificates
+localhost.key
+localhost.crt
+
+# Security scan outputs
+gitleaks.json
+gitleaks-*.json
