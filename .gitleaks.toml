@@ -1,0 +1,15 @@
+title = "Inventory Backend Gitleaks Configuration"
+
+[allowlist]
+description = "Known false positives and local development artifacts"
+
+paths = [
+  '''localhost\.key''',
+  '''localhost\.crt''',
+  '''gitleaks.*\.json'''
+]
+
+fingerprints = [
+  "de8fdb1e97ada38e1e4b0d011155879e0f5f9a71:db_inventory/utils/tokens.py:generic-api-key:68",
+  "ff8895c22006ebc8a2d911f8fec2f2603f20818b:db_inventory/utils.py:generic-api-key:120"
+]
