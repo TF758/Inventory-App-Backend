@@ -306,10 +306,7 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
         attached_ids = get_attached_agreement_ids(
             asset
         )
-        print(
-            "Attached:",
-            list(attached_ids)
-        )
+
     
         queryset = (
             self.get_queryset()
@@ -335,30 +332,9 @@ class AssetAgreementViewSet( ScopeFilterMixin, viewsets.ModelViewSet, ):
             )
             .distinct()
         )
-        print(
-        "Before exclude:",
-        queryset.count()
-        )
 
         queryset = queryset.exclude( id__in=attached_ids, )
-
-        print(
-            "After exclude:",
-            queryset.count()
-        )
-        print(
-            "Attached Agreements:",
-            list(
-                AssetAgreement.objects.filter(
-                    id__in=attached_ids
-                ).values(
-                    "id",
-                    "public_id",
-                    "name",
-                )
-            )
-        )
-
+        
         page = self.paginate_queryset(
             queryset
         )

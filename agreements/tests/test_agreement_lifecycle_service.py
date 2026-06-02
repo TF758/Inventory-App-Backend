@@ -378,6 +378,9 @@ class AgreementLifecycleServiceTests(TestCase):
                 date.today()
                 + timedelta(days=365)
             ),
+            new_renewal_date=(
+                date.today()+ timedelta(days=330)
+            ),
             user=self.user,
         )
 
