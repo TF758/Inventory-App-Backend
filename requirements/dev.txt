@@ -1,0 +1,4 @@
+-r base.txt
+
+django-extensions==3.2.3
+ruff==0.4.5
