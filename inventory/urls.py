@@ -10,7 +10,7 @@ from drf_spectacular.views import (
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-     path("monitoring/metrics/", include("django_prometheus.urls")),
+    path("", include("django_prometheus.urls")),
 
     # API Documentation
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
