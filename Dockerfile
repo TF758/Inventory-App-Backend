@@ -9,11 +9,12 @@ WORKDIR /app
 # Copy uv binary
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy dependency file first for caching
-COPY requirements.txt .
+COPY requirements/base.txt requirements/base.txt
+COPY requirements/dev.txt requirements/dev.txt
+COPY requirements/test.txt requirements/test.txt
 
-# Install dependencies (system environment)
-RUN uv pip install --system -r requirements.txt
+RUN uv pip install --system -r requirements/dev.txt
+RUN uv pip install --system -r requirements/test.txt
 
 # Copy application code
 COPY . .
