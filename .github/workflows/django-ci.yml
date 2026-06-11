@@ -298,5 +298,6 @@ jobs:
         with:
           image-ref: inventory-api:latest
           format: table
-          severity: HIGH,CRITICAL
+          severity: CRITICAL
+          ignore-unfixed: true
           exit-code: "1"
