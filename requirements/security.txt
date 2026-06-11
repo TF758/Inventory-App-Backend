@@ -1,0 +1,2 @@
+bandit==1.7.8
+pip_audit==2.7.3

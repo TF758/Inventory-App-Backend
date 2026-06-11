@@ -43,7 +43,7 @@ source .venv/bin/activate
 # Windows
 .venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install -r requirements/dev.txt
 
 cp .env.example .env.dev
 
@@ -171,8 +171,17 @@ source .venv/bin/activate
 
 ```bash
 # Install Python packages
-pip install -r requirements.txt
+pip install -r requirements/dev.txt
 ```
+
+The project now uses modular requirements:
+
+requirements/
+├── base.txt # Runtime dependencies
+├── dev.txt # Development dependencies
+├── test.txt # Testing dependencies
+├── security.txt # Security tooling
+└── perf.txt # Performance testing
 
 ---
 
@@ -431,18 +440,6 @@ lsof -i :6379
 # Stop the conflicting process or modify .env.dev to use different ports
 ```
 
-### psycopg2 Installation Issues
-
-If you encounter errors installing `psycopg2`:
-
-```bash
-# Windows: Install Visual C++ Build Tools, then:
-pip install psycopg2-binary
-
-# Or use:
-pip install psycopg2
-```
-
 ---
 
 ## Project Structure
@@ -451,7 +448,12 @@ pip install psycopg2
 Inventory-App-Backend/
 ├── .env.dev              # Environment variables (your local config)
 ├── manage.py             # Django management script
-├── requirements.txt      # Python dependencies
+├── requirements/
+│   ├── base.txt
+│   ├── dev.txt
+│   ├── test.txt
+│   ├── security.txt
+│   └── perf.txt
 │
 ├── core/                 # Shared infrastructure
 ├── assets/               # Asset management

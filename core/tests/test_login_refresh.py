@@ -311,8 +311,8 @@ class RefreshTokenViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         cookie = response.cookies["refresh"]
-        self.assertEqual(bool(cookie["secure"]), settings.COOKIE_SECURE)
-        self.assertEqual(cookie["samesite"], settings.COOKIE_SAMESITE)
+        self.assertEqual(bool(cookie["secure"]), settings.SESSION_COOKIE_SECURE)
+        self.assertEqual(cookie["samesite"], settings.SESSION_COOKIE_SAMESITE)
         self.assertTrue(cookie["httponly"])
         self.assertEqual(cookie["path"], "/")
 

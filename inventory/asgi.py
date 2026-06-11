@@ -1,7 +1,13 @@
 import os
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory.settings")
+os.environ.setdefault(
+    "DJANGO_SETTINGS_MODULE",
+    os.getenv(
+        "DJANGO_SETTINGS_MODULE",
+        "inventory.settings"
+    )
+)
 
 django.setup()
 

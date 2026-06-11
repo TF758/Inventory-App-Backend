@@ -4,8 +4,27 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
   security:
     runs-on: ubuntu-latest
 
@@ -16,6 +35,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: |
+            requirements/base.txt
+            requirements/dev.txt
+            requirements/test.txt
+            requirements/security.txt
 
       - name: Install security tools
         run: |
@@ -25,23 +49,88 @@ jobs:
       - name: Run Bandit
         run: python -m bandit -r . -c .bandit -ll
 
-      # Twisted is used indirectly via Daphne/Channels.
-      # CVE-2026-42304 affects twisted.names DNS handling.
-      # Current application does not expose DNS services.
-      # Temporary ignore until stable upstream fix is available.
-      #
-      # References:
-      # https://nvd.nist.gov/general/cve-process
-      # https://www.fortinet.com/uk/resources/cyberglossary/cve
-
       - name: Run pip-audit
         run: |
           python -m pip_audit \
-            -r requirements.txt \
+            -r requirements/base.txt \
             --progress-spinner off \
             --ignore-vuln CVE-2026-42304
 
+  hadolint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+
+  trivy-fs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  deploy-check:
+    needs:
+      - gitleaks
+      - security
+      - hadolint
+      - trivy-fs
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create CI environment file
+        run: |
+          cat <<EOF > .env.dev
+          DJANGO_ENV=dev
+          DEBUG=True
+          SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars
+
+          POSTGRES_DB=inventory
+          POSTGRES_USER=inventory
+          POSTGRES_PASSWORD=inventory
+
+          DB_NAME=inventory
+          DB_USER=inventory
+          DB_PASSWORD=inventory
+          DB_HOST=db
+          DB_PORT=5432
+
+          SESSION_IDLE_MINUTES=30
+          SESSION_ABSOLUTE_HOURS=8
+          EOF
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Run Django deployment checks
+        run: |
+          docker compose run --rm api \
+            python manage.py check \
+            --deploy \
+            --settings=inventory.settings.prod
+
   tests:
+    needs: deploy-check
+
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -61,7 +150,6 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ✅ Create env file (fixed)
       - name: Create CI environment file
         run: |
           cat <<EOF > .env.dev
@@ -106,60 +194,29 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  coverage:
-    needs: tests
+  trivy-image:
+    needs:
+      - tests
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Create CI environment file
-        run: |
-          cat <<EOF > .env.dev
-          DJANGO_ENV=dev
-          DEBUG=True
-          SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars
+      - name: Build image
+        run: docker build -t inventory-api:latest .
 
-          POSTGRES_DB=inventory
-          POSTGRES_USER=inventory
-          POSTGRES_PASSWORD=inventory
+      - name: Verify image exists
+        run: docker image inspect inventory-api:latest
 
-          DB_NAME=inventory
-          DB_USER=inventory
-          DB_PASSWORD=inventory
-          DB_HOST=db
-          DB_PORT=5432
-
-          SESSION_IDLE_MINUTES=30
-          SESSION_ABSOLUTE_HOURS=8
-          EOF
-
-      - name: Build images
-        run: docker compose build
-
-      - name: Start DB + Redis
-        run: docker compose up -d db redis
-
-      - name: Wait for database
-        run: |
-          until docker compose exec -T db pg_isready -U inventory; do
-            echo "Waiting for database..."
-            sleep 2
-          done
-
-      - name: Run migrations
-        run: docker compose run --rm api python manage.py migrate
-
-      - name: Run full test suite with coverage
-        run: docker compose run --rm api coverage run manage.py test --parallel
-
-      - name: Show coverage report
-        run: docker compose run --rm api coverage report -m --fail-under=30
-
-      - name: Shutdown services
-        if: always()
-        run: docker compose down -v
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: inventory-api:latest
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"

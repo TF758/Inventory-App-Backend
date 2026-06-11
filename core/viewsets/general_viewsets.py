@@ -385,8 +385,8 @@ class SessionTokenLoginView(TokenObtainPairView):
             key="refresh",
             value=raw_refresh,
             httponly=True,
-            secure=settings.COOKIE_SECURE,
-            samesite=settings.COOKIE_SAMESITE,
+            secure=settings.SESSION_COOKIE_SECURE,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
             path="/",
             max_age=int(
                 get_session_absolute_lifetime()
@@ -625,8 +625,8 @@ class RefreshAPIView(APIView):
                 key="refresh",
                 value=new_raw_refresh,
                 httponly=True,
-                secure=settings.COOKIE_SECURE,
-                samesite=settings.COOKIE_SAMESITE,
+                secure=settings.SESSION_COOKIE_SECURE,
+                samesite=settings.SESSION_COOKIE_SAMESITE,
                 path="/",
                 max_age=int(get_session_absolute_lifetime().total_seconds()),
             )
