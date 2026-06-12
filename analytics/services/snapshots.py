@@ -16,7 +16,8 @@ from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max
 
 from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
-
+from decimal import Decimal
+from django.db.models import DecimalField
 
 User = get_user_model()
 
@@ -37,6 +38,40 @@ def generate_daily_system_metrics(for_date=None):
     base_consumables = Consumable.objects.filter(is_deleted=False)
     base_accessories = Accessory.objects.filter(is_deleted=False)
 
+    equipment_value = ( base_equipment.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
+
+    consumable_value = (
+        base_consumables.aggregate(
+            total=Sum(
+                F("quantity") * F("unit_cost"),
+                output_field=DecimalField(
+                    max_digits=18,
+                    decimal_places=2,
+                ),
+            )
+        )["total"]
+        or Decimal("0.00")
+    )
+
+    accessory_value = (
+        base_accessories.aggregate(
+            total=Sum(
+                F("quantity") * F("unit_cost"),
+                output_field=DecimalField(
+                    max_digits=18,
+                    decimal_places=2,
+                ),
+            )
+        )["total"]
+        or Decimal("0.00")
+    )
+
+    total_inventory_value = (
+        equipment_value
+        + consumable_value
+        + accessory_value
+    )
+
     active_equipment = base_equipment.filter(
         status__in=[
             EquipmentStatus.OK,
@@ -44,6 +79,7 @@ def generate_daily_system_metrics(for_date=None):
             EquipmentStatus.DAMAGED,
         ]
     )
+    
 
     with transaction.atomic():
         obj, created = DailySystemMetrics.objects.get_or_create(
@@ -147,7 +183,14 @@ def generate_daily_system_metrics(for_date=None):
                     base_accessories.aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
+
+                "total_equipment_value": equipment_value,
+                "total_consumable_value": consumable_value,
+                "total_accessory_value": accessory_value,
+                "total_inventory_value": total_inventory_value,
             },
+
+            
         )
 
     return created
@@ -190,6 +233,11 @@ def generate_daily_department_snapshot(
     consumables_qs = Consumable.objects.filter( room__in=rooms_qs)
 
     accessories_qs = Accessory.objects.filter( room__in=rooms_qs)
+
+    equipment_value = ( equipment_qs.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
+    consumable_value = ( consumables_qs.aggregate( total=Sum( F("quantity") * F("unit_cost"), output_field=DecimalField( max_digits=18, decimal_places=2, ), ) )["total"] or Decimal("0.00") )
+    accessory_value = ( accessories_qs.aggregate( total=Sum( F("quantity") * F("unit_cost"), output_field=DecimalField( max_digits=18, decimal_places=2, ), ) )["total"] or Decimal("0.00") )
+    total_inventory_value = ( equipment_value + consumable_value + accessory_value )    
 
     # -------------------------------------------------
     # Returns (scoped via items → room)
@@ -246,18 +294,8 @@ def generate_daily_department_snapshot(
 
     returns_processed_last_24h = return_requests_qs.filter( processed_at__gte=last_24h ).count()
 
-    base_equipment = Equipment.objects.filter(is_deleted=False)
 
-    active_equipment = base_equipment.filter(
-        status__in=[
-            EquipmentStatus.OK,
-            EquipmentStatus.UNDER_REPAIR,
-            EquipmentStatus.DAMAGED,
-        ]
-    )
-
-    base_consumables = Consumable.objects.filter(is_deleted=False)
-    base_accessories = Accessory.objects.filter(is_deleted=False)
+    
         # -------------------------------------------------
         # Atomic get_or_create
     # -------------------------------------------------
@@ -279,20 +317,18 @@ def generate_daily_department_snapshot(
                 "total_rooms": rooms_qs.count(),
 
                # Inventory metrics
-                "total_equipment": base_equipment.count(),
-                "equipment_ok": active_equipment.filter(status=EquipmentStatus.OK).count(),
-                "equipment_under_repair": active_equipment.filter(status=EquipmentStatus.UNDER_REPAIR).count(),
-                "equipment_damaged": active_equipment.filter(status=EquipmentStatus.DAMAGED).count(),
+                "total_equipment": equipment_qs.count(),
 
-                "total_components": Component.objects.count(),
-                "total_components_quantity": Component.objects.aggregate( total=Sum("quantity") )["total"] or 0,
+                "equipment_ok": equipment_qs.filter( status=EquipmentStatus.OK ).count(),
+                "equipment_under_repair": equipment_qs.filter( status=EquipmentStatus.UNDER_REPAIR ).count(),
+                "equipment_damaged": equipment_qs.filter( status=EquipmentStatus.DAMAGED ).count(),
 
-                "total_consumables": base_consumables.count(),
-                "total_consumables_quantity": base_consumables.aggregate( total=Sum("quantity") )["total"] or 0,
+                "total_consumables": consumables_qs.count(),
+                "total_consumables_quantity": consumables_qs.aggregate( total=Sum("quantity") )["total"] or 0,
 
-                "total_accessories": base_accessories.count(),
-                "total_accessories_quantity": base_accessories.aggregate( total=Sum("quantity") )["total"] or 0,
-                # -------------------------
+                "total_accessories": accessories_qs.count(),
+                "total_accessories_quantity": accessories_qs.aggregate( total=Sum("quantity") )["total"] or 0,
+                                # -------------------------
                 # Return metrics
                 # -------------------------
                 "total_return_requests": total_return_requests,
@@ -303,6 +339,13 @@ def generate_daily_department_snapshot(
 
                 "returns_created_last_24h": returns_created_last_24h,
                 "returns_processed_last_24h": returns_processed_last_24h,
+
+                # Price Info
+
+                "total_equipment_value": equipment_value,
+                "total_consumable_value": consumable_value,
+                "total_accessory_value": accessory_value,
+                "total_inventory_value": total_inventory_value,
             },
         )
 

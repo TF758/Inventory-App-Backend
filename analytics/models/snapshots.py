@@ -48,6 +48,13 @@ class DailyDepartmentSnapshot(models.Model):
     denied_return_requests = models.PositiveIntegerField(default=0)
     partial_return_requests = models.PositiveIntegerField(default=0)
 
+    # pricing
+
+    total_equipment_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+    total_accessory_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+    total_consumable_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+    total_inventory_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+
     # Optional (activity)
     returns_created_last_24h = models.PositiveIntegerField(default=0)
     returns_processed_last_24h = models.PositiveIntegerField(default=0)

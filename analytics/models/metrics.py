@@ -27,6 +27,12 @@ class DailySystemMetrics(models.Model):
     equipment_under_repair = models.PositiveIntegerField(default=0)
     equipment_damaged = models.PositiveIntegerField(default=0)
 
+    # Pricing Metrics
+    total_equipment_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+    total_accessory_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+    total_consumable_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+    total_inventory_value = models.DecimalField( max_digits=18, decimal_places=2, default=0, )
+
     total_components = models.PositiveIntegerField(default=0)
     total_components_quantity = models.PositiveIntegerField(default=0)
     total_consumables = models.PositiveIntegerField(default=0)
