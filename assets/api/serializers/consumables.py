@@ -14,6 +14,7 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
         fields = (
             "name",
             "quantity",
+            "unit_cost",
             "low_stock_threshold",
             "description",
             "room",
@@ -50,6 +51,13 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
         if value > 100_000:
             raise serializers.ValidationError( "Low stock threshold is unreasonably large." )
         return value
+    
+    def validate_unit_cost(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError(
+                "Unit cost cannot be negative."
+            )
+        return value
 
     # ---------- Object-level validation ----------
 
@@ -62,6 +70,7 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
 
 class ConsumableAreaReaSerializer(serializers.ModelSerializer):
     is_low_stock = serializers.BooleanField(read_only=True)
+    inventory_value = serializers.DecimalField( source="inventory_value", max_digits=12, decimal_places=2, read_only=True, )
 
     room_id = serializers.CharField(source='room.public_id', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
@@ -78,6 +87,8 @@ class ConsumableAreaReaSerializer(serializers.ModelSerializer):
             'public_id',
             'name',
             'quantity',
+            "unit_cost",
+            "inventory_value",
             "low_stock_threshold",
             "is_low_stock",
             'description',

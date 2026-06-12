@@ -42,6 +42,8 @@ class Equipment(PublicIDModel):
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    purchase_price = models.DecimalField( max_digits=12, decimal_places=2, null=True, blank=True, )
+    purchase_date = models.DateField( null=True, blank=True, )
 ```
 
 Features:
@@ -51,6 +53,8 @@ Features:
 - Room-based location
 - Soft delete with audit trail
 - Assignment tracking via `current_holder` property
+- Purchase date tracking
+- Purchase price tracking
 
 ### Accessory
 
@@ -63,6 +67,7 @@ class Accessory(PublicIDModel):
     name = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.PositiveIntegerField(default=0)
+    unit_cost = models.DecimalField( max_digits=10, decimal_places=2, null=True, blank=True, )
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -72,6 +77,7 @@ Features:
 
 - Optional serial number tracking
 - Quantity support for bulk accessories
+- Unit cost tracking
 - Room-based location
 - Soft delete
 
@@ -87,6 +93,7 @@ class Consumable(PublicIDModel):
     description = models.TextField(blank=True, max_length=255)
     quantity = models.PositiveIntegerField(default=0)
     low_stock_threshold = models.PositiveIntegerField(default=0)
+    unit_cost = models.DecimalField( max_digits=10, decimal_places=2, null=True, blank=True, )
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -95,6 +102,8 @@ class Consumable(PublicIDModel):
 Features:
 
 - Quantity tracking with non-negative constraint
+- Unit cost tracking
+- Inventory valuation support
 - Low stock threshold alerts via `is_low_stock` property
 - Room-based storage
 - Soft delete
@@ -104,6 +113,9 @@ Features:
 - Unique public ID generation (EQ, AC, CON prefixes)
 - Status tracking for equipment (OK, damaged, under repair, lost, retired, condemned)
 - Room-based location tracking
+- Equipment purchase date and purchase price tracking
+- Unit cost tracking for accessories and consumables
+- Inventory valuation support
 - Serial number validation for equipment and accessories
 - Quantity tracking for accessories and consumables
 - Low stock threshold alerts for consumables
@@ -155,7 +167,7 @@ class Accessory(PublicIDModel):
     PUBLIC_ID_PREFIX = "AC"  # Generates AC-XXXXX
 
 class Consumable(PublicIDModel):
-    PUBLIC_ID_PREFIX = "CS"  # Generates CS-XXXXX
+    PUBLIC_ID_PREFIX = "CON"  # Generates CON-XXXXX
 
 class Component(PublicIDModel):
     PUBLIC_ID_PREFIX = "COM" # Generates COM-XXXXX
@@ -225,8 +237,10 @@ equipment = Equipment.objects.create(
     brand="Dell",
     model="XPS 15",
     serial_number="SN123456",
+    purchase_price=8500.00,
+    purchase_date="2025-02-15",
     status=EquipmentStatus.OK,
-    room=room
+    room=room,
 )
 # Generates public_id: EQ-XXXXX
 ```
@@ -240,7 +254,8 @@ accessory = Accessory.objects.create(
     name="USB-C Hub",
     serial_number="USB123456",
     quantity=10,
-    room=room
+    unit_cost=75.00,
+    room=room,
 )
 # Generates public_id: AC-XXXXX
 ```
@@ -252,11 +267,12 @@ from assets.models import Consumable
 
 consumable = Consumable.objects.create(
     name="A4 Paper Ream",
-    description="White A4 printer paper, 500 sheets",
     quantity=50,
+    unit_cost=12.50,
     low_stock_threshold=10,
-    room=room
+    room=room,
 )
+
 # Generates public_id: CON-XXXXX
 
 # Check low stock

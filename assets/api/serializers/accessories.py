@@ -28,7 +28,7 @@ class AccessoryWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Accessory
-        fields = ("name", "serial_number", "quantity", "room")
+        fields = ("name", "serial_number", "unit_cost",  "quantity", "room")
 
     # ---------- Field-level validation ----------
 
@@ -79,6 +79,8 @@ class AccessoryFullSerializer(serializers.ModelSerializer):
             'serial_number',
             'quantity',
             'available_quantity',
+            "unit_cost",
+            "inventory_value",
             'is_deleted',
             'deleted_at',
             'room_id',

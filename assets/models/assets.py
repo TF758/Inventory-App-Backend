@@ -30,6 +30,8 @@ class Equipment(PublicIDModel):
     model = models.CharField(max_length=100, blank=True)
     serial_number = models.CharField(max_length=50, unique=True, blank=True, null=True,  validators=[serial_validator])
     status = models.CharField(max_length=20,choices=EquipmentStatus.choices,default=EquipmentStatus.OK,db_index=True, null=True)
+    purchase_price = models.DecimalField( max_digits=12, decimal_places=2, null=True, blank=True, )
+    purchase_date = models.DateField( null=True, blank=True, )
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="equipment")
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -118,6 +120,7 @@ class Consumable(PublicIDModel):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, max_length=255)
     quantity = models.PositiveIntegerField(default=0)
+    unit_cost = models.DecimalField( max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost per individual unit" )
     low_stock_threshold = models.PositiveIntegerField( default=0, help_text="Alert when available quantity is at or below this value" )
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="consumables")
     is_deleted = models.BooleanField(default=False)
@@ -136,6 +139,10 @@ class Consumable(PublicIDModel):
     def is_low_stock(self) -> bool:
         return (self.low_stock_threshold > 0 and self.quantity <= self.low_stock_threshold)
     
+    @property
+    def inventory_value(self):
+        return (self.unit_cost or 0) * self.quantity
+    
     def audit_label(self) -> str:
         return self.name
 
@@ -145,6 +152,7 @@ class Accessory(PublicIDModel):
     name = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True, blank=True, null=True)
     quantity = models.PositiveIntegerField(default=0)
+    unit_cost = models.DecimalField( max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost per individual unit" )
     room = models.ForeignKey(Room,on_delete=models.SET_NULL,null=True,blank=True,related_name="accessories")
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -168,6 +176,10 @@ class Accessory(PublicIDModel):
     @property
     def available_quantity(self) -> int:
         return self.quantity - self.assigned_quantity
+    
+    @property
+    def inventory_value(self):
+        return (self.unit_cost or 0) * self.quantity
 
     def __str__(self):
         return self.name

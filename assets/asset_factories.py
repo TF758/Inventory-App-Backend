@@ -13,6 +13,8 @@ class EquipmentFactory(factory.django.DjangoModelFactory):
     brand = factory.LazyFunction(fake.company)
     model = factory.LazyFunction(fake.word)
     serial_number = factory.Sequence(lambda n: f'SN{n}')
+    purchase_price = factory.Faker( "pydecimal", left_digits=5, right_digits=2, positive=True, )
+    purchase_date = factory.Faker( "date_between", start_date="-5y", end_date="today", )
     room = factory.SubFactory(RoomFactory)
 
 
@@ -25,6 +27,7 @@ class ComponentFactory(factory.django.DjangoModelFactory):
     model = factory.Faker("word")
     serial_number = factory.Sequence(lambda n: f'SN{n}')
     quantity = factory.Faker("random_int", min=1, max=40)
+    unit_cost = factory.Faker( "pydecimal", left_digits=4, right_digits=2, positive=True, )
     equipment = factory.SubFactory(EquipmentFactory)
 
 
@@ -35,6 +38,8 @@ class AccessoryFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f'Accessory {n}')
     serial_number = factory.Sequence(lambda n: f'SN{n}')
     quantity = factory.Faker("random_int", min=1, max=100)
+    unit_cost = factory.Faker( "pydecimal", left_digits=4, right_digits=2, positive=True, )
+
     room = factory.SubFactory(RoomFactory)
 
 
