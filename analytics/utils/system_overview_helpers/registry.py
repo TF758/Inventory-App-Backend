@@ -1,5 +1,4 @@
-# registry.py
-
+from .valuation import build_asset_value_trends
 
 from .security import build_security_trends, build_session_trends
 from .assets import build_asset_trends, build_user_trends
@@ -17,4 +16,5 @@ SECTION_BUILDERS = {
     "return_flow": build_return_flow_trends,
     "return_state": build_return_state_trends,
     "return_performance": build_return_performance_trends,
+    "asset_value": build_asset_value_trends,
 }
