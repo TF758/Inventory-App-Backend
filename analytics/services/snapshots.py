@@ -8,6 +8,13 @@ import datetime
 from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from core.models.security import PasswordResetEvent
 from core.models.sessions import UserSession
+from assets.selectors.accessories import department_accessories_queryset
+from assets.selectors.base import accessory_queryset, consumable_queryset, equipment_queryset
+
+from assets.selectors.consumables import department_consumables_queryset
+from assets.selectors.equipment import department_equipment_queryset
+from users.selectors.users import department_admins_queryset, department_users_queryset
+from assignments.selectors.returns import department_return_requests_queryset
 from sites.models.sites import Department, Location, Room
 from core.models.audit import AuditLog
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
@@ -34,14 +41,14 @@ def generate_daily_system_metrics(for_date=None):
     )
     end = start + timedelta(days=1)
 
-    base_equipment = Equipment.objects.filter(is_deleted=False)
-    base_consumables = Consumable.objects.filter(is_deleted=False)
-    base_accessories = Accessory.objects.filter(is_deleted=False)
+    equipment = equipment_queryset()
+    consumables = consumable_queryset()
+    accessories = accessory_queryset()
 
-    equipment_value = ( base_equipment.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
+    equipment_value = ( equipment.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
 
     consumable_value = (
-        base_consumables.aggregate(
+        consumables.aggregate(
             total=Sum(
                 F("quantity") * F("unit_cost"),
                 output_field=DecimalField(
@@ -54,7 +61,7 @@ def generate_daily_system_metrics(for_date=None):
     )
 
     accessory_value = (
-        base_accessories.aggregate(
+        accessories.aggregate(
             total=Sum(
                 F("quantity") * F("unit_cost"),
                 output_field=DecimalField(
@@ -72,7 +79,7 @@ def generate_daily_system_metrics(for_date=None):
         + accessory_value
     )
 
-    active_equipment = base_equipment.filter(
+    active_equipment = equipment.filter(
         status__in=[
             EquipmentStatus.OK,
             EquipmentStatus.UNDER_REPAIR,
@@ -151,7 +158,7 @@ def generate_daily_system_metrics(for_date=None):
                 # -------------------------
                 # Inventory metrics
                 # -------------------------
-                "total_equipment": base_equipment.count(),
+                "total_equipment": equipment.count(),
 
                 "equipment_ok": active_equipment.filter( status=EquipmentStatus.OK ).count(),
 
@@ -169,18 +176,18 @@ def generate_daily_system_metrics(for_date=None):
                     )["total"] or 0,
 
                 # Consumables
-                "total_consumables": base_consumables.count(),
+                "total_consumables": consumables.count(),
 
                 "total_consumables_quantity":
-                    base_consumables.aggregate(
+                    consumables.aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
 
                 # Accessories
-                "total_accessories": base_accessories.count(),
+                "total_accessories": accessories.count(),
 
                 "total_accessories_quantity":
-                    base_accessories.aggregate(
+                    accessories.aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
 
@@ -219,7 +226,7 @@ def generate_daily_department_snapshot(
     # -------------------------------------------------
     rooms_qs = Room.objects.filter(location__department=department)
 
-    equipment_qs = Equipment.objects.filter(room__in=rooms_qs, is_deleted=False)
+    equipment_qs = department_equipment_queryset( department )
     active_equipment_qs = equipment_qs.filter(
     status__in=[
         EquipmentStatus.OK,
@@ -230,9 +237,9 @@ def generate_daily_department_snapshot(
     total_equipment = active_equipment_qs.count()
     components_qs = Component.objects.filter(equipment__room__in=rooms_qs)
 
-    consumables_qs = Consumable.objects.filter( room__in=rooms_qs)
+    consumables_qs = department_consumables_queryset(department)
 
-    accessories_qs = Accessory.objects.filter( room__in=rooms_qs)
+    accessories_qs = department_accessories_queryset( department )
 
     equipment_value = ( equipment_qs.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
     consumable_value = ( consumables_qs.aggregate( total=Sum( F("quantity") * F("unit_cost"), output_field=DecimalField( max_digits=18, decimal_places=2, ), ) )["total"] or Decimal("0.00") )
@@ -242,44 +249,17 @@ def generate_daily_department_snapshot(
     # -------------------------------------------------
     # Returns (scoped via items → room)
     # -------------------------------------------------
-    return_items_qs = ReturnRequestItem.objects.filter(
-        room__in=rooms_qs
-    )
 
-    request_ids = return_items_qs.values_list(
-        "return_request_id",
-        flat=True
-    ).distinct()
-
-    return_requests_qs = ReturnRequest.objects.filter(
-        id__in=request_ids
-    )
+    return_requests_qs =  department_return_requests_queryset( department ) 
 
     # -------------------------------------------------
     # Users (current assignments only)
     # -------------------------------------------------
-    users_qs = User.objects.filter(
-        user_placements__is_current=True,
-        user_placements__room__in=rooms_qs,
-    ).distinct()
+    users_qs = department_users_queryset( department )
 
     total_users = users_qs.count()
 
-    admin_roles = [
-        "DEPARTMENT_ADMIN",
-        "LOCATION_ADMIN",
-        "ROOM_ADMIN",
-        "SITE_ADMIN",
-    ]
-
-    total_admins = users_qs.filter(
-        role_assignments__role__in=admin_roles
-    ).filter(
-        Q(role_assignments__department=department) |
-        Q(role_assignments__location__department=department) |
-        Q(role_assignments__room__location__department=department) |
-        Q(role_assignments__role="SITE_ADMIN")
-    ).distinct().count()
+    total_admins = department_admins_queryset(department).count()
 
     total_return_requests = return_requests_qs.count()
     pending_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.PENDING ).count()

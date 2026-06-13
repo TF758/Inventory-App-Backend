@@ -70,7 +70,7 @@ class ConsumableWriteSerializer(serializers.ModelSerializer):
 
 class ConsumableAreaReaSerializer(serializers.ModelSerializer):
     is_low_stock = serializers.BooleanField(read_only=True)
-    inventory_value = serializers.DecimalField( source="inventory_value", max_digits=12, decimal_places=2, read_only=True, )
+    inventory_value = serializers.DecimalField(  max_digits=12, decimal_places=2, read_only=True, )
 
     room_id = serializers.CharField(source='room.public_id', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
