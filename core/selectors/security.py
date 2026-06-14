@@ -43,11 +43,10 @@ def login_auditlogs_created_within_period_queryset(period):
 
 def active_password_reset_queryset():
     """returns all active password resets that have not been used/expired"""
-    now = now or timezone.now()
     return PasswordResetEvent.objects.filter(
         is_active=True,
         used_at__isnull=True,
-        expires_at__gte=now,
+        expires_at__gte=timezone.now(),
     )
 
 def password_reset_events_queryset( *, created_after=None, created_before=None, admin_initiated=None, ):

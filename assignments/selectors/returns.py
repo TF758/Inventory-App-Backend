@@ -1,4 +1,5 @@
-from assignments.models import ReturnRequest, ReturnRequestItem
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
+
 
 def pending_return_request_items_queryset():
     """returns all returns requet items that are currently pending"""

@@ -165,14 +165,14 @@ def get_security_health():
     # -------------------------
     # User Security Signals
     # -------------------------
-    locked_users = locked_users_queryset.count()
+    locked_users = locked_users_queryset().count()
 
-    forced_password_change_users = forced_password_change_users_queryset.count()
+    forced_password_change_users = forced_password_change_users_queryset().count()
 
     # -------------------------
     # Password Reset Signals
     # -------------------------
-    active_password_resets = active_password_reset_queryset.count()
+    active_password_resets = active_password_reset_queryset().count()
 
     user_initiated_resets_last_24hrs = (
         password_reset_events_queryset(
@@ -207,7 +207,7 @@ def get_return_health():
     # -------------------------
     pending_requests =  return_requests_queryset( status=ReturnRequest.Status.PENDING ).count() 
 
-    pending_items = pending_return_request_items_queryset.count()
+    pending_items = pending_return_request_items_queryset().count()
 
     # -------------------------
     # Aging (VERY important)

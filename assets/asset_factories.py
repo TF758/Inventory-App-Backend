@@ -27,7 +27,7 @@ class ComponentFactory(factory.django.DjangoModelFactory):
     model = factory.Faker("word")
     serial_number = factory.Sequence(lambda n: f'SN{n}')
     quantity = factory.Faker("random_int", min=1, max=40)
-    unit_cost = factory.Faker( "pydecimal", left_digits=4, right_digits=2, positive=True, )
+    # unit_cost = factory.Faker( "pydecimal", left_digits=4, right_digits=2, positive=True, )
     equipment = factory.SubFactory(EquipmentFactory)
 
 
@@ -50,4 +50,5 @@ class ConsumableFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f'Consumable {n}')
     description = factory.Faker("text", max_nb_chars=50)
     quantity = factory.Faker("random_int", min=1, max=100)
+    unit_cost = factory.Faker( "pydecimal", left_digits=4, right_digits=2, positive=True, )
     room = factory.SubFactory(RoomFactory)

@@ -1,9 +1,11 @@
-from assets.models import  Equipment, Accessory, Consumable, Component
+from assets.models.assets import Accessory, Component, Consumable, Equipment
 
 
 # ==========================================================
 # Equipment
 # ==========================================================
+
+
 
 def equipment_queryset():
     """
