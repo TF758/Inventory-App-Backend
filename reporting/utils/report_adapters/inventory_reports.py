@@ -32,6 +32,10 @@ def inventory_summary_to_workbook_spec(payload: dict) -> dict:
         ["Total Equipment Records", overview.get("total_equipment", 0)],
         ["Total Accessory Units", overview.get("total_accessories_units", 0)],
         ["Total Consumable Units In Stock", overview.get("total_consumables_units", 0)],
+        [ "Total Inventory Value", overview.get("total_inventory_value", 0), ],
+        [ "Equipment Value", overview.get("equipment_value", 0), ],
+        [ "Accessory Value", overview.get("accessory_value", 0), ],
+        [ "Consumable Value", overview.get("consumable_value", 0), ],
         ["Total Users In Scope", overview.get("total_users", 0)],
         [
             "Equipment Utilization % (Assigned ÷ Usable)",
@@ -136,6 +140,39 @@ def inventory_summary_to_workbook_spec(payload: dict) -> dict:
         "rows": rows,
     }
 
+
+    # =====================================================
+    # Asset Value Sheet
+    # =====================================================
+    asset_value = data.get("asset_value", {})
+
+    rows = [
+        [
+            "Total Inventory Value",
+            asset_value.get("total_inventory_value", 0),
+        ],
+        [
+            "Equipment Value",
+            asset_value.get("equipment_value", 0),
+        ],
+        [
+            "Accessory Value",
+            asset_value.get("accessory_value", 0),
+        ],
+        [
+            "Consumable Value",
+            asset_value.get("consumable_value", 0),
+        ],
+    ]
+
+    spec["Asset Value"] = {
+        "headers": ["Metric", "Value"],
+        "rows": rows,
+        "formats": {
+            "Value": "currency",
+        },
+    }
+
     # =====================================================
     # Users Sheet
     # =====================================================
@@ -183,13 +220,22 @@ def inventory_summary_to_workbook_spec(payload: dict) -> dict:
             rows.append([
                 str(row.get("scope_type", "")).title(),
                 row.get("scope_name"),
+
                 row.get("equipment", 0),
+                row.get("equipment_value", 0),
                 row.get("assigned_equipment", 0),
                 row.get("damaged_equipment", 0),
                 row.get("under_repair", 0),
+
                 row.get("accessory_units", 0),
+                row.get("accessory_value", 0),
+
                 row.get("consumable_units", 0),
+                row.get("consumable_value", 0),
                 row.get("low_stock_consumables", 0),
+
+                row.get("total_inventory_value", 0),
+
                 row.get("users", 0),
                 row.get("active_users", 0),
             ])
@@ -198,17 +244,32 @@ def inventory_summary_to_workbook_spec(payload: dict) -> dict:
             "headers": [
                 "Scope Type",
                 "Scope Name",
+
                 "Equipment Records",
+                "Equipment Value",
                 "Assigned Equipment",
                 "Damaged Equipment",
                 "Under Repair",
+
                 "Accessory Units",
+                "Accessory Value",
+
                 "Consumable Units",
+                "Consumable Value",
                 "Low Stock Consumables",
+
+                "Total Inventory Value",
+
                 "Users In Scope",
                 "Active Users",
             ],
             "rows": rows,
+             "formats": {
+                "Equipment Value": "currency",
+                "Accessory Value": "currency",
+                "Consumable Value": "currency",
+                "Total Inventory Value": "currency",
+            },
         }
 
     return spec
