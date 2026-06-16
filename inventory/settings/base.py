@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "core",
 
     "assets",
+    "authorization",
     "assignments",
     "agreements",
     "sites",

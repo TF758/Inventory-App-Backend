@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from core.models.base import PublicIDModel
+from authorization.models import Role
 from sites.models.sites import Department, Location, Room
 from django.conf import settings
 from django.db.models import Q
@@ -48,6 +49,7 @@ class RoleAssignment(PublicIDModel):
 
     assigned_by = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="assigned_roles",)
     assigned_date = models.DateTimeField(default=timezone.now)
+    role_ref = models.ForeignKey( Role, null=True, blank=True, on_delete=models.PROTECT, related_name="assignments" )
 
     class Meta:  
         indexes = [
