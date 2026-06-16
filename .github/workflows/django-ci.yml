@@ -82,7 +82,7 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
 
-  deploy-check:
+  build-image:
     needs:
       - gitleaks
       - security
@@ -96,6 +96,38 @@ jobs:
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          tags: inventory-api:ci
+          outputs: type=docker,dest=/tmp/inventory-api.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-api-image
+          path: /tmp/inventory-api.tar
+          retention-days: 1
+
+  deploy-check:
+    needs: build-image
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: inventory-api-image
+
+      - name: Load image
+        run: docker load -i inventory-api.tar
 
       - name: Create CI environment file
         run: |
@@ -117,9 +149,6 @@ jobs:
           SESSION_IDLE_MINUTES=30
           SESSION_ABSOLUTE_HOURS=8
           EOF
-
-      - name: Build images
-        run: docker compose build
 
       - name: Run Django deployment checks
         run: |
@@ -147,8 +176,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: inventory-api-image
+
+      - name: Load image
+        run: docker load -i inventory-api.tar
 
       - name: Create CI environment file
         run: |
@@ -171,9 +205,6 @@ jobs:
           SESSION_ABSOLUTE_HOURS=8
           EOF
 
-      - name: Build images
-        run: docker compose build
-
       - name: Start DB + Redis
         run: docker compose up -d db redis
 
@@ -188,34 +219,37 @@ jobs:
         run: docker compose run --rm api python manage.py migrate
 
       - name: Run tests
-        run: docker compose run --rm api python manage.py test ${{ matrix.suite }} --parallel
+        run: |
+          docker compose run --rm api \
+            python manage.py test ${{ matrix.suite }} --parallel
 
       - name: Shutdown services
         if: always()
         run: docker compose down -v
 
   trivy-image:
-    needs:
-      - tests
+    needs: tests
 
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: inventory-api-image
 
-      - name: Build image
-        run: docker build -t inventory-api:latest .
+      - name: Load image
+        run: docker load -i inventory-api.tar
 
       - name: Verify image exists
-        run: docker image inspect inventory-api:latest
+        run: docker image inspect inventory-api:ci
 
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: inventory-api:latest
+          image-ref: inventory-api:ci
           format: table
           severity: CRITICAL
           ignore-unfixed: true
