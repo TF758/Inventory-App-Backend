@@ -54,7 +54,7 @@ jobs:
           python -m pip_audit \
             -r requirements/base.txt \
             --progress-spinner off \
-            --ignore-vuln CVE-2026-42304
+            --ignore-vuln CVE-2026-42304 \
             --ignore-vuln GHSA-537c-gmf6-5ccf
 
   hadolint:
