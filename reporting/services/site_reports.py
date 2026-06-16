@@ -35,7 +35,7 @@ def build_site_asset_report(
     asset_model_map = {
         "equipment": {
             "model": Equipment,
-            "fields": ["name", "brand", "model", "serial_number", "public_id"],
+            "fields": ["name", "brand", "model", "serial_number","purchase_date", "purchase_price", "public_id"],
         },
         "component": {
             "model": Component,
@@ -55,6 +55,8 @@ def build_site_asset_report(
                 "name",
                 "description",
                 "quantity",
+                "unit_cost",
+                "inventory_value",
                 "public_id",
                 "room_id",
             ],
@@ -65,6 +67,8 @@ def build_site_asset_report(
                 "name",
                 "serial_number",
                 "quantity",
+                "unit_cost",
+                "inventory_value",
                 "public_id",
                 "room_id",
             ],

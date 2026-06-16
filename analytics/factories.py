@@ -5,6 +5,7 @@ from django.utils import timezone
 from analytics.models.metrics import DailyAuthMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
 from sites.factories.site_factories import DepartmentFactory
+from decimal import Decimal
 
 
 # --------------------------
@@ -42,6 +43,19 @@ class DailySystemMetricsFactory(factory.django.DjangoModelFactory):
     total_consumables_quantity = fuzzy.FuzzyInteger(1_000, 5_000)
     total_accessories = fuzzy.FuzzyInteger(300, 1_500)
     total_accessories_quantity = fuzzy.FuzzyInteger(1_000, 4_000)
+
+
+    total_equipment_value = fuzzy.FuzzyDecimal( 100_000, 5_000_000, precision=2, )
+    total_consumable_value = fuzzy.FuzzyDecimal( 5_000, 500_000, precision=2, )
+    total_accessory_value = fuzzy.FuzzyDecimal( 5_000, 500_000, precision=2, )
+
+    total_inventory_value = factory.LazyAttribute(
+        lambda o: (
+            o.total_equipment_value
+            + o.total_consumable_value
+            + o.total_accessory_value
+        )
+    )
 
     schema_version = 1
 
@@ -105,3 +119,15 @@ class DailyDepartmentSnapshotFactory(factory.django.DjangoModelFactory):
 
     total_accessories = fuzzy.FuzzyInteger(5, 200)
     total_accessories_quantity = fuzzy.FuzzyInteger(10, 1_000)
+
+    total_equipment_value = fuzzy.FuzzyDecimal( 10_000, 500_000, precision=2, )
+    total_consumable_value = fuzzy.FuzzyDecimal( 500, 50_000, precision=2, )
+    total_accessory_value = fuzzy.FuzzyDecimal( 500, 50_000, precision=2, )
+
+    total_inventory_value = factory.LazyAttribute(
+        lambda o: (
+            o.total_equipment_value
+            + o.total_consumable_value
+            + o.total_accessory_value
+        )
+    )

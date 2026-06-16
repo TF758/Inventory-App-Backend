@@ -8,6 +8,13 @@ import datetime
 from assets.models.assets import Accessory, Component, Consumable, Equipment, EquipmentStatus
 from core.models.security import PasswordResetEvent
 from core.models.sessions import UserSession
+from assets.selectors.accessories import department_accessories_queryset
+from assets.selectors.base import accessory_queryset, consumable_queryset, equipment_queryset
+
+from assets.selectors.consumables import department_consumables_queryset
+from assets.selectors.equipment import department_equipment_queryset
+from users.selectors.users import department_admins_queryset, department_users_queryset
+from assignments.selectors.returns import department_return_requests_queryset
 from sites.models.sites import Department, Location, Room
 from core.models.audit import AuditLog
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
@@ -16,7 +23,8 @@ from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max
 
 from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
-
+from decimal import Decimal
+from django.db.models import DecimalField
 
 User = get_user_model()
 
@@ -33,17 +41,52 @@ def generate_daily_system_metrics(for_date=None):
     )
     end = start + timedelta(days=1)
 
-    base_equipment = Equipment.objects.filter(is_deleted=False)
-    base_consumables = Consumable.objects.filter(is_deleted=False)
-    base_accessories = Accessory.objects.filter(is_deleted=False)
+    equipment = equipment_queryset()
+    consumables = consumable_queryset()
+    accessories = accessory_queryset()
 
-    active_equipment = base_equipment.filter(
+    equipment_value = ( equipment.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
+
+    consumable_value = (
+        consumables.aggregate(
+            total=Sum(
+                F("quantity") * F("unit_cost"),
+                output_field=DecimalField(
+                    max_digits=18,
+                    decimal_places=2,
+                ),
+            )
+        )["total"]
+        or Decimal("0.00")
+    )
+
+    accessory_value = (
+        accessories.aggregate(
+            total=Sum(
+                F("quantity") * F("unit_cost"),
+                output_field=DecimalField(
+                    max_digits=18,
+                    decimal_places=2,
+                ),
+            )
+        )["total"]
+        or Decimal("0.00")
+    )
+
+    total_inventory_value = (
+        equipment_value
+        + consumable_value
+        + accessory_value
+    )
+
+    active_equipment = equipment.filter(
         status__in=[
             EquipmentStatus.OK,
             EquipmentStatus.UNDER_REPAIR,
             EquipmentStatus.DAMAGED,
         ]
     )
+    
 
     with transaction.atomic():
         obj, created = DailySystemMetrics.objects.get_or_create(
@@ -115,7 +158,7 @@ def generate_daily_system_metrics(for_date=None):
                 # -------------------------
                 # Inventory metrics
                 # -------------------------
-                "total_equipment": base_equipment.count(),
+                "total_equipment": equipment.count(),
 
                 "equipment_ok": active_equipment.filter( status=EquipmentStatus.OK ).count(),
 
@@ -133,21 +176,28 @@ def generate_daily_system_metrics(for_date=None):
                     )["total"] or 0,
 
                 # Consumables
-                "total_consumables": base_consumables.count(),
+                "total_consumables": consumables.count(),
 
                 "total_consumables_quantity":
-                    base_consumables.aggregate(
+                    consumables.aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
 
                 # Accessories
-                "total_accessories": base_accessories.count(),
+                "total_accessories": accessories.count(),
 
                 "total_accessories_quantity":
-                    base_accessories.aggregate(
+                    accessories.aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
+
+                "total_equipment_value": equipment_value,
+                "total_consumable_value": consumable_value,
+                "total_accessory_value": accessory_value,
+                "total_inventory_value": total_inventory_value,
             },
+
+            
         )
 
     return created
@@ -176,7 +226,7 @@ def generate_daily_department_snapshot(
     # -------------------------------------------------
     rooms_qs = Room.objects.filter(location__department=department)
 
-    equipment_qs = Equipment.objects.filter(room__in=rooms_qs, is_deleted=False)
+    equipment_qs = department_equipment_queryset( department )
     active_equipment_qs = equipment_qs.filter(
     status__in=[
         EquipmentStatus.OK,
@@ -187,51 +237,29 @@ def generate_daily_department_snapshot(
     total_equipment = active_equipment_qs.count()
     components_qs = Component.objects.filter(equipment__room__in=rooms_qs)
 
-    consumables_qs = Consumable.objects.filter( room__in=rooms_qs)
+    consumables_qs = department_consumables_queryset(department)
 
-    accessories_qs = Accessory.objects.filter( room__in=rooms_qs)
+    accessories_qs = department_accessories_queryset( department )
+
+    equipment_value = ( equipment_qs.aggregate( total=Sum("purchase_price") )["total"] or Decimal("0.00") )
+    consumable_value = ( consumables_qs.aggregate( total=Sum( F("quantity") * F("unit_cost"), output_field=DecimalField( max_digits=18, decimal_places=2, ), ) )["total"] or Decimal("0.00") )
+    accessory_value = ( accessories_qs.aggregate( total=Sum( F("quantity") * F("unit_cost"), output_field=DecimalField( max_digits=18, decimal_places=2, ), ) )["total"] or Decimal("0.00") )
+    total_inventory_value = ( equipment_value + consumable_value + accessory_value )    
 
     # -------------------------------------------------
     # Returns (scoped via items → room)
     # -------------------------------------------------
-    return_items_qs = ReturnRequestItem.objects.filter(
-        room__in=rooms_qs
-    )
 
-    request_ids = return_items_qs.values_list(
-        "return_request_id",
-        flat=True
-    ).distinct()
-
-    return_requests_qs = ReturnRequest.objects.filter(
-        id__in=request_ids
-    )
+    return_requests_qs =  department_return_requests_queryset( department ) 
 
     # -------------------------------------------------
     # Users (current assignments only)
     # -------------------------------------------------
-    users_qs = User.objects.filter(
-        user_placements__is_current=True,
-        user_placements__room__in=rooms_qs,
-    ).distinct()
+    users_qs = department_users_queryset( department )
 
     total_users = users_qs.count()
 
-    admin_roles = [
-        "DEPARTMENT_ADMIN",
-        "LOCATION_ADMIN",
-        "ROOM_ADMIN",
-        "SITE_ADMIN",
-    ]
-
-    total_admins = users_qs.filter(
-        role_assignments__role__in=admin_roles
-    ).filter(
-        Q(role_assignments__department=department) |
-        Q(role_assignments__location__department=department) |
-        Q(role_assignments__room__location__department=department) |
-        Q(role_assignments__role="SITE_ADMIN")
-    ).distinct().count()
+    total_admins = department_admins_queryset(department).count()
 
     total_return_requests = return_requests_qs.count()
     pending_return_requests = return_requests_qs.filter( status=ReturnRequest.Status.PENDING ).count()
@@ -246,18 +274,8 @@ def generate_daily_department_snapshot(
 
     returns_processed_last_24h = return_requests_qs.filter( processed_at__gte=last_24h ).count()
 
-    base_equipment = Equipment.objects.filter(is_deleted=False)
 
-    active_equipment = base_equipment.filter(
-        status__in=[
-            EquipmentStatus.OK,
-            EquipmentStatus.UNDER_REPAIR,
-            EquipmentStatus.DAMAGED,
-        ]
-    )
-
-    base_consumables = Consumable.objects.filter(is_deleted=False)
-    base_accessories = Accessory.objects.filter(is_deleted=False)
+    
         # -------------------------------------------------
         # Atomic get_or_create
     # -------------------------------------------------
@@ -279,20 +297,18 @@ def generate_daily_department_snapshot(
                 "total_rooms": rooms_qs.count(),
 
                # Inventory metrics
-                "total_equipment": base_equipment.count(),
-                "equipment_ok": active_equipment.filter(status=EquipmentStatus.OK).count(),
-                "equipment_under_repair": active_equipment.filter(status=EquipmentStatus.UNDER_REPAIR).count(),
-                "equipment_damaged": active_equipment.filter(status=EquipmentStatus.DAMAGED).count(),
+                "total_equipment": equipment_qs.count(),
 
-                "total_components": Component.objects.count(),
-                "total_components_quantity": Component.objects.aggregate( total=Sum("quantity") )["total"] or 0,
+                "equipment_ok": equipment_qs.filter( status=EquipmentStatus.OK ).count(),
+                "equipment_under_repair": equipment_qs.filter( status=EquipmentStatus.UNDER_REPAIR ).count(),
+                "equipment_damaged": equipment_qs.filter( status=EquipmentStatus.DAMAGED ).count(),
 
-                "total_consumables": base_consumables.count(),
-                "total_consumables_quantity": base_consumables.aggregate( total=Sum("quantity") )["total"] or 0,
+                "total_consumables": consumables_qs.count(),
+                "total_consumables_quantity": consumables_qs.aggregate( total=Sum("quantity") )["total"] or 0,
 
-                "total_accessories": base_accessories.count(),
-                "total_accessories_quantity": base_accessories.aggregate( total=Sum("quantity") )["total"] or 0,
-                # -------------------------
+                "total_accessories": accessories_qs.count(),
+                "total_accessories_quantity": accessories_qs.aggregate( total=Sum("quantity") )["total"] or 0,
+                                # -------------------------
                 # Return metrics
                 # -------------------------
                 "total_return_requests": total_return_requests,
@@ -303,6 +319,13 @@ def generate_daily_department_snapshot(
 
                 "returns_created_last_24h": returns_created_last_24h,
                 "returns_processed_last_24h": returns_processed_last_24h,
+
+                # Price Info
+
+                "total_equipment_value": equipment_value,
+                "total_consumable_value": consumable_value,
+                "total_accessory_value": accessory_value,
+                "total_inventory_value": total_inventory_value,
             },
         )
 

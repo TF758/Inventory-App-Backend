@@ -3,7 +3,7 @@
 from data_import.renderers import asset_import_to_workbook_spec
 from data_import.services.import_builder import build_asset_import
 from reporting.services.inventory_reports import build_inventory_summary_report
-from reporting.utils.report_adapters.inevntory_reports import inventory_summary_to_workbook_spec
+from reporting.utils.report_adapters.inventory_reports import inventory_summary_to_workbook_spec
 from reporting.services.asset_reports import build_asset_history_report
 from reporting.services.site_reports import build_site_asset_report, build_site_audit_log_report
 from reporting.services.user_summary import build_user_audit_history_report, build_user_login_history_report, build_user_summary_report

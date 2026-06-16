@@ -1,35 +1,25 @@
 from datetime import timedelta
 from django.utils import timezone
-from assets.models.assets import Accessory, Consumable, Equipment, EquipmentStatus
-from django.db.models import Exists, OuterRef, Sum, F
-
+from assets.models.assets import  Consumable
+from django.db.models import  Sum, F
 from analytics.services.snapshots import User
-from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
-from core.models.audit import AuditLog
-from core.models.security import PasswordResetEvent
-from core.models.sessions import UserSession
+from assignments.models.asset_assignment import ReturnRequest
 from core.utils.viewset_helpers import unallocated_users_queryset
+from assets.selectors.base import accessory_queryset, consumable_queryset, equipment_queryset
+from assets.selectors.consumables import low_stock_consumables_queryset
+from assets.selectors.equipment import damaged_equipment_queryset, equipment_under_repair_queryset
+from core.selectors.security import active_password_reset_queryset, active_sessions_queryset, forced_password_change_users_queryset, login_auditlogs_created_within_period_queryset, password_reset_events_queryset, session_created_within_period_queryset
+from users.selectors.users import active_users_queryset, all_users_queryset, locked_users_queryset, system_users_queryset, users_without_active_role_queryset
+from assignments.selectors.returns import pending_return_request_items_queryset, return_requests_queryset
 from sites.models.sites import Department, Location, Room
 
 def get_user_health():
-    total_users = User.objects.count()
 
-    system_users = User.objects.filter(
-        is_system_user=True
-    ).count()
-
-    locked_users = User.objects.filter(
-        is_locked=True
-    ).count()
-
-    active_users = User.objects.filter(
-        is_active=True
-    ).count()
-
-    users_without_active_role = User.objects.filter(
-        active_role__isnull=True,
-        is_system_user=False
-    ).count()
+    total_users = all_users_queryset().count()
+    system_users = system_users_queryset().count()
+    locked_users = locked_users_queryset().count()
+    active_users = active_users_queryset().count()
+    users_without_active_role = users_without_active_role_queryset().count()
 
     floating_users = unallocated_users_queryset().count()
 
@@ -63,17 +53,10 @@ def get_site_structure_health():
 
 def get_asset_health():
 
-    total_equipment = Equipment.objects.count()
-
-    equipment_damaged = Equipment.objects.filter(
-        status=EquipmentStatus.DAMAGED
-    ).count()
-
-    equipment_under_repair = Equipment.objects.filter(
-        status=EquipmentStatus.UNDER_REPAIR
-    ).count()
-
-    consumable_total_types = Consumable.objects.count()
+    total_equipment = equipment_queryset().count()
+    equipment_damaged = damaged_equipment_queryset().count()
+    equipment_under_repair = equipment_under_repair_queryset().count()
+    consumable_total_types = consumable_queryset().count()
 
     consumable_total_quantity = (
         Consumable.objects.aggregate(
@@ -81,15 +64,12 @@ def get_asset_health():
         )["total"] or 0
     )
 
-    low_stock_consumables = Consumable.objects.filter(
-        low_stock_threshold__gt=0,
-        quantity__lte=F("low_stock_threshold"),
-    ).count()
+    low_stock_consumables = low_stock_consumables_queryset().count()
 
-    accessory_total_types = Accessory.objects.count()
+    accessory_total_types = accessory_queryset().count()
 
     accessory_total_quantity = (
-        Accessory.objects.aggregate(
+       accessory_queryset().aggregate(
             total=Sum("quantity")
         )["total"] or 0
     )
@@ -98,6 +78,30 @@ def get_asset_health():
         total_equipment
         + consumable_total_types
         + accessory_total_types
+    )
+
+    equipment_value = (
+    equipment_queryset().aggregate(
+        total=Sum("purchase_price")
+    )["total"] or 0
+    )
+
+    consumable_value = (
+       consumable_queryset().aggregate(
+            total=Sum(F("quantity") * F("unit_cost"))
+        )["total"] or 0
+    )
+
+    accessory_value = (
+        accessory_queryset().aggregate(
+            total=Sum(F("quantity") * F("unit_cost"))
+        )["total"] or 0
+    )
+
+    total_inventory_value = (
+        equipment_value
+        + consumable_value
+        + accessory_value
     )
 
     return {
@@ -119,6 +123,12 @@ def get_asset_health():
             "total_types": accessory_total_types,
             "total_quantity": accessory_total_quantity,
         },
+        "value": {
+            "equipment_value": equipment_value,
+            "consumable_value": consumable_value,
+            "accessory_value": accessory_value,
+            "total_inventory_value": total_inventory_value,
+        },
     }
 
 def get_session_health():
@@ -129,31 +139,17 @@ def get_session_health():
     # -------------------------
     # Core Session Metrics
     # -------------------------
-    active_sessions = UserSession.objects.filter(
-        status=UserSession.Status.ACTIVE
-    ).count()
+    active_sessions = active_sessions_queryset().count()
 
-    sessions_last_24h = UserSession.objects.filter(
-        created_at__gte=last_24h
-    ).count()
+    sessions_last_24h = session_created_within_period_queryset(period=last_24h).count()
 
     # -------------------------
     # Login Flow Metrics
     # -------------------------
-    recent_logins = AuditLog.objects.filter(
-        event_type=AuditLog.Events.LOGIN,
-        created_at__gte=last_24h,
-    ).count()
+    recent_logins = login_auditlogs_created_within_period_queryset(period=last_24h).count()
 
-    unique_logins_last_5_days = (
-        AuditLog.objects.filter(
-            event_type=AuditLog.Events.LOGIN,
-            created_at__gte=last_5d,
-        )
-        .values("user")
-        .distinct()
-        .count()
-    )
+    unique_logins_last_5_days = login_auditlogs_created_within_period_queryset(period=last_5d).values("user").distinct().count()
+    
 
     return {
         "active_sessions": active_sessions,
@@ -169,34 +165,28 @@ def get_security_health():
     # -------------------------
     # User Security Signals
     # -------------------------
-    locked_users = User.objects.filter(
-        is_locked=True,
-        is_system_user=False,
-    ).count()
+    locked_users = locked_users_queryset().count()
 
-    forced_password_change_users = User.objects.filter(
-        force_password_change=True,
-        is_system_user=False,
-    ).count()
+    forced_password_change_users = forced_password_change_users_queryset().count()
 
     # -------------------------
     # Password Reset Signals
     # -------------------------
-    active_password_resets = PasswordResetEvent.objects.filter(
-        is_active=True,
-        used_at__isnull=True,
-        expires_at__gte=now,
-    ).count()
+    active_password_resets = active_password_reset_queryset().count()
 
-    user_initiated_resets_last_24hrs = PasswordResetEvent.objects.filter(
-        admin__isnull=True,
-        created_at__gte=last_24h,
-    ).count()
+    user_initiated_resets_last_24hrs = (
+        password_reset_events_queryset(
+            created_after=last_24h,
+            admin_initiated=False,
+        ).count()
+    )
 
-    admin_initiated_resets_last_24hrs = PasswordResetEvent.objects.filter(
-        admin__isnull=False,
-        created_at__gte=last_24h,
-    ).count()
+    admin_initiated_resets_last_24hrs = (
+        password_reset_events_queryset(
+            created_after=last_24h,
+            admin_initiated=True,
+        ).count()
+    )
 
     return {
         "locked_users": locked_users,
@@ -215,49 +205,35 @@ def get_return_health():
     # -------------------------
     # Backlog (current state)
     # -------------------------
-    pending_requests = ReturnRequest.objects.filter(
-        status=ReturnRequest.Status.PENDING
-    ).count()
+    pending_requests =  return_requests_queryset( status=ReturnRequest.Status.PENDING ).count() 
 
-    pending_items = ReturnRequestItem.objects.filter(
-        status=ReturnRequestItem.Status.PENDING
-    ).count()
+    pending_items = pending_return_request_items_queryset().count()
 
     # -------------------------
     # Aging (VERY important)
     # -------------------------
-    stale_requests_24h = ReturnRequest.objects.filter(
-        status=ReturnRequest.Status.PENDING,
-        requested_at__lt=last_24h
-    ).count()
+    stale_requests_24h =  return_requests_queryset( status=ReturnRequest.Status.PENDING, requested_before=last_24h, ).count() 
 
-    stale_requests_3d = ReturnRequest.objects.filter(
-        status=ReturnRequest.Status.PENDING,
-        requested_at__lt=last_3d
-    ).count()
-
+    stale_requests_3d =  return_requests_queryset( status=ReturnRequest.Status.PENDING, requested_before=last_3d, ).count() 
     # -------------------------
     # Processing flow
     # -------------------------
-    processed_last_24h = ReturnRequest.objects.filter(
-        processed_at__gte=last_24h
-    ).count()
+    processed_last_24h =  return_requests_queryset( processed_after=last_24h ).count() 
 
-    created_last_24h = ReturnRequest.objects.filter(
-        requested_at__gte=last_24h
-    ).count()
-
+    created_last_24h =  return_requests_queryset( requested_after=last_24h ).count() 
     # -------------------------
     # Quality signals
     # -------------------------
-    denied_requests_last_7d = ReturnRequest.objects.filter(
-        status=ReturnRequest.Status.DENIED,
-        processed_at__gte=last_7d
-    ).count()
+    denied_requests_last_7d = (
+        return_requests_queryset(
+            status=ReturnRequest.Status.DENIED,
+            processed_after=last_7d,
+        ).count()
+    )
 
-    partial_requests_last_7d = ReturnRequest.objects.filter(
+    partial_requests_last_7d = return_requests_queryset(
         status=ReturnRequest.Status.PARTIAL,
-        processed_at__gte=last_7d
+        processed_after=last_7d
     ).count()
 
     # -------------------------

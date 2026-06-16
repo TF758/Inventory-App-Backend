@@ -16,6 +16,12 @@ class EquipmentFilter(django_filters.FilterSet):
     status = django_filters.BaseInFilter(field_name="status",lookup_expr="in")
     is_assigned = django_filters.BooleanFilter(method="filter_is_assigned")
 
+    purchase_price_min = django_filters.NumberFilter( field_name="purchase_price", lookup_expr="gte" )
+    purchase_price_max = django_filters.NumberFilter( field_name="purchase_price", lookup_expr="lte" )
+
+    purchase_date_after = django_filters.DateFilter( field_name="purchase_date", lookup_expr="gte" )
+    purchase_date_before = django_filters.DateFilter( field_name="purchase_date", lookup_expr="lte" )
+
     class Meta:
         model = Equipment
         fields = [
@@ -26,7 +32,11 @@ class EquipmentFilter(django_filters.FilterSet):
         'location',
         'department',
         'status',
-         'is_assigned',
+        'is_assigned',
+        'purchase_price_min',
+        'purchase_price_max',
+        'purchase_date_after',
+        'purchase_date_before'
        
     ]
     # filter using equipment asignemnt related_name
@@ -88,6 +98,10 @@ class AccessoryFilter(django_filters.FilterSet):
     available_quantity_max = django_filters.NumberFilter(method="filter_available_max")
 
     out_of_stock = django_filters.BooleanFilter(method="filter_out_of_stock")
+    
+    unit_cost_min = django_filters.NumberFilter( field_name="unit_cost", lookup_expr="gte" )
+
+    unit_cost_max = django_filters.NumberFilter( field_name="unit_cost", lookup_expr="lte" )
 
     class Meta:
         model = Accessory
@@ -100,6 +114,8 @@ class AccessoryFilter(django_filters.FilterSet):
             "quantity",
             "quantity_min",
             "quantity_max",
+            'unit_cost_min',
+            'unit_cost_max',
         ]
 
     def with_available_quantity(self, queryset):
@@ -147,6 +163,9 @@ class ConsumableFilter(django_filters.FilterSet):
     low_stock = django_filters.BooleanFilter(method="filter_low_stock")
     out_of_stock = django_filters.BooleanFilter(method="filter_out_of_stock")
 
+    unit_cost_min = django_filters.NumberFilter( field_name="unit_cost", lookup_expr="gte" )
+    unit_cost_max = django_filters.NumberFilter( field_name="unit_cost", lookup_expr="lte" )
+
     class Meta:
         model = Consumable
         fields = [
@@ -159,6 +178,8 @@ class ConsumableFilter(django_filters.FilterSet):
             "quantity_max",
             "low_stock",
             "out_of_stock",
+            'unit_cost_min',
+            'unit_cost_max',
         ]
 
     def filter_low_stock(self, queryset, name, value):

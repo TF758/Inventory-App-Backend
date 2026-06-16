@@ -3,6 +3,7 @@ from django.db.models import Max, OuterRef, Subquery, Avg, Sum
 from analytics.models.metrics import DailyReturnMetrics
 from analytics.utils.analytics_helpers import truncate_date
 from analytics.utils.utils.viewset_helpers import get_snapshot_range_start
+from analytics.models.snapshots import DailyDepartmentSnapshot
 
 
 
@@ -105,6 +106,84 @@ def build_return_performance_trends(*, days: int, granularity: str):
             "date": row["period"].isoformat(),
             "avg_processing_time_seconds": int(row["avg_processing_time"] or 0),
             "max_processing_time_seconds": int(row["max_processing_time"] or 0),
+        }
+        for row in qs
+    ]
+
+def build_department_return_flow_trends(*, department, days, granularity):
+    start = get_snapshot_range_start(
+        model=DailyDepartmentSnapshot,
+        days=days,
+        date_field="snapshot_date",
+        filters={"department": department},
+    )
+
+    if not start:
+        return []
+
+    qs = (
+        DailyDepartmentSnapshot.objects
+        .filter(department=department, snapshot_date__gte=start)
+        .annotate(period=truncate_date("snapshot_date", granularity))
+        .values("period")
+        .annotate(
+            created=Sum("returns_created_last_24h"),
+            processed=Sum("returns_processed_last_24h"),
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row["period"].isoformat(),
+            "created": row["created"],
+            "processed": row["processed"],
+        }
+        for row in qs
+    ]
+
+
+
+def build_department_return_state_trends(*, department, days, granularity):
+    start = get_snapshot_range_start(
+        model=DailyDepartmentSnapshot,
+        days=days,
+        date_field="snapshot_date",
+        filters={"department": department},
+    )
+
+    if not start:
+        return []
+
+    base = (
+        DailyDepartmentSnapshot.objects
+        .filter(department=department, snapshot_date__gte=start)
+        .annotate(period=truncate_date("snapshot_date", granularity))
+    )
+
+    latest_per_period = (
+        base.values("period")
+        .annotate(latest_date=Max("snapshot_date"))
+    )
+
+    qs = (
+        base.filter(
+            snapshot_date=Subquery(
+                latest_per_period
+                .filter(period=OuterRef("period"))
+                .values("latest_date")[:1]
+            )
+        )
+        .order_by("period")
+    )
+
+    return [
+        {
+            "date": row.period.isoformat(),
+            "pending": row.pending_return_requests,
+            "approved": row.approved_return_requests,
+            "denied": row.denied_return_requests,
+            "partial": row.partial_return_requests,
         }
         for row in qs
     ]

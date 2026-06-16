@@ -6,6 +6,8 @@ from django.utils import timezone
 from analytics.services.snapshots import User
 from assets.models.assets import Accessory, Consumable, Equipment
 from assignments.models.asset_assignment import AccessoryAssignment, AccessoryEvent, ConsumableIssue
+from assets.selectors.base import accessory_queryset, consumable_queryset, equipment_queryset
+from reporting.utils.asset_value_helpers import calculate_inventory_values
 from sites.models.sites import Department, Location, Room, UserPlacement
 from users.models.roles import RoleAssignment
 
@@ -155,19 +157,16 @@ def build_inventory_summary_report(
     # =====================================================
     # Base Querysets
     # =====================================================
-    equipment_qs = Equipment.objects.filter(
+    equipment_qs = equipment_queryset().filter(
         room_id__in=room_ids,
-        is_deleted=False,
     )
 
-    accessory_qs = Accessory.objects.filter(
+    accessory_qs = accessory_queryset().filter(
         room_id__in=room_ids,
-        is_deleted=False,
     )
 
-    consumable_qs = Consumable.objects.filter(
+    consumable_qs = consumable_queryset().filter(
         room_id__in=room_ids,
-        is_deleted=False,
     )
 
     placements = UserPlacement.objects.filter(
@@ -209,7 +208,13 @@ def build_inventory_summary_report(
     total_consumables = (
         consumable_qs.aggregate(
             total=Sum("quantity")
-        )["total"] or 0
+            )["total"] or 0
+        )
+
+    values = calculate_inventory_values(
+        equipment_qs,
+        accessory_qs,
+        consumable_qs,
     )
 
     low_stock_count = consumable_qs.filter(
@@ -221,6 +226,10 @@ def build_inventory_summary_report(
         "total_equipment": total_equipment,
         "total_accessories_units": total_accessories,
         "total_consumables_units": total_consumables,
+        "equipment_value": values["equipment_value"],
+        "accessory_value": values["accessory_value"],
+        "consumable_value": values["consumable_value"],
+        "total_inventory_value": values["total_inventory_value"],
         "total_users": users_qs.count(),
         "equipment_utilization_percent":
             equipment_utilization,
@@ -357,6 +366,20 @@ def build_inventory_summary_report(
             ).count(),
     }
 
+    asset_value = {
+        "equipment_value":
+            values["equipment_value"],
+
+        "accessory_value":
+            values["accessory_value"],
+
+        "consumable_value":
+            values["consumable_value"],
+
+        "total_inventory_value":
+            values["total_inventory_value"],
+    }
+
     # =====================================================
     # User Summary
     # =====================================================
@@ -441,14 +464,24 @@ def build_inventory_summary_report(
                 flat=True,
             )
 
-            eq = Equipment.objects.filter(
+            eq = equipment_queryset().filter(
                 room_id__in=ids,
-                is_deleted=False,
+            
             )
 
             us = UserPlacement.objects.filter(
                 room_id__in=ids,
                 is_current=True,
+            )
+
+            values = calculate_inventory_values(
+                eq,
+               accessory_queryset().filter(
+                    room_id__in=ids,
+                ),
+                consumable_queryset().filter(
+                    room_id__in=ids,
+                ),
             )
 
             breakdown.append({
@@ -468,23 +501,20 @@ def build_inventory_summary_report(
                         status="under_repair"
                     ).count(),
                 "accessory_units":
-                    Accessory.objects.filter(
+                    accessory_queryset().filter(
                         room_id__in=ids,
-                        is_deleted=False,
                     ).aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
                 "consumable_units":
-                    Consumable.objects.filter(
+                    consumable_queryset().filter(
                         room_id__in=ids,
-                        is_deleted=False,
                     ).aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
                 "low_stock_consumables":
-                    Consumable.objects.filter(
+                    consumable_queryset().filter(
                         room_id__in=ids,
-                        is_deleted=False,
                         low_stock_threshold__gt=0,
                         quantity__lte=F(
                             "low_stock_threshold"
@@ -497,7 +527,10 @@ def build_inventory_summary_report(
                         id__in=us.values("user_id"),
                         is_active=True,
                     ).count(),
-            })
+                "equipment_value": values["equipment_value"],
+                "accessory_value": values["accessory_value"],
+                "consumable_value": values["consumable_value"],
+                "total_inventory_value": values["total_inventory_value"], })
 
     elif scope == "department":
         for loc in locations:
@@ -508,14 +541,24 @@ def build_inventory_summary_report(
                 flat=True,
             )
 
-            eq = Equipment.objects.filter(
+            eq = equipment_queryset().filter(
                 room_id__in=ids,
-                is_deleted=False,
+             
             )
 
             us = UserPlacement.objects.filter(
                 room_id__in=ids,
                 is_current=True,
+            )
+
+            values = calculate_inventory_values(
+                eq,
+                accessory_queryset().filter(
+                    room_id__in=ids,
+                ),
+                consumable_queryset().filter(
+                    room_id__in=ids,
+                ),
             )
 
             breakdown.append({
@@ -535,23 +578,20 @@ def build_inventory_summary_report(
                         status="under_repair"
                     ).count(),
                 "accessory_units":
-                    Accessory.objects.filter(
+                   accessory_queryset().filter(
                         room_id__in=ids,
-                        is_deleted=False,
                     ).aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
                 "consumable_units":
-                    Consumable.objects.filter(
+                    consumable_queryset().filter(
                         room_id__in=ids,
-                        is_deleted=False,
                     ).aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
                 "low_stock_consumables":
-                    Consumable.objects.filter(
+                    consumable_queryset().filter(
                         room_id__in=ids,
-                        is_deleted=False,
                         low_stock_threshold__gt=0,
                         quantity__lte=F(
                             "low_stock_threshold"
@@ -564,18 +604,32 @@ def build_inventory_summary_report(
                         id__in=us.values("user_id"),
                         is_active=True,
                     ).count(),
+            "equipment_value": values["equipment_value"],
+            "accessory_value": values["accessory_value"],
+            "consumable_value": values["consumable_value"],
+            "total_inventory_value": values["total_inventory_value"], 
+            
             })
-
     elif scope == "location":
         for rm in rooms:
-            eq = Equipment.objects.filter(
+
+            eq = equipment_queryset().filter(
                 room=rm,
-                is_deleted=False,
             )
 
             us = UserPlacement.objects.filter(
                 room=rm,
                 is_current=True,
+            )
+
+            values = calculate_inventory_values(
+                eq,
+                accessory_queryset().filter(
+                    room=rm,
+                ),
+                consumable_queryset().filter(
+                    room=rm,
+                ),
             )
 
             breakdown.append({
@@ -595,23 +649,20 @@ def build_inventory_summary_report(
                         status="under_repair"
                     ).count(),
                 "accessory_units":
-                    Accessory.objects.filter(
+                    accessory_queryset().filter(
                         room=rm,
-                        is_deleted=False,
                     ).aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
                 "consumable_units":
-                    Consumable.objects.filter(
+                    consumable_queryset().filter(
                         room=rm,
-                        is_deleted=False,
                     ).aggregate(
                         total=Sum("quantity")
                     )["total"] or 0,
                 "low_stock_consumables":
-                    Consumable.objects.filter(
+                    consumable_queryset().filter(
                         room=rm,
-                        is_deleted=False,
                         low_stock_threshold__gt=0,
                         quantity__lte=F(
                             "low_stock_threshold"
@@ -624,6 +675,10 @@ def build_inventory_summary_report(
                         id__in=us.values("user_id"),
                         is_active=True,
                     ).count(),
+                "equipment_value": values["equipment_value"],
+                "accessory_value": values["accessory_value"],
+                "consumable_value": values["consumable_value"],
+                "total_inventory_value": values["total_inventory_value"],
             })
 
     # =====================================================
@@ -648,6 +703,7 @@ def build_inventory_summary_report(
             "equipment": equipment,
             "accessories": accessories,
             "consumables": consumables,
+            "asset_value": asset_value,
             "users": users,
             "roles": roles,
             "breakdown": breakdown,

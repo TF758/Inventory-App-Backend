@@ -1,5 +1,6 @@
 import datetime
 import random
+from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import transaction, models
@@ -100,7 +101,43 @@ class Command(BaseCommand):
                 "equipment": Equipment.objects.filter(
                     room__location__department=dept
                 ).count(),
-            }
+                "equipment_value": (
+                    Equipment.objects.filter(
+                        room__location__department=dept
+                    ).aggregate(
+                        total=models.Sum("purchase_price")
+                    )["total"]
+                    or Decimal("0.00")
+                ),
+                "consumable_value": (
+                    Consumable.objects.filter(
+                        room__location__department=dept
+                    ).aggregate(
+                        total=models.Sum(
+                            models.F("quantity") * models.F("unit_cost"),
+                            output_field=models.DecimalField(
+                                max_digits=18,
+                                decimal_places=2,
+                            ),
+                        )
+                    )["total"]
+                    or Decimal("0.00")
+                ),
+                "accessory_value": (
+                    Accessory.objects.filter(
+                        room__location__department=dept
+                    ).aggregate(
+                        total=models.Sum(
+                            models.F("quantity") * models.F("unit_cost"),
+                            output_field=models.DecimalField(
+                                max_digits=18,
+                                decimal_places=2,
+                            ),
+                        )
+                    )["total"]
+                    or Decimal("0.00")
+                ),
+                            }
 
         # ------------------------------
         # Cache inventory metrics
@@ -118,6 +155,43 @@ class Command(BaseCommand):
         )
         baseline_accessory_quantity = (
             Accessory.objects.aggregate(q=models.Sum("quantity"))["q"] or 0
+        )
+
+        # ------------------------------
+        # Inventory valuation baselines
+        # ------------------------------
+
+        baseline_equipment_value = (
+            Equipment.objects.aggregate(
+                total=models.Sum("purchase_price")
+            )["total"]
+            or Decimal("0.00")
+        )
+
+        baseline_consumable_value = (
+            Consumable.objects.aggregate(
+                total=models.Sum(
+                    models.F("quantity") * models.F("unit_cost"),
+                    output_field=models.DecimalField(
+                        max_digits=18,
+                        decimal_places=2,
+                    ),
+                )
+            )["total"]
+            or Decimal("0.00")
+        )
+
+        baseline_accessory_value = (
+            Accessory.objects.aggregate(
+                total=models.Sum(
+                    models.F("quantity") * models.F("unit_cost"),
+                    output_field=models.DecimalField(
+                        max_digits=18,
+                        decimal_places=2,
+                    ),
+                )
+            )["total"]
+            or Decimal("0.00")
         )
 
         system_rows = []
@@ -141,6 +215,12 @@ class Command(BaseCommand):
             )
 
             active_sessions = clamp(active_users * random.uniform(0.9, 1.4))
+
+            equipment_value = Decimal( noise(float(baseline_equipment_value), 0.05) )
+            consumable_value = Decimal( noise(float(baseline_consumable_value), 0.05) )
+            accessory_value = Decimal( noise(float(baseline_accessory_value), 0.05) )
+
+            inventory_value = equipment_value + consumable_value + accessory_value 
 
             system_rows.append(
                 DailySystemMetrics(
@@ -170,6 +250,12 @@ class Command(BaseCommand):
                     total_consumables_quantity=noise(baseline_consumable_quantity, 0.05),
                     total_accessories=baseline_accessories,
                     total_accessories_quantity=noise(baseline_accessory_quantity, 0.05),
+
+                    total_equipment_value=equipment_value,
+                    total_consumable_value=consumable_value,
+                    total_accessory_value=accessory_value,
+                    total_inventory_value=inventory_value,
+                    
                 )
             )
 
@@ -240,6 +326,14 @@ class Command(BaseCommand):
                 returns_created_24h = clamp(noise(int(dept_total_returns * 0.15), 0.3))
                 returns_processed_24h = clamp(noise(int(dept_total_returns * 0.12), 0.3))
 
+                dept_equipment_value = Decimal( noise(float(stats["equipment_value"]), 0.05) )
+
+                dept_consumable_value = Decimal( noise(float(stats["consumable_value"]), 0.05) )
+
+                dept_accessory_value = Decimal( noise(float(stats["accessory_value"]), 0.05) )
+
+                dept_inventory_value =  dept_equipment_value + dept_consumable_value + dept_accessory_value 
+
                 dept_rows.append(
                     DailyDepartmentSnapshot(
                         department=dept,
@@ -273,6 +367,11 @@ class Command(BaseCommand):
 
                         returns_created_last_24h=returns_created_24h,
                         returns_processed_last_24h=returns_processed_24h,
+
+                        total_equipment_value=dept_equipment_value,
+                        total_consumable_value=dept_consumable_value,
+                        total_accessory_value=dept_accessory_value,
+                        total_inventory_value=dept_inventory_value,
                     )
                 )
 

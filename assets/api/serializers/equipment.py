@@ -3,6 +3,7 @@ from rest_framework import serializers
 from assets.models.assets import Equipment, EquipmentStatus
 from sites.models.sites import  Room
 from core.permissions.helpers import is_admin_role, is_in_scope
+from django.utils import timezone
 
 class EquipmentSerializer(serializers.ModelSerializer):
     is_assigned = serializers.SerializerMethodField()
@@ -24,6 +25,8 @@ class EquipmentSerializer(serializers.ModelSerializer):
             'brand',
             'model',
             'status',
+            "purchase_price",
+            "purchase_date",
             'is_assigned',   
             'serial_number',
             'is_deleted',
@@ -137,10 +140,27 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
             "brand",
             "model",
             "serial_number",
+            "purchase_price",
+            "purchase_date",
             "status",
             "room",
         ]
         read_only_fields = ["public_id"]
+    
+
+    def validate_purchase_price(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError(
+                "Purchase price cannot be negative."
+            )
+        return value
+    
+    def validate_purchase_date(self, value):
+        if value and value > timezone.now().date():
+            raise serializers.ValidationError(
+                "Purchase date cannot be in the future."
+            )
+        return value
 
 
 
