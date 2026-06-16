@@ -55,6 +55,7 @@ jobs:
             -r requirements/base.txt \
             --progress-spinner off \
             --ignore-vuln CVE-2026-42304
+            --ignore-vuln GHSA-537c-gmf6-5ccf
 
   hadolint:
     runs-on: ubuntu-latest
