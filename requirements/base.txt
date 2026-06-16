@@ -26,6 +26,8 @@ python-ulid==3.1.0
 pyOpenSSL==26.0.0
 service-identity==24.2.0
 
-tqdm==4.66.0
+tqdm==4.67.1
+
+cryptography>=48.0.1
 
 whitenoise==6.11.0
