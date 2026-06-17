@@ -17,11 +17,16 @@ from core.utils.viewset_helpers import get_admins_responsible_for_room, get_curr
 from django.http import Http404
 
 from assignments.api.serializers.assignment import ConsumableDistributionSerializer, ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, RestockConsumableSerializer, ReturnConsumableSerializer, UseConsumableSerializer
+from inventory.authorization.permissions.assets import AssetCustodyScopePermission
+from inventory.authorization.permissions.base_permissions import RequiresPermission
 
 class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Full chronological event timeline for a consumable.
     """
+    permission_classes = [ RequiresPermission, ]
+
+    required_permission = ( "assets.view" )
     serializer_class = ConsumableEventSerializer
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
@@ -42,7 +47,11 @@ class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 class IssueConsumableView(AuditMixin, NotificationMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission, ]
+
+    required_permission = (
+        "assignments.create"
+    )
 
     def post(self, request):
         serializer = IssueConsumableSerializer(data=request.data)
@@ -149,7 +158,8 @@ class IssueConsumableView(AuditMixin, NotificationMixin, APIView):
         )
 
 class UseConsumableView(AuditMixin, APIView):
-    permission_classes = [CanUseAsset]
+    permission_classes = [RequiresPermission]
+    required_permission = ( "assets.use" )
 
     def post(self, request):
         serializer = UseConsumableSerializer( data=request.data, context={"request": request})
@@ -223,7 +233,9 @@ class UseConsumableView(AuditMixin, APIView):
         )
 
 class AdminReturnConsumableView(AuditMixin,NotificationMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission, ]
+    required_permission = ( "returns.process" )
+
 
     def post(self, request):
         serializer = ReturnConsumableSerializer(data=request.data)
@@ -317,7 +329,9 @@ class AdminReturnConsumableView(AuditMixin,NotificationMixin, APIView):
         return Response(status=status.HTTP_200_OK,)
     
 class ReportConsumableLossView(AuditMixin, NotificationMixin, APIView):
-    permission_classes = [CanReportConsumableLoss]
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission ]
+
+    required_permission = ( "consumables.report_loss" )
 
     ALLOWED_EVENT_TYPES = {
         ConsumableEvent.EventType.LOST,
@@ -443,9 +457,12 @@ class ConsumableDistributionViewSet(viewsets.ReadOnlyModelViewSet):
     Current distribution of a consumable:
     who holds it and how much remains.
     """
+    permission_classes = [ RequiresPermission ]
+    required_permission = ( "assignments.view" )
+
     serializer_class = ConsumableDistributionSerializer
     pagination_class = FlexiblePagination
-    permission_classes = [CanManageAssetCustody]
+
 
     def get_queryset(self):
         consumable_id = self.kwargs.get("public_id")
@@ -462,7 +479,8 @@ class ConsumableDistributionViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 class RestockConsumableView(AuditMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission, AssetCustodyScopePermission]
+    required_permission = ( "assets.update" )
 
     def post(self, request):
         serializer = RestockConsumableSerializer(data=request.data)

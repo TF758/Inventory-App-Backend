@@ -17,12 +17,17 @@ from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer, SelfReturnAccessorySerializer
 from assets.api.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
+from inventory.authorization.permissions.assets import AssetCustodyScopePermission
+from inventory.authorization.permissions.base_permissions import RequiresPermission
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Full chronological event timeline for an accessory.
     """
+    permission_classes = [ RequiresPermission ]
+
+    required_permission = ( "assets.view" )
     serializer_class = AccessoryEventSerializer
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
@@ -41,7 +46,10 @@ class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+    
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission ]
+
+    required_permission = ( "assignments.create" )
 
     def post(self, request):
         serializer = AssignAccessorySerializer(data=request.data)
@@ -138,7 +146,10 @@ class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
         )
 
 class AdminReturnAccessoryView(AuditMixin,NotificationMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission, ]
+
+    required_permission = ( "returns.process" )
 
     def post(self, request):
         serializer = AdminReturnAccessorySerializer(data=request.data)
@@ -220,7 +231,10 @@ class AdminReturnAccessoryView(AuditMixin,NotificationMixin, APIView):
         return Response(status=status.HTTP_200_OK)
 
 class CondemnAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission ]
+
+    required_permission = ( "assets.delete" )
 
     def post(self, request):
         serializer = CondemnAccessorySerializer(data=request.data)
@@ -269,7 +283,9 @@ class CondemnAccessoryView(AuditMixin, APIView):
         return Response(status=status.HTTP_200_OK)
 
 class SelfReturnAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanSelfReturnAsset]
+    permission_classes = [RequiresPermission]
+
+    required_permission = ( "returns.self_return" )
 
     def post(self, request):
         serializer = SelfReturnAccessorySerializer(data=request.data)
@@ -332,7 +348,9 @@ class SelfReturnAccessoryView(AuditMixin, APIView):
 
 
 class AccessoryDistributionView(GenericAPIView):
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission ]
+
+    required_permission = ( "assignments.view" )
     pagination_class = FlexiblePagination
     serializer_class = AccessoryDistributionSerializer
 
@@ -363,7 +381,10 @@ class AccessoryDistributionView(GenericAPIView):
         return Response(serializer.data)
 
 class RestockAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission ]
+
+    required_permission = ( "assets.update" )
 
     def post(self, request):
         serializer = RestockAccessorySerializer(data=request.data)
@@ -425,6 +446,8 @@ class UseAccessoryView(AuditMixin, APIView):
             user=request.user,
             returned_at__isnull=True,
         )
+
+        self.check_object_permissions(request, assignment)
 
         if quantity > assignment.quantity:
             raise ValidationError(

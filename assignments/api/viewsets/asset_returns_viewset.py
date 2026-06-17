@@ -16,6 +16,8 @@ from core.pagination import FlexiblePagination
 from assignments.api.serializers.returns import ReturnRequestSerializer
 from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
 from assignments.assignment_filters import AdminReturnRequestFilter, ReturnRequestFilter
+from inventory.authorization.permissions.base_permissions import RequiresPermission
+from inventory.authorization.permissions.returns import ReturnRequestScopePermission
 from users.api.serializers.self import MixedAssetReturnSerializer
 
 
@@ -23,7 +25,8 @@ class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):
 
     """Send a return request of assets of various types"""
 
-    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
+    permission_classes = [RequiresPermission]
+    required_permission = "returns.request_asset_return"
 
     def create(self, request):
 
@@ -71,7 +74,9 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ReturnRequestSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+
+    required_permission = ( "returns.view" )
     filter_backends = [DjangoFilterBackend]
     pagination_class = FlexiblePagination
 
@@ -93,6 +98,9 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
     
 class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet ):
     serializer_class = ReturnRequestSerializer
+    permission_classes = [RequiresPermission]
+
+    required_permission = ( "returns.view" )
     permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
 
@@ -155,7 +163,8 @@ class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
 class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
 
-    permission_classes = [IsAuthenticated, CanProcessReturnRequest]
+    permission_classes = [ RequiresPermission, ReturnRequestScopePermission ]
+    required_permission = ( "returns.process" )
     queryset = ReturnRequest.objects.all()
     lookup_field = "public_id"
     lookup_url_kwarg = "public_id"
@@ -341,7 +350,8 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
 
 class AdminReturnRequestItemWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
 
-    permission_classes = [IsAuthenticated, CanProcessReturnRequest]
+    permission_classes = [ RequiresPermission, ReturnRequestScopePermission, ]
+    required_permission = ( "returns.process" )
     lookup_field = "public_id"
     lookup_url_kwarg = "public_id"
 
