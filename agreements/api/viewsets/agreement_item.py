@@ -10,8 +10,12 @@ from agreements.services.coverage import can_attach_asset_to_agreement
 from core.models.audit import AuditLog
 from rest_framework import status
 
+from inventory.authorization.permissions.agreements import AgreementItemPermission
+
 
 class AssetAgreementItemViewSet(AuditMixin, ScopeFilterMixin, viewsets.GenericViewSet, ):
+
+    permission_classes = [AgreementItemPermission]
 
     queryset = (
         AssetAgreementItem.objects

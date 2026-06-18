@@ -10,19 +10,10 @@ class ReturnRequestScopePermission(BasePermission):
     the user's custody scope.
     """
 
-    def has_permission(
-        self,
-        request,
-        view,
-    ):
+    def has_permission( self, request, view, ):
         return True
 
-    def has_object_permission(
-        self,
-        request,
-        view,
-        obj,
-    ):
+    def has_object_permission( self, request, view, obj, ):
         role = get_active_role(
             request.user
         )

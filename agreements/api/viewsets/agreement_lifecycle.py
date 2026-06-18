@@ -9,10 +9,14 @@ from core.mixins import ( AuditMixin, ScopeFilterMixin, )
 from agreements.service import AgreementLifecycleService
 from core.models.audit import AuditLog
 from agreements.api.serialziers.agreement_lifecycle import ExtendAgreementSerializer, RenewAgreementSerializer
+from inventory.authorization.permissions.agreements import AgreementLifecyclePermission
+from inventory.authorization.permissions.base_permissions import RequiresPermission
 
 
 
 class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericViewSet, ):
+
+    permission_classes = [ AgreementLifecyclePermission ]
 
     queryset = (
         AssetAgreement.objects
@@ -69,6 +73,7 @@ class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericV
 
     @action( detail=True, methods=["post"], )
     def extend( self, request, public_id=None, ):
+
 
         agreement = self.get_object()
         previous_expiry_date = agreement.expiry_date

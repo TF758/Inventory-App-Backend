@@ -7,6 +7,10 @@ from core.pagination import FlexiblePagination
 from core.models.audit import AuditLog
 from rest_framework import status
 
+from inventory.authorization.permissions.agreements import AgreementCoveragePermission
+from inventory.authorization.permissions.base_permissions import RequiresPermission
+from inventory.core.permissions.assets import AssetAgreementPermission
+
 
 class AgreementCoverageViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
 
@@ -21,7 +25,7 @@ class AgreementCoverageViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewS
         .order_by("id")
     )
 
-    # permission_classes = [AssetAgreementPermission]
+    permission_classes = [AgreementCoveragePermission]
 
     pagination_class = FlexiblePagination
 
