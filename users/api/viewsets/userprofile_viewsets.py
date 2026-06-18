@@ -1,9 +1,10 @@
 
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets
 from rest_framework import mixins
 from core.pagination import FlexiblePagination
-from core.permissions import UserPermission
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from core.permissions.helpers import filter_user_assets_by_scope
@@ -16,6 +17,8 @@ from rest_framework.response import Response
 from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.api.serializers.equipment import EquipmentSerializer
+from inventory.assignments.assignment_filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter
+from inventory.authorization.permissions.users import UserProfilePermission
 from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from users.models.users import User
 
@@ -23,7 +26,7 @@ from users.models.users import User
 
 class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
 
-    permission_classes = [CanViewUserProfile]
+    permission_classes = [UserProfilePermission]
     serializer_class = UserProfileSerializer
     lookup_field = "public_id"
 
@@ -55,10 +58,71 @@ class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
         )
 
         return queryset
-    
+
+
+
+
+class UserAssetsAggregateView(APIView):
+
+    """returns all assets belonging to a user.
+    this include equipment, accessories, and consumables"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_public_id):
+
+        user = get_user(user_public_id)
+
+        equipment_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_equipment(user),
+            "room"
+        )
+
+        accessory_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_accessories(user),
+            "accessory__room"
+        )
+
+        consumable_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_consumables(user),
+            "consumable__room"
+        )
+
+        equipment_data = EquipmentSerializer(
+            equipment_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        accessory_data = UserAccessoryAssignmentSerializer(
+            accessory_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        consumable_data = UserConsumableIssueSerializer(
+            consumable_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        return Response({
+            "equipment": equipment_data,
+            "accessories": accessory_data,
+            "consumables": consumable_data,
+        })
+
 class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+
+    permission_classes = [IsAuthenticated]
     serializer_class = EquipmentSerializer
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfEquipmentFilter
+
 
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
@@ -74,8 +138,13 @@ class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return queryset
 
 class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+
+    permission_classes = [IsAuthenticated]
     serializer_class = UserAccessoryAssignmentSerializer
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfAccessoryFilter
 
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
@@ -98,8 +167,13 @@ class UserAccessoryAssignmentViewSet(mixins.ListModelMixin, viewsets.GenericView
 
 
 class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+
+    permission_classes = [IsAuthenticated]
     serializer_class = UserConsumableIssueSerializer
     pagination_class = FlexiblePagination
+
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SelfConsumableFilter
 
     def get_queryset(self):
         user = get_user(self.kwargs["user_public_id"])
@@ -119,9 +193,10 @@ class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet)
         )
 
         return queryset
-
+    
 class UserAssetStatusView(APIView):
-    permission_classes = [UserPermission]
+
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, user_public_id):
 
