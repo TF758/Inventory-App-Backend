@@ -9,7 +9,7 @@ from assignments.services.equipment_assignment import StatusChangeResult
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from core.permissions import AssetPermission
+
 from core.mixins import AuditMixin
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -20,6 +20,8 @@ from assets.services.assets import hard_delete_asset, restore_asset, soft_delete
 from core.pagination import FlexiblePagination
 from assets.models.assets import Accessory
 from assets.asset_filters import AccessoryFilter
+from inventory.authorization.permissions.assets import AssetPermission
+from inventory.authorization.permissions.base_permissions import RequiresPermission
 
 class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -62,6 +64,9 @@ class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
     
 
 class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.create"
+    
     save_to_db = False
 
     def post(self, request, *args, **kwargs):
@@ -89,6 +94,9 @@ class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):
 
 
 class AccessoryBatchImportView(AccessoryBatchMixin, APIView):
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.create"
+
     save_to_db = True
 
     def post(self, request, *args, **kwargs):
@@ -115,6 +123,8 @@ class AccessoryBatchImportView(AccessoryBatchMixin, APIView):
         )
 
 class AccessorySoftDeleteView(APIView):
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
     """
     Soft delete a single accessory by public_id.
     """
@@ -155,6 +165,9 @@ class AccessorySoftDeleteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class AccessoryRestoreViewSet(APIView):
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update"
+
     """
     Restore a soft-deleted Accessory by public_id.
     """
@@ -183,7 +196,8 @@ class AccessoryRestoreViewSet(APIView):
 
 class BatchAccessorySoftDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchAccessorySoftDeleteSerializer(data=request.data)
@@ -243,7 +257,8 @@ class BatchAccessorySoftDeleteView(APIView):
 
 class BatchAccessoryHardDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchAccessoryHardDeleteSerializer(data=request.data)

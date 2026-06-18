@@ -18,6 +18,7 @@ from assets.api.serializers.consumables import BatchConsumableHardDeleteSerializ
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from assets.models.assets import Consumable
 from assets.asset_filters import ConsumableFilter
+from inventory.authorization.permissions.base_permissions import RequiresPermission
 from sites.models.sites import Room
 
 
@@ -82,6 +83,9 @@ class ConsumableModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet)
 
     
 class ConsumableBatchValidateView(ConsumableBatchMixin, APIView):
+
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.create"
     save_to_db = False
 
     def post(self, request, *args, **kwargs):
@@ -102,6 +106,10 @@ class ConsumableBatchValidateView(ConsumableBatchMixin, APIView):
 
 
 class ConsumableBatchImportView(ConsumableBatchMixin, APIView):
+
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.create"
+
     save_to_db = True
 
     def post(self, request, *args, **kwargs):
@@ -125,7 +133,8 @@ class ConsumableSoftDeleteView(APIView):
     Soft delete a single consumable by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def delete(self, request, public_id):
 
@@ -165,7 +174,9 @@ class ConsumableRestoreViewSet(APIView):
     Restore a soft-deleted Consumable by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update"
+
     lookup_field = "public_id"
 
     def get(self, request, public_id=None):
@@ -189,7 +200,9 @@ class ConsumableRestoreViewSet(APIView):
     
 class BatchConsumableSoftDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchConsumableSoftDeleteSerializer(data=request.data)
@@ -248,7 +261,8 @@ class BatchConsumableSoftDeleteView(APIView):
         )
 class BatchConsumableHardDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchConsumableHardDeleteSerializer(data=request.data)

@@ -1,6 +1,5 @@
 from rest_framework import viewsets
 from rest_framework.serializers import ValidationError
-
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from core.mixins import ScopeFilterMixin,EquipmentBatchMixin, AuditMixin
@@ -16,7 +15,6 @@ from django.db import transaction
 from core.utils.asset_helpers import equipment_event_from_status
 from core.utils.audit import create_audit_log
 from django.utils import timezone
-from core.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
 from core.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
 from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from assets.models.assets import Equipment, EquipmentStatus
@@ -27,6 +25,8 @@ from assets.api.serializers.equipment import EquipmentCondemnSerializer, Equipme
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from core.models.audit import AuditLog
 from assets.asset_filters import EquipmentFilter
+from inventory.authorization.permissions.assets import AssetCustodyScopePermission
+from inventory.authorization.permissions.base_permissions import RequiresPermission
 from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
@@ -70,50 +70,32 @@ class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet)
 
         return qs
     
-def perform_create(self, serializer):
-        room_id = self.request.data.get("room")
-        if not room_id:
-            raise PermissionDenied("You must specify a room to create equipment.")
-        
-        room = Room.objects.filter(pk=room_id).first()
-        if not room:
-            raise PermissionDenied("Invalid room ID.")
+    def perform_create(self, serializer):
+            room_id = self.request.data.get("room")
+            if not room_id:
+                raise PermissionDenied("You must specify a room to create equipment.")
+            
+            room = Room.objects.filter(pk=room_id).first()
+            if not room:
+                raise PermissionDenied("Invalid room ID.")
 
-        active_role = getattr(self.request.user, "active_role", None)
-        if not active_role:
-            raise PermissionDenied("No active role assigned.")
+            active_role = getattr(self.request.user, "active_role", None)
+            if not active_role:
+                raise PermissionDenied("No active role assigned.")
 
-        # Permission check for POST creation scope
-        if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
-            raise PermissionDenied("You do not have permission to create equipment in this room.")
+            # Permission check for POST creation scope
+            if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
+                raise PermissionDenied("You do not have permission to create equipment in this room.")
 
-        serializer.save(room=room)
+            serializer.save(room=room)
 
-class EquipmentDeleteViewSet(viewsets.ViewSet):
-    """
-    Soft delete Equipment by public_id.
-    """
-
-    permission_classes = [AssetPermission]
-    lookup_field = "public_id"
-
-    def destroy(self, request, public_id=None):
-        equipment = get_object_or_404(
-            Equipment,
-            public_id=public_id,
-            is_deleted=False,
-        )
-
-        equipment.is_deleted = True
-        equipment.deleted_at = timezone.now()
-        equipment.save(update_fields=["is_deleted", "deleted_at"])
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
-      
 class EquipmentBatchValidateView(EquipmentBatchMixin, APIView):
     """
     Validate a batch of equipment rows without saving.
     """
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.create"
+
     save_to_db = False
 
     def post(self, request, *args, **kwargs):
@@ -141,6 +123,9 @@ class EquipmentBatchImportView(EquipmentBatchMixin, APIView):
     """
     Batch import of equipment (saves to DB).
     """
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.create"
+
     save_to_db = True
 
     def post(self, request, *args, **kwargs):
@@ -166,15 +151,14 @@ class EquipmentBatchImportView(EquipmentBatchMixin, APIView):
 class EquipmentStatusChangeView(APIView):
     """Dedicated view to update equipment status"""
 
-    permission_classes = [CanUpdateEquipmentStatus]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update_status"
 
     def patch(self, request, public_id):
         equipment = get_object_or_404(
             Equipment.objects.select_related("active_assignment"),
             public_id=public_id,
         )
-
-        self.check_object_permissions(request, equipment)
 
         serializer = EquipmentStatusChangeSerializer(
             data=request.data,
@@ -226,15 +210,15 @@ class EquipmentStatusChangeView(APIView):
         return Response( status=status.HTTP_200_OK, )
 
 class EquipmentCondemnView(APIView):
-    permission_classes = [CanUpdateEquipmentStatus]
+
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update_status"
 
     def patch(self, request, public_id):
         equipment = get_object_or_404(
             Equipment.objects.select_related("active_assignment"),
             public_id=public_id,
         )
-
-        self.check_object_permissions(request, equipment)
 
         if equipment.status == EquipmentStatus.CONDEMNED:
             return Response(
@@ -286,7 +270,8 @@ class EquipmentCondemnView(APIView):
     
 class BatchUnassignEquipmentView(APIView):
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission]
+    required_permission = "assignments.unassign"
 
     def post(self, request):
 
@@ -349,7 +334,9 @@ class BatchUnassignEquipmentView(APIView):
 
 class BatchAssignEquipmentView(APIView):
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission, AssetCustodyScopePermission]
+
+    required_permission = "assignments.create"
 
     def post(self, request):
 
@@ -391,8 +378,10 @@ class BatchAssignEquipmentView(APIView):
                     continue
 
                 try:
-                    self.check_object_permissions(request, equipment)
-
+                    self.check_object_permissions(
+                                request,
+                                equipment,
+                            )
                     result = assign_equipment(
                         actor=actor,
                         equipment=equipment,
@@ -422,7 +411,8 @@ class BatchAssignEquipmentView(APIView):
 
 class BatchEquipmentStatusChangeView(APIView):
 
-    permission_classes = [CanUpdateEquipmentStatus]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update_status"
 
     def post(self, request):
         serializer = BatchEquipmentStatusChangeSerializer(data=request.data)
@@ -456,7 +446,6 @@ class BatchEquipmentStatusChangeView(APIView):
                     continue
 
                 try:
-                    self.check_object_permissions(request, eq)
 
                     result = change_equipment_status(
                         actor=actor,
@@ -483,7 +472,8 @@ class BatchEquipmentStatusChangeView(APIView):
 
 class BatchEquipmentCondemnView(APIView):
 
-    permission_classes = [CanUpdateEquipmentStatus]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update_status"
 
     def post(self, request):
         serializer = BatchEquipmentCondemnSerializer(data=request.data)
@@ -516,7 +506,6 @@ class BatchEquipmentCondemnView(APIView):
                     continue
 
                 try:
-                    self.check_object_permissions(request, eq)
 
                     result = condemn_equipment(
                         actor=actor,
@@ -543,7 +532,8 @@ class BatchEquipmentCondemnView(APIView):
     
 class BatchEquipmentHardDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchEquipmentHardDeleteSerializer(data=request.data)
@@ -576,7 +566,6 @@ class BatchEquipmentHardDeleteView(APIView):
                     continue
 
                 try:
-                    self.check_object_permissions(request, eq)
 
                     result = hard_delete_asset(
                         actor=actor,
@@ -610,7 +599,9 @@ class EquipmentRestoreViewSet(APIView):
     Restore a soft-deleted Equipment by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.update"
+
     lookup_field = "public_id"
 
     def get(self, request, public_id=None):
@@ -636,7 +627,8 @@ class EquipmentSoftDeleteView(APIView):
     Soft delete a single equipment item by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def delete(self, request, public_id):
 
@@ -646,12 +638,7 @@ class EquipmentSoftDeleteView(APIView):
             is_deleted=False,
         )
 
-        for permission in self.get_permissions():
-            if hasattr(permission, "has_object_permission"):
-                if not permission.has_object_permission(request, self, equipment):
-                    raise PermissionDenied()
 
-        # ⭐ Optional notes support
         notes = request.data.get("notes", "")
 
         result = soft_delete_asset(
@@ -674,7 +661,8 @@ class EquipmentSoftDeleteView(APIView):
     
 class BatchEquipmentSoftDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchEquipmentSoftDeleteSerializer(data=request.data)
@@ -707,7 +695,6 @@ class BatchEquipmentSoftDeleteView(APIView):
                     continue
 
                 try:
-                    self.check_object_permissions(request, eq)
 
                     result = soft_delete_asset(
                         actor=actor,

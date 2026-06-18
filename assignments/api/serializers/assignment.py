@@ -177,6 +177,7 @@ class AssignAccessorySerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
 class AdminReturnAccessorySerializer(serializers.Serializer):
+    
     assignment = serializers.PrimaryKeyRelatedField(queryset=AccessoryAssignment.objects.all())
     quantity = serializers.IntegerField(min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True)
