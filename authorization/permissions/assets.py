@@ -5,7 +5,7 @@ from authorization.services import get_active_role
 from core.permissions.helpers import has_asset_custody_scope
 from rest_framework.permissions import BasePermission 
 
-from inventory.assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
+from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
 
 class AssetPermission(ScopedPermission):

@@ -1,7 +1,7 @@
 
 
-from inventory.authorization.permissions.base_permissions import RequiresPermission, ScopedPermission
-from inventory.authorization.services import user_has_permission
+from authorization.permissions.base_permissions import RequiresPermission, ScopedPermission
+from authorization.services import user_has_permission
 from rest_framework.permissions import BasePermission 
 
 class AgreementPermission(ScopedPermission):

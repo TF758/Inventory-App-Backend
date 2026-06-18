@@ -17,7 +17,7 @@ from assets.models.assets import Accessory, Consumable, Equipment
 from agreements.service import get_attached_agreement_ids
 from rest_framework import status
 
-from inventory.authorization.permissions.agreements import AgreementPermission
+from authorization.permissions.agreements import AgreementPermission
 
 class AssetAgreementViewSet( AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
 

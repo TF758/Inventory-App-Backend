@@ -17,8 +17,8 @@ from rest_framework.response import Response
 from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.api.serializers.equipment import EquipmentSerializer
-from inventory.assignments.assignment_filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter
-from inventory.authorization.permissions.users import UserProfilePermission
+from assignments.assignment_filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter
+from authorization.permissions.users import UserProfilePermission
 from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from users.models.users import User
 

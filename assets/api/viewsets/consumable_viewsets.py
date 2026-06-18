@@ -18,7 +18,7 @@ from assets.api.serializers.consumables import BatchConsumableHardDeleteSerializ
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from assets.models.assets import Consumable
 from assets.asset_filters import ConsumableFilter
-from inventory.authorization.permissions.base_permissions import RequiresPermission
+from authorization.permissions.base_permissions import RequiresPermission
 from sites.models.sites import Room
 
 

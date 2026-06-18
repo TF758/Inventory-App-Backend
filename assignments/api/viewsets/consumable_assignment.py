@@ -17,8 +17,8 @@ from core.utils.viewset_helpers import get_admins_responsible_for_room, get_curr
 from django.http import Http404
 
 from assignments.api.serializers.assignment import ConsumableDistributionSerializer, ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, RestockConsumableSerializer, ReturnConsumableSerializer, UseConsumableSerializer
-from inventory.authorization.permissions.assets import AssetCustodyScopePermission
-from inventory.authorization.permissions.base_permissions import RequiresPermission
+from authorization.permissions.assets import AssetCustodyScopePermission
+from authorization.permissions.base_permissions import RequiresPermission
 
 class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """

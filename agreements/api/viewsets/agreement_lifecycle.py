@@ -9,8 +9,8 @@ from core.mixins import ( AuditMixin, ScopeFilterMixin, )
 from agreements.service import AgreementLifecycleService
 from core.models.audit import AuditLog
 from agreements.api.serialziers.agreement_lifecycle import ExtendAgreementSerializer, RenewAgreementSerializer
-from inventory.authorization.permissions.agreements import AgreementLifecyclePermission
-from inventory.authorization.permissions.base_permissions import RequiresPermission
+from authorization.permissions.agreements import AgreementLifecyclePermission
+from authorization.permissions.base_permissions import RequiresPermission
 
 
 

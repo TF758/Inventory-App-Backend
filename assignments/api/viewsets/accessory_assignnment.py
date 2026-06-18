@@ -17,8 +17,8 @@ from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer, SelfReturnAccessorySerializer
 from assets.api.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
-from inventory.authorization.permissions.assets import AssetCustodyScopePermission
-from inventory.authorization.permissions.base_permissions import RequiresPermission
+from authorization.permissions.assets import AssetCustodyScopePermission
+from authorization.permissions.base_permissions import RequiresPermission
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):

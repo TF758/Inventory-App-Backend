@@ -6,7 +6,7 @@ from rest_framework.generics import ( GenericAPIView, ListAPIView, RetrieveAPIVi
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from authorization.models import ( Permission, Role, RolePermission, )
-from inventory.authorization.api.serialziers import RoleDetailSerializer, RolePermissionUpdateSerializer, RoleSerializer
+from authorization.api.serialziers import RoleDetailSerializer, RolePermissionUpdateSerializer, RoleSerializer
 
 
 

@@ -16,8 +16,8 @@ from core.pagination import FlexiblePagination
 from assignments.api.serializers.returns import ReturnRequestSerializer
 from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
 from assignments.assignment_filters import AdminReturnRequestFilter, ReturnRequestFilter
-from inventory.authorization.permissions.base_permissions import RequiresPermission
-from inventory.authorization.permissions.returns import ReturnRequestScopePermission
+from authorization.permissions.base_permissions import RequiresPermission
+from authorization.permissions.returns import ReturnRequestScopePermission
 from users.api.serializers.self import MixedAssetReturnSerializer
 
 

@@ -1,7 +1,7 @@
 from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
-from inventory.authorization.services import get_active_role
-from inventory.core.permissions.helpers import has_asset_custody_scope
+from authorization.services import get_active_role
+from core.permissions.helpers import has_asset_custody_scope
 
 
 class ReturnRequestScopePermission(BasePermission):

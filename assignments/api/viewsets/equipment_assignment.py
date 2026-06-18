@@ -17,8 +17,8 @@ from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from assignments.assignment_filters import EquipmentAssignmentFilter
-from inventory.authorization.permissions.assets import AssetCustodyScopePermission
-from inventory.authorization.permissions.base_permissions import RequiresPermission
+from authorization.permissions.assets import AssetCustodyScopePermission
+from authorization.permissions.base_permissions import RequiresPermission
 
 class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet ):
     """
@@ -373,7 +373,7 @@ class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
     permission_classes = [ RequiresPermission ]
 
     required_permission = "assets.view"
-    
+
     serializer_class = EquipmentEventSerializer
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
