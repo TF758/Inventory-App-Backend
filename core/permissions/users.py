@@ -18,32 +18,7 @@ ROLE_ASSIGNMENT_RULES = {
 }
 
 
-class UserPermission(BasePermission):
-    """
-    Permissions for user self-service and read-only access.
 
-    Rules:
-    - All authenticated users may view users
-    - Users may edit themselves
-    - No admin-level writes allowed here
-    """
-
-    def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated)
-
-    def has_object_permission(self, request, view, obj):
-        user = request.user
-
-        # READ — all authenticated users
-        if request.method in SAFE_METHODS:
-            return True
-
-        # WRITE — self only
-        if request.method in ["PUT", "PATCH"]:
-            return user == obj
-
-        return False
-    
 
 
 

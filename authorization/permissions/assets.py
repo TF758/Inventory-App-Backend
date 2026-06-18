@@ -3,7 +3,7 @@
 from authorization.permissions.base_permissions import RequiresPermission, ScopedPermission
 from authorization.services import get_active_role
 from core.permissions.helpers import has_asset_custody_scope
-from rest_framework.permissions import ( BasePermission, )
+from rest_framework.permissions import BasePermission 
 
 from inventory.assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
 
@@ -33,19 +33,10 @@ class AssetCustodyScopePermission( BasePermission ):
     Replacing legacy CanManageAssetCustody
     """
 
-    def has_permission(
-        self,
-        request,
-        view,
-    ):
+    def has_permission( self, request, view, ):
         return True
 
-    def has_object_permission(
-        self,
-        request,
-        view,
-        asset,
-    ):
+    def has_object_permission( self, request, view, asset, ):
         role = get_active_role(
             request.user
         )
