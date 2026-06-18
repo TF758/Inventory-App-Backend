@@ -6,6 +6,7 @@ from assets.models.assets import Accessory, Component, Consumable, Equipment, Eq
 from assignments.models.asset_assignment import ReturnRequest
 from core.models.audit import AuditLog
 from core.utils.scope.policies import POLICY_REGISTRY
+from authorization.helpers import is_in_scope
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, UserPlacement
@@ -30,11 +31,6 @@ def can_modify(user_role: str, target_role: str) -> bool:
     # must be strictly higher
     return user_rank > target_rank
 
-def get_active_role(user: User) -> Optional[RoleAssignment]:
-    """
-    Retrieve the active role assignment for a user.
-    """
-    return getattr(user, "active_role", None)
 
 def get_user_roles(user: User):
     """
@@ -53,94 +49,6 @@ def has_hierarchy_permission(user_role: str, required_role: str) -> bool:
     if user_role == "SITE_ADMIN":
         return True
     return ROLE_HIERARCHY.get(user_role, -1) >= ROLE_HIERARCHY.get(required_role, -1)
-
-def is_in_scope(role_assignment: RoleAssignment,
-                room: Optional[Room] = None,
-                location: Optional[Location] = None,
-                department: Optional[Department] = None) -> bool:
-    """
-    Determine whether a role assignment has scope over a given resource
-    (room, location, or department).
-
-    Returns:
-        bool: True if the role covers the given resource, otherwise False.
-    """
-
-    if not role_assignment:
-        return False
-    if role_assignment.role == "SITE_ADMIN":
-        return True
-
-    if department:
-        if role_assignment.department == department:
-            return True
-        if role_assignment.location and role_assignment.location.department == department:
-            return True
-        if role_assignment.room and role_assignment.room.location.department == department:
-            return True
-
-    if location:
-        if role_assignment.location == location:
-            return True
-        if role_assignment.department and location.department == role_assignment.department:
-            return True
-        if role_assignment.room and role_assignment.room.location == location:
-            return True
-
-    if room:
-        if role_assignment.room == room:
-            return True
-        if role_assignment.location and role_assignment.location == room.location:
-            return True
-        if role_assignment.department and room.location.department == role_assignment.department:
-            return True
-
-    return False
-
-    
-def is_user_in_scope(
-    admin_role: RoleAssignment,
-    target_user: User
-) -> bool:
-    """
-    Check whether the admin_role has scope over the target user.
-    """
-
-    if not admin_role:
-        return False
-
-    if admin_role.role == "SITE_ADMIN":
-        return True
-
-
-    for ra in RoleAssignment.objects.filter(user=target_user):
-        if is_in_scope(
-            admin_role,
-            room=ra.room,
-            location=ra.location,
-            department=ra.department,
-        ):
-            return True
-
-    current_ul = (
-        UserPlacement.objects
-        .select_related("room__location__department")
-        .filter(user=target_user, is_current=True)
-    )
-
-    for ul in current_ul:
-        if not ul.room:
-            continue  
-
-        if is_in_scope(
-            admin_role,
-            room=ul.room,
-            location=ul.room.location,
-            department=ul.room.location.department,
-        ):
-            return True
-
-    return False
 
 def check_permission(user: User, required_role: str,
                      room: Optional[Room] = None,
@@ -395,37 +303,6 @@ def ensure_permission(user: User, required_role: str,
 
 #     return queryset.filter(q).distinct()
 
-def filter_queryset_by_scope(user, queryset, model_class):
-    """
-    Restrict a queryset to the subset of records the user's active role
-    has scope over (based on department, location, or room).
-
-    This function delegates filtering to model-specific scope policies.
-
-    Behavior:
-        - No active role → empty queryset
-        - SITE_ADMIN → full access
-        - Otherwise → use registered policy
-        - No policy → deny (empty queryset)
-
-    Returns:
-        QuerySet filtered according to scope rules
-    """
-    role = get_active_role(user)
-
-    if not role:
-        return queryset.none()
-
-    if role.role == "SITE_ADMIN":
-        return queryset
-
-    policy_cls = POLICY_REGISTRY.get(model_class)
-
-    if not policy_cls:
-        return queryset.none()
-
-    policy = policy_cls(user, queryset)
-    return policy.apply()
 
 def is_viewer_role(role: str) -> bool:
     """
@@ -480,80 +357,6 @@ def is_admin_role(role: str) -> bool:
     # Any non-viewer role in the hierarchy is considered an admin/write role
     return True
 
-def has_asset_custody_scope(
-    role: RoleAssignment,
-    asset,
-) -> bool:
-    """
-    Scope check for physical asset custody.
-    Prevents upward / sideways authority leakage.
-    """
-
-    if role.role == "SITE_ADMIN":
-        return True
-
-    if not asset.room:
-        return False
-
-    role_name = role.role
-
-    # ROOM roles → exact room only
-    if role_name.startswith("ROOM_"):
-        return role.room == asset.room
-
-    # LOCATION roles → same location
-    if role_name.startswith("LOCATION_"):
-        return (
-            role.location
-            and asset.room.location == role.location
-        )
-
-    # DEPARTMENT roles → same department
-    if role_name.startswith("DEPARTMENT_"):
-        return (
-            role.department
-            and asset.room.location.department == role.department
-        )
-
-    return False
-
-def can_assign_asset_to_user(
-    admin_role: RoleAssignment,
-    target_user: User,
-) -> bool:
-    """
-    Determines whether an admin may assign equipment
-    to a target user.
-    """
-
-    if admin_role.role == "SITE_ADMIN":
-        return True
-
-    # ROOM roles → user must be in same room
-    if admin_role.role.startswith("ROOM_"):
-        return UserPlacement.objects.filter(
-            user=target_user,
-            room=admin_role.room,
-            is_current=True,
-        ).exists()
-
-    # LOCATION roles → user must be in same location
-    if admin_role.role.startswith("LOCATION_"):
-        return UserPlacement.objects.filter(
-            user=target_user,
-            room__location=admin_role.location,
-            is_current=True,
-        ).exists()
-
-    # DEPARTMENT roles → user must be in same department
-    if admin_role.role.startswith("DEPARTMENT_"):
-        return UserPlacement.objects.filter(
-            user=target_user,
-            room__location__department=admin_role.department,
-            is_current=True,
-        ).exists()
-
-    return False
 
 def can_change_equipment_status(user, equipment, new_status):
     active_role = getattr(user, "active_role", None)
@@ -578,58 +381,6 @@ def can_change_equipment_status(user, equipment, new_status):
         and is_in_scope(active_role, room=equipment.room)
     )
 
-def can_soft_delete_asset(user: User, asset) -> bool:
-    """
-    Generic permission check for soft-deleting a room-scoped asset.
-
-    Applies to Equipment, Accessory, Consumable, etc.
-    """
-
-    active_role = getattr(user, "active_role", None)
-    if not active_role:
-        return False
-
-    role_name = active_role.role
-
-    # --- SITE ADMIN ---
-    if role_name == "SITE_ADMIN":
-        return True
-
-    # --- Viewer roles cannot modify ---
-    if is_viewer_role(role_name):
-        return False
-
-    # --- Must be an admin/write role ---
-    if not is_admin_role(role_name):
-        return False
-
-    room = getattr(asset, "room", None)
-    if not room:
-        return False
-
-    location = getattr(room, "location", None)
-    department = getattr(location, "department", None)
-
-    return is_in_scope(
-        active_role,
-        room=room,
-        location=location,
-        department=department,
-    )
-
-def can_hard_delete_asset(user: User, asset=None) -> bool:
-    """
-    Hard delete permission.
-
-    Only SITE_ADMIN may permanently delete assets.
-    Scope and hierarchy checks are intentionally bypassed.
-    """
-
-    active_role = getattr(user, "active_role", None)
-    if not active_role:
-        return False
-
-    return active_role.role == "SITE_ADMIN"
 
 
 def filter_user_assets_by_scope(viewer, queryset, asset_path="room"):
