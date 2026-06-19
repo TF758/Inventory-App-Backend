@@ -2,10 +2,10 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from authorization.models import RolePermission
+from inventory.authorization.permissions.roles import RoleAssignmentPermission, ensure_can_assign_role, ensure_can_delete_role_assignment, ensure_can_update_role_assignment
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
-from core.permissions.helpers import ensure_permission
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -32,7 +32,7 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
         .order_by("-assigned_date", "-id")
     )
     lookup_field = "public_id"
-    permission_classes = [RolePermission]
+    permission_classes = [RoleAssignmentPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_class = RoleAssignmentFilter
     pagination_class = FlexiblePagination
@@ -112,12 +112,12 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
 
         # Pre-check permissions before saving
-        ensure_permission(
-            user,
-            data['role'],
-            data.get('room'),
-            data.get('location'),
-            data.get('department')
+        ensure_can_assign_role(
+            actor=user,
+            target_role=data["role_ref"],
+            room=data.get("room"),
+            location=data.get("location"),
+            department=data.get("department"),
         )
 
         try:
@@ -134,12 +134,13 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         data = serializer.validated_data
 
-        ensure_permission(
-            user,
-            data.get('role', serializer.instance.role),
-            data.get('room', serializer.instance.room),
-            data.get('location', serializer.instance.location),
-            data.get('department', serializer.instance.department)
+        ensure_can_update_role_assignment(
+            actor=user,
+            assignment=serializer.instance,
+            new_role=data.get("role_ref"),
+            room=data.get("room"),
+            location=data.get("location"),
+            department=data.get("department"),
         )
 
         try:
@@ -154,12 +155,9 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         user = self.request.user
-        ensure_permission(
-            user,
-            instance.role,
-            instance.room,
-            instance.location,
-            instance.department
+        ensure_can_delete_role_assignment(
+            actor=user,
+            assignment=instance,
         )
         instance.delete()
 
