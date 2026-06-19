@@ -1,9 +1,9 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
-from authorization.models import RolePermission
 from authorization.permissions.roles import RoleAssignmentPermission 
 from authorization.services.role import ensure_can_assign_role, ensure_can_delete_role_assignment, ensure_can_update_role_assignment
+from authorization.constants import ROLE_HIERARCHY
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -17,7 +17,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
-from core.permissions.constants import ROLE_HIERARCHY
 from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer, RoleWriteSerializer
 
 # --- Role Assignments CRUD ---

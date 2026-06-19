@@ -1,6 +1,5 @@
 
-from authorization.helpers import get_active_role
-from authorization.services import role_has_permission
+from authorization.helpers import get_active_role, role_has_permission
 from functools import lru_cache
 
 

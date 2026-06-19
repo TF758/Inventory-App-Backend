@@ -2,10 +2,10 @@ from rest_framework import viewsets
 from rest_framework import status, views
 from django.db import transaction
 from core.models.audit import AuditLog
-from inventory.authorization.helpers import filter_queryset_by_scope
-from inventory.authorization.models import Role
-from inventory.authorization.permissions.users import FullUserCreatePermission, UserPermission, UserPlacementPermission
-from inventory.authorization.services.role import ensure_can_assign_role
+from authorization.helpers import filter_queryset_by_scope
+from authorization.models import Role
+from authorization.permissions.users import FullUserCreatePermission, UserPermission, UserPlacementPermission
+from authorization.services.role import ensure_can_assign_role
 from sites.site_filters import UserPlacementFilter
 from users.users_filters import UserFilter
 from users.models.roles import RoleAssignment

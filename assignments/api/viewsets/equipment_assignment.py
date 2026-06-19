@@ -8,8 +8,6 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from core.mixins import AuditMixin, NotificationMixin
-from core.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
-from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
 
 from core.pagination import FlexiblePagination
@@ -19,6 +17,8 @@ from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEv
 from assignments.assignment_filters import EquipmentAssignmentFilter
 from authorization.permissions.assets import AssetCustodyScopePermission
 from authorization.permissions.base_permissions import RequiresPermission
+from authorization.helpers import get_active_role
+from authorization.services.assets import can_assign_asset_to_user
 
 class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet ):
     """
@@ -32,7 +32,6 @@ class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.Retr
         "equipment", "user", "assigned_by"
     )
     serializer_class = EquipmentAssignmentSerializer
-    permission_classes = [CanViewEquipmentAssignments]
     pagination_class = FlexiblePagination
 
     filterset_class = EquipmentAssignmentFilter

@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 from assets.models.assets import Equipment, EquipmentStatus
-from inventory.authorization.helpers import is_in_scope
+from authorization.helpers import is_in_scope
 from sites.models.sites import  Room
 
 from django.utils import timezone

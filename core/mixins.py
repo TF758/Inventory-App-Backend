@@ -5,8 +5,9 @@ from assets.api.serializers.accessories import AccessoryBatchWriteSerializer, Ac
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer, ConsumableBatchWriteSerializer
 from assets.api.serializers.equipment import EquipmentBatchtWriteSerializer, EquipmentSerializer
 from core.models.audit import AuditLog
+from authorization.helpers import filter_queryset_by_scope
 from users.models.roles import RoleAssignment
-from .permissions import filter_queryset_by_scope
+
 from django.db import transaction
 from collections import Counter
 from django.utils.text import capfirst

@@ -3,8 +3,9 @@ from assets.models.assets import Accessory, Consumable, Equipment, EquipmentStat
 from django.core.exceptions import ValidationError
 
 from core.models.audit import AuditLog
-from core.permissions.helpers import can_soft_delete_asset
+
 from core.models.base import generate_public_id
+from authorization.services.assets import can_soft_delete_asset
 
 
 def equipment_event_from_status(status: str) -> str:

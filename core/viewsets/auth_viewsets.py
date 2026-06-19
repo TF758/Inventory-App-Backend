@@ -12,7 +12,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from core.mixins import AuditMixin, NotificationMixin
 from rest_framework.exceptions import ValidationError, NotFound
 from django.db import transaction
-from core.permissions.users import AdminUpdateUserPermission
 from core.utils.audit import create_audit_log
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from core.utils.viewset_helpers import get_users_affected_by_site
@@ -26,6 +25,7 @@ from core.models.notifications import Notification
 from core.models.security import SecuritySettings
 from core.filters import SiteNameChangeHistoryFilter
 from core.serializers.audit import SiteNameChangeSerializer, SiteRelocationSerializer
+from authorization.permissions.users import AdminUpdateUserPermission
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
 

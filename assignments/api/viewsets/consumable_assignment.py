@@ -7,7 +7,6 @@ from core.mixins import AuditMixin, NotificationMixin
 from assignments.models.asset_assignment import ConsumableEvent, ConsumableIssue
 from assets.models.assets import Consumable
 from core.models.audit import AuditLog
-from core.permissions.assets import CanManageAssetCustody, CanReportConsumableLoss, CanUseAsset
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets, filters

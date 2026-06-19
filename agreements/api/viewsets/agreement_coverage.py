@@ -6,10 +6,8 @@ from core.mixins import AuditMixin, ScopeFilterMixin
 from core.pagination import FlexiblePagination
 from core.models.audit import AuditLog
 from rest_framework import status
-
 from authorization.permissions.agreements import AgreementCoveragePermission
-from authorization.permissions.base_permissions import RequiresPermission
-from core.permissions.assets import AssetAgreementPermission
+
 
 
 class AgreementCoverageViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):

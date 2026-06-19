@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 
 from django.core.files.storage import default_storage
 from django.db import transaction
+from authorization.helpers import is_in_scope
 from sites.models.sites import Room
-from core.permissions.helpers import has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 import pandas as pd
 import io
 
@@ -226,15 +226,7 @@ class BaseAssetImporter:
         # SITE_ADMIN always allowed
         if role_name == "SITE_ADMIN":
             return
-
-        # Viewer roles cannot import
-        if is_viewer_role(role_name):
-            raise PermissionError("Viewer roles cannot import assets.")
-
-        # Must be admin role
-        if not is_admin_role(role_name):
-            raise PermissionError("Only admin roles can import assets.")
-        
+ 
         # Clerks cannot import
         if role_name == "ROOM_CLERK":
             raise PermissionError("Room clerks cannot import assets.")

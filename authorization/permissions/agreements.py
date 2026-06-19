@@ -1,8 +1,9 @@
 
 
 from authorization.permissions.base_permissions import RequiresPermission, ScopedPermission
-from authorization.services import user_has_permission
-from rest_framework.permissions import BasePermission 
+from rest_framework.permissions import BasePermission
+
+from authorization.services.users import user_has_permission 
 
 class AgreementPermission(ScopedPermission):
     """

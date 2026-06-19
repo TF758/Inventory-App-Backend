@@ -1,7 +1,7 @@
 # authorization/base_permissions.py
 from rest_framework.permissions import  SAFE_METHODS, BasePermission
-from authorization.services import  get_active_role, user_has_permission
-from authorization.helpers import is_in_scope
+from authorization.helpers import get_active_role, is_in_scope
+from authorization.services.users import user_has_permission
 
 
 

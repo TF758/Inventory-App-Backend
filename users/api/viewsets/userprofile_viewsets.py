@@ -7,11 +7,9 @@ from core.pagination import FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.permissions.helpers import filter_user_assets_by_scope
 from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
-from core.permissions.users import CanViewUserProfile
 from rest_framework import viewsets
 from rest_framework.response import Response
 from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
@@ -19,6 +17,7 @@ from assignments.models.asset_assignment import AccessoryAssignment, ConsumableI
 from assets.api.serializers.equipment import EquipmentSerializer
 from assignments.assignment_filters import SelfAccessoryFilter, SelfConsumableFilter, SelfEquipmentFilter
 from authorization.permissions.users import UserProfilePermission
+from authorization.helpers import filter_user_assets_by_scope
 from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from users.models.users import User
 

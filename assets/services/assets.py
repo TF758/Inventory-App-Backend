@@ -1,12 +1,10 @@
 
 from core.models.audit import AuditLog
-from core.permissions.helpers import can_hard_delete_asset, can_soft_delete_asset
-from core.utils.asset_helpers import ASSET_CONFIG
 from django.db import transaction
 from django.utils import timezone
-
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assignments.services.equipment_assignment import StatusChangeResult
+from authorization.services.assets import can_hard_delete_asset, can_soft_delete_asset
 
 def create_asset_audit_log(
     *,

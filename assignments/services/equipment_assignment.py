@@ -6,10 +6,10 @@ from core.models.notifications import Notification
 from django.apps import apps
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from core.permissions.helpers import  is_admin_role, is_in_scope
 from core.utils.asset_helpers import equipment_event_from_status
 from assets.models.assets import Equipment, EquipmentStatus
 from assignments.models.asset_assignment import EquipmentEvent
+from authorization.helpers import get_active_role, is_in_scope
 
 class UnassignResult:
     SUCCESS = "success"
@@ -279,25 +279,49 @@ class StatusChangeResult:
     FAILED = "failed"
 
 
-def can_user_set_equipment_status(*, actor, equipment, new_status) -> bool:
-    active_role = getattr(actor, "active_role", None)
+def can_user_set_equipment_status( *, actor, equipment, new_status, ) -> bool:
 
-    # SITE_ADMIN unrestricted
-    if active_role and active_role.role == "SITE_ADMIN":
+    active_role = get_active_role(actor)
+
+    if not active_role:
+        return False
+
+    # Site admin
+    if (
+        active_role.role_ref
+        and active_role.role_ref.code == "SITE_ADMIN"
+    ):
         return True
 
-    # Scoped admin unrestricted (in scope)
+    # Administrative role with scope
     if (
-        active_role
-        and is_admin_role(active_role.role)
-        and is_in_scope(active_role, room=getattr(equipment, "room", None))
+        active_role.role_ref
+        and active_role.role_ref.level > 0
+        and is_in_scope(
+            active_role,
+            room=getattr(equipment, "room", None),
+        )
     ):
         return True
 
     # Assigned user limited self-reporting
-    assignment = getattr(equipment, "active_assignment", None)
-    if assignment and assignment.returned_at is None and assignment.user_id == actor.id:
-        allowed = {EquipmentStatus.OK, EquipmentStatus.DAMAGED, EquipmentStatus.UNDER_REPAIR}
+    assignment = getattr(
+        equipment,
+        "active_assignment",
+        None,
+    )
+
+    if (
+        assignment
+        and assignment.returned_at is None
+        and assignment.user_id == actor.id
+    ):
+        allowed = {
+            EquipmentStatus.OK,
+            EquipmentStatus.DAMAGED,
+            EquipmentStatus.UNDER_REPAIR,
+        }
+
         return new_status in allowed
 
     return False

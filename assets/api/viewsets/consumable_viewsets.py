@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from core.pagination import FlexiblePagination
 from core.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMixin
-from core.permissions import AssetPermission, is_in_scope
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
@@ -19,6 +18,8 @@ from assets.services.assets import hard_delete_asset, restore_asset, soft_delete
 from assets.models.assets import Consumable
 from assets.asset_filters import ConsumableFilter
 from authorization.permissions.base_permissions import RequiresPermission
+from authorization.helpers import is_in_scope
+from authorization.permissions.assets import AssetPermission
 from sites.models.sites import Room
 
 

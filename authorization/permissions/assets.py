@@ -1,11 +1,10 @@
 
 
 from authorization.permissions.base_permissions import RequiresPermission, ScopedPermission
-from authorization.services import get_active_role
-from core.permissions.helpers import has_asset_custody_scope
 from rest_framework.permissions import BasePermission 
-
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
+from authorization.services.assets import has_asset_custody_scope
+from authorization.helpers import get_active_role
 
 
 class AssetPermission(ScopedPermission):

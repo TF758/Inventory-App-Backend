@@ -1,9 +1,7 @@
 
 from rest_framework.permissions import BasePermission, SAFE_METHODS
-
-from core.permissions.helpers import is_in_scope, is_user_in_scope
 from authorization.permissions.base_permissions import RequiresPermission, ScopedPermission
-from authorization.services import get_active_role
+from authorization.helpers import get_active_role, is_user_in_scope
 
 
 class UserPlacementPermission(ScopedPermission):

@@ -1,11 +1,7 @@
 from rest_framework.exceptions import PermissionDenied
 
-from authorization.helpers import is_in_scope
-from authorization.services import (
-    get_active_role,
-    user_has_permission,
-)
-
+from authorization.helpers import get_active_role, is_in_scope
+from authorization.services.users import user_has_permission
 
 def can_create_room( *, actor, location, ) -> bool:
     """

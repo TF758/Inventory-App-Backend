@@ -1,6 +1,5 @@
 from rest_framework import viewsets
 from assets.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
-from core.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -8,6 +7,9 @@ from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
 from authorization.services.sites import ensure_can_create_location, ensure_can_transfer_location
+from authorization.permissions.assets import AssetPermission
+from authorization.permissions.sites import LocationPermission
+from authorization.permissions.users import UserPermission
 from sites.api.serializers.rooms import RoomReadSerializer
 from sites.site_filters import AreaUserFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
@@ -19,7 +21,6 @@ from sites.models.sites import Location, Room, UserPlacement
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
-from sites.permissions.sites import LocationPermission
 from django.db.models import Case, When, Value, IntegerField
 from core.pagination import FlexiblePagination
 from django.db.models import Q
@@ -30,7 +31,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
-from core.permissions.assets import AssetPermission, HasAssignmentScopePermission
+
 
 class LocationDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [IsAuthenticated]
@@ -411,7 +412,7 @@ class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnl
     serializer_class = RoleReadSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RolePermission]
+    permission_classes = [IsAuthenticated]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -431,14 +432,10 @@ class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnl
 
         return queryset.order_by("-assigned_date")
 
-class LocationEquipmentAssignmentViewSet(
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    viewsets.GenericViewSet,
-):
+class LocationEquipmentAssignmentViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet, ):
     serializer_class = EquipmentAssignmentSerializer
 
-    permission_classes = [HasAssignmentScopePermission]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         location_id = self.kwargs.get("public_id")

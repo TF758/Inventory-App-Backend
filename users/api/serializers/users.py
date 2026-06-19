@@ -302,28 +302,13 @@ class UserAccessoryAssignmentSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source="accessory.room.public_id", read_only=True)
     room_name = serializers.CharField(source="accessory.room.name", read_only=True)
 
-    location_id = serializers.CharField(
-        source="accessory.room.location.public_id",
-        read_only=True
-    )
-    location_name = serializers.CharField(
-        source="accessory.room.location.name",
-        read_only=True
-    )
+    location_id = serializers.CharField( source="accessory.room.location.public_id", read_only=True )
+    location_name = serializers.CharField( source="accessory.room.location.name", read_only=True )
 
-    department_id = serializers.CharField(
-        source="accessory.room.location.department.public_id",
-        read_only=True
-    )
-    department_name = serializers.CharField(
-        source="accessory.room.location.department.name",
-        read_only=True
-    )
+    department_id = serializers.CharField( source="accessory.room.location.department.public_id", read_only=True )
+    department_name = serializers.CharField( source="accessory.room.location.department.name", read_only=True )
 
-    assigned_by_id = serializers.CharField(
-        source="assigned_by.public_id",
-        read_only=True
-    )
+    assigned_by_id = serializers.CharField( source="assigned_by.public_id", read_only=True )
 
     assigned_by_name = serializers.SerializerMethodField()
 
@@ -359,28 +344,13 @@ class UserConsumableIssueSerializer(serializers.ModelSerializer):
     room_id = serializers.CharField(source="consumable.room.public_id", read_only=True)
     room_name = serializers.CharField(source="consumable.room.name", read_only=True)
 
-    location_id = serializers.CharField(
-        source="consumable.room.location.public_id",
-        read_only=True
-    )
-    location_name = serializers.CharField(
-        source="consumable.room.location.name",
-        read_only=True
-    )
+    location_id = serializers.CharField( source="consumable.room.location.public_id", read_only=True )
+    location_name = serializers.CharField( source="consumable.room.location.name", read_only=True )
 
-    department_id = serializers.CharField(
-        source="consumable.room.location.department.public_id",
-        read_only=True
-    )
-    department_name = serializers.CharField(
-        source="consumable.room.location.department.name",
-        read_only=True
-    )
+    department_id = serializers.CharField( source="consumable.room.location.department.public_id", read_only=True )
+    department_name = serializers.CharField( source="consumable.room.location.department.name", read_only=True )
 
-    assigned_by_id = serializers.CharField(
-        source="assigned_by.public_id",
-        read_only=True
-    )
+    assigned_by_id = serializers.CharField( source="assigned_by.public_id", read_only=True )
 
     assigned_by_name = serializers.SerializerMethodField()
 

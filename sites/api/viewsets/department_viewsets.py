@@ -12,8 +12,6 @@ from rest_framework.permissions import IsAuthenticated
 from assets.models.assets import Accessory, EquipmentStatus
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from core.permissions.assets import AssetPermission
-from core.permissions.users import RolePermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -21,13 +19,16 @@ from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
 from authorization.services.sites import ensure_can_create_department, ensure_can_delete_department, ensure_can_update_department
+from authorization.permissions.assets import AssetPermission
+from authorization.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
+from authorization.permissions.users import UserPermission
+from authorization.models import RolePermission
 from sites.site_filters import AreaUserFilter, DepartmentFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer
 from sites.models.sites import Department, Location, Room, UserPlacement
-from sites.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
 from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
 from sites.api.serializers.rooms import RoomSerializer
 

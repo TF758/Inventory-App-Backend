@@ -9,8 +9,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
-from core.permissions.assets import CanProcessReturnRequest, CanRequestAssetReturn
-
 from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from core.pagination import FlexiblePagination
 from assignments.api.serializers.returns import ReturnRequestSerializer
