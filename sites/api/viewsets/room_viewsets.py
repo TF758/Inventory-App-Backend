@@ -3,7 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
 from core.permissions.assets import AssetPermission
-from core.permissions.users import UserPermission
+
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -11,6 +11,8 @@ from assets.api.serializers.components import ComponentSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from authorization.permissions.users import UserPermission
+from authorization.services.sites import ensure_can_create_room, ensure_can_transfer_room
 from sites.site_filters import AreaUserFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
@@ -42,41 +44,86 @@ class RoomDashboardView(AreaDashboardMixin, APIView):
         room = get_object_or_404(Room, public_id=public_id)
         return Response(self.build_dashboard(room))
     
-class RoomViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+class RoomViewSet( AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
     lookup_field = "public_id"
-    permission_classes = [RoomPermission]
 
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ["^name", "name"]
+    permission_classes = [ RoomPermission, ]
+
+    filter_backends = [ DjangoFilterBackend, SearchFilter, ]
+
+    search_fields = [ "^name", "name", ]
+
     filterset_class = RoomFilter
 
     pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
+
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+        ]:
             return RoomWriteSerializer
 
-        # Light list endpoint
-        if self.action == "list" and self.pagination_class is None:
+        if ( self.action == "list" and self.pagination_class is None ):
             return RoomListSerializer
 
         return RoomReadSerializer
-    
+
     def get_queryset(self):
-        qs = Room.objects.all().order_by("id")
-        search_term = self.request.query_params.get("search")
+
+        qs = ( Room.objects .all() .order_by("id") )
+
+        search_term = (
+            self.request.query_params.get(
+                "search"
+            )
+        )
 
         if search_term:
             qs = qs.annotate(
                 starts_with_order=Case(
-                    When(name__istartswith=search_term, then=Value(1)),
+                    When(
+                        name__istartswith=search_term,
+                        then=Value(1),
+                    ),
                     default=Value(2),
                     output_field=IntegerField(),
                 )
-            ).order_by("starts_with_order", "name")
+            ).order_by(
+                "starts_with_order",
+                "name",
+            )
 
         return qs
 
+    def perform_create( self, serializer, ):
+        ensure_can_create_room(
+            actor=self.request.user,
+            location=serializer.validated_data[
+                "location"
+            ],
+        )
+
+        serializer.save()
+
+    def perform_update( self, serializer, ):
+
+        new_location = (
+            serializer.validated_data.get(
+                "location"
+            )
+        )
+
+        if ( new_location and new_location != serializer.instance.location ):
+            ensure_can_transfer_room(
+                actor=self.request.user,
+                room=serializer.instance,
+                new_location=new_location,
+            )
+
+        serializer.save()
     
 class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of users in a given room"""

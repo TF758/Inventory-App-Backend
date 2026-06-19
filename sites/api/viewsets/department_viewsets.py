@@ -20,6 +20,7 @@ from assets.api.serializers.accessories import AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from authorization.services.sites import ensure_can_create_department, ensure_can_delete_department, ensure_can_update_department
 from sites.site_filters import AreaUserFilter, DepartmentFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
@@ -66,6 +67,29 @@ class DepartmentViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Department.objects.all().order_by("-id")
+    
+    def perform_create( self, serializer, ):
+        ensure_can_create_department(
+            actor=self.request.user,
+        )
+
+        serializer.save()
+
+    def perform_update( self, serializer, ):
+        ensure_can_update_department(
+            actor=self.request.user,
+            department=serializer.instance,
+        )
+
+        serializer.save()
+
+    def perform_destroy( self, instance, ):
+        ensure_can_delete_department(
+            actor=self.request.user,
+            department=instance,
+        )
+
+        instance.delete()
 
 class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = UserAreaSerializer

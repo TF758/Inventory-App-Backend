@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from inventory.authorization.models import Role
+from authorization.models import Role
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, Room

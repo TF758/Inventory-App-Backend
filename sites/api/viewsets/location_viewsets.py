@@ -7,6 +7,7 @@ from assets.api.serializers.accessories import AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from authorization.services.sites import ensure_can_create_location, ensure_can_transfer_location
 from sites.api.serializers.rooms import RoomReadSerializer
 from sites.site_filters import AreaUserFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
@@ -41,42 +42,91 @@ class LocationDashboardView(AreaDashboardMixin, APIView):
         location = get_object_or_404(Location, public_id=public_id)
         return Response(self.build_dashboard(location))
 
-class LocationViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
-    """ViewSet for managing Location objects"""
+class LocationViewSet( AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
+    """
+    ViewSet for managing Location objects.
+    """
 
     lookup_field = "public_id"
-    permission_classes = [LocationPermission]
 
-    filter_backends = [DjangoFilterBackend, SearchFilter]
-    search_fields = ["^name", "name"]
+    permission_classes = [ LocationPermission ]
+
+    filter_backends = [ DjangoFilterBackend, SearchFilter, ]
+    search_fields = [ "^name", "name" ]
+
     filterset_class = LocationFilter
 
     pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
+
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+        ]:
             return LocationWriteSerializer
 
         # Light list endpoint (unpaginated)
-        if self.action == "list" and self.pagination_class is None:
+        if (
+            self.action == "list"
+            and self.pagination_class is None
+        ):
             return LocationListSerializer
 
         return LocationReadSerializer
 
     def get_queryset(self):
+
         qs = Location.objects.all()
-        search_term = self.request.query_params.get("search")
+
+        search_term = self.request.query_params.get(
+            "search"
+        )
 
         if search_term:
             qs = qs.annotate(
                 starts_with_order=Case(
-                    When(name__istartswith=search_term, then=Value(1)),
+                    When(
+                        name__istartswith=search_term,
+                        then=Value(1),
+                    ),
                     default=Value(2),
                     output_field=IntegerField(),
                 )
-            ).order_by("starts_with_order", "name")
+            ).order_by(
+                "starts_with_order",
+                "name",
+            )
 
         return qs
+
+    def perform_create( self, serializer, ):
+        ensure_can_create_location(
+            actor=self.request.user,
+            department=serializer.validated_data[
+                "department"
+            ],
+        )
+
+        serializer.save()
+
+    def perform_update( self, serializer, ):
+
+        new_department = (
+            serializer.validated_data.get(
+                "department"
+            )
+        )
+
+        if ( new_department and new_department != serializer.instance.department ):
+            ensure_can_transfer_location(
+                actor=self.request.user,
+                location=serializer.instance,
+                new_department=new_department,
+            )
+
+        serializer.save()
 
 class LocationRoomsView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
     """Retrieves a list of rooms in a given location"""

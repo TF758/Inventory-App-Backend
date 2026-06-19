@@ -1,7 +1,7 @@
 # authorization/services/role_delegation.py
 from rest_framework.exceptions import PermissionDenied
 from authorization.services import get_active_role
-from inventory.authorization.helpers import is_in_scope
+from authorization.helpers import is_in_scope
 
 
 def can_manage_role_assignment( actor, assignment, ) -> bool:

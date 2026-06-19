@@ -2,7 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from authorization.models import RolePermission
-from inventory.authorization.permissions.roles import RoleAssignmentPermission, ensure_can_assign_role, ensure_can_delete_role_assignment, ensure_can_update_role_assignment
+from authorization.permissions.roles import RoleAssignmentPermission 
+from authorization.services.role import ensure_can_assign_role, ensure_can_delete_role_assignment, ensure_can_update_role_assignment
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -13,8 +14,6 @@ from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
 from core.pagination import  FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
-
-
 from django.db.models import Q
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
