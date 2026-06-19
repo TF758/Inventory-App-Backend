@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from authorization.permissions.base_permissions import RequiresPermission
 from reporting.api.serializers.site_reports import SiteAssetRequestSerializer, SiteAuditLogRequestSerializer
 from reporting.models.reports import ReportJob
 from reporting.tasks.reports import generate_report_task
@@ -11,7 +12,8 @@ from reporting.tasks.reports import generate_report_task
 
 
 class SiteAssetExcelReportAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "reports.site_assets"
 
     def post(self, request):
         serializer = SiteAssetRequestSerializer(data=request.data)
@@ -34,7 +36,8 @@ class SiteAssetExcelReportAPIView(APIView):
         )
     
 class SiteAuditLogReportAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "reports.site_audit_logs"
 
     def post(self, request):
         serializer = SiteAuditLogRequestSerializer(data=request.data)

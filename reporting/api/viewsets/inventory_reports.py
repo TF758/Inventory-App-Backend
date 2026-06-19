@@ -1,5 +1,6 @@
 
 
+from authorization.permissions.base_permissions import RequiresPermission
 from reporting.api.serializers.inventory_report import InventorySummaryReportRequestSerializer
 from reporting.models.reports import ReportJob
 from rest_framework.views import APIView
@@ -13,7 +14,8 @@ class InventorySummaryReport(APIView):
     Queue Inventory Summary Report generation.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "reports.inventory_summary"
 
     def post(self, request):
         serializer = InventorySummaryReportRequestSerializer(
