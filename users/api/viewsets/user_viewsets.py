@@ -2,6 +2,10 @@ from rest_framework import viewsets
 from rest_framework import status, views
 from django.db import transaction
 from core.models.audit import AuditLog
+from inventory.authorization.helpers import filter_queryset_by_scope
+from inventory.authorization.models import Role
+from inventory.authorization.permissions.users import FullUserCreatePermission, UserPermission, UserPlacementPermission
+from inventory.authorization.services.role import ensure_can_assign_role
 from sites.site_filters import UserPlacementFilter
 from users.users_filters import UserFilter
 from users.models.roles import RoleAssignment
@@ -13,13 +17,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from core.mixins import NotificationMixin, ScopeFilterMixin
 from core.pagination import FlexiblePagination
-from core.permissions import UserPermission,  UserPlacementPermission, filter_queryset_by_scope, FullUserCreatePermission
+
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from core.mixins import AuditMixin
-from core.permissions.helpers import ensure_permission
+
 from rest_framework.viewsets import GenericViewSet
 from django.utils import timezone
 from core.models.notifications import Notification
@@ -333,7 +337,9 @@ class FullUserCreateView(AuditMixin,views.APIView):
                 user_location_instance = ul_serializer.save()
 
             # 3️⃣ Assign Role (permission enforced here)
-            role_name = role_data.get("role")
+            role_ref_id = role_data.get("role_ref") or role_data.get("role")
+
+            role_ref = Role.objects.get(public_id=role_ref_id)
 
             def resolve(model, public_id):
                 if not public_id:
@@ -344,41 +350,18 @@ class FullUserCreateView(AuditMixin,views.APIView):
             location = resolve(Location, role_data.get("location"))
             room = resolve(Room, role_data.get("room"))
 
-            # Normalize scope based on role level
-            if role_name.startswith("ROOM_"):
-                department = None
-                location = None
-            elif role_name.startswith("LOCATION_"):
-                department = None
-                room = None
-            elif role_name.startswith("DEPARTMENT_"):
-                location = None
-                room = None
-
-            temp_role = RoleAssignment(
-                user=user,
-                role=role_name,
-                department=department,
-                location=location,
+            ensure_can_assign_role(
+                actor=request.user,
+                target_role=role_ref,
                 room=room,
+                location=location,
+                department=department,
             )
-
-            
-            try:
-                ensure_permission(
-                    request.user,
-                    role_name,
-                    room=room,
-                    location=location,
-                    department=department,
-                )
-            except PermissionDenied:
-                raise PermissionDenied("You do not have permission to assign this role.")
 
             role_serializer = RoleWriteSerializer(
                 data={
                     "user": user.public_id,
-                    "role": role_name,
+                    "role_ref": role_ref.public_id,
                     "department": department.public_id if department else None,
                     "location": location.public_id if location else None,
                     "room": room.public_id if room else None,

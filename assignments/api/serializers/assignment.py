@@ -279,12 +279,6 @@ class UseConsumableSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True)
 
-    def validate(self, attrs):
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            raise serializers.ValidationError("Authentication required.")
-        return attrs
-
 class ReturnConsumableSerializer(serializers.Serializer):
     issue = serializers.PrimaryKeyRelatedField(queryset=ConsumableIssue.objects.select_related("consumable", "user"))
     quantity = serializers.IntegerField(min_value=1)
