@@ -1,10 +1,19 @@
 from typing import Optional
+from authorization.models import RolePermission
 from users.models.users import User
-from authorization.services import get_active_role, user_has_permission
+from functools import lru_cache
 from core.utils.scope.policies import POLICY_REGISTRY
 from sites.models.sites import Department, Location, Room, UserPlacement
 from users.models.roles import RoleAssignment
 
+
+def get_active_role(user):
+    """
+    Returns the user's active RoleAssignment.
+
+    Existing architecture remains unchanged.
+    """
+    return getattr(user, "active_role", None)
 
 def is_in_scope(role_assignment: RoleAssignment,
                 room: Optional[Room] = None,
@@ -148,119 +157,51 @@ def filter_user_assets_by_scope(viewer, queryset, asset_path="room"):
     return queryset.none()
 
 
-def has_asset_custody_scope( role: RoleAssignment, asset ) -> bool:
+
+
+@lru_cache(maxsize=256)
+def get_role_permissions(role_public_id):
     """
-    Scope check for physical asset custody.
-    Prevents upward / sideways authority leakage.
+    Returns a set of permission codes for a role.
+
+    Example:
+        {
+            "assets.view",
+            "assets.create",
+            "users.view",
+        }
     """
 
-    if role.role == "SITE_ADMIN":
-        return True
-
-    if not asset.room:
-        return False
-
-    role_name = role.role
-
-    # ROOM roles → exact room only
-    if role_name.startswith("ROOM_"):
-        return role.room == asset.room
-
-    # LOCATION roles → same location
-    if role_name.startswith("LOCATION_"):
-        return (
-            role.location
-            and asset.room.location == role.location
+    return set(
+        RolePermission.objects.filter(
+            role__public_id=role_public_id,
+            enabled=True,
+        ).values_list(
+            "permission__code",
+            flat=True,
         )
+    )
 
-    # DEPARTMENT roles → same department
-    if role_name.startswith("DEPARTMENT_"):
-        return (
-            role.department
-            and asset.room.location.department == role.department
-        )
 
-    return False
-
-def can_assign_asset_to_user( admin_role: RoleAssignment, target_user: User ) -> bool:
+def role_has_permission( role, permission_code, ):
     """
-    Determines whether an admin may assign equipment
-    to a target user.
+    Check whether a role has a permission.
     """
-
-    if admin_role.role == "SITE_ADMIN":
-        return True
-
-    # ROOM roles → user must be in same room
-    if admin_role.role.startswith("ROOM_"):
-        return UserPlacement.objects.filter(
-            user=target_user,
-            room=admin_role.room,
-            is_current=True,
-        ).exists()
-
-    # LOCATION roles → user must be in same location
-    if admin_role.role.startswith("LOCATION_"):
-        return UserPlacement.objects.filter(
-            user=target_user,
-            room__location=admin_role.location,
-            is_current=True,
-        ).exists()
-
-    # DEPARTMENT roles → user must be in same department
-    if admin_role.role.startswith("DEPARTMENT_"):
-        return UserPlacement.objects.filter(
-            user=target_user,
-            room__location__department=admin_role.department,
-            is_current=True,
-        ).exists()
-
-    return False
-
-def can_soft_delete_asset(
-    user,
-    asset,
-) -> bool:
-    """
-    Business-rule authorization for soft deletion.
-
-    Requires:
-        assets.delete capability
-        +
-        custody scope
-    """
-
-    role = get_active_role(user)
 
     if not role:
         return False
 
-    if role.role == "SITE_ADMIN":
-        return True
-
-    if not user_has_permission(
-        user,
-        "assets.delete",
-    ):
-        return False
-
-    return has_asset_custody_scope(
-        role,
-        asset,
+    permissions = get_role_permissions(
+        role.public_id,
     )
 
+    return permission_code in permissions
 
 
-def can_hard_delete_asset(
-    user,
-    asset=None,
-) -> bool:
+
+def invalidate_role_permission_cache():
     """
-    Business-rule authorization for
-    permanent asset deletion.
+    Utility for admin updates/imports.
     """
 
-    return user_has_permission(
-        user,
-        "assets.hard_delete",
-    )
+    get_role_permissions.cache_clear()

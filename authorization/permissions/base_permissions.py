@@ -1,15 +1,8 @@
 # authorization/base_permissions.py
+from rest_framework.permissions import  SAFE_METHODS, BasePermission
+from authorization.services import  get_active_role, user_has_permission
+from authorization.helpers import is_in_scope
 
-from rest_framework.permissions import (
-    SAFE_METHODS,
-    BasePermission,
-)
-
-from authorization.services import (
-    get_active_role,
-    user_has_permission,
-)
-from core.permissions.helpers import is_in_scope
 
 
 class ScopedPermission(BasePermission):
