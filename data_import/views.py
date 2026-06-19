@@ -12,6 +12,7 @@ from data_import.utils import store_import_upload
 from data_import.serializers import AssetImportRequestSerializer
 from core.mixins import AuditMixin, NotificationMixin
 from core.models.audit import AuditLog
+from authorization.permissions.base_permissions import RequiresPermission
 from reporting.models.reports import ReportJob
 import csv
 from django.http import HttpResponse
@@ -19,7 +20,8 @@ from django.http import HttpResponse
 
 
 class AssetImportCreateView(NotificationMixin, AuditMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.import"
 
     def post(self, request):
         serializer = AssetImportRequestSerializer(data=request.data)
@@ -75,7 +77,8 @@ class AssetImportCreateView(NotificationMixin, AuditMixin, APIView):
         )
 
 class AssetImportStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.import"
 
     def get(self, request, job_id):
         job = get_object_or_404(
@@ -97,7 +100,8 @@ class AssetImportStatusView(APIView):
         })
 
 class AssetImportErrorDownloadView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.import"
 
     def get(self, request, job_id):
 
@@ -128,7 +132,8 @@ class AssetImportErrorDownloadView(APIView):
         return response
 
 class AssetImportCancelView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.import"
 
     def post(self, request, job_id):
 

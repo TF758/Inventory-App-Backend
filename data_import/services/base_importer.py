@@ -227,10 +227,6 @@ class BaseAssetImporter:
         if role_name == "SITE_ADMIN":
             return
  
-        # Clerks cannot import
-        if role_name == "ROOM_CLERK":
-            raise PermissionError("Room clerks cannot import assets.")
-
         # Must be within scope
         if not is_in_scope(active_role, room=room):
             raise PermissionError(
