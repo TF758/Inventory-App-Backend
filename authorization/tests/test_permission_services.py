@@ -1,16 +1,10 @@
-# authorization/tests/test_permission_services.py
 
 from django.test import TestCase
-
-from authorization.services import (
-role_has_permission,
-user_has_permission,
-)
-
-from authorization.tests.utils import (
-PermissionTestFixture,
-)
-
+from authorization.models import Permission, Role, RolePermission
+from authorization.tests.utils import PermissionTestFixture
+from authorization.models import Role
+from authorization.helpers import invalidate_role_permission_cache, role_has_permission
+from authorization.services.users import user_has_permission
 from users.models import User
 from users.models.roles import RoleAssignment
 
@@ -159,3 +153,79 @@ class TestPermissionServices(TestCase):
             )
         )
 
+    def test_role_with_no_permissions_returns_false(self):
+
+
+        empty_role = Role.objects.create(
+            code="EMPTY_ROLE",
+            name="Empty Role",
+            scope_type="DEPARTMENT",
+            level=1,
+        )
+
+        self.assertFalse(
+            role_has_permission(
+                empty_role,
+                "test.view",
+            )
+        )
+
+    def test_active_role_without_role_ref_returns_false(self):
+
+        user = User.objects.create(
+            email="legacy@test.com",
+        )
+
+        assignment = RoleAssignment.objects.create(
+            user=user,
+            role="DEPARTMENT_ADMIN",
+            department=self.department,
+            role_ref=None,
+        )
+
+        user.active_role = assignment
+        user.save(update_fields=["active_role"])
+
+        self.assertFalse(
+            user_has_permission(
+                user,
+                "test.view",
+            )
+        )
+
+    def test_permission_cache_can_be_invalidated(self):
+
+        permission = Permission.objects.create(
+            code="test.cached",
+            name="Cached Permission",
+            module="test",
+        )
+
+        self.assertFalse(
+            role_has_permission(
+                self.viewer_role,
+                "test.cached",
+            )
+        )
+
+        RolePermission.objects.create(
+            role=self.viewer_role,
+            permission=permission,
+        )
+
+        # Cached result should still be stale
+        self.assertFalse(
+            role_has_permission(
+                self.viewer_role,
+                "test.cached",
+            )
+        )
+
+        invalidate_role_permission_cache()
+
+        self.assertTrue(
+            role_has_permission(
+                self.viewer_role,
+                "test.cached",
+            )
+        )

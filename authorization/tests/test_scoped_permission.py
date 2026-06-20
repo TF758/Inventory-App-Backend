@@ -1,21 +1,19 @@
-# authorization/tests/test_scoped_permission.py
-
 from types import SimpleNamespace
-
 from django.test import TestCase
-
-
 from authorization.models import Permission, Role, RolePermission
 from authorization.permissions.base_permissions import ScopedPermission
-from users.factories.user_factories import (
-    UserFactory,
-    AdminUserFactory,
-)
+from users.factories.user_factories import  UserFactory, AdminUserFactory
 from users.models.roles import RoleAssignment
-from sites.factories.site_factories import (
-    DepartmentFactory,
-)
+from sites.factories.site_factories import  DepartmentFactory, LocationFactory, RoomFactory 
 
+class CustomScopedPermission(ScopedPermission):
+
+    permission_map = {
+        "GET": "assets.view",
+    }
+
+    def get_scope_object(self, obj):
+        return obj.custom_room
 
 class DummyPermission(ScopedPermission):
     permission_map = {
@@ -205,3 +203,81 @@ class ScopedPermissionTests(TestCase):
                 obj=object(),
             )
         )
+
+
+    def test_object_in_scope_is_allowed(self):
+
+        location = LocationFactory(
+            department=self.department,
+        )
+
+        room = RoomFactory(
+            location=location,
+        )
+
+        obj = SimpleNamespace(
+            room=room,
+        )
+
+        request = self.make_request(
+            "GET",
+            self.user,
+        )
+
+        self.assertTrue(
+            self.permission.has_object_permission(
+                request,
+                view=None,
+                obj=obj,
+            )
+        )
+
+    def test_object_out_of_scope_is_denied(self):
+
+        other_department = DepartmentFactory()
+
+        location = LocationFactory(
+            department=other_department,
+        )
+
+        room = RoomFactory(
+            location=location,
+        )
+
+        obj = SimpleNamespace(
+            room=room,
+        )
+
+        request = self.make_request(
+            "GET",
+            self.user,
+        )
+
+        self.assertFalse(
+            self.permission.has_object_permission(
+                request,
+                view=None,
+                obj=obj,
+            )
+        )
+
+
+    def test_custom_scope_object_is_used(self):
+
+            permission = CustomScopedPermission()
+
+            location = LocationFactory( department=self.department )
+
+            room = RoomFactory( location=location )
+
+            obj = SimpleNamespace( custom_room=room )
+
+            request = self.make_request( "GET", self.user, )
+
+            self.assertTrue(
+                permission.has_object_permission(
+                    request,
+                    view=None,
+                    obj=obj,
+                )
+            )
