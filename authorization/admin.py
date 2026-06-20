@@ -1,4 +1,3 @@
-
 from django.contrib import admin
 
 from .models import (
@@ -8,7 +7,9 @@ from .models import (
 )
 
 
-
+# =====================================================
+# Role Permission Inline
+# =====================================================
 
 class RolePermissionInline(admin.TabularInline):
     model = RolePermission
@@ -25,7 +26,36 @@ class RolePermissionInline(admin.TabularInline):
 
     show_change_link = True
 
+    # Future:
+    # Once Permission Matrix UI is stable,
+    # consider making system role permissions
+    # read-only and managed exclusively through
+    # the application.
+    #
+    # def has_add_permission(
+    #     self,
+    #     request,
+    #     obj=None,
+    # ):
+    #     if obj and obj.is_system_role:
+    #         return False
+    #
+    #     return True
+    #
+    # def has_delete_permission(
+    #     self,
+    #     request,
+    #     obj=None,
+    # ):
+    #     if obj and obj.is_system_role:
+    #         return False
+    #
+    #     return True
 
+
+# =====================================================
+# Permission Admin
+# =====================================================
 
 @admin.register(Permission)
 class PermissionAdmin(admin.ModelAdmin):
@@ -56,6 +86,40 @@ class PermissionAdmin(admin.ModelAdmin):
 
     save_on_top = True
 
+    # Future:
+    # Permissions should ideally be created
+    # through migrations / seed data only.
+    #
+    # def has_add_permission(
+    #     self,
+    #     request,
+    # ):
+    #     return False
+    #
+    # def has_delete_permission(
+    #     self,
+    #     request,
+    #     obj=None,
+    # ):
+    #     return False
+    #
+    # def get_readonly_fields(
+    #     self,
+    #     request,
+    #     obj=None,
+    # ):
+    #     return (
+    #         "code",
+    #         "name",
+    #         "description",
+    #         "module",
+    #         "is_system",
+    #     )
+
+
+# =====================================================
+# Role Admin
+# =====================================================
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
@@ -114,9 +178,13 @@ class RoleAdmin(admin.ModelAdmin):
     )
 
     def permission_count(self, obj):
-        return obj.role_permissions.count()
+        return obj.role_permissions.filter(
+            enabled=True
+        ).count()
 
-    permission_count.short_description = "Permissions"
+    permission_count.short_description = (
+        "Enabled Permissions"
+    )
 
     def get_readonly_fields(
         self,
@@ -167,9 +235,12 @@ class RolePermissionAdmin(admin.ModelAdmin):
     list_display = (
         "role",
         "permission",
+        "enabled",
+        "updated_at",
     )
 
     list_filter = (
+        "enabled",
         "role",
         "permission__module",
     )
@@ -193,3 +264,34 @@ class RolePermissionAdmin(admin.ModelAdmin):
 
     save_on_top = True
 
+    # Future:
+    # Once the Permission Matrix UI is the
+    # primary management surface, consider
+    # making RolePermission read-only here.
+    #
+    # readonly_fields = (
+    #     "role",
+    #     "permission",
+    #     "enabled",
+    #     "updated_at",
+    # )
+    #
+    # def has_add_permission(
+    #     self,
+    #     request,
+    # ):
+    #     return False
+    #
+    # def has_change_permission(
+    #     self,
+    #     request,
+    #     obj=None,
+    # ):
+    #     return False
+    #
+    # def has_delete_permission(
+    #     self,
+    #     request,
+    #     obj=None,
+    # ):
+    #     return False

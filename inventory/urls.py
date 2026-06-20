@@ -20,6 +20,9 @@ urlpatterns = [
     # Core platform endpoints
     path("api/", include("core.api_urls")),
 
+    # Authorization
+    path( "authorization/", include("authorization.urls"), ),
+
     # Domain endpoints
     path("analytics/", include("analytics.urls.analytics_url")),
     path("assets/", include("assets.urls.asset_urls")),

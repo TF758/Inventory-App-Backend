@@ -1,6 +1,8 @@
 # authorization/services/role_delegation.py
 from rest_framework.exceptions import PermissionDenied
-from authorization.helpers import get_active_role, is_in_scope
+from authorization.helpers import get_active_role, invalidate_role_permission_cache, is_in_scope
+from django.db import transaction
+from authorization.models import Permission, Role, RolePermission
 
 
 def can_manage_role_assignment( actor, assignment, ) -> bool:
@@ -199,3 +201,100 @@ def ensure_can_delete_role_assignment(**kwargs):
         raise PermissionDenied(
             "You cannot delete role assignments in this scope."
         )
+@transaction.atomic
+def sync_role_permissions(
+    *,
+    role,
+    permission_codes,
+):
+    desired_permissions = set(
+        permission_codes
+    )
+
+    permissions = {
+        permission.code: permission
+        for permission in Permission.objects.filter(
+            code__in=desired_permissions
+        )
+    }
+
+    existing = {
+        rp.permission.code: rp
+        for rp in RolePermission.objects.filter(
+            role=role
+        ).select_related(
+            "permission"
+        )
+    }
+
+    # Enable/Create
+
+    for code in desired_permissions:
+
+        role_permission = existing.get(
+            code
+        )
+
+        if role_permission:
+
+            if not role_permission.enabled:
+
+                role_permission.enabled = True
+
+                role_permission.save(
+                    update_fields=[
+                        "enabled",
+                        "updated_at",
+                    ]
+                )
+
+        else:
+
+            RolePermission.objects.create(
+                role=role,
+                permission=permissions[code],
+                enabled=True,
+            )
+
+    # Disable removed
+
+    for code, role_permission in (
+        existing.items()
+    ):
+
+        if code not in desired_permissions:
+
+            if role_permission.enabled:
+
+                role_permission.enabled = False
+
+                role_permission.save(
+                    update_fields=[
+                        "enabled",
+                        "updated_at",
+                    ]
+                )
+
+@transaction.atomic
+def sync_permission_matrix(
+    assignments,
+):
+    roles = {
+        str(role.public_id): role
+        for role in Role.objects.all()
+    }
+
+    for role_public_id, permission_codes in (
+        assignments.items()
+    ):
+
+        role = roles[
+            str(role_public_id)
+        ]
+
+        sync_role_permissions(
+            role=role,
+            permission_codes=permission_codes,
+        )
+
+    invalidate_role_permission_cache()

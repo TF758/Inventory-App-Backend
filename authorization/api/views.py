@@ -6,188 +6,185 @@ from rest_framework.generics import ( GenericAPIView, ListAPIView, RetrieveAPIVi
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from authorization.models import ( Permission, Role, RolePermission, )
-from authorization.api.serialziers import RoleDetailSerializer, RolePermissionUpdateSerializer, RoleSerializer
+from authorization.api.serialziers import PermissionMatrixUpdateSerializer, PermissionSerializer, RoleDetailSerializer, RolePermissionUpdateSerializer, RoleSerializer
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from authorization.models import Role
+from authorization.permissions.base_permissions import (
+    RequiresPermission,
+)
+from authorization.services.role import sync_permission_matrix, sync_role_permissions
 
+class PermissionMatrixView(APIView):
 
+    permission_classes = [
+        RequiresPermission
+    ]
 
+    required_permission = (
+        "auth.manage_permissions"
+    )
 
-class RoleListView(ListAPIView):
-    """
-    GET /api/authorization/roles/
-    """
+    def get(self, request):
 
-    serializer_class = RoleSerializer
-
-    def get_queryset(self):
-        return (
+        roles = (
             Role.objects
             .prefetch_related(
                 "role_permissions__permission"
             )
-            .order_by("level", "name")
-        )
-
-
-class RolePermissionsView(RetrieveAPIView):
-    """
-    GET /api/authorization/roles/<public_id>/permissions/
-    """
-
-    serializer_class = RoleDetailSerializer
-
-    lookup_field = "public_id"
-    lookup_url_kwarg = "public_id"
-
-    def get_queryset(self):
-        return (
-            Role.objects
-            .prefetch_related(
-                "role_permissions__permission"
+            .order_by(
+                "level",
+                "name",
             )
-            .order_by("level", "name")
         )
 
-
-class RolePermissionsUpdateView(GenericAPIView):
-    """
-    PATCH /api/authorization/roles/<public_id>/permissions/
-    """
-
-    serializer_class = RolePermissionUpdateSerializer
-
-    @transaction.atomic
-    def patch(self, request, public_id):
-        role = get_object_or_404(
-            Role,
-            public_id=public_id,
+        permissions = (
+            Permission.objects
+            .all()
+            .order_by(
+                "module",
+                "code",
+            )
         )
 
-        serializer = self.get_serializer(
-            data=request.data
+        assignments = {}
+
+        for role in roles:
+
+            assignments[
+                str(role.public_id)
+            ] = [
+                rp.permission.code
+                for rp in role.role_permissions.all()
+                if rp.enabled
+            ]
+
+        permission_groups = defaultdict(
+            list
+        )
+
+        for permission in permissions:
+
+            permission_groups[
+                permission.module
+            ].append(
+                PermissionSerializer(
+                    permission
+                ).data
+            )
+
+        return Response(
+            {
+                "roles": RoleSerializer(
+                    roles,
+                    many=True,
+                ).data,
+
+                "permissions": dict(
+                    permission_groups
+                ),
+
+                "assignments": assignments,
+            }
+        )
+
+    def put(self, request):
+
+        serializer = (
+            PermissionMatrixUpdateSerializer(
+                data=request.data
+            )
         )
 
         serializer.is_valid(
             raise_exception=True
         )
 
-        permission_codes = serializer.validated_data[
-            "permissions"
-        ]
-
-        permissions = list(
-            Permission.objects.filter(
-                code__in=permission_codes
-            )
-        )
-
-        RolePermission.objects.filter(
-            role=role
-        ).delete()
-
-        RolePermission.objects.bulk_create(
-            [
-                RolePermission(
-                    role=role,
-                    permission=permission,
-                    enabled=True,
-                )
-                for permission in permissions
+        sync_permission_matrix(
+            serializer.validated_data[
+                "assignments"
             ]
         )
 
-        role = (
-            Role.objects
-            .prefetch_related(
+        return Response(
+            {
+                "detail":
+                "Permission matrix updated."
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+
+class RolePermissionManagementView(APIView):
+    """
+    SITE_ADMIN-only permission matrix management.
+    """
+
+    permission_classes = [RequiresPermission]
+
+    required_permission = (
+        "auth.manage_permissions"
+    )
+
+    def get_role(self, public_id):
+        return get_object_or_404(
+            Role.objects.prefetch_related(
                 "role_permissions__permission"
-            )
-            .get(
-                public_id=role.public_id
-            )
+            ),
+            public_id=public_id,
+        )
+
+    def get(self, request, public_id):
+
+        role = self.get_role(public_id)
+
+        serializer = RoleDetailSerializer(
+            role,
+            context={
+                "request": request,
+            },
         )
 
         return Response(
-            RoleDetailSerializer(
-                role,
-                context={
-                    "request": request
-                },
-            ).data,
+            serializer.data,
             status=status.HTTP_200_OK,
         )
 
+    def put(self, request, public_id):
 
-class PermissionMatrixView(APIView):
-    """
-    GET /api/authorization/matrix/
-    """
+        role = self.get_role(public_id)
 
-    def get(self, request):
-        roles = list(
-            Role.objects.order_by(
-                "level",
-                "name",
+        serializer = (
+            RolePermissionUpdateSerializer(
+                data=request.data
             )
         )
 
-        permissions = list(
-            Permission.objects.order_by(
-                "module",
-                "code",
-            )
+        serializer.is_valid(
+            raise_exception=True
         )
 
-        mappings = (
-            RolePermission.objects
-            .filter(enabled=True)
-            .values_list(
-                "permission_id",
-                "role_id",
-            )
+        sync_role_permissions(
+            role=role,
+            permission_codes=serializer.validated_data[
+                "permissions"
+            ],
         )
 
-        permission_role_map = defaultdict(set)
+        role.refresh_from_db()
 
-        for permission_id, role_id in mappings:
-            permission_role_map[
-                permission_id
-            ].add(role_id)
-
-        matrix = []
-
-        for permission in permissions:
-            assigned_role_ids = permission_role_map.get(
-                permission.id,
-                set(),
+        response_serializer = (
+            RoleDetailSerializer(
+                role,
+                context={
+                    "request": request,
+                },
             )
-
-            matrix.append(
-                {
-                    "public_id": permission.public_id,
-                    "code": permission.code,
-                    "name": permission.name,
-                    "description": permission.description,
-                    "module": permission.module,
-                    "is_system": permission.is_system,
-                    "roles": {
-                        role.code: role.id in assigned_role_ids
-                        for role in roles
-                    },
-                }
-            )
+        )
 
         return Response(
-            {
-                "roles": [
-                    {
-                        "public_id": role.public_id,
-                        "code": role.code,
-                        "name": role.name,
-                        "scope_type": role.scope_type,
-                        "level": role.level,
-                        "is_system_role": role.is_system_role,
-                    }
-                    for role in roles
-                ],
-                "permissions": matrix,
-            }
+            response_serializer.data,
+            status=status.HTTP_200_OK,
         )

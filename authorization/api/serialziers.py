@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from authorization.models import  Permission, Role, RolePermission
+
+from authorization.models import ( Permission, Role, RolePermission, )
 
 
 class PermissionSerializer(serializers.ModelSerializer):
@@ -93,15 +94,47 @@ class RoleDetailSerializer(serializers.ModelSerializer):
 
 
 class RolePermissionUpdateSerializer(serializers.Serializer):
+    """
+    Used by the permission matrix UI.
+
+    Payload:
+
+    {
+        "permissions": [
+            "assets.view",
+            "assets.create",
+            "assets.update"
+        ]
+    }
+
+    The target role is supplied by the endpoint URL.
+    """
+
     permissions = serializers.ListField(
         child=serializers.CharField(),
         allow_empty=True,
     )
 
-    def validate_permissions(self, value):
+    def validate_permissions(self, permissions):
+
+        # Prevent duplicate entries
+        duplicates = {
+            code
+            for code in permissions
+            if permissions.count(code) > 1
+        }
+
+        if duplicates:
+            raise serializers.ValidationError(
+                (
+                    "Duplicate permissions: "
+                    f"{', '.join(sorted(duplicates))}"
+                )
+            )
+
         existing_codes = set(
             Permission.objects.filter(
-                code__in=value
+                code__in=permissions,
             ).values_list(
                 "code",
                 flat=True,
@@ -109,12 +142,112 @@ class RolePermissionUpdateSerializer(serializers.Serializer):
         )
 
         missing = sorted(
-            set(value) - existing_codes
+            set(permissions)
+            - existing_codes
         )
 
         if missing:
             raise serializers.ValidationError(
-                f"Unknown permissions: {', '.join(missing)}"
+                (
+                    "Unknown permissions: "
+                    f"{', '.join(missing)}"
+                )
             )
 
-        return value
+        return permissions
+
+
+class PermissionMatrixUpdateSerializer(
+    serializers.Serializer
+):
+    """
+    Payload:
+
+    {
+        "assignments": {
+            "<role_public_id>": [
+                "assets.view",
+                "assets.create"
+            ]
+        }
+    }
+    """
+
+    assignments = serializers.DictField(
+        child=serializers.ListField(
+            child=serializers.CharField(),
+            allow_empty=True,
+        )
+    )
+
+    def validate_assignments(self, assignments):
+
+        role_public_ids = set(
+            Role.objects.filter(
+                public_id__in=assignments.keys()
+            ).values_list(
+                "public_id",
+                flat=True,
+            )
+        )
+
+        missing_roles = sorted(
+            str(role_id)
+            for role_id in (
+                set(assignments.keys())
+                - {str(x) for x in role_public_ids}
+            )
+        )
+
+        if missing_roles:
+            raise serializers.ValidationError(
+                (
+                    "Unknown roles: "
+                    f"{', '.join(missing_roles)}"
+                )
+            )
+
+        all_codes = set()
+
+        for permission_codes in assignments.values():
+
+            duplicates = {
+                code
+                for code in permission_codes
+                if permission_codes.count(code) > 1
+            }
+
+            if duplicates:
+                raise serializers.ValidationError(
+                    (
+                        "Duplicate permissions: "
+                        f"{', '.join(sorted(duplicates))}"
+                    )
+                )
+
+            all_codes.update(
+                permission_codes
+            )
+
+        existing_codes = set(
+            Permission.objects.filter(
+                code__in=all_codes
+            ).values_list(
+                "code",
+                flat=True,
+            )
+        )
+
+        missing_permissions = sorted(
+            all_codes - existing_codes
+        )
+
+        if missing_permissions:
+            raise serializers.ValidationError(
+                (
+                    "Unknown permissions: "
+                    f"{', '.join(missing_permissions)}"
+                )
+            )
+
+        return assignments
