@@ -147,10 +147,15 @@ class ScopeService:
     # =====================================================
 
     @staticmethod
-    def can_access_asset(
-        role_assignment,
-        asset,
-    ):
+    def can_access_asset( role_assignment, asset, ):
+        """
+        Resolve an asset to its room and evaluate
+        access against the role hierarchy.
+
+        Equipment, Consumables, Accessories and
+        other asset types ultimately derive scope
+        from a room.
+        """
 
         room = ScopeService.get_asset_room(
             asset,
@@ -205,3 +210,97 @@ class ScopeService:
             role_assignment,
             room,
         )
+    
+class UserScopeService:
+
+    @staticmethod
+    def can_access_user(
+        role_assignment: RoleAssignment,
+        user,
+    ) -> bool:
+
+        if not role_assignment:
+            return False
+
+        if role_assignment.role == "SITE_ADMIN":
+            return True
+
+        # ---------------------------------
+        # Current placement scope
+        # ---------------------------------
+
+        placements = (
+            UserPlacement.objects
+            .filter(
+                user=user,
+                is_current=True,
+            )
+            .select_related(
+                "room",
+                "room__location",
+                "room__location__department",
+            )
+        )
+
+        for placement in placements:
+
+            if ScopeService.can_access_room(
+                role_assignment,
+                placement.room,
+            ):
+                return True
+
+        # ---------------------------------
+        # Role assignment scope
+        # ---------------------------------
+
+        roles = (
+            RoleAssignment.objects
+            .filter(user=user)
+            .select_related(
+                "room",
+                "location",
+                "department",
+            )
+        )
+
+        for role in roles:
+
+            if role.room:
+
+                if ScopeService.can_access_room(
+                    role_assignment,
+                    role.room,
+                ):
+                    return True
+
+            elif role.location:
+
+                if (
+                    role_assignment.role
+                    == "SITE_ADMIN"
+                ):
+                    return True
+
+                if (
+                    role_assignment.location_id
+                    == role.location_id
+                ):
+                    return True
+
+                if (
+                    role_assignment.department_id
+                    and role.location.department_id
+                    == role_assignment.department_id
+                ):
+                    return True
+
+            elif role.department:
+
+                if (
+                    role_assignment.department_id
+                    == role.department_id
+                ):
+                    return True
+
+        return False

@@ -1,5 +1,7 @@
 # myapp/permissions/users.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from access.permissions.scoped import ScopedPermission
+from access.services.scope import ScopeService, UserScopeService
 from users.models.roles import RoleAssignment
 from .constants import ROLE_HIERARCHY
 from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role, is_user_in_scope
@@ -18,34 +20,86 @@ ROLE_ASSIGNMENT_RULES = {
 }
 
 
-class UserPermission(BasePermission):
-    """
-    Permissions for user self-service and read-only access.
+# class UserPermission(BasePermission):
+#     """
+#     Permissions for user self-service and read-only access.
 
-    Rules:
-    - All authenticated users may view users
-    - Users may edit themselves
-    - No admin-level writes allowed here
-    """
+#     Rules:
+#     - All authenticated users may view users
+#     - Users may edit themselves
+#     - No admin-level writes allowed here
+#     """
 
-    def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated)
+#     def has_permission(self, request, view):
+#         return bool(request.user and request.user.is_authenticated)
 
-    def has_object_permission(self, request, view, obj):
-        user = request.user
+#     def has_object_permission(self, request, view, obj):
+#         user = request.user
 
-        # READ — all authenticated users
-        if request.method in SAFE_METHODS:
-            return True
+#         # READ — all authenticated users
+#         if request.method in SAFE_METHODS:
+#             return True
 
-        # WRITE — self only
-        if request.method in ["PUT", "PATCH"]:
-            return user == obj
+#         # WRITE — self only
+#         if request.method in ["PUT", "PATCH"]:
+#             return user == obj
 
-        return False
+#         return False
+class UserPermission( ScopedPermission, ):
+
+    permission_map = {
+        "GET": "users.view",
+        "PUT": "users.self_update",
+        "PATCH": "users.self_update",
+    }
+
+    def has_object_permission(
+        self,
+        request,
+        view,
+        obj,
+    ):
+
+        active_role = getattr(
+            request.user,
+            "active_role",
+            None,
+        )
+
+        if not active_role:
+            return False
+
+        # -------------------------
+        # SELF UPDATE
+        # -------------------------
+
+        if request.method in [
+            "PUT",
+            "PATCH",
+        ]:
+            return (
+                obj == request.user
+                and self.has_permission(
+                    request,
+                    view,
+                )
+            )
+
+        # -------------------------
+        # READ
+        # -------------------------
+
+        return (
+            self.has_permission(
+                request,
+                view,
+            )
+            and UserScopeService.can_access_user(
+                active_role,
+                obj,
+            )
+        )
     
-
-
 
 class RolePermission(BasePermission):
     """
