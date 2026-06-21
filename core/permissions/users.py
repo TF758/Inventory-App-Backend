@@ -232,85 +232,157 @@ class RolePermission(BasePermission):
         except PermissionDenied:
             return False
         
-class UserPlacementPermission(BasePermission):
-    method_role_map = {
-        "GET": "ROOM_VIEWER",    # minimum role to read
-        "HEAD": "ROOM_VIEWER",
-        "OPTIONS": "ROOM_VIEWER",
-        "POST": "ROOM_ADMIN",    # minimum role to write
-        "PUT": "ROOM_ADMIN",
-        "PATCH": "ROOM_ADMIN",
-        "DELETE": "ROOM_ADMIN",
-    }
+# class UserPlacementPermission(BasePermission):
+#     method_role_map = {
+#         "GET": "ROOM_VIEWER",    # minimum role to read
+#         "HEAD": "ROOM_VIEWER",
+#         "OPTIONS": "ROOM_VIEWER",
+#         "POST": "ROOM_ADMIN",    # minimum role to write
+#         "PUT": "ROOM_ADMIN",
+#         "PATCH": "ROOM_ADMIN",
+#         "DELETE": "ROOM_ADMIN",
+#     }
 
-    def has_permission(self, request, view):
-        active_role = getattr(request.user, "active_role", None)
-        if not active_role:
-            return False
+#     def has_permission(self, request, view):
+#         active_role = getattr(request.user, "active_role", None)
+#         if not active_role:
+#             return False
 
-        # Site admin bypass
-        if active_role.role == "SITE_ADMIN":
-            return True
+#         # Site admin bypass
+#         if active_role.role == "SITE_ADMIN":
+#             return True
         
-        # room admins cant affect user location as they're scope to one area
-        if active_role.role == "ROOM_ADMIN" and request.method in ("POST","PUT","PATCH","DELETE"):
-            return False
+#         # room admins cant affect user location as they're scope to one area
+#         if active_role.role == "ROOM_ADMIN" and request.method in ("POST","PUT","PATCH","DELETE"):
+#             return False
 
-        required_role = self.method_role_map.get(request.method)
-        if not required_role:
-            return False
+#         required_role = self.method_role_map.get(request.method)
+#         if not required_role:
+#             return False
 
-        if ROLE_HIERARCHY.get(active_role.role, 0) < ROLE_HIERARCHY.get(required_role, 0):
-            return False
+#         if ROLE_HIERARCHY.get(active_role.role, 0) < ROLE_HIERARCHY.get(required_role, 0):
+#             return False
 
-        # ---- CREATE scope enforcement ----
-        if request.method == "POST":
-            room_id = request.data.get("room_id")
-            if not room_id:
-                return False
+#         # ---- CREATE scope enforcement ----
+#         if request.method == "POST":
+#             room_id = request.data.get("room_id")
+#             if not room_id:
+#                 return False
 
-            try:
-                room = Room.objects.select_related(
-                    "location__department"
-                ).get(public_id=room_id)
-            except Room.DoesNotExist:
-                return False
+#             try:
+#                 room = Room.objects.select_related(
+#                     "location__department"
+#                 ).get(public_id=room_id)
+#             except Room.DoesNotExist:
+#                 return False
 
-            return is_in_scope(active_role, room=room)
+#             return is_in_scope(active_role, room=room)
 
-        return True
+#         return True
 
-    def has_object_permission(self, request, view, obj):
-        active_role = getattr(request.user, "active_role", None)
+#     def has_object_permission(self, request, view, obj):
+#         active_role = getattr(request.user, "active_role", None)
+#         if not active_role:
+#             return False
+
+#         # Site admin bypass
+#         if active_role.role == "SITE_ADMIN":
+#             return True
+
+#         # Block viewers from write operations
+#         if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
+#             return False
+
+#         # Check hierarchy
+#         required_role = self.method_role_map.get(request.method)
+#         if not required_role:
+#             return False
+#         if ROLE_HIERARCHY.get(active_role.role, 0) < ROLE_HIERARCHY.get(required_role, 0):
+#             return False
+
+#         # Scope check for the object
+#         if "ROOM" in active_role.role:
+#             return is_in_scope(active_role, room=obj.room)
+#         elif "LOCATION" in active_role.role:
+#             return is_in_scope(active_role, location=obj.room.location)
+#         elif "DEPARTMENT" in active_role.role:
+#             return is_in_scope(active_role, department=obj.room.location.department)
+
+#         return False
+    
+class UserPlacementPermission( ScopedPermission):
+    """
+    User placement authorization.
+
+    Permission checks are handled by AccessService
+    through ScopedPermission.
+
+    Object-level scope checks are delegated to
+    ScopeService so users can only manage
+    placements within their assigned scope.
+    """
+
+    permission_map = {
+        "GET": "user_placements.view",
+        "POST": "user_placements.create",
+        "PUT": "user_placements.update",
+        "PATCH": "user_placements.update",
+        "DELETE": "user_placements.delete",
+    }
+    def has_permission(
+    self,
+    request,
+    view,
+    ):
+        result = super().has_permission(
+            request,
+            view,
+        )
+
+        print(
+            "HAS_PERMISSION",
+            request.method,
+            self.get_required_permission(
+                request,
+                view,
+            ),
+            result,
+        )
+
+        return result
+
+    def has_object_permission(
+        self,
+        request,
+        view,
+        obj,
+    ):
+        active_role = getattr(
+            request.user,
+            "active_role",
+            None,
+        )
+        print(
+            "HAS_OBJECT_PERMISSION",
+            active_role.role if active_role else None,
+            obj.room_id,
+        )
+
+
         if not active_role:
             return False
 
-        # Site admin bypass
-        if active_role.role == "SITE_ADMIN":
-            return True
-
-        # Block viewers from write operations
-        if request.method in ("POST", "PUT", "PATCH", "DELETE") and is_viewer_role(active_role.role):
-            return False
-
-        # Check hierarchy
-        required_role = self.method_role_map.get(request.method)
-        if not required_role:
-            return False
-        if ROLE_HIERARCHY.get(active_role.role, 0) < ROLE_HIERARCHY.get(required_role, 0):
-            return False
-
-        # Scope check for the object
-        if "ROOM" in active_role.role:
-            return is_in_scope(active_role, room=obj.room)
-        elif "LOCATION" in active_role.role:
-            return is_in_scope(active_role, location=obj.room.location)
-        elif "DEPARTMENT" in active_role.role:
-            return is_in_scope(active_role, department=obj.room.location.department)
-
-        return False
+        return (
+            self.has_permission(
+                request,
+                view,
+            )
+            and ScopeService.can_access_room(
+                active_role,
+                obj.room,
+            )
+        )
     
-
 class FullUserCreatePermission(BasePermission):
     """
     Permission for FullUserCreateView.

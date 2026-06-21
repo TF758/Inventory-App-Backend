@@ -36,6 +36,15 @@ class Permission(models.Model):
         auto_now=True,
     )
 
+    class Meta:
+        ordering = [
+            "domain",
+            "code",
+        ]
+
+    def __str__(self):
+        return self.code
+
 
 class RolePermission(models.Model):
     role = models.CharField(
@@ -51,9 +60,21 @@ class RolePermission(models.Model):
     )
 
     class Meta:
+        ordering = [
+            "role",
+            "permission__domain",
+            "permission__code",
+        ]
+
         constraints = [
             models.UniqueConstraint(
                 fields=["role", "permission"],
                 name="unique_role_permission",
             )
         ]
+
+    def __str__(self):
+        return (
+            f"{self.get_role_display()} → "
+            f"{self.permission.code}"
+        )

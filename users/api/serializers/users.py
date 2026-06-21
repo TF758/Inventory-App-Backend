@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from access.services.scope import ScopeService
 from users.models.users import User
 from sites.models.sites import Room, UserPlacement
 from django.utils import timezone
@@ -170,80 +171,173 @@ class UserAreaSerializer(serializers.ModelSerializer):
             self.fields.pop('department_id', None)
             self.fields.pop('department_name', None)
 
+class UserPlacementWriteSerializer( serializers.ModelSerializer, ):
 
-class UserPlacementWriteSerializer(serializers.ModelSerializer):
-    user_id = serializers.CharField(write_only=True)
-    room_id = serializers.CharField(write_only=True, allow_null=True, required=False)
-
-    public_id = serializers.CharField(read_only=True)
-    date_joined = serializers.DateTimeField(read_only=True)
+    user_id = serializers.CharField( write_only=True )
+    room_id = serializers.CharField( write_only=True, allow_null=True, required=False )
+    public_id = serializers.CharField( read_only=True )
+    date_joined = serializers.DateTimeField( read_only=True)
 
     class Meta:
         model = UserPlacement
-        fields = ['public_id', 'user_id', 'room_id', 'date_joined']
+        fields = [
+            "public_id",
+            "user_id",
+            "room_id",
+            "date_joined",
+        ]
 
-    def validate(self, attrs):
-        user_id = attrs.get("user_id")
+    def validate( self, attrs, ):
+        user_id = attrs.get(
+            "user_id"
+        )
 
-        # Resolve user
+        # -------------------------
+        # Resolve User
+        # -------------------------
+
         if self.instance:
             user = self.instance.user
+
         else:
+
             if not user_id:
                 raise serializers.ValidationError(
-                    {"user_id": "This field is required."}
-                )
-            try:
-                user = User.objects.only("id").get(public_id=user_id)
-            except User.DoesNotExist:
-                raise serializers.ValidationError(
-                    {"user_id": "Invalid user public_id."}
+                    {
+                        "user_id": (
+                            "This field is required."
+                        )
+                    }
                 )
 
-        # Resolve room
-        room_id = attrs.get("room_id")
+            try:
+                user = (
+                    User.objects
+                    .only("id")
+                    .get(
+                        public_id=user_id,
+                    )
+                )
+
+            except User.DoesNotExist:
+                raise serializers.ValidationError(
+                    {
+                        "user_id": (
+                            "Invalid user public_id."
+                        )
+                    }
+                )
+
+        # -------------------------
+        # Resolve Room
+        # -------------------------
+
+        room_id = attrs.get( "room_id" )
+
         room = None
 
         if room_id is not None:
+
             try:
-                room = Room.objects.only("id").get(public_id=room_id)
+                room = (
+                    Room.objects
+                    .select_related(
+                        "location",
+                        "location__department",
+                    )
+                    .get(
+                        public_id=room_id,
+                    )
+                )
+
             except Room.DoesNotExist:
                 raise serializers.ValidationError(
-                    {"room_id": "Invalid room public_id."}
+                    {
+                        "room_id": (
+                            "Invalid room public_id."
+                        )
+                    }
                 )
+
         elif self.instance:
             room = self.instance.room
+
+        # -------------------------
+        # Scope Validation
+        # -------------------------
+
+        request = self.context.get( "request" )
+
+        if request and room:
+
+            active_role = getattr(
+                request.user,
+                "active_role",
+                None,
+            )
+
+            if not ScopeService.can_access_room(
+                active_role,
+                room,
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "room_id": [
+                            "Room is outside your scope."
+                        ]
+                    }
+                )
 
         attrs["user"] = user
         attrs["room"] = room
 
         return attrs
 
-    def create(self, validated_data):
-        validated_data.pop('user_id', None)
-        validated_data.pop('room_id', None)
+    def create( self, validated_data):
+        validated_data.pop(
+            "user_id",
+            None,
+        )
 
-        user = validated_data['user']
+        validated_data.pop(
+            "room_id",
+            None,
+        )
+
+        user = validated_data["user"]
 
         with transaction.atomic():
-            # Clear previous current
+
             UserPlacement.objects.filter(
                 user=user,
-                is_current=True
-            ).update(is_current=False)
+                is_current=True,
+            ).update(
+                is_current=False,
+            )
 
-            # Create new current
             return UserPlacement.objects.create(
                 **validated_data,
                 is_current=True,
-                date_joined=timezone.now()
+                date_joined=timezone.now(),
             )
-        
-    def update(self, instance, validated_data):
-        validated_data.pop('user_id', None)
-        validated_data.pop('room_id', None)
-        return super().update(instance, validated_data)
 
+    def update( self, instance, validated_data ):
+        validated_data.pop(
+            "user_id",
+            None,
+        )
+
+        validated_data.pop(
+            "room_id",
+            None,
+        )
+
+        return super().update(
+            instance,
+            validated_data,
+        )
+    
+    
 class UserTransferSerializer(serializers.Serializer):
     user_id = serializers.CharField()
     room_id  = serializers.CharField()
