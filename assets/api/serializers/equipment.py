@@ -1,6 +1,7 @@
 
 from rest_framework import serializers
 from assets.models.assets import Equipment, EquipmentStatus
+from access.services.scope import ScopeService
 from sites.models.sites import  Room
 from core.permissions.helpers import is_admin_role, is_in_scope
 from django.utils import timezone
@@ -123,8 +124,8 @@ class EquipmentBatchtWriteSerializer(serializers.ModelSerializer):
             instance.room = room_obj
             instance.save(update_fields=["room"])
         return instance
-
 class EquipmentWriteSerializer(serializers.ModelSerializer):
+
     room = serializers.SlugRelatedField(
         slug_field="public_id",
         queryset=Room.objects.all(),
@@ -135,7 +136,7 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Equipment
         fields = [
-            "public_id",      
+            "public_id",
             "name",
             "brand",
             "model",
@@ -146,7 +147,31 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
             "room",
         ]
         read_only_fields = ["public_id"]
-    
+
+    def validate_room(self, room):
+
+        request = self.context.get(
+            "request"
+        )
+
+        if not request:
+            return room
+
+        active_role = getattr(
+            request.user,
+            "active_role",
+            None,
+        )
+
+        if not ScopeService.can_access_room(
+            active_role,
+            room,
+        ):
+            raise serializers.ValidationError(
+                "Room is outside your scope."
+            )
+
+        return room
 
     def validate_purchase_price(self, value):
         if value is not None and value < 0:
@@ -154,7 +179,7 @@ class EquipmentWriteSerializer(serializers.ModelSerializer):
                 "Purchase price cannot be negative."
             )
         return value
-    
+
     def validate_purchase_date(self, value):
         if value and value > timezone.now().date():
             raise serializers.ValidationError(
