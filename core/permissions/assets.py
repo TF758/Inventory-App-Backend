@@ -3,14 +3,28 @@ from assignments.models.asset_assignment import AccessoryAssignment, ConsumableI
 from assets.models.assets import Equipment
 from agreements.models.agreements import AssetAgreement, AssetAgreementItem
 from access.services.access import AccessService
+from access.permissions.scoped import ScopedPermission
+from inventory.access.services.scope import ScopeService
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from sites.models.sites import Department, Location, Room
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
+class AssetPermission(
+    ScopedPermission,
+):
+    """
+    Asset authorization.
 
-class AssetPermission(BasePermission):
+    Permission checks are handled by AccessService
+    through ScopedPermission.
+
+    Object-level scope checks are delegated to
+    ScopeService so users can only interact with
+    assets that fall within their assigned
+    department/location/room hierarchy.
+    """
 
     permission_map = {
         "GET": "assets.view",
@@ -20,41 +34,12 @@ class AssetPermission(BasePermission):
         "DELETE": "assets.delete",
     }
 
-    def _permission_code(self, request):
-        return self.permission_map.get(
-            request.method
-        )
-
-    def has_permission(self, request, view):
-
-        active_role = getattr(
-            request.user,
-            "active_role",
-            None,
-        )
-
-        if not active_role:
-            return False
-
-        permission_code = self._permission_code(
-            request
-        )
-
-        if not permission_code:
-            return False
-
-        return AccessService.has_permission(
-            request.user,
-            permission_code,
-        )
-
     def has_object_permission(
         self,
         request,
         view,
         obj,
     ):
-
         active_role = getattr(
             request.user,
             "active_role",
@@ -64,33 +49,17 @@ class AssetPermission(BasePermission):
         if not active_role:
             return False
 
-        room_for_scope = getattr(
-            obj,
-            "room",
-            None,
-        )
-
-        if hasattr(obj, "equipment") and obj.equipment:
-            room_for_scope = obj.equipment.room
-
-        permission_code = self._permission_code(
-            request
-        )
-
-        if not permission_code:
-            return False
-
         return (
-            AccessService.has_permission(
-                request.user,
-                permission_code,
+            self.has_permission(
+                request,
+                view,
             )
-            and is_in_scope(
+            and ScopeService.can_access_asset(
                 active_role,
-                room=room_for_scope,
+                obj,
             )
         )
-
+    
 class CanManageAssetCustody(BasePermission):
     """
     Permission to assign / unassign / reassign equipment.
