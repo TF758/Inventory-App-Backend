@@ -100,7 +100,59 @@ class UserPermission( ScopedPermission, ):
             )
         )
     
+class RoleAssignmentPermission(
+    ScopedPermission,
+):
+    """
+    Role assignment authorization.
 
+    Permission checks are handled by AccessService
+    through ScopedPermission.
+
+    Scope checks determine whether the acting role
+    may view or interact with the target role
+    assignment's department/location/room scope.
+
+    Role governance (who may assign which roles)
+    remains delegated to RoleGovernanceService /
+    ensure_permission until the legacy hierarchy
+    migration is completed.
+    """
+
+    permission_map = {
+        "GET": "role_assignments.view",
+        "POST": "role_assignments.create",
+        "PUT": "role_assignments.update",
+        "PATCH": "role_assignments.update",
+        "DELETE": "role_assignments.delete",
+    }
+
+    def has_object_permission(
+        self,
+        request,
+        view,
+        obj,
+    ):
+        active_role = getattr(
+            request.user,
+            "active_role",
+            None,
+        )
+
+        if not active_role:
+            return False
+
+        return (
+            self.has_permission(
+                request,
+                view,
+            )
+            and ScopeService.can_access_role_assignment(
+                active_role,
+                obj,
+            )
+        )
+    
 class RolePermission(BasePermission):
     """
     Permission class for RoleAssignment objects.

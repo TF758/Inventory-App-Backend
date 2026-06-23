@@ -38,7 +38,12 @@ class ScopeService:
             "DEPARTMENT_VIEWER",
             "DEPARTMENT_ADMIN",
         }:
-
+            result = (
+                room.location
+                and room.location.department_id
+                == role_assignment.department_id
+            )
+            print( "DEPARTMENT CHECK", room.location.department_id, role_assignment.department_id, result )
             return (
                 room.location
                 and room.location.department_id
@@ -211,6 +216,61 @@ class ScopeService:
             room,
         )
     
+
+    @staticmethod
+    def can_access_role_assignment(
+            role_assignment,
+            assignment,
+        ):
+            """
+            Determine whether a role assignment falls
+            within the actor's scope.
+            """
+
+            if assignment.room:
+                return ScopeService.can_access_room(
+                    role_assignment,
+                    assignment.room,
+                )
+
+            if assignment.location:
+
+                if role_assignment.role == "SITE_ADMIN":
+                    return True
+
+                if role_assignment.role in {
+                    "DEPARTMENT_ADMIN",
+                    "DEPARTMENT_VIEWER",
+                }:
+                    return (
+                        assignment.location.department_id
+                        == role_assignment.department_id
+                    )
+
+                if role_assignment.role in {
+                    "LOCATION_ADMIN",
+                    "LOCATION_VIEWER",
+                }:
+                    return (
+                        assignment.location_id
+                        == role_assignment.location_id
+                    )
+
+                return False
+
+            if assignment.department:
+
+                if role_assignment.role == "SITE_ADMIN":
+                    return True
+
+                return (
+                    role_assignment.department_id
+                    == assignment.department_id
+                )
+
+            # SITE_ADMIN assignment
+            return role_assignment.role == "SITE_ADMIN"
+    
 class UserScopeService:
 
     @staticmethod
@@ -304,3 +364,5 @@ class UserScopeService:
                     return True
 
         return False
+
+   
