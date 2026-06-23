@@ -1,6 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
+from inventory.access.services.roles import RoleGovernanceService
+from inventory.core.permissions.users import RoleAssignmentPermission
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -23,25 +25,43 @@ from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
     """
-    Handles listing, creating, retrieving, updating, and deleting RoleAssignment objects.
+    Handles listing, creating, retrieving, updating,
+    and deleting RoleAssignment objects.
     """
+
     base_queryset = (
         RoleAssignment.objects
-        .select_related("user", "department", "location", "room")
-        .order_by("-assigned_date", "-id")
+        .select_related(
+            "user",
+            "department",
+            "location",
+            "room",
+        )
+        .order_by(
+            "-assigned_date",
+            "-id",
+        )
     )
+
     lookup_field = "public_id"
-    permission_classes = [RolePermission]
-    filter_backends = [DjangoFilterBackend]
+
+    permission_classes = [ RoleAssignmentPermission, ]
+
+    filter_backends = [ DjangoFilterBackend, ]
+
     filterset_class = RoleAssignmentFilter
     pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+        ]:
             return RoleWriteSerializer
+
         return RoleReadSerializer
 
-    
     def get_queryset(self):
         user = self.request.user
         qs = self.base_queryset
@@ -102,25 +122,32 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
         return own_roles
 
-
-    # ------------------------------
-    # Enforce permission before serializer.save()
-    # ------------------------------
     def perform_create(self, serializer):
         user = self.request.user
-        data = serializer.validated_data
 
-        # Pre-check permissions before saving
-        ensure_permission(
+        active_role = getattr(
             user,
-            data['role'],
-            data.get('room'),
-            data.get('location'),
-            data.get('department')
+            "active_role",
+            None,
         )
 
+        data = serializer.validated_data
+
+        if not RoleGovernanceService.can_assign(
+            active_role,
+            data["role"],
+            room=data.get("room"),
+            location=data.get("location"),
+            department=data.get("department"),
+        ):
+            raise PermissionDenied(
+                "You may not assign this role."
+            )
+
         try:
-            serializer.save(assigned_by=user)
+            serializer.save(
+                assigned_by=user,
+            )
 
         except IntegrityError:
             raise ValidationError({
@@ -131,18 +158,25 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         user = self.request.user
-        data = serializer.validated_data
 
-        ensure_permission(
+        active_role = getattr(
             user,
-            data.get('role', serializer.instance.role),
-            data.get('room', serializer.instance.room),
-            data.get('location', serializer.instance.location),
-            data.get('department', serializer.instance.department)
+            "active_role",
+            None,
         )
 
+        if not RoleGovernanceService.can_manage_assignment(
+            active_role,
+            serializer.instance,
+        ):
+            raise PermissionDenied(
+                "You may not modify this role assignment."
+            )
+
         try:
-            serializer.save(assigned_by=user)
+            serializer.save(
+                assigned_by=user,
+            )
 
         except IntegrityError:
             raise ValidationError({
@@ -152,15 +186,22 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             })
 
     def perform_destroy(self, instance):
-        user = self.request.user
-        ensure_permission(
-            user,
-            instance.role,
-            instance.room,
-            instance.location,
-            instance.department
+        active_role = getattr(
+            self.request.user,
+            "active_role",
+            None,
         )
+
+        if not RoleGovernanceService.can_manage_assignment(
+            active_role,
+            instance,
+        ):
+            raise PermissionDenied(
+                "You may not delete this role assignment."
+            )
+
         instance.delete()
+
 
 
 # --- User Roles List (current user or any user by public_id) ---
