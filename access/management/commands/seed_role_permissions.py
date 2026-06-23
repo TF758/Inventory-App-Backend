@@ -4,8 +4,10 @@ import pandas as pd
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import transaction
 
-from access.models import Permission, RolePermission
+from access.models import Permission
+from access.models import RolePermission
 
 
 ROLE_COLUMNS = [
@@ -25,7 +27,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
 
-        file_path = Path(settings.BASE_DIR) / "permissions.xlsx"
+        file_path = (
+            Path(settings.BASE_DIR)
+            / "permissions.xlsx"
+        )
 
         if not file_path.exists():
             self.stdout.write(
@@ -35,7 +40,6 @@ class Command(BaseCommand):
             )
             return
 
-        # Update this sheet name if your matrix lives elsewhere
         df = pd.read_excel(
             file_path,
             sheet_name="Sheet1",
@@ -43,50 +47,70 @@ class Command(BaseCommand):
 
         created = 0
 
-        for _, row in df.iterrows():
+        with transaction.atomic():
 
-            permission_code = row["Permission"]
+            # ---------------------------------
+            # Reset mappings
+            # ---------------------------------
 
-            try:
-                permission = Permission.objects.get(
-                    code=permission_code
-                )
-            except Permission.DoesNotExist:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Permission not found: {permission_code}"
+            deleted_count, _ = (
+                RolePermission.objects.all()
+                .delete()
+            )
+
+            self.stdout.write(
+                f"Removed {deleted_count} existing role permissions"
+            )
+
+            # ---------------------------------
+            # Rebuild mappings
+            # ---------------------------------
+
+            for _, row in df.iterrows():
+
+                permission_code = row["Permission"]
+
+                try:
+                    permission = Permission.objects.get(
+                        code=permission_code,
                     )
-                )
-                continue
 
-            for role in ROLE_COLUMNS:
+                except Permission.DoesNotExist:
 
-                value = row.get(role)
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Permission not found: "
+                            f"{permission_code}"
+                        )
+                    )
 
-                if pd.isna(value):
                     continue
 
-                allowed = str(value).strip() in [
-                    "1",
-                    "TRUE",
-                    "True",
-                    "true",
-                    "Y",
-                    "YES",
-                    "Yes",
-                ]
+                for role in ROLE_COLUMNS:
 
-                if not allowed:
-                    continue
+                    value = row.get(role)
 
-                _, was_created = (
-                    RolePermission.objects.get_or_create(
+                    if pd.isna(value):
+                        continue
+
+                    allowed = str(value).strip() in [
+                        "1",
+                        "TRUE",
+                        "True",
+                        "true",
+                        "Y",
+                        "YES",
+                        "Yes",
+                    ]
+
+                    if not allowed:
+                        continue
+
+                    RolePermission.objects.create(
                         role=role,
                         permission=permission,
                     )
-                )
 
-                if was_created:
                     created += 1
 
         self.stdout.write(
