@@ -12,6 +12,7 @@ from django.http import FileResponse
 from core.pagination import FlexiblePagination
 from rest_framework import mixins, viewsets, permissions
 import os
+from access.permissions.base import RequiresPermission
 from reporting.api.serializers.reports import ReportJobSerializer
 from reporting.filters import ReportJobFilter
 from reporting.models.reports import ReportJob
@@ -99,7 +100,10 @@ class MyReportJobViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixi
 
 class ReportJobAdminViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet, ):
     serializer_class = ReportJobSerializer
-    permission_classes = [permissions.IsAdminUser]
+
+    permission_classes = [ RequiresPermission ]
+    required_permission = ( "reports.manage" )
+    
     pagination_class = FlexiblePagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ReportJobFilter

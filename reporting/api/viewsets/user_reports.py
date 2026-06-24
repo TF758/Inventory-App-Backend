@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 import redis
 from django.db.models import Q, Count
 from core.models.audit import AuditLog
+from access.permissions.base import RequiresPermission
 from reporting.api.serializers.user_report import UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
 from reporting.models.reports import ReportJob
 from reporting.tasks.reports import generate_report_task
@@ -20,7 +21,10 @@ User = get_user_model()
 
 
 class UserSummaryReport(APIView):
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [ RequiresPermission]
+
+    required_permission = ( "reports.user_summary" )
 
     def post(self, request):
         serializer = UserSummaryReportRequestSerializer(data=request.data)
@@ -56,7 +60,10 @@ class UserSummaryReport(APIView):
         )
 
 class UserAuditHistoryReport(APIView):
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [ RequiresPermission]
+
+    required_permission = ( "reports.user_audit_history" )
 
     def post(self, request):
 
@@ -107,7 +114,9 @@ class UserAuditHistoryReport(APIView):
         )
 
 class UserAuditHistoryPreview(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ RequiresPermission]
+
+    required_permission = ( "reports.user_audit_history" )
 
     PREVIEW_LIMIT = 20
 
@@ -234,7 +243,10 @@ class UserAuditHistoryPreview(APIView):
         )
 
 class UserLoginHistoryReport(APIView):
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [ RequiresPermission]
+
+    required_permission = ( "reports.user_login_history" )
 
     def post(self, request):
 
