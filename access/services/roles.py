@@ -1,4 +1,4 @@
-from inventory.access.services.scope import ScopeService
+from access.services.scope import ScopeService
 
 
 class RoleGovernanceService:
@@ -104,4 +104,31 @@ class RoleGovernanceService:
                 location=location,
                 department=department,
             )
+        )
+    
+    @classmethod
+    def can_manage_assignment(
+        cls,
+        actor_role,
+        assignment,
+    ):
+        if not actor_role:
+            return False
+
+        if actor_role.role == "SITE_ADMIN":
+            return True
+
+        # Cannot manage own active role assignment
+        # Optional business rule
+        # if assignment.pk == actor_role.pk:
+        #     return False
+
+        return cls.can_assign_role(
+            actor_role,
+            assignment.role,
+        ) and cls.can_assign_scope(
+            actor_role,
+            room=assignment.room,
+            location=assignment.location,
+            department=assignment.department,
         )

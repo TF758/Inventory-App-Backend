@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from inventory.access.services.roles import RoleGovernanceService
+from access.services.roles import RoleGovernanceService
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, Room

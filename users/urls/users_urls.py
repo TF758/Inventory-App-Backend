@@ -1,6 +1,8 @@
 from django.urls import path
 
-from users.api.viewsets import user_viewsets
+from users.api.viewsets import user_viewsets, userprofile_viewsets
+
+
 
 
 urlpatterns = [
@@ -25,25 +27,26 @@ urlpatterns = [
     path("transfers/", user_viewsets.UserTransferViewSet.as_view({"post": "create"})),
 
     # Profile
-    path("profile/<str:public_id>/", user_viewsets.UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
+    path("profile/<str:public_id>/", userprofile_viewsets.UserProfileViewSet.as_view({"get": "retrieve"}), name='user-profile-detail'),
 
-    path("<str:user_public_id>/assets/", user_viewsets.UserAssetsAggregateView.as_view(), name="user-assets"),
+    path("<str:user_public_id>/assets/", userprofile_viewsets.UserAssetsAggregateView.as_view(), name="user-assets"),
 
     # Assets
-    path("<str:user_public_id>/equipment/", user_viewsets.UserEquipmentViewSet.as_view({"get": "list"})),
-    path("<str:user_public_id>/accessories/", user_viewsets.UserAccessoryAssignmentViewSet.as_view({"get": "list"})),
-    path("<str:user_public_id>/consumables/", user_viewsets.UserConsumableIssueViewSet.as_view({"get": "list"})),
+    path("<str:user_public_id>/equipment/", userprofile_viewsets.UserEquipmentViewSet.as_view({"get": "list"})),
+    path("<str:user_public_id>/accessories/", userprofile_viewsets.UserAccessoryAssignmentViewSet.as_view({"get": "list"})),
+    path("<str:user_public_id>/consumables/", userprofile_viewsets.UserConsumableIssueViewSet.as_view({"get": "list"})),
 
     # Current placement
     path("<str:user_public_id>/current-placement/", user_viewsets.UserPlacementByUserView.as_view()),
 
-    path("<str:user_public_id>/asset-status/", user_viewsets.UserAssetStatusView.as_view(), name="user-asset-status"),
+    path("<str:user_public_id>/asset-status/", userprofile_viewsets.UserAssetStatusView.as_view(), name="user-asset-status"),
 
 
     path("", user_viewsets.UserModelViewSet.as_view({
         "get": "list",
         "post": "create",
     }), name='users'),
+
     path("<str:public_id>/", user_viewsets.UserModelViewSet.as_view({
         "get": "retrieve",
         "put": "update",

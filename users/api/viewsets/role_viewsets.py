@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
-from inventory.access.services.roles import RoleGovernanceService
-from inventory.core.permissions.users import RoleAssignmentPermission
+from access.services.roles import RoleGovernanceService
+from core.permissions.users import RoleAssignmentPermission
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User

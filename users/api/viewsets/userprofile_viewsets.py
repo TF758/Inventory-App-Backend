@@ -5,56 +5,59 @@ from rest_framework import mixins
 from core.pagination import FlexiblePagination
 from core.permissions import UserPermission
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import APIView, PermissionDenied
 from core.permissions.helpers import filter_user_assets_by_scope
 from django.db.models import Count
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import RetrieveModelMixin
-from core.permissions.users import CanViewUserProfile
+from core.permissions.users import CanViewUserProfile, UserProfilePermission
 from rest_framework import viewsets
 from rest_framework.response import Response
 from core.utils.query_helpers import accessory_active_q, consumable_active_q, equipment_active_q, get_user, get_user_accessories, get_user_consumables, get_user_equipment
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.api.serializers.equipment import EquipmentSerializer
+from access.permissions.base import RequiresPermission
+from access.services.scope import UserScopeService
 from users.api.serializers.users import UserAccessoryAssignmentSerializer, UserConsumableIssueSerializer, UserProfileSerializer
 from users.models.users import User
 
 
+class UserProfileViewSet( RetrieveModelMixin, GenericViewSet ):
 
-class UserProfileViewSet(RetrieveModelMixin, GenericViewSet):
+    permission_classes = [ UserProfilePermission ]
 
-    permission_classes = [CanViewUserProfile]
     serializer_class = UserProfileSerializer
     lookup_field = "public_id"
 
     def get_queryset(self):
 
-        queryset = (
+        return (
             User.objects
             .filter(is_active=True)
             .annotate(
-
                 equipment_count=Count(
                     "equipment_assignments__equipment",
-                    filter=equipment_active_q(self.request.user),
+                    filter=equipment_active_q(
+                        self.request.user
+                    ),
                     distinct=True,
                 ),
-
                 accessory_count=Count(
                     "accessory_assignments__accessory",
-                    filter=accessory_active_q(self.request.user),
+                    filter=accessory_active_q(
+                        self.request.user
+                    ),
                     distinct=True,
                 ),
-
                 consumable_count=Count(
                     "consumable_assignments__consumable",
-                    filter=consumable_active_q(self.request.user),
+                    filter=consumable_active_q(
+                        self.request.user
+                    ),
                     distinct=True,
                 ),
             )
         )
-
-        return queryset
     
 class UserEquipmentViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = EquipmentSerializer
@@ -121,11 +124,32 @@ class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet)
         return queryset
 
 class UserAssetStatusView(APIView):
-    permission_classes = [UserPermission]
 
-    def get(self, request, user_public_id):
+    permission_classes = [ RequiresPermission]
+    required_permission = "users.view"
 
-        user = get_object_or_404(User, public_id=user_public_id)
+    def get( self, request, user_public_id, ):
+        user = get_object_or_404(
+            User,
+            public_id=user_public_id,
+        )
+
+        active_role = getattr(
+            request.user,
+            "active_role",
+            None,
+        )
+
+        if (
+            user != request.user
+            and not UserScopeService.can_access_user(
+                active_role,
+                user,
+            )
+        ):
+            raise PermissionDenied(
+                "You do not have permission to view this user."
+            )
 
         equipment = EquipmentAssignment.objects.filter(
             user=user,
@@ -146,8 +170,66 @@ class UserAssetStatusView(APIView):
         ).count()
 
         return Response({
-            "has_assets": (equipment + accessories + consumables) > 0,
+            "has_assets": (
+                equipment
+                + accessories
+                + consumables
+            ) > 0,
             "equipment": equipment,
             "accessories": accessories,
             "consumables": consumables,
         })
+
+
+
+class UserAssetsAggregateView(APIView):
+    permission_classes = [ RequiresPermission]
+
+    required_permission = ( "users.view" )
+    
+    def get(self, request, user_public_id):
+
+        user = get_user(user_public_id)
+
+        equipment_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_equipment(user),
+            "room"
+        )
+
+        accessory_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_accessories(user),
+            "accessory__room"
+        )
+
+        consumable_qs = filter_user_assets_by_scope(
+            request.user,
+            get_user_consumables(user),
+            "consumable__room"
+        )
+
+        equipment_data = EquipmentSerializer(
+            equipment_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        accessory_data = UserAccessoryAssignmentSerializer(
+            accessory_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        consumable_data = UserConsumableIssueSerializer(
+            consumable_qs,
+            many=True,
+            context={"request": request}
+        ).data
+
+        return Response({
+            "equipment": equipment_data,
+            "accessories": accessory_data,
+            "consumables": consumable_data,
+        })
+        
