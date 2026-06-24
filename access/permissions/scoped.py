@@ -3,10 +3,7 @@ from access.permissions.base import (
 )
 
 
-class ScopedPermission(
-    RequiresPermission
-):
-
+class ScopedPermission(RequiresPermission):
     permission_map = {}
 
     def get_required_permission(
@@ -17,3 +14,15 @@ class ScopedPermission(
         return self.permission_map.get(
             request.method
         )
+
+    def has_permission(self, request, view):
+        required_permission = self.get_required_permission(
+            request,
+            view,
+        )
+
+        result = super().has_permission(
+            request,
+            view,
+        )
+        return result

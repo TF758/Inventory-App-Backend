@@ -15,7 +15,6 @@ from django.shortcuts import get_object_or_404
 from core.pagination import  FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 
-from core.permissions import RolePermission
 from django.db.models import Q
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
@@ -45,7 +44,7 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
     lookup_field = "public_id"
 
-    permission_classes = [ RoleAssignmentPermission, ]
+    permission_classes = [ RoleAssignmentPermission]
 
     filter_backends = [ DjangoFilterBackend, ]
 

@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 from assets.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
-from core.permissions.users import RolePermission, UserPermission
+from core.permissions.users import RoleAssignmentPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -18,7 +18,7 @@ from sites.models.sites import Location, Room, UserPlacement
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, RoleVisibilityMixin
-from sites.permissions.sites import LocationPermission
+from sites.permissions.sites import LocationPermission, RoomPermission
 from django.db.models import Case, When, Value, IntegerField
 from core.pagination import FlexiblePagination
 from django.db.models import Q
@@ -29,7 +29,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
-from core.permissions.assets import AssetPermission, HasAssignmentScopePermission
+from core.permissions.assets import AssetPermission, AssignmentPermission, HasAssignmentScopePermission
 
 class LocationDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [IsAuthenticated]
@@ -106,7 +106,7 @@ class LocationUsersView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixi
     """Retrieves a list of users in a given location"""
     serializer_class = UserAreaSerializer
 
-    permission_classes = [UserPermission]
+    permission_classes = [LocationPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["user__email"]
@@ -361,7 +361,7 @@ class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnl
     serializer_class = RoleReadSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RolePermission]
+    permission_classes = [RoleAssignmentPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -388,7 +388,7 @@ class LocationEquipmentAssignmentViewSet(
 ):
     serializer_class = EquipmentAssignmentSerializer
 
-    permission_classes = [HasAssignmentScopePermission]
+    permission_classes = [AssignmentPermission]
 
     def get_queryset(self):
         location_id = self.kwargs.get("public_id")

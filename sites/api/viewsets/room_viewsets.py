@@ -2,8 +2,8 @@ from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 
-from core.permissions.assets import AssetPermission
-from core.permissions.users import UserPermission
+from core.permissions.assets import AssetPermission, AssignmentPermission
+from core.permissions.users import RoleAssignmentPermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -350,7 +350,7 @@ class RoomRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyMod
     serializer_class = RoleReadSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RoomPermission]
+    permission_classes = [RoleAssignmentPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -377,6 +377,10 @@ class RoomEquipmentAssignmentViewSet(
     viewsets.GenericViewSet,
 ):
     serializer_class = EquipmentAssignmentSerializer
+
+    permission_classes = [
+        AssignmentPermission,
+    ]
 
     def get_queryset(self):
         room_id = self.kwargs.get("public_id")

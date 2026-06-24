@@ -36,7 +36,8 @@ class RequiresPermission(BasePermission):
         if not permission_code:
             return False
 
-        return AccessService.has_permission(
+        result = AccessService.has_permission(
             request.user,
             permission_code,
         )
+        return result

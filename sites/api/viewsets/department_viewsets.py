@@ -13,7 +13,7 @@ from assets.models.assets import Accessory, EquipmentStatus
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from core.permissions.assets import AssetPermission
-from core.permissions.users import RolePermission, UserPermission
+from core.permissions.users import  RoleAssignmentPermission, UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -345,7 +345,7 @@ class DepartmentRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadO
     serializer_class = RoleReadSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RolePermission]
+    permission_classes = [RoleAssignmentPermission]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
