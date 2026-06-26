@@ -27,6 +27,7 @@ from assets.api.serializers.equipment import EquipmentCondemnSerializer, Equipme
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from core.models.audit import AuditLog
 from assets.asset_filters import EquipmentFilter
+from inventory.access.permissions.base import RequiresPermission
 from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
@@ -89,84 +90,12 @@ def perform_create(self, serializer):
 
         serializer.save(room=room)
 
-class EquipmentDeleteViewSet(viewsets.ViewSet):
-    """
-    Soft delete Equipment by public_id.
-    """
-
-    permission_classes = [AssetPermission]
-    lookup_field = "public_id"
-
-    def destroy(self, request, public_id=None):
-        equipment = get_object_or_404(
-            Equipment,
-            public_id=public_id,
-            is_deleted=False,
-        )
-
-        equipment.is_deleted = True
-        equipment.deleted_at = timezone.now()
-        equipment.save(update_fields=["is_deleted", "deleted_at"])
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
-      
-class EquipmentBatchValidateView(EquipmentBatchMixin, APIView):
-    """
-    Validate a batch of equipment rows without saving.
-    """
-    save_to_db = False
-
-    def post(self, request, *args, **kwargs):
-        data = request.data if isinstance(request.data, list) else []
-        if not data:
-            return Response({"detail": "Expected a list of objects"}, status=status.HTTP_400_BAD_REQUEST)
-
-        successes, errors = self.process_batch(data)
-
-        return Response(
-            {
-                "validated": successes,
-                "errors": errors,
-                "summary": {
-                    "total": len(data),
-                    "valid": len(successes),
-                    "invalid": len(errors),
-                },
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class EquipmentBatchImportView(EquipmentBatchMixin, APIView):
-    """
-    Batch import of equipment (saves to DB).
-    """
-    save_to_db = True
-
-    def post(self, request, *args, **kwargs):
-        data = request.data if isinstance(request.data, list) else []
-        if not data:
-            return Response({"detail": "Expected a list of objects"}, status=status.HTTP_400_BAD_REQUEST)
-
-        successes, errors = self.process_batch(data)
-
-        return Response(
-            {
-                "created": successes,
-                "errors": errors,
-                "summary": {
-                    "total": len(data),
-                    "success": len(successes),
-                    "failed": len(errors),
-                },
-            },
-            status=status.HTTP_207_MULTI_STATUS,
-        )
 
 class EquipmentStatusChangeView(APIView):
     """Dedicated view to update equipment status"""
 
-    permission_classes = [CanUpdateEquipmentStatus]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.change_status"
 
     def patch(self, request, public_id):
         equipment = get_object_or_404(
@@ -226,7 +155,9 @@ class EquipmentStatusChangeView(APIView):
         return Response( status=status.HTTP_200_OK, )
 
 class EquipmentCondemnView(APIView):
-    permission_classes = [CanUpdateEquipmentStatus]
+        
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.condemn"
 
     def patch(self, request, public_id):
         equipment = get_object_or_404(
@@ -286,7 +217,9 @@ class EquipmentCondemnView(APIView):
     
 class BatchUnassignEquipmentView(APIView):
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.unassign"
+
 
     def post(self, request):
 
@@ -349,7 +282,9 @@ class BatchUnassignEquipmentView(APIView):
 
 class BatchAssignEquipmentView(APIView):
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.assign"
+
 
     def post(self, request):
 
@@ -422,7 +357,9 @@ class BatchAssignEquipmentView(APIView):
 
 class BatchEquipmentStatusChangeView(APIView):
 
-    permission_classes = [CanUpdateEquipmentStatus]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.chnage_status"
+
 
     def post(self, request):
         serializer = BatchEquipmentStatusChangeSerializer(data=request.data)
@@ -483,7 +420,9 @@ class BatchEquipmentStatusChangeView(APIView):
 
 class BatchEquipmentCondemnView(APIView):
 
-    permission_classes = [CanUpdateEquipmentStatus]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.condemn"
+
 
     def post(self, request):
         serializer = BatchEquipmentCondemnSerializer(data=request.data)
@@ -543,7 +482,9 @@ class BatchEquipmentCondemnView(APIView):
     
 class BatchEquipmentHardDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.hard_delete"
+
 
     def post(self, request):
         serializer = BatchEquipmentHardDeleteSerializer(data=request.data)
@@ -610,7 +551,9 @@ class EquipmentRestoreViewSet(APIView):
     Restore a soft-deleted Equipment by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.restore"
+
     lookup_field = "public_id"
 
     def get(self, request, public_id=None):
@@ -636,7 +579,8 @@ class EquipmentSoftDeleteView(APIView):
     Soft delete a single equipment item by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.delete"
 
     def delete(self, request, public_id):
 
@@ -674,7 +618,8 @@ class EquipmentSoftDeleteView(APIView):
     
 class BatchEquipmentSoftDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchEquipmentSoftDeleteSerializer(data=request.data)

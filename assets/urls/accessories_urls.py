@@ -24,8 +24,6 @@ urlpatterns = [
         "delete": "destroy"
     }), name="accessory-detail"),
 
-    path("accessories-validate-import/", accessory_viewsets.AccessoryBatchValidateView.as_view(), name="accessories-validate-import"),
-    path("accessories-import/", accessory_viewsets.AccessoryBatchImportView.as_view(), name="accessories-import"),
 
     path("", accessory_viewsets.AccessoryModelViewSet.as_view({
         "get": "list",

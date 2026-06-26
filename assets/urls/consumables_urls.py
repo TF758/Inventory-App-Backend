@@ -9,7 +9,6 @@ urlpatterns = [
     # Consumables
     # ----------------------------
 
-    # previously was consumable/batch-* chnaging to cosumable to match urls of other asset types
 
     path("batch-soft-delete/", consumable_viewsets.BatchConsumableSoftDeleteView.as_view(), name="batch-soft-delete-consumable"),
     path("batch-hard-delete/", consumable_viewsets.BatchConsumableHardDeleteView.as_view(), name="batch-hard-delete-consumable"),
@@ -23,9 +22,6 @@ urlpatterns = [
         "patch": "partial_update",
         "delete": "destroy"
     }), name="consumable-detail"),
-
-    path("consumables-import/", consumable_viewsets.ConsumableBatchImportView.as_view(), name="consumables-batch-import"),
-    path("consumables-validate-import/", consumable_viewsets.ConsumableBatchValidateView.as_view(), name="consumables-batch-validate"),
 
     path("", consumable_viewsets.ConsumableModelViewSet.as_view({
         "get": "list",

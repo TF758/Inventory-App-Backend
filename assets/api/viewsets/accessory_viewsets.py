@@ -20,6 +20,7 @@ from assets.services.assets import hard_delete_asset, restore_asset, soft_delete
 from core.pagination import FlexiblePagination
 from assets.models.assets import Accessory
 from assets.asset_filters import AccessoryFilter
+from inventory.access.permissions.base import RequiresPermission
 
 class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 
@@ -61,65 +62,14 @@ class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
     
 
-class AccessoryBatchValidateView(AccessoryBatchMixin, APIView):
-    save_to_db = False
-
-    def post(self, request, *args, **kwargs):
-        data = request.data if isinstance(request.data, list) else []
-        if not data:
-            return Response(
-                {"detail": "Expected a list of objects"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        successes, errors = self.process_batch(data)
-
-        return Response(
-            {
-                "validated": successes,
-                "errors": errors,
-                "summary": {
-                    "total": len(data),
-                    "valid": len(successes),
-                    "invalid": len(errors),
-                },
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class AccessoryBatchImportView(AccessoryBatchMixin, APIView):
-    save_to_db = True
-
-    def post(self, request, *args, **kwargs):
-        data = request.data if isinstance(request.data, list) else []
-        if not data:
-            return Response(
-                {"detail": "Expected a list of objects"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        successes, errors = self.process_batch(data)
-
-        return Response(
-            {
-                "created": successes,
-                "errors": errors,
-                "summary": {
-                    "total": len(data),
-                    "success": len(successes),
-                    "failed": len(errors),
-                },
-            },
-            status=status.HTTP_207_MULTI_STATUS,
-        )
 
 class AccessorySoftDeleteView(APIView):
     """
     Soft delete a single accessory by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.delete"
 
     def delete(self, request, public_id):
 
@@ -159,7 +109,9 @@ class AccessoryRestoreViewSet(APIView):
     Restore a soft-deleted Accessory by public_id.
     """
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.restore"
+
     lookup_field = "public_id"
 
     def get(self, request, public_id=None):
@@ -183,7 +135,8 @@ class AccessoryRestoreViewSet(APIView):
 
 class BatchAccessorySoftDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.delete"
 
     def post(self, request):
         serializer = BatchAccessorySoftDeleteSerializer(data=request.data)
@@ -243,7 +196,8 @@ class BatchAccessorySoftDeleteView(APIView):
 
 class BatchAccessoryHardDeleteView(APIView):
 
-    permission_classes = [AssetPermission]
+    permission_classes = [ RequiresPermission]
+    required_permission = "assets.hard_delete"
 
     def post(self, request):
         serializer = BatchAccessoryHardDeleteSerializer(data=request.data)
