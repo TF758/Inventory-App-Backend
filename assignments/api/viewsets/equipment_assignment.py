@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from core.mixins import AuditMixin, NotificationMixin
-from core.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
+from core.permissions.assets import AssignmentPermission, CanManageAssetCustody, CanViewEquipmentAssignments
 from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
 
@@ -17,13 +17,9 @@ from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from assignments.assignment_filters import EquipmentAssignmentFilter
+from access.permissions.base import RequiresPermission
 
-class EquipmentAssignmentViewSet(
-    AuditMixin,
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    viewsets.GenericViewSet,
-):
+class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet, ):
     """
     Viewset to handle Listing Equipment Assignment
     both via list and in detail used by Site Admin
@@ -33,7 +29,9 @@ class EquipmentAssignmentViewSet(
         "equipment", "user", "assigned_by"
     )
     serializer_class = EquipmentAssignmentSerializer
-    permission_classes = [CanViewEquipmentAssignments]
+
+    permission_classes = [AssignmentPermission]
+
     pagination_class = FlexiblePagination
 
     filterset_class = EquipmentAssignmentFilter
@@ -55,7 +53,8 @@ class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    permission_classes = "assignments.assign"
 
     def post(self, request):
         serializer = AssignEquipmentSerializer(data=request.data)
@@ -154,7 +153,8 @@ class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     Unassign (return) an equipment from a user.
     """
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    permission_classes = "assignments.unassign"
 
     def post(self, request):
         serializer = UnassignEquipmentSerializer(data=request.data)
@@ -237,7 +237,8 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    req = "assignments.reassign"
 
     def post(self, request):
         serializer = ReassignEquipmentSerializer(data=request.data)
@@ -367,6 +368,9 @@ class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
     Full chronological event timeline for a piece of equipment.
     """
     serializer_class = EquipmentEventSerializer
+
+    permission_classes = [AssignmentPermission]
+
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["occurred_at"]

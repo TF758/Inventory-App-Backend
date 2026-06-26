@@ -17,7 +17,10 @@ from assets.models.assets import Accessory, Consumable, Equipment
 from agreements.service import get_attached_agreement_ids
 from rest_framework import status
 
+from access.permissions.agreements import AssetAgreementPermission
+
 class AssetAgreementViewSet( AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
+
 
     queryset = (
         AssetAgreement.objects
@@ -37,7 +40,8 @@ class AssetAgreementViewSet( AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet
         .order_by("id")
     )
 
-    # permission_classes = [AssetAgreementPermission]
+
+    permission_classes = [AssetAgreementPermission]
 
     pagination_class = FlexiblePagination
     lookup_field = "public_id"

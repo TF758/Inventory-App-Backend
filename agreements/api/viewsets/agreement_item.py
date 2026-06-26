@@ -10,6 +10,8 @@ from agreements.services.coverage import can_attach_asset_to_agreement
 from core.models.audit import AuditLog
 from rest_framework import status
 
+from access.permissions.agreements import AssetAgreementPermission
+
 
 class AssetAgreementItemViewSet(AuditMixin, ScopeFilterMixin, viewsets.GenericViewSet, ):
 
@@ -24,6 +26,8 @@ class AssetAgreementItemViewSet(AuditMixin, ScopeFilterMixin, viewsets.GenericVi
         .order_by("id")
     )
 
+    permission_classes = [AssetAgreementPermission]
+    
     pagination_class = FlexiblePagination
 
     lookup_field = "public_id"

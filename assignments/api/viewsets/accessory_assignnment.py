@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 from assets.models.assets import Accessory
 from assignments.models.asset_assignment import AccessoryAssignment, AccessoryEvent
 from core.models.audit import AuditLog
@@ -9,7 +10,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from core.mixins import AuditMixin, NotificationMixin
-from core.permissions.assets import CanManageAssetCustody, CanSelfReturnAsset, CanUseAsset
+from core.permissions.assets import AssignmentPermission, CanManageAssetCustody, CanSelfReturnAsset, CanUseAsset
 from rest_framework import viewsets, filters
 from rest_framework.generics import GenericAPIView
 from core.pagination import FlexiblePagination
@@ -17,6 +18,9 @@ from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from core.models.notifications import Notification
 from assignments.api.serializers.assignment import AccessoryEventSerializer, AdminReturnAccessorySerializer, AssignAccessorySerializer, CondemnAccessorySerializer, SelfReturnAccessorySerializer
 from assets.api.serializers.accessories import AccessoryDistributionSerializer, RestockAccessorySerializer, UseAccessorySerializer
+from access.permissions.base import RequiresPermission
+from access.services.asset import AssetUsageService
+from access.services.assignments import SelfReturnService
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -24,6 +28,9 @@ class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     Full chronological event timeline for an accessory.
     """
     serializer_class = AccessoryEventSerializer
+
+    permission_classes = [AssignmentPermission]
+
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["occurred_at"]
@@ -41,7 +48,9 @@ class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [RequiresPermission]
+    required_permission = "assignments.assign"
 
     def post(self, request):
         serializer = AssignAccessorySerializer(data=request.data)
@@ -138,7 +147,9 @@ class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
         )
 
 class AdminReturnAccessoryView(AuditMixin,NotificationMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [RequiresPermission]
+    required_permission = "assignments.unassign"
 
     def post(self, request):
         serializer = AdminReturnAccessorySerializer(data=request.data)
@@ -220,7 +231,9 @@ class AdminReturnAccessoryView(AuditMixin,NotificationMixin, APIView):
         return Response(status=status.HTTP_200_OK)
 
 class CondemnAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.condemn"
+
 
     def post(self, request):
         serializer = CondemnAccessorySerializer(data=request.data)
@@ -269,7 +282,7 @@ class CondemnAccessoryView(AuditMixin, APIView):
         return Response(status=status.HTTP_200_OK)
 
 class SelfReturnAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanSelfReturnAsset]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = SelfReturnAccessorySerializer(data=request.data)
@@ -279,19 +292,13 @@ class SelfReturnAccessoryView(AuditMixin, APIView):
         quantity = serializer.validated_data["quantity"]
         notes = serializer.validated_data.get("notes", "")
 
-        assignment = get_object_or_404(
-            AccessoryAssignment,
-            accessory=accessory,
-            user=request.user,
-            returned_at__isnull=True,
-        )
 
         with transaction.atomic():
 
-            assignment = (
-                AccessoryAssignment.objects
-                .select_for_update()
-                .get(pk=assignment.pk)
+            assignment = SelfReturnService.ensure_can_self_return_accessory(
+                user=request.user,
+                accessory=accessory,
+                quantity=quantity,
             )
 
             accessory = (
@@ -300,14 +307,17 @@ class SelfReturnAccessoryView(AuditMixin, APIView):
                 .get(pk=accessory.pk)
             )
 
-            if quantity > assignment.quantity:
-                raise ValidationError("Return exceeds assigned quantity")
-
             assignment.quantity -= quantity
+
             if assignment.quantity == 0:
                 assignment.returned_at = timezone.now()
 
-            assignment.save()
+            assignment.save(
+                update_fields=[
+                    "quantity",
+                    "returned_at",
+                ]
+            )
 
             AccessoryEvent.objects.create(
                 accessory=accessory,
@@ -332,7 +342,9 @@ class SelfReturnAccessoryView(AuditMixin, APIView):
 
 
 class AccessoryDistributionView(GenericAPIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [AssignmentPermission]
+
     pagination_class = FlexiblePagination
     serializer_class = AccessoryDistributionSerializer
 
@@ -363,7 +375,9 @@ class AccessoryDistributionView(GenericAPIView):
         return Response(serializer.data)
 
 class RestockAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanManageAssetCustody]
+
+    permission_classes = [RequiresPermission]
+    required_permission = "assets.restock"
 
     def post(self, request):
         serializer = RestockAccessorySerializer(data=request.data)
@@ -408,7 +422,8 @@ class RestockAccessoryView(AuditMixin, APIView):
         return Response(status=status.HTTP_200_OK)
 
 class UseAccessoryView(AuditMixin, APIView):
-    permission_classes = [CanUseAsset]
+    
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = UseAccessorySerializer(data=request.data)
@@ -418,20 +433,29 @@ class UseAccessoryView(AuditMixin, APIView):
         quantity = serializer.validated_data["quantity"]
         notes = serializer.validated_data.get("notes", "")
 
-        # Enforce ownership
-        assignment = get_object_or_404(
-            AccessoryAssignment,
-            accessory=accessory,
-            user=request.user,
-            returned_at__isnull=True,
-        )
 
-        if quantity > assignment.quantity:
-            raise ValidationError(
-                "Usage quantity exceeds your assigned quantity."
-            )
 
         with transaction.atomic():
+
+
+            assignment = AssetUsageService.ensure_user_can_use_accessory(
+                user=request.user,
+                accessory=accessory,
+                quantity=quantity,
+            )
+
+            # Reduce remaining assigned quantity
+            assignment.quantity -= quantity
+
+            if assignment.quantity == 0:
+                assignment.returned_at = timezone.now()
+
+            assignment.save(
+                update_fields=[
+                    "quantity",
+                    "returned_at",
+                ]
+            )
             # Record usage event (inventory-neutral)
             AccessoryEvent.objects.create(
                 accessory=accessory,

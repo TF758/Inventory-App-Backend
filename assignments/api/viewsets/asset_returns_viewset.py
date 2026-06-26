@@ -16,6 +16,7 @@ from core.pagination import FlexiblePagination
 from assignments.api.serializers.returns import ReturnRequestSerializer
 from assignments.services.asset_returns import create_mixed_return_request, approve_return_request, deny_return_request, approve_return_item, deny_return_item
 from assignments.assignment_filters import AdminReturnRequestFilter, ReturnRequestFilter
+from access.permissions.returns import ReturnRequestPermission
 from users.api.serializers.self import MixedAssetReturnSerializer
 
 
@@ -23,7 +24,7 @@ class MixedAssetReturnViewSet(AuditMixin, viewsets.ViewSet):
 
     """Send a return request of assets of various types"""
 
-    permission_classes = [IsAuthenticated, CanRequestAssetReturn]
+    permission_classes = [IsAuthenticated]
 
     def create(self, request):
 
@@ -71,7 +72,9 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     serializer_class = ReturnRequestSerializer
+
     permission_classes = [IsAuthenticated]
+
     filter_backends = [DjangoFilterBackend]
     pagination_class = FlexiblePagination
 
@@ -93,7 +96,9 @@ class SelfReturnRequestViewSet(viewsets.ReadOnlyModelViewSet):
     
 class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet ):
     serializer_class = ReturnRequestSerializer
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [ReturnRequestPermission]
+
     pagination_class = FlexiblePagination
 
     model_class = ReturnRequest
@@ -155,7 +160,8 @@ class AdminReturnRequestViewSet( ScopeFilterMixin, viewsets.ReadOnlyModelViewSet
 
 class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
 
-    permission_classes = [IsAuthenticated, CanProcessReturnRequest]
+    permission_classes = [ReturnRequestPermission]
+
     queryset = ReturnRequest.objects.all()
     lookup_field = "public_id"
     lookup_url_kwarg = "public_id"
@@ -341,7 +347,8 @@ class AdminReturnRequestWorkflowViewSet( AuditMixin, NotificationMixin, viewsets
 
 class AdminReturnRequestItemWorkflowViewSet( AuditMixin, NotificationMixin, viewsets.GenericViewSet, ):
 
-    permission_classes = [IsAuthenticated, CanProcessReturnRequest]
+    permission_classes = [ReturnRequestPermission]
+
     lookup_field = "public_id"
     lookup_url_kwarg = "public_id"
 

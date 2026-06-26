@@ -20,7 +20,7 @@ from assets.services.assets import hard_delete_asset, restore_asset, soft_delete
 from core.pagination import FlexiblePagination
 from assets.models.assets import Accessory
 from assets.asset_filters import AccessoryFilter
-from inventory.access.permissions.base import RequiresPermission
+from access.permissions.base import RequiresPermission
 
 class AccessoryModelViewSet(AuditMixin,ScopeFilterMixin, viewsets.ModelViewSet):
 

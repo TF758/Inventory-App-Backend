@@ -9,6 +9,7 @@ from core.mixins import ( AuditMixin, ScopeFilterMixin, )
 from agreements.service import AgreementLifecycleService
 from core.models.audit import AuditLog
 from agreements.api.serialziers.agreement_lifecycle import ExtendAgreementSerializer, RenewAgreementSerializer
+from access.permissions.agreements import AssetAgreementPermission
 
 
 
@@ -21,6 +22,8 @@ class AgreementLifecycleViewSet( AuditMixin, ScopeFilterMixin, viewsets.GenericV
         )
         .order_by("id")
     )
+
+    permission_classes = [AssetAgreementPermission]
 
     lookup_field = "public_id"
 

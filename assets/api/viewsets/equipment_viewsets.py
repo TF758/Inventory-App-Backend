@@ -27,7 +27,7 @@ from assets.api.serializers.equipment import EquipmentCondemnSerializer, Equipme
 from assets.services.assets import hard_delete_asset, restore_asset, soft_delete_asset
 from core.models.audit import AuditLog
 from assets.asset_filters import EquipmentFilter
-from inventory.access.permissions.base import RequiresPermission
+from access.permissions.base import RequiresPermission
 from sites.models.sites import Room
 
 class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
