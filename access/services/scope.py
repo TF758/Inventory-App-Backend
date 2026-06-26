@@ -1,3 +1,4 @@
+from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from users.models.roles import RoleAssignment
 from sites.models.sites import Room
 from sites.models.sites import UserPlacement
@@ -139,13 +140,20 @@ class ScopeService:
 
     @staticmethod
     def get_return_request_room(
-        request_item,
+        obj,
     ):
-        return getattr(
-            request_item,
-            "room",
-            None,
-        )
+        if isinstance(obj, ReturnRequest):
+            item = (
+                obj.items
+                .select_related("room")
+                .first()
+            )
+            return item.room if item else None
+
+        if isinstance(obj, ReturnRequestItem):
+            return obj.room
+
+        return None
 
     # =====================================================
     # Convenience Checks
