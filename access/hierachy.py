@@ -1,9 +1,9 @@
 """
 Site hierarchy configuration.
 
-Defines where each role may be assigned and
-which levels of the site hierarchy it may
-navigate.
+Defines where each role may be assigned,
+which levels of the site hierarchy it may navigate,
+and which roles it may govern.
 
 This configuration is intentionally separate
 from permissions.
@@ -12,6 +12,9 @@ Permissions determine WHAT a role can do.
 
 Hierarchy determines WHERE within the site
 structure that role may operate.
+
+Governance determines WHICH roles this role
+may assign, update, or delete.
 """
 
 SITE = "site"
@@ -19,8 +22,10 @@ DEPARTMENT = "department"
 LOCATION = "location"
 ROOM = "room"
 
+MANAGES_ALL = "__all__"
 
-ROLE_HIERARCHY = {
+
+ROLE_HIERARCHY_LIST = {
 
     # --------------------------------------------------
     # Site
@@ -35,6 +40,7 @@ ROLE_HIERARCHY = {
             LOCATION,
             ROOM,
         },
+        "manages": MANAGES_ALL,
     },
 
     # --------------------------------------------------
@@ -50,6 +56,13 @@ ROLE_HIERARCHY = {
             LOCATION,
             ROOM,
         },
+        "manages": {
+            "LOCATION_ADMIN",
+            "LOCATION_VIEWER",
+            "ROOM_ADMIN",
+            "ROOM_CLERK",
+            "ROOM_VIEWER",
+        },
     },
 
     "DEPARTMENT_VIEWER": {
@@ -61,6 +74,7 @@ ROLE_HIERARCHY = {
             LOCATION,
             ROOM,
         },
+        "manages": set(),
     },
 
     # --------------------------------------------------
@@ -75,6 +89,11 @@ ROLE_HIERARCHY = {
             LOCATION,
             ROOM,
         },
+        "manages": {
+            "ROOM_ADMIN",
+            "ROOM_CLERK",
+            "ROOM_VIEWER",
+        },
     },
 
     "LOCATION_VIEWER": {
@@ -85,6 +104,7 @@ ROLE_HIERARCHY = {
             LOCATION,
             ROOM,
         },
+        "manages": set(),
     },
 
     # --------------------------------------------------
@@ -98,6 +118,10 @@ ROLE_HIERARCHY = {
         "access": {
             ROOM,
         },
+        "manages": {
+            "ROOM_CLERK",
+            "ROOM_VIEWER",
+        },
     },
 
     "ROOM_CLERK": {
@@ -107,6 +131,7 @@ ROLE_HIERARCHY = {
         "access": {
             ROOM,
         },
+        "manages": set(),
     },
 
     "ROOM_VIEWER": {
@@ -116,5 +141,6 @@ ROLE_HIERARCHY = {
         "access": {
             ROOM,
         },
+        "manages": set(),
     },
 }
