@@ -5,11 +5,9 @@ from access.services.scope import ScopeService, UserScopeService
 from access.permissions.base import RequiresPermission
 from inventory.access.services.access import AccessService
 from users.models.roles import RoleAssignment
-from .constants import ROLE_HIERARCHY
-from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role, is_user_in_scope
+
 from sites.models.sites import Room, Location, Department
 from rest_framework.exceptions import PermissionDenied
-
 
 
 class UserPermission(BasePermission):
@@ -61,64 +59,7 @@ class UserPermission(BasePermission):
 
         return False
 
-class RoleAssignmentPermission(
-    ScopedPermission,
-):
-    """
-    Role assignment authorization.
 
-    Permission checks are handled by AccessService
-    through ScopedPermission.
-
-    Scope checks determine whether the acting role
-    may view or interact with the target role
-    assignment's department/location/room scope.
-
-    Role governance (who may assign which roles)
-    remains delegated to RoleGovernanceService /
-    ensure_permission until the legacy hierarchy
-    migration is completed.
-    """
-
-    permission_map = {
-        "GET": "role_assignments.view",
-        "POST": "role_assignments.create",
-        "PUT": "role_assignments.update",
-        "PATCH": "role_assignments.update",
-        "DELETE": "role_assignments.delete",
-    }
-
-    def has_object_permission(
-        self,
-        request,
-        view,
-        obj,
-    ):
-        active_role = getattr(
-            request.user,
-            "active_role",
-            None,
-        )
-        active_role = getattr(
-        request.user,
-        "active_role",
-        None,
-    )
-
-        if not active_role:
-            return False
-
-        return (
-            self.has_permission(
-                request,
-                view,
-            )
-            and ScopeService.can_access_role_assignment(
-                active_role,
-                obj,
-            )
-        )
-    
 class UserPlacementPermission(
     ScopedPermission,
 ):
@@ -177,39 +118,6 @@ class UserPlacementPermission(
         )
     
 
-class FullUserCreatePermission(
-    RequiresPermission,
-):
-    required_permission = (
-        "users.full_create"
-    )
-        
-# class FullUserCreatePermission(BasePermission):
-#     """
-#     Permission for FullUserCreateView.
-
-#     Rules:
-#     - SITE_ADMIN: allowed
-#     - DEPARTMENT_ADMIN: allowed
-#     - LOCATION_ADMIN: denied
-#     - ROOM_ADMIN: denied
-#     - VIEWER / no role: denied
-#     """
-
-#     def has_permission(self, request, view):
-#         if not request.user.is_authenticated:
-#             return False
-
-#         active = getattr(request.user, "active_role", None)
-#         if not active:
-#             return False
-
-#         # Explicit allow-list (DO NOT use hierarchy here)
-#         return active.role in [
-#             "SITE_ADMIN",
-#             "DEPARTMENT_ADMIN",
-#         ]
-
 class AdminUpdateUserPermission(BasePermission):
     """
     Allows scoped admins to update user demographic info.
@@ -242,32 +150,6 @@ class AdminUpdateUserPermission(BasePermission):
 
         return is_user_in_scope(role, obj)
 
-class CanViewUserProfile(BasePermission):
-    """
-    Permission to view a user profile.
-    """
-
-    def has_permission(self, request, view):
-        """
-        """
-        return request.user and request.user.is_authenticated
-
-    def has_object_permission(self, request, view, obj):
-
-        requester = request.user
-        target_user = obj
-
-        if requester == target_user:
-            return True
-
-        active_role = getattr(requester, "active_role", None)
-        if not active_role:
-            return False
-
-        if active_role.role == "SITE_ADMIN":
-            return True
-
-        return is_user_in_scope(admin_role=active_role, target_user=target_user, )
 
 
 class UserProfilePermission( ScopedPermission, ):
