@@ -1,5 +1,5 @@
 
-from access.hierachy import DEPARTMENT, LOCATION, ROLE_HIERARCHY, ROOM, SITE
+from access.hierachy import DEPARTMENT, LOCATION, ROLE_HIERARCHY_LIST, ROOM, SITE
 from users.models.roles import RoleAssignment
 
 
@@ -34,7 +34,7 @@ class HierarchyService:
         if not role_assignment:
             return {}
 
-        return ROLE_HIERARCHY.get(
+        return ROLE_HIERARCHY_LIST.get(
             role_assignment.role,
             {},
         )
@@ -113,7 +113,7 @@ class HierarchyService:
         level: str,
     ) -> bool:
 
-        config = ROLE_HIERARCHY.get(
+        config = ROLE_HIERARCHY_LIST.get(
             role,
             {},
         )

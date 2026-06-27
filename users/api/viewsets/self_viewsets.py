@@ -63,33 +63,54 @@ class SelfAssetsOverviewView(APIView):
 
     def get(self, request):
 
-        equipment_qs = ( get_user_equipment_with_meta(request.user) .order_by("-assigned_at")[:10] )
+        equipment_base_qs = (
+            get_user_equipment_with_meta(request.user)
+            .order_by("-assigned_at")
+        )
 
-        accessories_qs = ( get_user_accessories_with_meta(request.user) .order_by("-assigned_at")[:10] )
+        accessories_base_qs = (
+            get_user_accessories_with_meta(request.user)
+            .order_by("-assigned_at")
+        )
 
-        consumables_qs = ( get_user_consumables_with_meta(request.user) .order_by("-assigned_at")[:10] )
-        equipment_data = SelfAssignedEquipmentSerializer( equipment_qs, many=True, ).data
+        consumables_base_qs = (
+            get_user_consumables_with_meta(request.user)
+            .order_by("-assigned_at")
+        )
 
-        accessories_data = SelfAccessoryAssignmentSerializer( accessories_qs, many=True, ).data
+        equipment_qs = equipment_base_qs[:10]
+        accessories_qs = accessories_base_qs[:10]
+        consumables_qs = consumables_base_qs[:10]
 
-        consumables_data = SelfConsumableIssueSerializer( consumables_qs, many=True, ).data
+        equipment_data = SelfAssignedEquipmentSerializer(
+            equipment_qs,
+            many=True,
+        ).data
+
+        accessories_data = SelfAccessoryAssignmentSerializer(
+            accessories_qs,
+            many=True,
+        ).data
+
+        consumables_data = SelfConsumableIssueSerializer(
+            consumables_qs,
+            many=True,
+        ).data
 
         return Response({
             "equipment": {
-                "count": equipment_qs.count(),
+                "count": equipment_base_qs.count(),
                 "results": equipment_data,
             },
-
             "accessories": {
-                "count": accessories_qs.count(),
+                "count": accessories_base_qs.count(),
                 "results": accessories_data,
             },
-
             "consumables": {
-                "count": consumables_qs.count(),
+                "count": consumables_base_qs.count(),
                 "results": consumables_data,
             },
-        })    
+        })   
 
 class SelfAssignedEquipmentViewSet(ListModelMixin, GenericViewSet):
     """

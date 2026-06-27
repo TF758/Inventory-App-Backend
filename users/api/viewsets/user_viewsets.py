@@ -309,9 +309,7 @@ class FullUserCreateView(AuditMixin,views.APIView):
 
     permission_classes = [ RequiresPermission ]
 
-    required_permission = (
-        "users.full_create"
-    )
+    required_permission = ( "users.full_create" )
 
     def post(self, request, *args, **kwargs):
         payload = request.data
@@ -353,38 +351,26 @@ class FullUserCreateView(AuditMixin,views.APIView):
 
                 user_location_instance = ul_serializer.save()
 
-            # 3️⃣ Assign Role (permission enforced here)
-            role_name = role_data.get("role")
-
-            def resolve(model, public_id):
-                if not public_id:
-                    return None
-                return model.objects.get(public_id=public_id)
-
-            department = resolve(Department, role_data.get("department"))
-            location = resolve(Location, role_data.get("location"))
-            room = resolve(Room, role_data.get("room"))
-
-            # Normalize scope based on role level
-            if role_name.startswith("ROOM_"):
-                department = None
-                location = None
-            elif role_name.startswith("LOCATION_"):
-                department = None
-                room = None
-            elif role_name.startswith("DEPARTMENT_"):
-                location = None
-                room = None
-
-            temp_role = RoleAssignment(
-                user=user,
-                role=role_name,
-                department=department,
-                location=location,
-                room=room,
+           # 3️⃣ Assign Role
+            role_serializer = RoleWriteSerializer(
+                data={
+                    "user": user.public_id,
+                    "role": role_data.get("role"),
+                    "department": role_data.get("department"),
+                    "location": role_data.get("location"),
+                    "room": role_data.get("room"),
+                },
+                context={
+                    "request": request,
+                },
             )
 
-            
+            role_serializer.is_valid(
+                raise_exception=True,
+            )
+
+            role_validated_data = role_serializer.validated_data
+
             active_role = getattr(
                 request.user,
                 "active_role",
@@ -393,26 +379,15 @@ class FullUserCreateView(AuditMixin,views.APIView):
 
             if not RoleGovernanceService.can_assign(
                 active_role,
-                role_name,
-                room=room,
-                location=location,
-                department=department,
+                role_validated_data["role"],
+                room=role_validated_data.get("room"),
+                location=role_validated_data.get("location"),
+                department=role_validated_data.get("department"),
             ):
                 raise PermissionDenied(
                     "You do not have permission to assign this role."
                 )
 
-            role_serializer = RoleWriteSerializer(
-                data={
-                    "user": user.public_id,
-                    "role": role_name,
-                    "department": department.public_id if department else None,
-                    "location": location.public_id if location else None,
-                    "room": room.public_id if room else None,
-                },
-                context={"request": request},
-            )
-            role_serializer.is_valid(raise_exception=True)
             role_assignment = role_serializer.save()
 
         return Response(
