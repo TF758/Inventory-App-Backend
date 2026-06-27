@@ -6,23 +6,23 @@ from access.permissions.base import (
 class ScopedPermission(RequiresPermission):
     permission_map = {}
 
-    def get_required_permission(
+    def get_required_permissions(
         self,
         request,
         view,
     ):
-        return self.permission_map.get(
+        permission = self.permission_map.get(
             request.method
         )
 
-    def has_permission(self, request, view):
-        required_permission = self.get_required_permission(
-            request,
-            view,
-        )
+        if isinstance(permission, (list, tuple, set)):
+            return list(permission)
 
-        result = super().has_permission(
+
+        if permission:
+            return [permission]
+
+        return super().get_required_permissions(
             request,
             view,
         )
-        return result
