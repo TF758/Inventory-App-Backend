@@ -20,18 +20,19 @@ from assets.api.serializers.accessories import AccessoryFullSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from access.permissions.base import RequiresPermission
+from access.permissions.sites import DepartmentContextPermission, DepartmentPermission
 from sites.site_filters import AreaUserFilter, DepartmentFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer
 from sites.models.sites import Department, Location, Room, UserPlacement
-from sites.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
 from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
 from sites.api.serializers.rooms import RoomSerializer
 
 class DepartmentDashboardView(AreaDashboardMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [DepartmentContextPermission]
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -69,7 +70,10 @@ class DepartmentViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
 
 class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = UserAreaSerializer
-    permission_classes = [UserPermission]
+
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "users.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["user__email"]
@@ -103,7 +107,10 @@ class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
 
 class DepartmentLocationsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
     serializer_class = DepartmentLocationsLightSerializer
-    permission_classes = [LocationPermission]
+
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "locations.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -126,10 +133,14 @@ class DepartmentLocationsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFi
         return qs
 
 class DepartmentEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ReadOnlyModelViewSet, ):
+
     """Retrieves a list of equipment in a given department"""
     serializer_class = EquipmentSerializer
     lookup_field = "public_id"
-    permission_classes = [AssetPermission]
+
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "assets.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -156,7 +167,10 @@ class DepartmentEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFi
         return super().get_serializer(*args, **kwargs)
 
 class DepartmentEquipmentDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "assets.view"]
 
     def get(self, request, public_id):
 
@@ -216,7 +230,9 @@ class DepartmentConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, Exclude
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = "public_id"
 
-    permission_classes = [AssetPermission]
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "assets.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -242,7 +258,10 @@ class DepartmentConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, Exclude
         return super().get_serializer(*args, **kwargs)
     
 class DepartmentConsumableDashboardView( ConsumableDashboardMixin, APIView):
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "assets.view"]
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -261,7 +280,9 @@ class DepartmentAccessoriesViewSet(LightEndpointMixin, ScopeFilterMixin, Exclude
     serializer_class = AccessoryFullSerializer
     lookup_field = "public_id"
 
-    permission_classes = [AssetPermission]
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "assets.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -290,7 +311,10 @@ class DepartmentAccessoriesViewSet(LightEndpointMixin, ScopeFilterMixin, Exclude
     
 
 class DepartmentAccessoryDashboardView( AccessoryDashboardMixin, APIView ):
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "assets.view"]
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -338,14 +362,16 @@ class DepartmentComponentsViewSet(ScopeFilterMixin, ExcludeFiltersMixin, viewset
     
 class DepartmentRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyModelViewSet):
     """
-    Retrieves a list of users and their roles in a given department
+    Retrieves a list of users and their roles assignments in a given department
     """
 
     queryset = RoleAssignment.objects.all()
     serializer_class = RoleReadSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RoleAssignmentPermission]
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "role_assignments.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -373,7 +399,9 @@ class DepartmentRoomsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
     serializer_class = RoomSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RoomPermission]
+    permission_classes = [DepartmentContextPermission, RequiresPermission]
+
+    required_permission = [ "rooms.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -430,7 +458,7 @@ class DepartmentOverviewAssetsView(APIView):
     Intended for overview/dashboard UI usage only.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [DepartmentContextPermission]
 
     light_limit = 20
 
