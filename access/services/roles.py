@@ -1,7 +1,18 @@
 from access.services.scope import ScopeService
+from access.services.hierachy import HierarchyService
 
 
 class RoleGovernanceService:
+    """
+    Governs role assignment and management.
+
+    Responsibilities
+    ----------------
+    - Which roles an actor may assign/manage.
+    - Whether the assignment scope is valid.
+    - Delegates hierarchy validation to HierarchyService.
+    """
+
     ASSIGNABLE_ROLES = {
         "ROOM_ADMIN": {
             "ROOM_CLERK",
@@ -22,6 +33,10 @@ class RoleGovernanceService:
         "SITE_ADMIN": "__all__",
     }
 
+    # =====================================================
+    # Role Governance
+    # =====================================================
+
     @classmethod
     def can_assign_role(
         cls,
@@ -32,7 +47,7 @@ class RoleGovernanceService:
             return False
 
         allowed = cls.ASSIGNABLE_ROLES.get(
-            actor_role.role
+            actor_role.role,
         )
 
         if allowed == "__all__":
@@ -42,6 +57,10 @@ class RoleGovernanceService:
             return False
 
         return target_role in allowed
+
+    # =====================================================
+    # Scope Validation
+    # =====================================================
 
     @staticmethod
     def can_assign_scope(
@@ -54,34 +73,51 @@ class RoleGovernanceService:
         if not actor_role:
             return False
 
-        if actor_role.role == "SITE_ADMIN":
-            return True
-
         if room:
+
+            if not HierarchyService.can_assign_to_room(
+                actor_role.role,
+            ):
+                return False
+
             return ScopeService.can_access_room(
                 actor_role,
                 room,
             )
 
         if location:
+
+            if not HierarchyService.can_assign_to_location(
+                actor_role.role,
+            ):
+                return False
+
             return (
-                actor_role.role in {
-                    "LOCATION_ADMIN",
-                    "DEPARTMENT_ADMIN",
-                }
-                and (
-                    actor_role.location_id == location.id
-                    or actor_role.department_id == location.department_id
+                actor_role.role == "SITE_ADMIN"
+                or (
+                    actor_role.department_id
+                    == location.department_id
                 )
             )
 
         if department:
+
+            if not HierarchyService.can_assign_to_department(
+                actor_role.role,
+            ):
+                return False
+
             return (
-                actor_role.role == "DEPARTMENT_ADMIN"
-                and actor_role.department_id == department.id
+                actor_role.role == "SITE_ADMIN"
+                or actor_role.department_id
+                == department.id
             )
 
         return False
+
+    # =====================================================
+    # Combined Checks
+    # =====================================================
 
     @classmethod
     def can_assign(
@@ -105,7 +141,7 @@ class RoleGovernanceService:
                 department=department,
             )
         )
-    
+
     @classmethod
     def can_manage_assignment(
         cls,
@@ -115,20 +151,15 @@ class RoleGovernanceService:
         if not actor_role:
             return False
 
-        if actor_role.role == "SITE_ADMIN":
-            return True
-
-        # Cannot manage own active role assignment
-        # Optional business rule
-        # if assignment.pk == actor_role.pk:
-        #     return False
-
-        return cls.can_assign_role(
-            actor_role,
-            assignment.role,
-        ) and cls.can_assign_scope(
-            actor_role,
-            room=assignment.room,
-            location=assignment.location,
-            department=assignment.department,
+        return (
+            cls.can_assign_role(
+                actor_role,
+                assignment.role,
+            )
+            and cls.can_assign_scope(
+                actor_role,
+                room=assignment.room,
+                location=assignment.location,
+                department=assignment.department,
+            )
         )
