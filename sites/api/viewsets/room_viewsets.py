@@ -1,9 +1,7 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-
-from core.permissions.assets import AssetPermission, AssignmentPermission
-from core.permissions.users import RoleAssignmentPermission, UserPermission
+from core.permissions.assets import AssetPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -87,7 +85,7 @@ class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin
     serializer_class = UserAreaSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RoomContextPermission. RequiresPermission]
+    permission_classes = [RoomContextPermission, RequiresPermission]
 
     required_permission = [ "users.view"]
 

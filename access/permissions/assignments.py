@@ -1,7 +1,7 @@
 
 
-from inventory.access.permissions.scoped import ScopedPermission
-from inventory.access.services.scope import ScopeService
+from access.permissions.scoped import ScopedPermission
+from access.services.scope import ScopeService
 
 
 class AssignmentPermission(ScopedPermission):

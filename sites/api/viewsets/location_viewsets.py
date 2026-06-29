@@ -1,6 +1,5 @@
 from rest_framework import viewsets
 from assets.models.assets import Equipment, Consumable, Accessory, Component, EquipmentStatus
-from core.permissions.users import RoleAssignmentPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -9,6 +8,7 @@ from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
 from access.permissions.base import RequiresPermission
 from access.permissions.sites import LocationContextPermission, LocationPermission
+from access.permissions.assets import AssetPermission
 from sites.api.serializers.rooms import RoomReadSerializer
 from sites.site_filters import AreaUserFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
@@ -31,7 +31,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
-from core.permissions.assets import AssetPermission, AssignmentPermission, HasAssignmentScopePermission
+
 
 class LocationDashboardView(AreaDashboardMixin, APIView):
 

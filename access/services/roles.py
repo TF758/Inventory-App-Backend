@@ -1,7 +1,7 @@
 
 from access.services.scope import ScopeService
 from access.services.hierachy import HierarchyService
-from inventory.access.hierachy import MANAGES_ALL, ROLE_HIERARCHY_LIST
+from access.hierachy import MANAGES_ALL, ROLE_HIERARCHY_LIST
 
 
 class RoleGovernanceService:

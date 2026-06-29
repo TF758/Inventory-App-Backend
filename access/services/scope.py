@@ -44,7 +44,6 @@ class ScopeService:
                 and room.location.department_id
                 == role_assignment.department_id
             )
-            print( "DEPARTMENT CHECK", room.location.department_id, role_assignment.department_id, result )
             return (
                 room.location
                 and room.location.department_id
@@ -231,6 +230,9 @@ class ScopeService:
         Determine whether a role assignment falls
         within the actor's scope.
         """
+
+        if not role_assignment or not assignment:
+            return False
 
         if assignment.room:
             return ScopeService.can_access_room(

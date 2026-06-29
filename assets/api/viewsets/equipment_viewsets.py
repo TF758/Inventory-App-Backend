@@ -3,7 +3,7 @@ from rest_framework.serializers import ValidationError
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-from core.mixins import ScopeFilterMixin,EquipmentBatchMixin, AuditMixin
+from core.mixins import ScopeFilterMixin,AuditMixin
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework.response import Response
 from rest_framework import status
@@ -16,7 +16,6 @@ from django.db import transaction
 from core.utils.asset_helpers import equipment_event_from_status
 from core.utils.audit import create_audit_log
 from django.utils import timezone
-from core.permissions.assets import CanManageAssetCustody, CanUpdateEquipmentStatus
 from core.serializers.batch_processes import BatchAssignEquipmentSerializer, BatchEquipmentCondemnSerializer, BatchEquipmentHardDeleteSerializer, BatchEquipmentPublicIDsSerializer, BatchEquipmentSoftDeleteSerializer, BatchEquipmentStatusChangeSerializer
 from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from assets.models.assets import Equipment, EquipmentStatus
@@ -71,24 +70,11 @@ class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet)
 
         return qs
     
-def perform_create(self, serializer):
-        room_id = self.request.data.get("room")
-        if not room_id:
-            raise PermissionDenied("You must specify a room to create equipment.")
-        
-        room = Room.objects.filter(pk=room_id).first()
-        if not room:
-            raise PermissionDenied("Invalid room ID.")
-
-        active_role = getattr(self.request.user, "active_role", None)
-        if not active_role:
-            raise PermissionDenied("No active role assigned.")
-
-        # Permission check for POST creation scope
-        if active_role.role != "SITE_ADMIN" and not is_in_scope(active_role, room=room):
-            raise PermissionDenied("You do not have permission to create equipment in this room.")
-
-        serializer.save(room=room)
+    def perform_create(
+        self,
+        serializer,
+    ):
+        serializer.save()
 
 
 class EquipmentStatusChangeView(APIView):

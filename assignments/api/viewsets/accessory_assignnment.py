@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from core.mixins import AuditMixin, NotificationMixin
-from core.permissions.assets import AssignmentPermission, CanManageAssetCustody, CanSelfReturnAsset, CanUseAsset
+
 from rest_framework import viewsets, filters
 from rest_framework.generics import GenericAPIView
 from core.pagination import FlexiblePagination
@@ -21,6 +21,7 @@ from assets.api.serializers.accessories import AccessoryDistributionSerializer, 
 from access.permissions.base import RequiresPermission
 from access.services.asset import AssetUsageService
 from access.services.assignments import SelfReturnService
+from access.permissions.assignments import AssignmentPermission
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):

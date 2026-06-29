@@ -8,7 +8,6 @@ from core.mixins import AuditMixin, NotificationMixin
 from assignments.models.asset_assignment import ConsumableEvent, ConsumableIssue
 from assets.models.assets import Consumable
 from core.models.audit import AuditLog
-from core.permissions.assets import AssignmentPermission, CanManageAssetCustody, CanReportConsumableLoss, CanUseAsset
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets, filters
@@ -20,6 +19,8 @@ from django.http import Http404
 from assignments.api.serializers.assignment import ConsumableDistributionSerializer, ConsumableEventSerializer, IssueConsumableSerializer, ReportConsumableLossSerializer, RestockConsumableSerializer, ReturnConsumableSerializer, UseConsumableSerializer
 from access.permissions.base import RequiresPermission
 from access.services.asset import AssetUsageService
+from access.permissions.assignments import AssignmentPermission
+from core.permissions.assets import CanReportConsumableLoss
 
 class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """

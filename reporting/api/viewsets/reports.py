@@ -71,7 +71,7 @@ class MyReportJobViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixi
     """
 
     serializer_class = ReportJobSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ReportJobFilter

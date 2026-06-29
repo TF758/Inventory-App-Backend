@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from core.pagination import FlexiblePagination
-from core.mixins import ConsumableBatchMixin, AuditMixin, ScopeFilterMixin
+from core.mixins import AuditMixin, ScopeFilterMixin
 from core.permissions import AssetPermission, is_in_scope
 from django.utils import timezone
 from django.shortcuts import get_object_or_404

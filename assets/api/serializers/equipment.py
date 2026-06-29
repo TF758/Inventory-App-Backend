@@ -124,6 +124,7 @@ class EquipmentBatchtWriteSerializer(serializers.ModelSerializer):
             instance.room = room_obj
             instance.save(update_fields=["room"])
         return instance
+    
 class EquipmentWriteSerializer(serializers.ModelSerializer):
 
     room = serializers.SlugRelatedField(

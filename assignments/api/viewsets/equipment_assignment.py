@@ -8,7 +8,6 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from core.mixins import AuditMixin, NotificationMixin
-from core.permissions.assets import AssignmentPermission, CanManageAssetCustody, CanViewEquipmentAssignments
 from core.permissions.helpers import can_assign_asset_to_user, get_active_role
 from rest_framework import mixins, viewsets, filters
 
@@ -18,6 +17,7 @@ from assignments.api.serializers.assignment import AssignEquipmentSerializer, Eq
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from assignments.assignment_filters import EquipmentAssignmentFilter
 from access.permissions.base import RequiresPermission
+from access.permissions.assignments import AssignmentPermission
 
 class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet, ):
     """

@@ -8,7 +8,7 @@ from sites.models.sites import Department, Location, Room
 
 
 
-class RoomPermission( ScopedPermission, ):
+class RoomPermission( ScopedPermission):
 
     permission_map = {
         "GET": "rooms.view",
