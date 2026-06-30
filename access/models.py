@@ -4,47 +4,33 @@ from users.models.roles import RoleAssignment
 
 
 class Permission(models.Model):
-    domain = models.CharField(
-        max_length=100,
-        db_index=True,
-    )
+    domain = models.CharField( max_length=100, db_index=True )
 
-    code = models.CharField(
-        max_length=100,
-        unique=True,
-        db_index=True,
-    )
+    code = models.CharField( max_length=100, unique=True, db_index=True)
 
-    name = models.CharField(
-        max_length=255,
-    )
+    name = models.CharField( max_length=255)
 
-    scope_type = models.CharField(
-        max_length=50,
-        blank=True,
-    )
+    scope_type = models.CharField( max_length=50, blank=True)
 
-    description = models.TextField(
-        blank=True,
-    )
+    description = models.TextField( blank=True )
 
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-    )
+    sort_order = models.PositiveIntegerField( default=0, db_index=True )
 
-    updated_at = models.DateTimeField(
-        auto_now=True,
-    )
+    is_configurable = models.BooleanField( default=True, db_index=True)
+
+    created_at = models.DateTimeField( auto_now_add=True )
+
+    updated_at = models.DateTimeField( auto_now=True )
 
     class Meta:
         ordering = [
+            "sort_order",
             "domain",
             "code",
         ]
 
     def __str__(self):
         return self.code
-
 
 class RolePermission(models.Model):
     role = models.CharField(

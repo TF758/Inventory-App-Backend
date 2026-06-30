@@ -6,27 +6,32 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from access.models import Permission
-from access.models import RolePermission
+from access.models import (
+    Permission,
+    RolePermission,
+)
+from users.models.roles import RoleAssignment
 
 
 ROLE_COLUMNS = [
-    "ROOM_VIEWER",
-    "ROOM_CLERK",
-    "ROOM_ADMIN",
-    "LOCATION_VIEWER",
-    "LOCATION_ADMIN",
-    "DEPARTMENT_VIEWER",
-    "DEPARTMENT_ADMIN",
-    "SITE_ADMIN",
+    role
+    for role, _ in RoleAssignment.ROLE_CHOICES
+    if role != "SITE_ADMIN"
 ]
+
+
+TRUE_VALUES = {
+    "1",
+    "TRUE",
+    "Y",
+    "YES",
+}
 
 
 class Command(BaseCommand):
     help = "Seed role permission mappings from permissions.xlsx"
 
     def handle(self, *args, **kwargs):
-
         file_path = (
             Path(settings.BASE_DIR)
             / "permissions.xlsx"
@@ -45,16 +50,34 @@ class Command(BaseCommand):
             sheet_name="Sheet1",
         )
 
+        required_columns = [
+            "Permission",
+            *ROLE_COLUMNS,
+        ]
+
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in df.columns
+        ]
+
+        if missing_columns:
+            self.stdout.write(
+                self.style.ERROR(
+                    "Sheet1 is missing required columns: "
+                    + ", ".join(missing_columns)
+                )
+            )
+            return
+
         created = 0
+        skipped_unknown = 0
+        skipped_non_configurable = 0
 
         with transaction.atomic():
-
-            # ---------------------------------
-            # Reset mappings
-            # ---------------------------------
-
             deleted_count, _ = (
-                RolePermission.objects.all()
+                RolePermission.objects
+                .all()
                 .delete()
             )
 
@@ -62,13 +85,13 @@ class Command(BaseCommand):
                 f"Removed {deleted_count} existing role permissions"
             )
 
-            # ---------------------------------
-            # Rebuild mappings
-            # ---------------------------------
-
             for _, row in df.iterrows():
+                permission_code = str(
+                    row["Permission"]
+                ).strip()
 
-                permission_code = row["Permission"]
+                if not permission_code:
+                    continue
 
                 try:
                     permission = Permission.objects.get(
@@ -76,32 +99,38 @@ class Command(BaseCommand):
                     )
 
                 except Permission.DoesNotExist:
+                    skipped_unknown += 1
 
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Permission not found: "
-                            f"{permission_code}"
+                            f"Permission not found: {permission_code}"
+                        )
+                    )
+
+                    continue
+
+                if not permission.is_configurable:
+                    skipped_non_configurable += 1
+
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "Skipping non-configurable permission "
+                            f"from Sheet1: {permission_code}"
                         )
                     )
 
                     continue
 
                 for role in ROLE_COLUMNS:
-
-                    value = row.get(role)
+                    value = row[role]
 
                     if pd.isna(value):
-                        continue
-
-                    allowed = str(value).strip() in [
-                        "1",
-                        "TRUE",
-                        "True",
-                        "true",
-                        "Y",
-                        "YES",
-                        "Yes",
-                    ]
+                        allowed = False
+                    else:
+                        allowed = (
+                            str(value).strip().upper()
+                            in TRUE_VALUES
+                        )
 
                     if not allowed:
                         continue
@@ -115,6 +144,9 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Created {created} role permissions"
+                "Role permissions seeded. "
+                f"Created={created}, "
+                f"Unknown={skipped_unknown}, "
+                f"NonConfigurable={skipped_non_configurable}"
             )
         )
