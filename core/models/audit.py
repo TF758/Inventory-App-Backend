@@ -143,6 +143,9 @@ class AuditLog(PublicIDModel):
 
         AGREEMENT_COVERAGE_EXPIRED = ( "agreement_coverage_expired" )
 
+        PERMISSION_MATRIX_UPDATED = "permission_matrix_updated"
+        PERMISSION_MATRIX_SESSIONS_REVOKED = "permission_matrix_sessions_revoked"
+
 
         NOISE_EVENTS = [
             LOGIN,
