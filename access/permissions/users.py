@@ -3,7 +3,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from access.permissions.scoped import ScopedPermission
 from access.services.scope import ScopeService, UserScopeService
 from access.permissions.base import RequiresPermission
-from inventory.access.services.access import AccessService
+from access.services.access import AccessService
 from users.models.roles import RoleAssignment
 
 from sites.models.sites import Room, Location, Department
@@ -152,7 +152,7 @@ class AdminUpdateUserPermission(BasePermission):
 
 
 
-class UserProfilePermission( ScopedPermission, ):
+class UserProfilePermission( ScopedPermission):
 
     permission_map = {
         "GET": "users.view",

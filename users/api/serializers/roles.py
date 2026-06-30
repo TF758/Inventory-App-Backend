@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from access.services.roles import RoleGovernanceService
-from inventory.access.hierachy import DEPARTMENT, LOCATION, ROOM, SITE
-from inventory.access.services.hierachy import HierarchyService
+from access.hierachy import DEPARTMENT, LOCATION, ROOM, SITE
+from access.services.hierachy import HierarchyService
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, Room

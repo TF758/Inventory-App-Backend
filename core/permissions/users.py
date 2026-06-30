@@ -3,12 +3,10 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from access.permissions.scoped import ScopedPermission
 from access.services.scope import ScopeService, UserScopeService
 from access.permissions.base import RequiresPermission
-from inventory.access.services.access import AccessService
+from access.services.access import AccessService
+from core.permissions.helpers import is_user_in_scope
 from users.models.roles import RoleAssignment
 from .constants import ROLE_HIERARCHY
-from .helpers import is_admin_role, is_in_scope, has_hierarchy_permission, ensure_permission, get_active_role, is_viewer_role, is_user_in_scope
-from sites.models.sites import Room, Location, Department
-from rest_framework.exceptions import PermissionDenied
 
 
 
