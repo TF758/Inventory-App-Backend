@@ -10,4 +10,5 @@ urlpatterns = [
         PermissionMatrixView.as_view(),
         name="permission-matrix",
     ),
+
 ]

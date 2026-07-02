@@ -1,7 +1,7 @@
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
-
+from rest_framework.permissions import IsAuthenticated
 from access.permissions.site_admin import IsActiveSiteAdmin
 from access.serialziers import PermissionMatrixUpdateSerializer
 from access.services.permissions import (
@@ -14,6 +14,7 @@ from core.mixins import (
 )
 from core.models.audit import AuditLog
 from core.models.notifications import Notification
+from access.services.runtime_permissions import RuntimePermissionService
 
 
 class PermissionMatrixView( AuditMixin, NotificationMixin, APIView ):
@@ -30,7 +31,7 @@ class PermissionMatrixView( AuditMixin, NotificationMixin, APIView ):
         serializer = PermissionMatrixUpdateSerializer( data=request.data)
 
         serializer.is_valid( raise_exception=True)
-        
+
         current_session_id = None
 
         if getattr(request, "auth", None):
@@ -102,4 +103,24 @@ class PermissionMatrixView( AuditMixin, NotificationMixin, APIView ):
 
         return Response(
             matrix,
+        )
+
+class SelfPermissionsView(APIView):
+    """
+    Return runtime permission codes for the authenticated user's
+    currently active role.
+
+    This endpoint is for frontend runtime UI gating only.
+    It must not expose or depend on the editable permission matrix payload.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request):
+        return Response(
+            RuntimePermissionService.get_for_user(
+                request.user,
+            )
         )

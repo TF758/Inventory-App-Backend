@@ -2,17 +2,24 @@ from django.urls import path
 
 from assignments.api.viewsets.consumable_assignment import UseConsumableView
 from assignments.api.viewsets import asset_returns_viewset
+from access.views import SelfPermissionsView
 from users.api.viewsets import self_viewsets
 from users.api.viewsets.userprofile_viewsets import UserProfileViewSet
 
 urlpatterns = [
 
-    # Todo - Thessse routes were previously me/* now they parent route is self/*, 
-    #update frontend url accordingly
+
 
     # User Viewing thier own profile and assets
 
     path( "", self_viewsets.SelfUserProfileViewSet.as_view({"get": "retrieve"}), name="self-user-profile" ),
+    
+        path(
+        "permissions/",
+        SelfPermissionsView.as_view(),
+        name="self-permissions",
+    ),
+
     path( "assets-overview/", self_viewsets.SelfAssetsOverviewView.as_view(), name="self-assets-overview", ),
     path( "assets/", self_viewsets.SelfAllAssetsViewSet.as_view({"get": "list"}), name="self-user-assets", ),
 
