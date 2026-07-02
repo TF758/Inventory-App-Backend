@@ -126,7 +126,7 @@ class UserConsumableIssueViewSet(mixins.ListModelMixin, viewsets.GenericViewSet)
 class UserAssetStatusView(APIView):
 
     permission_classes = [ RequiresPermission]
-    required_permission = "users.view"
+    required_permission = "users.manage"
 
     def get( self, request, user_public_id, ):
         user = get_object_or_404(

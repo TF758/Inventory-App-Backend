@@ -81,7 +81,7 @@ class EquipmentStatusChangeView(APIView):
     """Dedicated view to update equipment status"""
 
     permission_classes = [ RequiresPermission]
-    required_permission = "assets.change_status"
+    required_permission = "assets.update_status"
 
     def patch(self, request, public_id):
         equipment = get_object_or_404(

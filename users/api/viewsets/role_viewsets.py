@@ -44,9 +44,7 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
     lookup_field = "public_id"
 
-    permission_classes = [
-        RoleAssignmentPermission,
-    ]
+    permission_classes = [ RoleAssignmentPermission ]
 
     filter_backends = [
         DjangoFilterBackend,

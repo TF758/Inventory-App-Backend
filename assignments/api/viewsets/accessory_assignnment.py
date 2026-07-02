@@ -30,7 +30,7 @@ class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     serializer_class = AccessoryEventSerializer
 
-    permission_classes = [AssignmentPermission]
+    permission_classes = [IsAuthenticated]
 
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]

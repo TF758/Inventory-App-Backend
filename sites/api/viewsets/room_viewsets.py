@@ -87,7 +87,7 @@ class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = [ "users.view"]
+    required_permission = "users.manage"
 
     filter_backends = [DjangoFilterBackend]
     filterset_class = AreaUserFilter
@@ -128,7 +128,7 @@ class RoomEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersM
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = ["assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -159,7 +159,7 @@ class RoomEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersM
 class RoomEquipmentDashboardView(APIView):
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = ["assets.view"]
+    required_permission = "assets.view"
 
     def get(self, request, public_id):
         # ---------------------------------------------
@@ -235,7 +235,7 @@ class RoomConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = ["assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -266,7 +266,7 @@ class RoomConsumableDashboardView( ConsumableDashboardMixin, APIView):
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = ["assets.view"]
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         room = get_object_or_404(Room, public_id=public_id)
@@ -318,7 +318,7 @@ class RoomAccessoryDashboardView( AccessoryDashboardMixin, APIView ):
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = ["assets.view"]
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -373,7 +373,7 @@ class RoomRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyMod
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = [ "role_assignments.view"]
+    required_permission = "role_assignments.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -403,7 +403,7 @@ class RoomEquipmentAssignmentViewSet(
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = ["assignments.view"]
+    required_permission = "assignments.view"
 
     def get_queryset(self):
         room_id = self.kwargs.get("public_id")

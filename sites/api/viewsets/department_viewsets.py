@@ -73,7 +73,7 @@ class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "users.view"]
+    required_permission = "users.manage"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["user__email"]
@@ -110,7 +110,7 @@ class DepartmentLocationsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFi
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "locations.view"]
+    required_permission = "locations.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -140,7 +140,7 @@ class DepartmentEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFi
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -170,7 +170,7 @@ class DepartmentEquipmentDashboardView(APIView):
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     def get(self, request, public_id):
 
@@ -232,7 +232,7 @@ class DepartmentConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, Exclude
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -261,7 +261,7 @@ class DepartmentConsumableDashboardView( ConsumableDashboardMixin, APIView):
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -282,7 +282,7 @@ class DepartmentAccessoriesViewSet(LightEndpointMixin, ScopeFilterMixin, Exclude
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -314,7 +314,7 @@ class DepartmentAccessoryDashboardView( AccessoryDashboardMixin, APIView ):
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -371,7 +371,7 @@ class DepartmentRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadO
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "role_assignments.view"]
+    required_permission =  "role_assignments.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -401,7 +401,7 @@ class DepartmentRoomsViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = [ "rooms.view"]
+    required_permission =  "rooms.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]

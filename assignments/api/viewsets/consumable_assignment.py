@@ -1,3 +1,4 @@
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
@@ -28,7 +29,7 @@ class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     serializer_class = ConsumableEventSerializer
 
-    permission_classes = [AssignmentPermission]
+    permission_classes = [IsAuthenticated]
     
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
@@ -441,7 +442,7 @@ class ConsumableDistributionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ConsumableDistributionSerializer
     pagination_class = FlexiblePagination
     
-    permission_classes = [AssignmentPermission]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         consumable_id = self.kwargs.get("public_id")

@@ -89,7 +89,7 @@ class LocationRoomsView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixi
 
     permission_classes = [LocationContextPermission, RequiresPermission]
 
-    required_permission = [ "rooms.view"]
+    required_permission = "rooms.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -113,7 +113,7 @@ class LocationUsersView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixi
     serializer_class = UserAreaSerializer
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "users.view"]
+    required_permission = "users.manage"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["user__email"]
@@ -152,7 +152,7 @@ class LocationEquipmentView(LightEndpointMixin, ScopeFilterMixin, ExcludeFilters
     lookup_field = "public_id"
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -180,7 +180,7 @@ class LocationEquipmentView(LightEndpointMixin, ScopeFilterMixin, ExcludeFilters
 class LocationEquipmentDashboardView(APIView):
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     def get(self, request, public_id):
 
@@ -240,7 +240,7 @@ class LocationConsumablesView(LightEndpointMixin, ScopeFilterMixin, ExcludeFilte
     lookup_field = "public_id"
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -268,7 +268,7 @@ class LocationConsumablesView(LightEndpointMixin, ScopeFilterMixin, ExcludeFilte
 class LocationConsumableDashboardView( ConsumableDashboardMixin, APIView):
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         location = get_object_or_404(Location, public_id=public_id)
@@ -290,7 +290,7 @@ class LocationAccessoriesView(LightEndpointMixin, ScopeFilterMixin, ExcludeFilte
     lookup_field = "public_id"
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -321,7 +321,7 @@ class LocationAccessoryDashboardView(
     APIView
 ):
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = [ "assets.view"]
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -384,7 +384,7 @@ class LocationRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnl
 
     permission_classes = [LocationContextPermission, RequiresPermission]
 
-    required_permission = [ "role_assignments.view"]
+    required_permission = "role_assignments.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -413,7 +413,7 @@ class LocationEquipmentAssignmentViewSet(
 
     permission_classes = [LocationContextPermission, RequiresPermission]
 
-    required_permission = [ "assignments.view"]
+    required_permission = "assignments.view"
 
     def get_queryset(self):
         location_id = self.kwargs.get("public_id")
