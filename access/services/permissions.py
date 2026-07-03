@@ -5,8 +5,9 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from access.models import  Permission, RolePermission
 from core.models.sessions import UserSession
+from access.role_permission_boundaries import is_permission_allowed_for_role
 from users.models.roles import RoleAssignment
-
+from rest_framework.exceptions import ValidationError
 
 class PermissionMatrixService:
     """
@@ -166,12 +167,61 @@ class PermissionMatrixService:
                 if not permission:
                     continue
 
+                role_items = item.get(
+                    "roles",
+                    [],
+                )
+
+                invalid_grants = []
+
+                for role_data in role_items:
+                    role = role_data.get(
+                        "role",
+                    )
+
+                    enabled = role_data.get(
+                        "enabled",
+                    )
+
+                    if not enabled:
+                        continue
+
+                    if role not in valid_roles:
+                        continue
+
+                    if not is_permission_allowed_for_role(
+                        role,
+                        permission.code,
+                    ):
+                        invalid_grants.append(
+                            {
+                                "role": role,
+                                "permission": permission.code,
+                            }
+                        )
+
+                if invalid_grants:
+                    if len(invalid_grants) == 1:
+                        invalid_grant = invalid_grants[0]
+
+                        raise ValidationError({
+                            "detail": (
+                                f"{invalid_grant['role']} cannot be granted "
+                                f"{invalid_grant['permission']}."
+                            ),
+                            "invalid_grants": invalid_grants,
+                        })
+
+                    raise ValidationError({
+                        "detail": (
+                            "One or more role-permission grants are not allowed."
+                        ),
+                        "invalid_grants": invalid_grants,
+                    })
+
                 requested_roles = {
                     role_data.get("role")
-                    for role_data in item.get(
-                        "roles",
-                        [],
-                    )
+                    for role_data in role_items
                     if (
                         role_data.get("enabled")
                         and role_data.get("role") in valid_roles
@@ -236,7 +286,6 @@ class PermissionMatrixService:
         }
 
         return matrix
-
 
 class PermissionMatrixSessionService:
     """

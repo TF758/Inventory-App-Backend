@@ -2,7 +2,6 @@ from access.permissions.scoped import ( ScopedPermission )
 from access.services.scope import ( ScopeService )
 from agreements.models.agreements import ( AssetAgreement, AssetAgreementItem )
 
-
 class AssetAgreementPermission(ScopedPermission):
     """
     Authorization for all agreement-related endpoints.
@@ -27,18 +26,29 @@ class AssetAgreementPermission(ScopedPermission):
         "terminate": "agreements.terminate",
     }
 
-    def get_required_permission( self, request, view ):
-        if view.action in self.CUSTOM_PERMISSION_MAP:
-            return self.CUSTOM_PERMISSION_MAP[
-                view.action
-            ]
+    def get_required_permissions(
+        self,
+        request,
+        view,
+    ):
+        permission = self.CUSTOM_PERMISSION_MAP.get(
+            getattr(view, "action", None),
+        )
 
-        return super().get_required_permission(
+        if permission:
+            return [permission]
+
+        return super().get_required_permissions(
             request,
             view,
         )
 
-    def has_object_permission( self, request, view, obj):
+    def has_object_permission(
+        self,
+        request,
+        view,
+        obj,
+    ):
         active_role = getattr(
             request.user,
             "active_role",
@@ -48,10 +58,16 @@ class AssetAgreementPermission(ScopedPermission):
         if not active_role:
             return False
 
-        if isinstance( obj, AssetAgreementItem):
+        if isinstance(
+            obj,
+            AssetAgreementItem,
+        ):
             agreement = obj.agreement
 
-        elif isinstance( obj, AssetAgreement):
+        elif isinstance(
+            obj,
+            AssetAgreement,
+        ):
             agreement = obj
 
         else:

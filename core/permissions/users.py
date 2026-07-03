@@ -1,4 +1,4 @@
-# myapp/permissions/users.py
+
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from access.permissions.scoped import ScopedPermission
 from access.services.scope import ScopeService, UserScopeService
@@ -58,33 +58,51 @@ class UserPermission(BasePermission):
             return user == obj
 
         return False
-
 class RoleAssignmentPermission(
     ScopedPermission,
 ):
     """
     Role assignment authorization.
 
-    Permission checks are handled by AccessService
-    through ScopedPermission.
+    Read behavior:
+    - GET/list/retrieve is not permission-code gated.
+    - Visibility is controlled by RoleAssignmentViewSet.get_queryset()
+      and object-level scope checks.
 
-    Scope checks determine whether the acting role
-    may view or interact with the target role
-    assignment's department/location/room scope.
-
-    Role governance (who may assign which roles)
-    remains delegated to RoleGovernanceService /
-    ensure_permission until the legacy hierarchy
-    migration is completed.
+    Write behavior:
+    - create/update/delete require permission codes.
+    - Target-role governance is handled by RoleGovernanceService
+      in the viewset.
+    - Target-scope coverage is checked through ScopeService.
     """
 
     permission_map = {
-        "GET": "role_assignments.view",
+        "create": "role_assignments.create",
+        "update": "role_assignments.update",
+        "partial_update": "role_assignments.update",
+        "destroy": "role_assignments.delete",
+
         "POST": "role_assignments.create",
         "PUT": "role_assignments.update",
         "PATCH": "role_assignments.update",
         "DELETE": "role_assignments.delete",
     }
+
+    def has_permission(
+        self,
+        request,
+        view,
+    ):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.method in SAFE_METHODS:
+            return True
+
+        return super().has_permission(
+            request,
+            view,
+        )
 
     def has_object_permission(
         self,
@@ -92,29 +110,36 @@ class RoleAssignmentPermission(
         view,
         obj,
     ):
+        user = request.user
+
         active_role = getattr(
-            request.user,
+            user,
             "active_role",
             None,
         )
-        active_role = getattr(
-        request.user,
-        "active_role",
-        None,
-    )
+
+        # Users may always see their own role assignments if the
+        # queryset/view path exposes them.
+        if request.method in SAFE_METHODS:
+            if obj.user_id == user.id:
+                return True
+
+            if not active_role:
+                return False
+
+            return ScopeService.can_access_role_assignment(
+                active_role,
+                obj,
+            )
 
         if not active_role:
             return False
 
-        return (
-            self.has_permission(
-                request,
-                view,
-            )
-            and ScopeService.can_access_role_assignment(
-                active_role,
-                obj,
-            )
+        # Write permission code was already checked by has_permission().
+        # This object-level check only verifies scope.
+        return ScopeService.can_access_role_assignment(
+            active_role,
+            obj,
         )
     
 class UserPlacementPermission(

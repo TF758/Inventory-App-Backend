@@ -10,7 +10,7 @@ from rest_framework.permissions import (
 
 from access.services.access import AccessService
 from core.permissions.helpers import is_in_scope
-from inventory.access.services.scope import ScopeService
+from access.services.scope import ScopeService
 
 
 

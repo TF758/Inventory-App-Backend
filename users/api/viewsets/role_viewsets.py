@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from access.services.roles import RoleGovernanceService
 from core.permissions.users import RoleAssignmentPermission
+from access.hierachy import MANAGES_ALL
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -26,6 +27,12 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
     """
     Handles listing, creating, retrieving, updating,
     and deleting RoleAssignment objects.
+
+    Authorization model:
+    - RoleAssignmentPermission checks permission capability.
+    - RoleGovernanceService checks target role governance.
+    - RoleGovernanceService checks target assignment scope.
+    - RoleAssignment model validates final scope shape.
     """
 
     base_queryset = (
@@ -44,7 +51,9 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
     lookup_field = "public_id"
 
-    permission_classes = [ RoleAssignmentPermission ]
+    permission_classes = [
+        RoleAssignmentPermission,
+    ]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -92,7 +101,7 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
         scoped = qs
 
-        if manageable_roles != "__all__":
+        if manageable_roles != MANAGES_ALL:
             scoped = scoped.filter(
                 role__in=manageable_roles,
             )
@@ -179,11 +188,6 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
         instance = serializer.instance
         data = serializer.validated_data
 
-        current_allowed = RoleGovernanceService.can_manage_assignment(
-            active_role,
-            instance,
-        )
-
         target_role = data.get(
             "role",
             instance.role,
@@ -204,15 +208,14 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             instance.department,
         )
 
-        target_allowed = RoleGovernanceService.can_assign(
+        if not RoleGovernanceService.can_update_assignment(
             active_role,
-            target_role,
+            instance,
+            new_role=target_role,
             room=target_room,
             location=target_location,
             department=target_department,
-        )
-
-        if not current_allowed or not target_allowed:
+        ):
             raise PermissionDenied(
                 "You may not modify this role assignment."
             )
@@ -236,7 +239,7 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             None,
         )
 
-        if not RoleGovernanceService.can_manage_assignment(
+        if not RoleGovernanceService.can_delete_assignment(
             active_role,
             instance,
         ):
@@ -245,7 +248,6 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             )
 
         instance.delete()
-
 
 # --- User Roles List (current user or any user by public_id) ---
 class UserRoleList(ListAPIView):

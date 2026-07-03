@@ -120,9 +120,45 @@ class ScopeService:
         return placement.room
 
     @staticmethod
-    def get_assignment_room(
-        assignment,
-    ):
+    def get_assignment_room( assignment, ):
+        """
+        Resolve the scope room for an assignment.
+
+        Prefer the asset/equipment custody room when present.
+        Fall back to the assigned user's current placement when
+        the assignment object does not expose equipment directly.
+
+        This fallback keeps generic assignment tests and lightweight
+        assignment-like objects working.
+        """
+
+        if not assignment:
+            return None
+
+        room = getattr(
+            assignment,
+            "room",
+            None,
+        )
+
+        if room:
+            return room
+
+        equipment = getattr(
+            assignment,
+            "equipment",
+            None,
+        )
+
+        if equipment:
+            equipment_room = getattr(
+                equipment,
+                "room",
+                None,
+            )
+
+            if equipment_room:
+                return equipment_room
 
         user = getattr(
             assignment,
@@ -130,13 +166,13 @@ class ScopeService:
             None,
         )
 
-        if not user:
-            return None
+        if user:
+            return ScopeService.get_user_room(
+                user,
+            )
 
-        return ScopeService.get_user_room(
-            user,
-        )
-
+        return None
+    
     @staticmethod
     def get_return_request_room(
         obj,
@@ -193,20 +229,6 @@ class ScopeService:
             room,
         )
 
-    @staticmethod
-    def can_access_assignment(
-        role_assignment,
-        assignment,
-    ):
-
-        room = ScopeService.get_assignment_room(
-            assignment,
-        )
-
-        return ScopeService.can_access_room(
-            role_assignment,
-            room,
-        )
 
     @staticmethod
     def can_access_return_request(
@@ -274,6 +296,152 @@ class ScopeService:
             role_assignment.role
             == "SITE_ADMIN"
         )
+    @staticmethod
+    def _identity(obj):
+        if not obj:
+            return None
+
+        return {
+            "pk": getattr(obj, "pk", None),
+            "id": getattr(obj, "id", None),
+            "public_id": getattr(obj, "public_id", None),
+            "name": getattr(obj, "name", None),
+            "label": str(obj),
+        }
+
+    @staticmethod
+    def check_access_assignment(
+        role_assignment,
+        assignment,
+    ):
+        """
+        Debuggable assignment scope check.
+
+        Returns a plain dict so PermissionDenied can safely serialize it.
+        """
+
+        if not role_assignment:
+            return {
+                "allowed": False,
+                "reason": "NO_ACTIVE_ROLE",
+                "assignment": ScopeService._identity(assignment),
+            }
+
+        if not assignment:
+            return {
+                "allowed": False,
+                "reason": "NO_ASSIGNMENT",
+                "active_role": {
+                    "role": getattr(role_assignment, "role", None),
+                    "public_id": getattr(role_assignment, "public_id", None),
+                    "department": ScopeService._identity(
+                        getattr(role_assignment, "department", None)
+                    ),
+                    "location": ScopeService._identity(
+                        getattr(role_assignment, "location", None)
+                    ),
+                    "room": ScopeService._identity(
+                        getattr(role_assignment, "room", None)
+                    ),
+                },
+            }
+
+        equipment = getattr(
+            assignment,
+            "equipment",
+            None,
+        )
+
+        user = getattr(
+            assignment,
+            "user",
+            None,
+        )
+
+        room = ScopeService.get_assignment_room(
+            assignment,
+        )
+
+        location = (
+            getattr(
+                room,
+                "location",
+                None,
+            )
+            if room
+            else None
+        )
+
+        department = (
+            getattr(
+                location,
+                "department",
+                None,
+            )
+            if location
+            else None
+        )
+
+        if not room:
+            return {
+                "allowed": False,
+                "reason": "ASSIGNMENT_HAS_NO_ROOM_SCOPE",
+                "assignment": ScopeService._identity(assignment),
+                "equipment": ScopeService._identity(equipment),
+                "user": ScopeService._identity(user),
+                "room": None,
+                "location": None,
+                "department": None,
+                "active_role": {
+                    "role": getattr(role_assignment, "role", None),
+                    "public_id": getattr(role_assignment, "public_id", None),
+                },
+            }
+
+        allowed = ScopeService.can_access_room(
+            role_assignment,
+            room,
+        )
+
+        return {
+            "allowed": allowed,
+            "reason": "IN_SCOPE" if allowed else "ROOM_OUT_OF_SCOPE",
+            "assignment": ScopeService._identity(assignment),
+            "equipment": ScopeService._identity(equipment),
+            "user": ScopeService._identity(user),
+            "room": ScopeService._identity(room),
+            "location": ScopeService._identity(location),
+            "department": ScopeService._identity(department),
+            "active_role": {
+                "role": getattr(role_assignment, "role", None),
+                "public_id": getattr(role_assignment, "public_id", None),
+                "department": ScopeService._identity(
+                    getattr(role_assignment, "department", None)
+                ),
+                "location": ScopeService._identity(
+                    getattr(role_assignment, "location", None)
+                ),
+                "room": ScopeService._identity(
+                    getattr(role_assignment, "room", None)
+                ),
+            },
+        }
+
+    @staticmethod
+    def can_access_assignment(
+        role_assignment,
+        assignment,
+    ):
+        """
+        Boolean wrapper kept for existing callers.
+        """
+
+        check = ScopeService.check_access_assignment(
+            role_assignment,
+            assignment,
+        )
+
+        return check["allowed"]
     
 class UserScopeService:
 

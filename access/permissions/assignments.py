@@ -2,9 +2,18 @@
 
 from access.permissions.scoped import ScopedPermission
 from access.services.scope import ScopeService
+from django.conf import settings
+from rest_framework.exceptions import PermissionDenied
 
+class AssignmentPermission(
+    ScopedPermission,
+):
+    """
+    Assignment authorization.
 
-class AssignmentPermission(ScopedPermission):
+    Permission capability is handled by ScopedPermission.
+    Object scope is delegated to ScopeService.
+    """
 
     permission_map = {
         "list": "assignments.view",
@@ -26,13 +35,13 @@ class AssignmentPermission(ScopedPermission):
         if not active_role:
             return False
 
-        return (
-            self.has_permission(
-                request,
-                view,
-            )
-            and ScopeService.can_access_assignment(
-                active_role,
-                obj,
-            )
+        if not self.has_permission(
+            request,
+            view,
+        ):
+            return False
+
+        return ScopeService.can_access_assignment(
+            active_role,
+            obj,
         )
