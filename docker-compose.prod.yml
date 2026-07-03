@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   api:
     build:
@@ -12,9 +18,17 @@ services:
     env_file:
       - .env.prod
 
+    environment:
+      SERVICE_NAME: api
+      LOG_TO_CONSOLE: "True"
+      LOG_TO_FILE: "False"
+
     depends_on:
       - db
       - redis
+
+    restart: unless-stopped
+    logging: *default-logging
 
   worker:
     build:
@@ -26,9 +40,17 @@ services:
     env_file:
       - .env.prod
 
+    environment:
+      SERVICE_NAME: worker
+      LOG_TO_CONSOLE: "True"
+      LOG_TO_FILE: "False"
+
     depends_on:
       - redis
       - api
+
+    restart: unless-stopped
+    logging: *default-logging
 
   beat:
     build:
@@ -40,19 +62,35 @@ services:
     env_file:
       - .env.prod
 
+    environment:
+      SERVICE_NAME: beat
+      LOG_TO_CONSOLE: "True"
+      LOG_TO_FILE: "False"
+
     depends_on:
       - redis
       - api
 
+    restart: unless-stopped
+    logging: *default-logging
+
   db:
     image: postgres:15
+
     env_file:
       - .env.prod
+
     volumes:
       - inventory_postgres_data:/var/lib/postgresql/data
 
+    restart: unless-stopped
+    logging: *default-logging
+
   redis:
     image: redis:7-alpine
+
+    restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   inventory_postgres_data:
