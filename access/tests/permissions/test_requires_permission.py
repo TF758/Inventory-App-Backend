@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 from unittest.mock import patch
-
+from rest_framework.exceptions import PermissionDenied
 from django.test import SimpleTestCase
 
 from access.permissions.base import RequiresPermission
@@ -130,7 +130,7 @@ class RequiresPermissionTests(SimpleTestCase):
     def test_get_required_permissions_uses_class_required_permissions_fallback(self):
         class TestPermission(RequiresPermission):
             required_permissions = [
-                "users.view",
+                "users.manage",
                 "users.update",
             ]
 
@@ -146,14 +146,14 @@ class RequiresPermissionTests(SimpleTestCase):
                 view,
             ),
             [
-                "users.view",
+                "users.manage",
                 "users.update",
             ],
         )
 
     def test_get_required_permissions_uses_class_required_permission_fallback(self):
         class TestPermission(RequiresPermission):
-            required_permission = "users.view"
+            required_permission = "users.manage"
 
         permission = TestPermission()
         request = self.make_request(
@@ -167,7 +167,7 @@ class RequiresPermissionTests(SimpleTestCase):
                 view,
             ),
             [
-                "users.view",
+                "users.manage",
             ],
         )
 
@@ -251,15 +251,26 @@ class RequiresPermissionTests(SimpleTestCase):
         )
         view = self.make_view()
 
-        self.assertFalse(
+        with self.assertRaises(PermissionDenied) as exc:
             permission.has_permission(
                 request,
                 view,
             )
+
+        self.assertEqual(
+            str(exc.exception.detail["detail"]),
+            "No permission requirement was configured for this endpoint.",
+        )
+        self.assertEqual(
+            exc.exception.detail["required_permissions"],
+            [],
+        )
+        self.assertEqual(
+            exc.exception.detail["missing_permissions"],
+            [],
         )
 
         mock_has_permission.assert_not_called()
-
     # ------------------------------------------------------------------
     # Single permission
     # ------------------------------------------------------------------
@@ -308,18 +319,29 @@ class RequiresPermissionTests(SimpleTestCase):
             required_permission="assets.create",
         )
 
-        self.assertFalse(
+        with self.assertRaises(PermissionDenied) as exc:
             permission.has_permission(
                 request,
                 view,
             )
+
+        self.assertEqual(
+            [str(value) for value in exc.exception.detail["required_permissions"]],
+            [
+                "assets.create",
+            ],
+        )
+        self.assertEqual(
+            [str(value) for value in exc.exception.detail["missing_permissions"]],
+            [
+                "assets.create",
+            ],
         )
 
         mock_has_permission.assert_called_once_with(
             user,
             "assets.create",
         )
-
     # ------------------------------------------------------------------
     # Multiple permissions
     # ------------------------------------------------------------------
@@ -380,11 +402,24 @@ class RequiresPermissionTests(SimpleTestCase):
             ],
         )
 
-        self.assertFalse(
+        with self.assertRaises(PermissionDenied) as exc:
             permission.has_permission(
                 request,
                 view,
             )
+
+        self.assertEqual(
+            [str(value) for value in exc.exception.detail["required_permissions"]],
+            [
+                "assets.view",
+                "assets.update",
+            ],
+        )
+        self.assertEqual(
+            [str(value) for value in exc.exception.detail["missing_permissions"]],
+            [
+                "assets.update",
+            ],
         )
 
         self.assertEqual(
@@ -396,7 +431,7 @@ class RequiresPermissionTests(SimpleTestCase):
         )
 
     @patch("access.services.access.AccessService.has_permission")
-    def test_has_permission_short_circuits_after_first_denied_permission(
+    def test_has_permission_collects_missing_permissions_without_short_circuiting(
         self,
         mock_has_permission,
     ):
@@ -417,14 +452,23 @@ class RequiresPermissionTests(SimpleTestCase):
             ],
         )
 
-        self.assertFalse(
+        with self.assertRaises(PermissionDenied) as exc:
             permission.has_permission(
                 request,
                 view,
             )
+
+        self.assertEqual(
+            [str(value) for value in exc.exception.detail["missing_permissions"]],
+            [
+                "assets.view",
+            ],
         )
 
-        mock_has_permission.assert_called_once_with(
-            user,
-            "assets.view",
+        self.assertEqual(
+            mock_has_permission.call_args_list,
+            [
+                ((user, "assets.view"),),
+                ((user, "assets.update"),),
+            ],
         )

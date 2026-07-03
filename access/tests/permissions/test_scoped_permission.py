@@ -1,5 +1,5 @@
 # access/tests/test_scoped_permission.py
-
+from rest_framework.exceptions import PermissionDenied
 from types import SimpleNamespace
 from unittest.mock import call, patch
 
@@ -352,11 +352,17 @@ class ScopedPermissionTests(SimpleTestCase):
         )
         view = self.make_view()
 
-        self.assertFalse(
+        with self.assertRaises(PermissionDenied) as exc:
             permission.has_permission(
                 request,
                 view,
             )
+
+        self.assertEqual(
+            [str(value) for value in exc.exception.detail["missing_permissions"]],
+            [
+                "assets.create",
+            ],
         )
 
         mock_has_permission.assert_called_once_with(
@@ -382,11 +388,15 @@ class ScopedPermissionTests(SimpleTestCase):
         )
         view = self.make_view()
 
-        self.assertFalse(
+        with self.assertRaises(PermissionDenied) as exc:
             permission.has_permission(
                 request,
                 view,
             )
+
+        self.assertEqual(
+            str(exc.exception.detail["detail"]),
+            "No permission requirement was configured for this endpoint.",
         )
 
         mock_has_permission.assert_not_called()

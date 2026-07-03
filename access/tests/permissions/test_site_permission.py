@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import patch
-
+from rest_framework.exceptions import PermissionDenied
 from django.test import SimpleTestCase
 
 from access.permissions.sites import DepartmentPermission, LocationPermission, RoomPermission
@@ -455,6 +455,17 @@ class LocationPermissionTests(SimpleTestCase):
             department_id=department_id,
             public_id=public_id,
         )
+    
+    def assert_location_permission_denied( self, callback, reason, ):
+        with self.assertRaises(PermissionDenied) as exc:
+            callback()
+
+        self.assertEqual(
+            str(exc.exception.detail["reason"]),
+            reason,
+        )
+
+        return exc
 
     # ------------------------------------------------------------------
     # Method map
@@ -487,7 +498,6 @@ class LocationPermissionTests(SimpleTestCase):
     # ------------------------------------------------------------------
     # POST creation validation
     # ------------------------------------------------------------------
-
     @patch("access.permissions.sites.HierarchyService.can_access_location")
     @patch("access.permissions.sites.Department.objects.filter")
     @patch("access.permissions.base.AccessService.has_permission")
@@ -510,11 +520,12 @@ class LocationPermissionTests(SimpleTestCase):
             data={},
         )
 
-        self.assertFalse(
-            permission.has_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_permission(
                 request,
                 self.make_view(),
-            )
+            ),
+            "MISSING_DEPARTMENT_FOR_LOCATION_CREATE",
         )
 
         mock_department_filter.assert_not_called()
@@ -545,11 +556,12 @@ class LocationPermissionTests(SimpleTestCase):
             },
         )
 
-        self.assertFalse(
-            permission.has_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_permission(
                 request,
                 self.make_view(),
-            )
+            ),
+            "TARGET_DEPARTMENT_NOT_FOUND",
         )
 
         mock_department_filter.assert_called_once_with(
@@ -579,11 +591,12 @@ class LocationPermissionTests(SimpleTestCase):
             },
         )
 
-        self.assertFalse(
-            permission.has_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_permission(
                 request,
                 self.make_view(),
-            )
+            ),
+            "NO_ACTIVE_ROLE",
         )
 
         mock_can_access_location.assert_not_called()
@@ -616,11 +629,12 @@ class LocationPermissionTests(SimpleTestCase):
             },
         )
 
-        self.assertFalse(
-            permission.has_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_permission(
                 request,
                 self.make_view(),
-            )
+            ),
+            "ROLE_CANNOT_ACCESS_LOCATION_LEVEL",
         )
 
         mock_can_access_location.assert_called_once_with(
@@ -728,13 +742,13 @@ class LocationPermissionTests(SimpleTestCase):
             },
         )
 
-        self.assertFalse(
-            permission.has_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_permission(
                 request,
                 self.make_view(),
-            )
+            ),
+            "CREATE_LOCATION_OUTSIDE_ACTIVE_ROLE_SCOPE",
         )
-
     # ------------------------------------------------------------------
     # Move business rule
     # ------------------------------------------------------------------
@@ -775,12 +789,14 @@ class LocationPermissionTests(SimpleTestCase):
                 location,
             )
         )
-        self.assertFalse(
-            permission.has_object_permission(
+
+        self.assert_location_permission_denied(
+            lambda: permission.has_object_permission(
                 department_request,
                 self.make_view(),
                 location,
-            )
+            ),
+            "ONLY_SITE_ADMIN_CAN_TRANSFER_LOCATION",
         )
 
         mock_can_access_location.assert_not_called()
@@ -810,12 +826,13 @@ class LocationPermissionTests(SimpleTestCase):
             department_id=1,
         )
 
-        self.assertFalse(
-            permission.has_object_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_object_permission(
                 request,
                 self.make_view(),
                 location,
-            )
+            ),
+            "ROLE_CANNOT_ACCESS_LOCATION_LEVEL",
         )
 
         mock_can_access_location.assert_called_once_with(
@@ -900,12 +917,13 @@ class LocationPermissionTests(SimpleTestCase):
             department_id=2,
         )
 
-        self.assertFalse(
-            permission.has_object_permission(
+        self.assert_location_permission_denied(
+            lambda: permission.has_object_permission(
                 request,
                 self.make_view(),
                 location,
-            )
+            ),
+            "LOCATION_OUTSIDE_ACTIVE_ROLE_SCOPE",
         )
 
 class RoomPermissionTests(SimpleTestCase):
