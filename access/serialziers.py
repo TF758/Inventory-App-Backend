@@ -1,6 +1,9 @@
 from rest_framework import serializers
 
 from access.models import Permission
+from access.role_permission_boundaries import (
+    is_permission_allowed_for_role,
+)
 from users.models.roles import RoleAssignment
 
 
@@ -64,6 +67,48 @@ class PermissionMatrixPermissionSerializer(
             )
 
         return value
+
+    def validate(self, attrs):
+        permission_code = attrs.get(
+            "code",
+            "",
+        )
+
+        roles = attrs.get(
+            "roles",
+            [],
+        )
+
+        invalid_roles = [
+            item["role"]
+            for item in roles
+            if item.get("enabled") is True
+            and not is_permission_allowed_for_role(
+                item["role"],
+                permission_code,
+            )
+        ]
+
+        if invalid_roles:
+            if len(invalid_roles) == 1:
+                raise serializers.ValidationError({
+                    "roles": [
+                        f"{invalid_roles[0]} cannot be granted "
+                        f"{permission_code}."
+                    ]
+                })
+
+            raise serializers.ValidationError({
+                "roles": [
+                    "These roles cannot be granted "
+                    f"{permission_code}: "
+                    + ", ".join(
+                        sorted(invalid_roles)
+                    )
+                ]
+            })
+
+        return attrs
 
 
 class PermissionMatrixDomainSerializer(

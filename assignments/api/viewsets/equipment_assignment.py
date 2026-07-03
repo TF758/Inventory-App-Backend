@@ -1,3 +1,4 @@
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from assets.models.assets import  Equipment
@@ -19,32 +20,71 @@ from assignments.assignment_filters import EquipmentAssignmentFilter
 from access.permissions.base import RequiresPermission
 from access.permissions.assignments import AssignmentPermission
 
-class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet, ):
-    """
-    Viewset to handle Listing Equipment Assignment
-    both via list and in detail used by Site Admin
-    """
-
-    queryset = EquipmentAssignment.objects.select_related(
-        "equipment", "user", "assigned_by"
-    )
+class EquipmentAssignmentViewSet( AuditMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = EquipmentAssignmentSerializer
-
-    permission_classes = [AssignmentPermission]
-
+    permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
-
     filterset_class = EquipmentAssignmentFilter
+
+    def get_queryset(self):
+        qs = (
+            EquipmentAssignment.objects
+            .select_related(
+                "equipment",
+                "equipment__room",
+                "equipment__room__location",
+                "equipment__room__location__department",
+                "user",
+                "assigned_by",
+            )
+        )
+
+        active_role = getattr(
+            self.request.user,
+            "active_role",
+            None,
+        )
+
+        if not active_role:
+            return qs.none()
+
+        if active_role.role == "SITE_ADMIN":
+            return qs
+
+        if active_role.room:
+            return qs.filter(
+                equipment__room=active_role.room,
+            )
+
+        if active_role.location:
+            return qs.filter(
+                equipment__room__location=active_role.location,
+            )
+
+        if active_role.department:
+            return qs.filter(
+                equipment__room__location__department=active_role.department,
+            )
+
+        return qs.none()
 
     def get_object(self):
         equipment_public_id = self.kwargs.get("equipment_id")
 
+        queryset = self.filter_queryset(
+            self.get_queryset(),
+        )
+
         obj = get_object_or_404(
-            EquipmentAssignment,
+            queryset,
             equipment__public_id=equipment_public_id,
         )
 
-        self.check_object_permissions(self.request, obj)
+        self.check_object_permissions(
+            self.request,
+            obj,
+        )
+
         return obj
 
 class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
@@ -369,7 +409,7 @@ class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
     """
     serializer_class = EquipmentEventSerializer
 
-    permission_classes = [AssignmentPermission]
+    permission_classes = [IsAuthenticated]
 
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
