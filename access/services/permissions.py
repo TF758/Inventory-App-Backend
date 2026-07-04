@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from access.models import  Permission, RolePermission
 from core.models.sessions import UserSession
-from access.role_permission_boundaries import is_permission_allowed_for_role
+from access.role_permission_boundaries import BOUNDARY_REASON_LABELS, get_permission_boundary_result, is_permission_allowed_for_role
 from users.models.roles import RoleAssignment
 from rest_framework.exceptions import ValidationError
 
@@ -88,6 +88,26 @@ class PermissionMatrixService:
                 if role_permission.role in valid_roles
             }
 
+            blocked_roles = []
+            blocked_reason_keys_by_role = {}
+
+            for role in roles:
+                role_code = role["code"]
+
+                boundary = get_permission_boundary_result(
+                    role_code,
+                    permission.code,
+                )
+
+                if not boundary.allowed:
+                    blocked_roles.append(
+                        role_code,
+                    )
+
+                    blocked_reason_keys_by_role[role_code] = list(
+                        boundary.reason_keys,
+                    )
+
             domains[
                 permission.domain
             ]["permissions"].append({
@@ -106,6 +126,10 @@ class PermissionMatrixService:
                     }
                     for role in roles
                 ],
+                "blocked_roles": blocked_roles,
+                "blocked_reason_keys_by_role": (
+                    blocked_reason_keys_by_role
+                ),
             })
 
         return {
@@ -113,6 +137,7 @@ class PermissionMatrixService:
             "domains": list(
                 domains.values(),
             ),
+            "boundary_reason_labels": BOUNDARY_REASON_LABELS,
         }
 
     @classmethod
@@ -189,14 +214,19 @@ class PermissionMatrixService:
                     if role not in valid_roles:
                         continue
 
-                    if not is_permission_allowed_for_role(
+                    boundary = get_permission_boundary_result(
                         role,
                         permission.code,
-                    ):
+                    )
+
+                    if not boundary.allowed:
                         invalid_grants.append(
                             {
                                 "role": role,
                                 "permission": permission.code,
+                                "reason_keys": list(
+                                    boundary.reason_keys,
+                                ),
                             }
                         )
 
@@ -210,6 +240,9 @@ class PermissionMatrixService:
                                 f"{invalid_grant['permission']}."
                             ),
                             "invalid_grants": invalid_grants,
+                            "boundary_reason_labels": (
+                                BOUNDARY_REASON_LABELS
+                            ),
                         })
 
                     raise ValidationError({
@@ -217,6 +250,9 @@ class PermissionMatrixService:
                             "One or more role-permission grants are not allowed."
                         ),
                         "invalid_grants": invalid_grants,
+                        "boundary_reason_labels": (
+                            BOUNDARY_REASON_LABELS
+                        ),
                     })
 
                 requested_roles = {
@@ -286,6 +322,7 @@ class PermissionMatrixService:
         }
 
         return matrix
+
 
 class PermissionMatrixSessionService:
     """

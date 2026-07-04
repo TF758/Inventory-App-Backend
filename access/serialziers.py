@@ -2,7 +2,8 @@ from rest_framework import serializers
 
 from access.models import Permission
 from access.role_permission_boundaries import (
-    is_permission_allowed_for_role,
+    BOUNDARY_REASON_LABELS,
+    get_permission_boundary_result,
 )
 from users.models.roles import RoleAssignment
 
@@ -79,23 +80,41 @@ class PermissionMatrixPermissionSerializer(
             [],
         )
 
-        invalid_roles = [
-            item["role"]
-            for item in roles
-            if item.get("enabled") is True
-            and not is_permission_allowed_for_role(
-                item["role"],
+        invalid_grants = []
+
+        for item in roles:
+            if item.get("enabled") is not True:
+                continue
+
+            role = item["role"]
+
+            boundary = get_permission_boundary_result(
+                role,
                 permission_code,
             )
-        ]
 
-        if invalid_roles:
-            if len(invalid_roles) == 1:
+            if boundary.allowed:
+                continue
+
+            invalid_grants.append({
+                "role": role,
+                "permission": permission_code,
+                "reason_keys": list(
+                    boundary.reason_keys,
+                ),
+            })
+
+        if invalid_grants:
+            if len(invalid_grants) == 1:
+                invalid_grant = invalid_grants[0]
+
                 raise serializers.ValidationError({
                     "roles": [
-                        f"{invalid_roles[0]} cannot be granted "
-                        f"{permission_code}."
-                    ]
+                        f"{invalid_grant['role']} cannot be granted "
+                        f"{invalid_grant['permission']}."
+                    ],
+                    "invalid_grants": invalid_grants,
+                    "boundary_reason_labels": BOUNDARY_REASON_LABELS,
                 })
 
             raise serializers.ValidationError({
@@ -103,9 +122,14 @@ class PermissionMatrixPermissionSerializer(
                     "These roles cannot be granted "
                     f"{permission_code}: "
                     + ", ".join(
-                        sorted(invalid_roles)
+                        sorted(
+                            grant["role"]
+                            for grant in invalid_grants
+                        )
                     )
-                ]
+                ],
+                "invalid_grants": invalid_grants,
+                "boundary_reason_labels": BOUNDARY_REASON_LABELS,
             })
 
         return attrs

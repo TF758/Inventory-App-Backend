@@ -14,6 +14,64 @@ It does not answer:
 Those checks belong to AccessService, ScopeService, and role governance.
 """
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PermissionBoundaryResult:
+    allowed: bool
+    reason_keys: tuple[str, ...] = ()
+
+
+# ------------------------------------------------------------------
+# Reason keys
+# ------------------------------------------------------------------
+
+REASON_INVALID_INPUT = "INVALID_INPUT"
+REASON_SITE_ADMIN_ONLY = "SITE_ADMIN_ONLY"
+REASON_ROOM_SCOPE_ONLY = "ROOM_SCOPE_ONLY"
+REASON_LOCATION_SCOPE_ONLY = "LOCATION_SCOPE_ONLY"
+REASON_ROOM_STRUCTURE_LIMIT = "ROOM_STRUCTURE_LIMIT"
+REASON_LOCATION_STRUCTURE_LIMIT = "LOCATION_STRUCTURE_LIMIT"
+REASON_VIEWER_READ_ONLY = "VIEWER_READ_ONLY"
+REASON_CLERK_OPERATIONAL_ONLY = "CLERK_OPERATIONAL_ONLY"
+REASON_ADMIN_ROLE_REQUIRED = "ADMIN_ROLE_REQUIRED"
+REASON_DEPARTMENT_ADMIN_REQUIRED = "DEPARTMENT_ADMIN_REQUIRED"
+
+
+BOUNDARY_REASON_LABELS = {
+    REASON_INVALID_INPUT:
+        "Missing role or permission code.",
+
+    REASON_SITE_ADMIN_ONLY:
+        "This permission is reserved for active Site Admin system authority.",
+
+    REASON_ROOM_SCOPE_ONLY:
+        "Room roles cannot receive department or location permissions.",
+
+    REASON_LOCATION_SCOPE_ONLY:
+        "Location roles cannot receive department permissions.",
+
+    REASON_ROOM_STRUCTURE_LIMIT:
+        "Room roles cannot create, transfer, or delete rooms.",
+
+    REASON_LOCATION_STRUCTURE_LIMIT:
+        "Location creation, transfer, and deletion belong to department authority.",
+
+    REASON_VIEWER_READ_ONLY:
+        "Viewer roles are limited to read, report, and self-service permissions.",
+
+    REASON_CLERK_OPERATIONAL_ONLY:
+        "Room Clerk is operational and cannot receive admin, structure, security, or destructive permissions.",
+
+    REASON_ADMIN_ROLE_REQUIRED:
+        "This permission requires an admin-shaped role.",
+
+    REASON_DEPARTMENT_ADMIN_REQUIRED:
+        "This permission requires Department Admin authority.",
+}
+
+
 VIEWER_ROLES = {
     "ROOM_VIEWER",
     "LOCATION_VIEWER",
@@ -223,6 +281,17 @@ def _ends_with_any(
     )
 
 
+def _dedupe_reason_keys(
+    reason_keys: list[str],
+) -> tuple[str, ...]:
+    """
+    Deduplicate while preserving order.
+    """
+    return tuple(
+        dict.fromkeys(reason_keys)
+    )
+
+
 def is_viewer_safe_permission(
     permission_code: str,
 ) -> bool:
@@ -243,28 +312,39 @@ def is_viewer_safe_permission(
         VIEWER_ALLOWED_PERMISSION_SUFFIXES,
     )
 
-def is_permission_allowed_for_role(
+
+def get_permission_boundary_result(
     role: str,
     permission_code: str,
-) -> bool:
+) -> PermissionBoundaryResult:
     """
-    Return whether a role type may ever be granted a permission code.
+    Return whether a role type may ever be granted a permission code,
+    plus one or more reason keys when blocked.
 
     This does not check whether the role currently has the permission.
     This does not check object scope.
     This does not check role-assignment governance.
     """
     if not role or not permission_code:
-        return False
+        return PermissionBoundaryResult(
+            allowed=False,
+            reason_keys=(REASON_INVALID_INPUT,),
+        )
 
     # SITE_ADMIN is system authority, but should normally be excluded
     # from the editable matrix upstream.
     if role in SYSTEM_ROLES:
-        return True
+        return PermissionBoundaryResult(
+            allowed=True,
+        )
+
+    reason_keys: list[str] = []
 
     # System-only permissions cannot be granted to normal roles.
     if permission_code in SITE_ADMIN_ONLY_EXACT_PERMISSIONS:
-        return False
+        reason_keys.append(
+            REASON_SITE_ADMIN_ONLY,
+        )
 
     # --------------------------------------------------
     # Structural hierarchy boundaries
@@ -279,49 +359,93 @@ def is_permission_allowed_for_role(
             permission_code,
             ROOM_ROLE_BLOCKED_PREFIXES,
         ):
-            return False
+            reason_keys.append(
+                REASON_ROOM_SCOPE_ONLY,
+            )
 
         if permission_code in ROOM_ROLE_BLOCKED_EXACT_PERMISSIONS:
-            return False
+            reason_keys.append(
+                REASON_ROOM_STRUCTURE_LIMIT,
+            )
 
     if role in LOCATION_ROLES:
         if _starts_with_any(
             permission_code,
             LOCATION_ROLE_BLOCKED_PREFIXES,
         ):
-            return False
+            reason_keys.append(
+                REASON_LOCATION_SCOPE_ONLY,
+            )
 
         if permission_code in LOCATION_ROLE_BLOCKED_EXACT_PERMISSIONS:
-            return False
+            reason_keys.append(
+                REASON_LOCATION_STRUCTURE_LIMIT,
+            )
 
     # Viewers are always read/self/report only,
     # but only after their hierarchy level has been enforced.
-    if role in VIEWER_ROLES:
-        return is_viewer_safe_permission(permission_code)
+    if (
+        role in VIEWER_ROLES
+        and not is_viewer_safe_permission(permission_code)
+    ):
+        reason_keys.append(
+            REASON_VIEWER_READ_ONLY,
+        )
 
     # Clerks are operational, not governance/structure/security.
     if role == "ROOM_CLERK":
-        if permission_code in CLERK_BLOCKED_EXACT_PERMISSIONS:
-            return False
-
-        if _starts_with_any(
-            permission_code,
-            CLERK_BLOCKED_PREFIXES,
+        if (
+            permission_code in CLERK_BLOCKED_EXACT_PERMISSIONS
+            or _starts_with_any(
+                permission_code,
+                CLERK_BLOCKED_PREFIXES,
+            )
         ):
-            return False
+            reason_keys.append(
+                REASON_CLERK_OPERATIONAL_ONLY,
+            )
 
     # Admin/governance capabilities require admin-shaped roles.
-    if permission_code in ADMIN_ONLY_EXACT_PERMISSIONS:
-        return role in ADMIN_ROLES
-
-    if _starts_with_any(
-        permission_code,
-        ADMIN_ONLY_PREFIXES,
+    if (
+        permission_code in ADMIN_ONLY_EXACT_PERMISSIONS
+        or _starts_with_any(
+            permission_code,
+            ADMIN_ONLY_PREFIXES,
+        )
     ):
-        return role in ADMIN_ROLES
+        if role not in ADMIN_ROLES:
+            reason_keys.append(
+                REASON_ADMIN_ROLE_REQUIRED,
+            )
 
     # Department-level destructive / structural authority.
     if permission_code in DEPARTMENT_ADMIN_ONLY_EXACT_PERMISSIONS:
-        return role == "DEPARTMENT_ADMIN"
+        if role != "DEPARTMENT_ADMIN":
+            reason_keys.append(
+                REASON_DEPARTMENT_ADMIN_REQUIRED,
+            )
 
-    return True
+    reason_keys_tuple = _dedupe_reason_keys(
+        reason_keys,
+    )
+
+    return PermissionBoundaryResult(
+        allowed=not reason_keys_tuple,
+        reason_keys=reason_keys_tuple,
+    )
+
+
+def is_permission_allowed_for_role(
+    role: str,
+    permission_code: str,
+) -> bool:
+    """
+    Return whether a role type may ever be granted a permission code.
+
+    This is the boolean compatibility helper used by enforcement paths.
+    Use get_permission_boundary_result() when UI/debug metadata is needed.
+    """
+    return get_permission_boundary_result(
+        role,
+        permission_code,
+    ).allowed
