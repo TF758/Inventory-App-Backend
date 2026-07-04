@@ -73,7 +73,7 @@ class DepartmentUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
 
     permission_classes = [DepartmentContextPermission, RequiresPermission]
 
-    required_permission = "users.manage"
+    required_permission = "users.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["user__email"]

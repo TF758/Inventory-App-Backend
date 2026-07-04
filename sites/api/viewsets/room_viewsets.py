@@ -87,7 +87,7 @@ class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin
 
     permission_classes = [RoomContextPermission, RequiresPermission]
 
-    required_permission = "users.manage"
+    required_permission = "users.view"
 
     filter_backends = [DjangoFilterBackend]
     filterset_class = AreaUserFilter

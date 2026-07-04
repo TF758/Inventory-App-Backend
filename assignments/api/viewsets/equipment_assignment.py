@@ -194,7 +194,7 @@ class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
 
     permission_classes = [RequiresPermission]
-    permission_classes = "assignments.unassign"
+    required_permission = "assignments.unassign"
 
     def post(self, request):
         serializer = UnassignEquipmentSerializer(data=request.data)
@@ -278,7 +278,7 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
 
     permission_classes = [RequiresPermission]
-    req = "assignments.reassign"
+    required_permission = "assignments.reassign"
 
     def post(self, request):
         serializer = ReassignEquipmentSerializer(data=request.data)

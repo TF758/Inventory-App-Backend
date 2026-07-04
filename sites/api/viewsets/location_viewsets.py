@@ -113,7 +113,7 @@ class LocationUsersView(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixi
     serializer_class = UserAreaSerializer
 
     permission_classes = [LocationContextPermission, RequiresPermission]
-    required_permission = "users.manage"
+    required_permission = "users.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["user__email"]
