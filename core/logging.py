@@ -1,6 +1,9 @@
+import json
 import logging
 import os
 import uuid
+
+from datetime import datetime, timezone
 
 from core.request_context import get_request_id
 
@@ -81,3 +84,76 @@ class RequestIDFilter(logging.Filter):
         record.request_id = get_request_id() or "-"
         record.service_name = os.getenv("SERVICE_NAME", "app")
         return True
+
+
+class JsonFormatter(logging.Formatter):
+    STANDARD_ATTRS = SafeExtraFormatter.STANDARD_ATTRS
+
+    def _json_safe(self, value):
+        if isinstance(value, uuid.UUID):
+            return str(value)
+
+        if isinstance(value, datetime):
+            return value.isoformat()
+
+        try:
+            json.dumps(value)
+            return value
+        except TypeError:
+            return str(value)
+
+    def format(self, record):
+        request_id = getattr(
+            record,
+            "request_id",
+            "-",
+        )
+
+        service_name = getattr(
+            record,
+            "service_name",
+            os.getenv("SERVICE_NAME", "app"),
+        )
+
+        payload = {
+            "timestamp": datetime.fromtimestamp(
+                record.created,
+                tz=timezone.utc,
+            ).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "service": service_name,
+            "request_id": request_id,
+            "module": record.module,
+            "filename": record.filename,
+            "line": record.lineno,
+            "function": record.funcName,
+            "process": record.process,
+            "thread": record.threadName,
+        }
+
+        extra = {
+            key: self._json_safe(value)
+            for key, value in record.__dict__.items()
+            if key not in self.STANDARD_ATTRS
+        }
+
+        if extra:
+            payload["extra"] = extra
+
+        if record.exc_info:
+            payload["exception"] = self.formatException(
+                record.exc_info,
+            )
+
+        if record.stack_info:
+            payload["stack"] = self.formatStack(
+                record.stack_info,
+            )
+
+        return json.dumps(
+            payload,
+            default=str,
+            ensure_ascii=False,
+        )
