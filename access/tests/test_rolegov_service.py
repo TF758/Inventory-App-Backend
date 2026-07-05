@@ -100,6 +100,7 @@ class RoleGovernanceServiceTests(SimpleTestCase):
         self.assertEqual(
             RoleGovernanceService.get_manageable_roles(actor_role),
             {
+                "DEPARTMENT_VIEWER",
                 "LOCATION_ADMIN",
                 "LOCATION_VIEWER",
                 "ROOM_ADMIN",
@@ -117,6 +118,7 @@ class RoleGovernanceServiceTests(SimpleTestCase):
         self.assertEqual(
             RoleGovernanceService.get_manageable_roles(actor_role),
             {
+                "LOCATION_VIEWER",
                 "ROOM_ADMIN",
                 "ROOM_CLERK",
                 "ROOM_VIEWER",
@@ -202,6 +204,7 @@ class RoleGovernanceServiceTests(SimpleTestCase):
         )
 
         for target_role in [
+            "DEPARTMENT_VIEWER",
             "LOCATION_ADMIN",
             "LOCATION_VIEWER",
             "ROOM_ADMIN",
@@ -225,7 +228,6 @@ class RoleGovernanceServiceTests(SimpleTestCase):
         for target_role in [
             "SITE_ADMIN",
             "DEPARTMENT_ADMIN",
-            "DEPARTMENT_VIEWER",
         ]:
             with self.subTest(target_role=target_role):
                 self.assertFalse(
@@ -235,12 +237,18 @@ class RoleGovernanceServiceTests(SimpleTestCase):
                     )
                 )
 
-    def test_location_admin_can_assign_room_roles_only(self):
+    def test_location_admin_can_assign_location_viewer_and_room_roles_only(self):
         actor_role = self.make_actor_role(
             "LOCATION_ADMIN",
             location_id=1,
         )
 
+        self.assertTrue(
+            RoleGovernanceService.can_assign_role(
+                actor_role,
+                "LOCATION_VIEWER",
+            )
+        )
         self.assertTrue(
             RoleGovernanceService.can_assign_role(
                 actor_role,
@@ -263,7 +271,13 @@ class RoleGovernanceServiceTests(SimpleTestCase):
         self.assertFalse(
             RoleGovernanceService.can_assign_role(
                 actor_role,
-                "LOCATION_VIEWER",
+                "LOCATION_ADMIN",
+            )
+        )
+        self.assertFalse(
+            RoleGovernanceService.can_assign_role(
+                actor_role,
+                "DEPARTMENT_VIEWER",
             )
         )
         self.assertFalse(
@@ -272,7 +286,7 @@ class RoleGovernanceServiceTests(SimpleTestCase):
                 "DEPARTMENT_ADMIN",
             )
         )
-
+        
     def test_room_admin_can_assign_room_clerk_and_room_viewer_only(self):
         actor_role = self.make_actor_role(
             "ROOM_ADMIN",
