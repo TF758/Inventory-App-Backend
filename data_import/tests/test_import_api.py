@@ -4,17 +4,26 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from unittest.mock import patch
 from django.urls import reverse
 
-from users.factories.user_factories import UserFactory
+from users.factories.user_factories import AdminUserFactory
+from users.models.roles import RoleAssignment
 from reporting.models.reports import ReportJob
 
 class AssetImportAPITests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.user = UserFactory()
+        self.user = AdminUserFactory()
+        self.site_admin_role = RoleAssignment.objects.create(
+            user=self.user,
+            role="SITE_ADMIN",
+            assigned_by=self.user,
+        )
+        self.user.active_role = self.site_admin_role
+        self.user.save(update_fields=["active_role"])
+
         self.url = reverse("asset-import")
 
-        self.client.force_authenticate(self.user)
+        self.client.force_authenticate(user=self.user)
 
     @patch("data_import.views.run_asset_import_task.delay")
     def test_asset_import_happy_path(self, mock_task):

@@ -70,12 +70,6 @@ class EquipmentModelViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet)
 
         return qs
     
-    def perform_create(
-        self,
-        serializer,
-    ):
-        serializer.save()
-
 
 class EquipmentStatusChangeView(APIView):
     """Dedicated view to update equipment status"""
@@ -344,7 +338,7 @@ class BatchAssignEquipmentView(APIView):
 class BatchEquipmentStatusChangeView(APIView):
 
     permission_classes = [ RequiresPermission]
-    required_permission = "assets.chnage_status"
+    required_permission = "assets.update_status"
 
 
     def post(self, request):

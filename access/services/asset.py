@@ -1,6 +1,6 @@
 
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 
 class AssetUsageService:
 
@@ -53,7 +53,7 @@ class AssetUsageService:
         )
 
         if not issue:
-            raise ValidationError(
+            raise NotFound(
                 "You do not have an active consumable issue for this consumable."
             )
 
