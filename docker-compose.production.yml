@@ -1,0 +1,12 @@
+name: inventory-production
+
+services:
+  api:
+    environment:
+      APP_ENV: production
+    ports:
+      - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
+
+volumes:
+  inventory_postgres_data:
+    name: inventory_production_postgres_data

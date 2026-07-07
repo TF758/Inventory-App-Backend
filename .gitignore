@@ -238,3 +238,10 @@ gitleaks-*.json
 
 trivy-fs.json
 trivy-image.json
+
+.env
+.env.*
+!.env.example
+!.env.dev.example
+!.env.staging.example
+!.env.production.example

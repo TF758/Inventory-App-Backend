@@ -1,0 +1,12 @@
+name: inventory-staging
+
+services:
+  api:
+    environment:
+      APP_ENV: staging
+    ports:
+      - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
+
+volumes:
+  inventory_postgres_data:
+    name: inventory_staging_postgres_data
