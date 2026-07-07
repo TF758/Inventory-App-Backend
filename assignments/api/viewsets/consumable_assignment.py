@@ -22,6 +22,8 @@ from access.permissions.base import RequiresPermission
 from access.services.asset import AssetUsageService
 from access.permissions.assignments import AssignmentPermission
 from core.permissions.assets import CanReportConsumableLoss
+from assignments.api.viewsets.equipment_assignment import ensure_asset_is_in_active_role_scope
+from core.permissions.helpers import can_assign_asset_to_user
 
 class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -52,7 +54,7 @@ class ConsumableEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
 class IssueConsumableView(AuditMixin, NotificationMixin, APIView):
 
     permission_classes = [RequiresPermission]
-    required_permission = "assignments.assign"
+    required_permission = "assignments.create"
 
     def post(self, request):
         serializer = IssueConsumableSerializer(data=request.data)
@@ -62,102 +64,111 @@ class IssueConsumableView(AuditMixin, NotificationMixin, APIView):
         user = serializer.validated_data["user"]
         quantity = serializer.validated_data["quantity"]
         purpose = serializer.validated_data.get("purpose", "")
-        notes = serializer.validated_data.get("notes", "")
 
-        # Permission check
-        self.check_object_permissions(request, consumable)
+        # Check that the consumable itself is inside active role scope.
+        active_role = ensure_asset_is_in_active_role_scope(
+            request,
+            consumable,
+            label="Consumable",
+        )
+
+        # Check that the target user is also inside active role scope.
+        if not can_assign_asset_to_user(active_role, user):
+            raise ValidationError(
+                "You do not have permission to issue consumables to this user."
+            )
 
         with transaction.atomic():
-
-            # Lock consumable row
             consumable = (
                 Consumable.objects
                 .select_for_update()
                 .get(pk=consumable.pk)
             )
 
-            if quantity > consumable.quantity:
-                raise ValidationError(
-                    "Not enough consumable stock available"
-                )
-
-            #Try to find existing open issue
-            issue = (
-                ConsumableIssue.objects
-                .select_for_update()
-                .filter(
-                    consumable=consumable,
-                    user=user,
-                    returned_at__isnull=True,
-                )
-                .first()
+            # Re-check after lock in case the consumable moved.
+            ensure_asset_is_in_active_role_scope(
+                request,
+                consumable,
+                label="Consumable",
             )
 
-            if issue:
-                # Merge into existing issue
-                issue.quantity += quantity
-                issue.issued_quantity += quantity
-                issue.save(update_fields=["quantity", "issued_quantity"])
-            else:
-                # Create new issue
-                issue = ConsumableIssue.objects.create(
-                    consumable=consumable,
-                    user=user,
-                    quantity=quantity,
-                    issued_quantity=quantity,
-                    assigned_by=request.user,
-                    purpose=purpose,
-                )
+            if quantity > consumable.quantity:
+                raise ValidationError("Not enough consumables available")
 
-            # Reduce global stock
             consumable.quantity -= quantity
             consumable.save(update_fields=["quantity"])
 
-            # Event (inventory-affecting)
+            issue, created = ConsumableIssue.objects.get_or_create(
+                consumable=consumable,
+                user=user,
+                returned_at__isnull=True,
+                defaults={
+                    "quantity": quantity,
+                    "issued_quantity": quantity,
+                    "assigned_by": request.user,
+                    "purpose": purpose,
+                },
+            )
+
+            if not created:
+                issue.quantity += quantity
+                issue.issued_quantity += quantity
+                issue.assigned_by = request.user
+                issue.purpose = purpose
+                issue.save(
+                    update_fields=[
+                        "quantity",
+                        "issued_quantity",
+                        "assigned_by",
+                        "purpose",
+                    ]
+                )
+
             ConsumableEvent.objects.create(
                 consumable=consumable,
-                issue=issue,
                 user=user,
-                event_type=ConsumableEvent.EventType.ISSUED,
+                event_type="issued",
                 quantity=quantity,
                 quantity_change=-quantity,
                 reported_by=request.user,
-                notes=notes or f"Issued {quantity} units",
+                notes=purpose or f"Issued {quantity} units",
             )
 
-            # Audit log
             self.audit(
-                event_type=AuditLog.Events.CONSUMABLE_ISSUED,
+                event_type=AuditLog.Events.ASSET_ASSIGNED,
                 target=consumable,
-                description=(
-                    f"Issued {quantity} units of {consumable.name} "
-                    f"to {user.email}"
-                ),
+                description=f"Issued {quantity} consumable units to {user.email}",
                 metadata={
-                    "consumable_public_id": consumable.public_id,
                     "user_public_id": user.public_id,
+                    "user_email": user.email,
                     "quantity": quantity,
+                    "consumable_public_id": consumable.public_id,
                     "purpose": purpose,
                 },
             )
 
             self.notify(
                 recipient=user,
-                notif_type=AuditLog.Events.CONSUMABLE_ISSUED,
+                notif_type=AuditLog.Events.ASSET_ASSIGNED,
                 level=Notification.Level.INFO,
                 title="Consumable issued to you",
                 message=(
                     f"{quantity} unit(s) of {consumable.name} "
-                    f"were issued to you by {request.user.get_full_name()}."
+                    f"were issued to you by {request.user.get_full_name()}"
                 ),
                 entity=consumable,
                 actor=request.user,
             )
 
         return Response(
+            {
+                "consumable": consumable.public_id,
+                "user": user.public_id,
+                "issued_quantity": quantity,
+                "remaining_quantity": consumable.quantity,
+            },
             status=status.HTTP_200_OK,
         )
-
 class UseConsumableView(AuditMixin, APIView):
     permission_classes = [IsAuthenticated]
 

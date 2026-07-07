@@ -5,7 +5,11 @@ from django.urls import reverse
 from assignments.models.asset_assignment import ConsumableIssue
 from assets.asset_factories import ConsumableFactory
 from users.models.roles import RoleAssignment
-from assignments.tests.assignments_test_bases import ConsumableAPITestBase
+from assignments.tests.assignments_test_bases import (
+    ASSIGNMENT_OPERATION_PERMISSIONS,
+    ConsumableAPITestBase,
+    grant_role_permissions,
+)
 from users.factories.user_factories import UserFactory, UserPlacementFactory
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 
@@ -306,22 +310,27 @@ class TestConsumableEdgeCases(APITestCase):
 
         admin = UserFactory()
 
-        # Has admin role for room A
+        # Has admin role for room A, but the active role is an
+        # equally capable admin role scoped to room B. This keeps
+        # the assertion focused on scope, not missing permissions.
         RoleAssignment.objects.create(
             user=admin,
             role="ROOM_ADMIN",
             room=room_a,
         )
 
-        # Active role is room B (viewer)
-        RoleAssignment.objects.create(
+        active_role = RoleAssignment.objects.create(
             user=admin,
-            role="ROOM_VIEWER",
+            role="ROOM_ADMIN",
             room=room_b,
         )
+        grant_role_permissions(
+            active_role,
+            ASSIGNMENT_OPERATION_PERMISSIONS,
+        )
 
-        admin.active_role = admin.role_assignments.last()
-        admin.save()
+        admin.active_role = active_role
+        admin.save(update_fields=["active_role"])
 
         user = UserFactory()
         UserPlacementFactory(user=user, room=room_a)

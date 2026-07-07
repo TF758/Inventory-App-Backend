@@ -120,7 +120,7 @@ class MixedAssetReturnViewSetTests(TestCase):
 
         response = self.client.post(url, payload, format="json")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 400)
 
     def test_limit_of_20_items(self):
 
@@ -168,7 +168,7 @@ class MixedAssetReturnViewSetTests(TestCase):
             format="json"
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 400)
 
     def test_cannot_return_already_returned_asset(self):
         assignment = EquipmentAssignment.objects.get(
@@ -193,7 +193,7 @@ class MixedAssetReturnViewSetTests(TestCase):
             format="json"
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 400)
 
     def test_quantity_edge_cases(self):
 

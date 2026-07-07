@@ -1,10 +1,12 @@
+from urllib import request
+
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from assets.models.assets import Accessory
 from assignments.models.asset_assignment import AccessoryAssignment, AccessoryEvent
 from core.models.audit import AuditLog
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
@@ -22,6 +24,25 @@ from access.permissions.base import RequiresPermission
 from access.services.asset import AssetUsageService
 from access.services.assignments import SelfReturnService
 from access.permissions.assignments import AssignmentPermission
+from access.services.scope import ScopeService
+
+def ensure_asset_is_in_active_role_scope(request, asset, label="Asset"):
+    """
+    APIView mutation endpoints use RequiresPermission for capability checks.
+    RequiresPermission does not perform object-level scope checks, so mutation
+    views must explicitly verify that the target asset is inside the active
+    role's department/location/room scope before changing state.
+    """
+    active_role = getattr(request.user, "active_role", None)
+
+    if not ScopeService.can_access_asset(active_role, asset):
+        raise PermissionDenied({
+            "detail": f"{label} is outside active role scope.",
+            "reason": "OUT_OF_SCOPE",
+        })
+
+    return active_role
+
 
 
 class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -47,11 +68,10 @@ class AccessoryEventHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             .select_related("user", "reported_by")
         )
 
-
 class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
 
     permission_classes = [RequiresPermission]
-    required_permission = "assignments.assign"
+    required_permission = "assignments.create"
 
     def post(self, request):
         serializer = AssignAccessorySerializer(data=request.data)
@@ -62,29 +82,39 @@ class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
         quantity = serializer.validated_data["quantity"]
         notes = serializer.validated_data.get("notes", "")
 
-        # Asset authority check
-        self.check_object_permissions(request, accessory)
-        role = get_active_role(request.user)
+        # 1. Check that the accessory itself is inside this role's scope.
+        role = ensure_asset_is_in_active_role_scope(
+            request,
+            accessory,
+            label="Accessory",
+        )
+
+        # 2. Check that the target user is inside this role's scope.
         if not can_assign_asset_to_user(role, user):
             raise ValidationError(
                 "You do not have permission to assign assets to this user."
             )
 
-
         with transaction.atomic():
-
-            # Lock accessory row to prevent race conditions
+            # 3. Lock accessory row before mutation.
             accessory = (
                 Accessory.objects
                 .select_for_update()
                 .get(pk=accessory.pk)
             )
 
-            # Final availability guard (after lock)
+            # 4. Re-check scope after lock in case the accessory moved.
+            ensure_asset_is_in_active_role_scope(
+                request,
+                accessory,
+                label="Accessory",
+            )
+
+            # 5. Final availability guard after lock.
             if quantity > accessory.available_quantity:
                 raise ValidationError("Not enough accessories available")
 
-            # Enforce ONE active assignment per (accessory, user)
+            # 6. Enforce one active assignment per accessory/user.
             assignment, created = AccessoryAssignment.objects.get_or_create(
                 accessory=accessory,
                 user=user,
@@ -100,18 +130,16 @@ class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
                 assignment.assigned_by = request.user
                 assignment.save(update_fields=["quantity", "assigned_by"])
 
-            # Domain event (inventory-neutral)
             AccessoryEvent.objects.create(
                 accessory=accessory,
                 user=user,
                 event_type="assigned",
-                quantity=quantity,  
+                quantity=quantity,
                 quantity_change=0,
                 reported_by=request.user,
                 notes=notes or f"Assigned {quantity} units",
             )
 
-            # Audit log
             self.audit(
                 event_type=AuditLog.Events.ASSET_ASSIGNED,
                 target=accessory,
@@ -121,21 +149,21 @@ class AssignAccessoryView(AuditMixin, NotificationMixin, APIView):
                     "user_email": user.email,
                     "quantity": quantity,
                     "accessory_public_id": accessory.public_id,
-                 
                 },
             )
 
             self.notify(
-            recipient=user,
-            notif_type=AuditLog.Events.ASSET_ASSIGNED,
-            level=Notification.Level.INFO,
-            title="Accessory assigned to you",
-            message=(
-                f"{quantity} unit(s) of {accessory.name} "
-                f"were assigned to you by {request.user.get_full_name()}"
-            ),
-            entity=accessory,
-        )
+                recipient=user,
+                notif_type=AuditLog.Events.ASSET_ASSIGNED,
+                level=Notification.Level.INFO,
+                title="Accessory assigned to you",
+                message=(
+                    f"{quantity} unit(s) of {accessory.name} "
+                    f"were assigned to you by {request.user.get_full_name()}"
+                ),
+                entity=accessory,
+                actor=request.user,
+            )
 
         return Response(
             {
@@ -230,11 +258,9 @@ class AdminReturnAccessoryView(AuditMixin,NotificationMixin, APIView):
                 )
 
         return Response(status=status.HTTP_200_OK)
-
 class CondemnAccessoryView(AuditMixin, APIView):
     permission_classes = [RequiresPermission]
     required_permission = "assets.condemn"
-
 
     def post(self, request):
         serializer = CondemnAccessorySerializer(data=request.data)
@@ -244,21 +270,28 @@ class CondemnAccessoryView(AuditMixin, APIView):
         quantity = serializer.validated_data["quantity"]
         notes = serializer.validated_data.get("notes", "")
 
-        self.check_object_permissions(request, accessory)
+        active_role = getattr(request.user, "active_role", None)
 
         with transaction.atomic():
-
             accessory = (
                 Accessory.objects
                 .select_for_update()
                 .get(pk=accessory.pk)
             )
 
+            if not ScopeService.can_access_asset(active_role, accessory):
+                raise PermissionDenied({
+                    "detail": "Accessory is outside active role scope.",
+                    "reason": "OUT_OF_SCOPE",
+                })
+
             if quantity > accessory.available_quantity:
-                raise ValidationError("Cannot condemn accessories that are currently assigned")
+                raise ValidationError(
+                    "Cannot condemn accessories that are currently assigned"
+                )
 
             accessory.quantity -= quantity
-            accessory.save()
+            accessory.save(update_fields=["quantity"])
 
             AccessoryEvent.objects.create(
                 accessory=accessory,
