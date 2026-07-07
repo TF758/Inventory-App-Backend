@@ -1,7 +1,5 @@
 
-from inventory.settings import IS_TESTING
-
-from .base import env, DEBUG
+from .base import env, DEBUG, IS_TESTING
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
