@@ -4,10 +4,13 @@ services:
     command: daphne -b 0.0.0.0 -p 8000 inventory.asgi:application
     volumes:
       - .:/app
+      - ./logs:/var/log/inventory
     ports:
       - "8000:8000"
     env_file:
       - .env.dev
+    environment:
+      SERVICE_NAME: api
     depends_on:
       - db
       - redis
@@ -17,8 +20,11 @@ services:
     command: celery -A inventory worker -l info
     volumes:
       - .:/app
+      - ./logs:/var/log/inventory
     env_file:
       - .env.dev
+    environment:
+      SERVICE_NAME: worker
     depends_on:
       - redis
       - api
@@ -28,8 +34,11 @@ services:
     command: celery -A inventory beat -l info
     volumes:
       - .:/app
+      - ./logs:/var/log/inventory
     env_file:
       - .env.dev
+    environment:
+      SERVICE_NAME: beat
     depends_on:
       - redis
       - api

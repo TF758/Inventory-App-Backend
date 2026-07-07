@@ -132,9 +132,7 @@ class BatchEquipmentStatusChangeTests(TestCase):
         self.eq1.refresh_from_db()
         self.assertEqual(self.eq1.status, EquipmentStatus.OK)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["success"], 0)
-        self.assertEqual(response.data["failed"], 1)
+        self.assertEqual(response.status_code, 403)
 
     # 7️⃣ Duplicate IDs Deduped
     def test_batch_status_change_duplicate_ids(self):

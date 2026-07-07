@@ -1,10 +1,12 @@
 
+
 from assignments.tests.assignments_test_bases import CondemnAccessoryTestBase
 from assignments.models.asset_assignment import AccessoryAssignment
-
+from rest_framework.exceptions import PermissionDenied
 from assets.asset_factories import AccessoryFactory
+from access.services.scope import ScopeService
 from users.factories.user_factories import UserFactory, UserPlacementFactory
-from sites.factories.site_factories import RoomFactory
+from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 
 
 
@@ -132,8 +134,16 @@ class TestCondemnAccessory(CondemnAccessoryTestBase):
         self.assertEqual(accessory.quantity, 5)
 
     def test_admin_cannot_condemn_accessory_outside_scope(self):
-        other_room = RoomFactory(location=self.location)
-        accessory = AccessoryFactory(room=other_room, quantity=5)
+        self.authenticate_admin()
+
+        other_department = DepartmentFactory()
+        other_location = LocationFactory(department=other_department)
+        other_room = RoomFactory(location=other_location)
+
+        accessory = AccessoryFactory(
+            room=other_room,
+            quantity=5,
+        )
 
         response = self.client.post(
             self.condemn_url,

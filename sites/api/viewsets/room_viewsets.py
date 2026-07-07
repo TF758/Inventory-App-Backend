@@ -1,9 +1,7 @@
 from rest_framework import viewsets
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-
 from core.permissions.assets import AssetPermission
-from core.permissions.users import UserPermission
 from assignments.api.serializers.assignment import EquipmentAssignmentSerializer
 from assignments.models.asset_assignment import EquipmentAssignment
 from assets.api.serializers.accessories import AccessoryFullSerializer
@@ -11,6 +9,8 @@ from assets.api.serializers.components import ComponentSerializer
 from assets.api.serializers.consumables import ConsumableAreaReaSerializer
 from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
+from access.permissions.base import RequiresPermission
+from access.permissions.sites import RoomContextPermission, RoomPermission
 from sites.site_filters import AreaUserFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
@@ -18,7 +18,7 @@ from users.api.serializers.roles import RoleReadSerializer
 from users.api.serializers.users import UserAreaSerializer
 from sites.models.sites import Room, UserPlacement
 from sites.api.serializers.rooms import RoomListSerializer, RoomReadSerializer, RoomWriteSerializer
-from sites.permissions.sites import RoomPermission
+
 from core.mixins import AccessoryDashboardMixin, AreaDashboardMixin, ConsumableDashboardMixin, LightEndpointMixin, ScopeFilterMixin, AuditMixin, ExcludeFiltersMixin, RoleVisibilityMixin
 from django.db.models import Case, When, Value, IntegerField
 from core.pagination import FlexiblePagination
@@ -33,7 +33,7 @@ from django.shortcuts import get_object_or_404
 
 
 class RoomDashboardView(AreaDashboardMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RoomContextPermission]
 
     def get_rooms(self, public_id):
         return Room.objects.filter(public_id=public_id)
@@ -78,12 +78,16 @@ class RoomViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
         return qs
 
     
-class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+
     """Retrieves a list of users in a given room"""
+    
     serializer_class = UserAreaSerializer
     lookup_field = "public_id"
 
-    permission_classes = [UserPermission]
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "users.view"
 
     filter_backends = [DjangoFilterBackend]
     filterset_class = AreaUserFilter
@@ -115,12 +119,16 @@ class RoomUsersViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin
         kwargs["exclude_room"] = True
         return super().get_serializer(*args, **kwargs)
     
-class RoomEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+
     """Retrieves a list of equipment in a given room"""
+
     serializer_class = EquipmentSerializer
     lookup_field = "public_id"
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -149,7 +157,9 @@ class RoomEquipmentViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersM
     
 
 class RoomEquipmentDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "assets.view"
 
     def get(self, request, public_id):
         # ---------------------------------------------
@@ -216,12 +226,16 @@ class RoomEquipmentDashboardView(APIView):
         })
     
 
-class RoomConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+
     """Retrieves a list of consumables in a given room"""
+
     serializer_class = ConsumableAreaReaSerializer
     lookup_field = "public_id"
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "assets.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -248,8 +262,11 @@ class RoomConsumablesViewSet(LightEndpointMixin, ScopeFilterMixin, ExcludeFilter
         kwargs["exclude_room"] = True
         return super().get_serializer(*args, **kwargs)
     
-class RoomConsumableDashboardView( ConsumableDashboardMixin, APIView, ):
-    permission_classes = [IsAuthenticated]
+class RoomConsumableDashboardView( ConsumableDashboardMixin, APIView):
+
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         room = get_object_or_404(Room, public_id=public_id)
@@ -262,12 +279,16 @@ class RoomConsumableDashboardView( ConsumableDashboardMixin, APIView, ):
         data = self.build_dashboard_response(rooms, period)
         return Response(data)   
 
-class RoomAccessoriesViewSet(LightEndpointMixin,ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet, ):
+class RoomAccessoriesViewSet(LightEndpointMixin,ScopeFilterMixin, ExcludeFiltersMixin, viewsets.ModelViewSet):
+
     """Retrieves a list of accessories in a given room"""
+
     serializer_class = AccessoryFullSerializer
     lookup_field = "public_id"
 
-    permission_classes = [AssetPermission]
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = ["assets.view"]
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["name"]
@@ -293,11 +314,11 @@ class RoomAccessoriesViewSet(LightEndpointMixin,ScopeFilterMixin, ExcludeFilters
         kwargs["exclude_room"] = True
         return super().get_serializer(*args, **kwargs)
     
-class RoomAccessoryDashboardView(
-    AccessoryDashboardMixin,
-    APIView
-):
-    permission_classes = [IsAuthenticated]
+class RoomAccessoryDashboardView( AccessoryDashboardMixin, APIView ):
+
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "assets.view"
 
     def get_rooms(self, public_id):
         return Room.objects.filter(
@@ -350,7 +371,9 @@ class RoomRolesViewSet(ScopeFilterMixin,RoleVisibilityMixin,viewsets.ReadOnlyMod
     serializer_class = RoleReadSerializer
     lookup_field = "public_id"
 
-    permission_classes = [RoomPermission]
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "role_assignments.view"
 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = RoleAssignmentFilter
@@ -377,6 +400,10 @@ class RoomEquipmentAssignmentViewSet(
     viewsets.GenericViewSet,
 ):
     serializer_class = EquipmentAssignmentSerializer
+
+    permission_classes = [RoomContextPermission, RequiresPermission]
+
+    required_permission = "assignments.view"
 
     def get_queryset(self):
         room_id = self.kwargs.get("public_id")

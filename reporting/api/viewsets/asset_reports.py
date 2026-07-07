@@ -6,13 +6,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
+from access.permissions.base import RequiresPermission
 from reporting.api.serializers.asset_reports import AssetHistoryReportRequestSerializer
 from reporting.models.reports import ReportJob
 from reporting.tasks.reports import generate_report_task
 
 
 class AssetHistoryReport(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ RequiresPermission]
+
+    required_permission = ( "reports.asset_history" )
 
     def post(self, request):
         serializer = AssetHistoryReportRequestSerializer(data=request.data)

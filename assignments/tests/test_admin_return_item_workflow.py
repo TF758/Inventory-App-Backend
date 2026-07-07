@@ -36,6 +36,7 @@ class AdminReturnItemWorkflowTests(TestCase):
             role="SITE_ADMIN"
         )
         self.admin.active_role = self.admin_role
+        self.admin.save(update_fields=["active_role"])
 
         # location
         self.room = RoomFactory()

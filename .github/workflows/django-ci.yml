@@ -168,6 +168,7 @@ jobs:
       matrix:
         suite:
           - core.tests
+          - access.tests
           - assignments.tests
           - data_import.tests
           - reporting.tests

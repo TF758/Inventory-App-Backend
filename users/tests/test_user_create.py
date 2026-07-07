@@ -6,7 +6,25 @@ from users.models.roles import RoleAssignment
 from sites.factories.site_factories import DepartmentFactory, LocationFactory, RoomFactory
 from users.factories.user_factories import AdminUserFactory
 from sites.models.sites import UserPlacement
+from access.models import Permission, RolePermission
 User = get_user_model()
+
+
+def grant_role_permissions(role: str, *codes: str):
+    for code in codes:
+        permission, _ = Permission.objects.get_or_create(
+            code=code,
+            defaults={
+                "name": code,
+                "description": f"Test permission for {code}",
+                "domain": code.split(".", 1)[0],
+                "scope_type": "global",
+            },
+        )
+        RolePermission.objects.get_or_create(
+            role=role,
+            permission=permission,
+        )
 
 class SiteAdminFullUserCreateTest(APITestCase):
     """Verify that SITE_ADMIN can create users anywhere"""
@@ -99,7 +117,15 @@ class DepartmentAdminFullUserCreateTest(APITestCase):
         )
         self.dept_admin.active_role = self.dept_admin_role
         self.dept_admin.save()
-        self.client.force_login(self.dept_admin)
+
+        grant_role_permissions(
+            "DEPARTMENT_ADMIN",
+            "users.full_create",
+            "user_placements.create",
+            "role_assignments.create",
+        )
+
+        self.client.force_authenticate(user=self.dept_admin)
 
         # --- Locations & Rooms ---
         self.location = LocationFactory(department=self.department, name="HQ")

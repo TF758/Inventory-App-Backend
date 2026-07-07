@@ -1,22 +1,49 @@
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from assets.models.assets import  Equipment
+from assets.models.assets import Equipment
 from core.models.audit import AuditLog
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import status
 from core.mixins import AuditMixin, NotificationMixin
-from core.permissions.assets import CanManageAssetCustody, CanViewEquipmentAssignments
-from core.permissions.helpers import can_assign_asset_to_user, get_active_role
+from core.permissions.helpers import can_assign_asset_to_user
 from rest_framework import mixins, viewsets, filters
 
 from core.pagination import FlexiblePagination
 from core.models.notifications import Notification
-from assignments.api.serializers.assignment import AssignEquipmentSerializer, EquipmentAssignmentSerializer, EquipmentEventSerializer, ReassignEquipmentSerializer, UnassignEquipmentSerializer
+from assignments.api.serializers.assignment import (
+    AssignEquipmentSerializer,
+    EquipmentAssignmentSerializer,
+    EquipmentEventSerializer,
+    ReassignEquipmentSerializer,
+    UnassignEquipmentSerializer,
+)
 from assignments.models.asset_assignment import EquipmentAssignment, EquipmentEvent
 from assignments.assignment_filters import EquipmentAssignmentFilter
+from access.permissions.base import RequiresPermission
+from access.services.scope import ScopeService
+
+
+def ensure_asset_is_in_active_role_scope(request, asset, label="Asset"):
+    """
+    APIView mutation endpoints use RequiresPermission for capability checks.
+    RequiresPermission does not perform object-level scope checks, so mutation
+    views must explicitly verify that the target asset is inside the active
+    role's department/location/room scope before changing state.
+    """
+    active_role = getattr(request.user, "active_role", None)
+
+    if not ScopeService.can_access_asset(active_role, asset):
+        raise PermissionDenied({
+            "detail": f"{label} is outside active role scope.",
+            "reason": "OUT_OF_SCOPE",
+        })
+
+    return active_role
+
 
 class EquipmentAssignmentViewSet(
     AuditMixin,
@@ -24,30 +51,72 @@ class EquipmentAssignmentViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-    """
-    Viewset to handle Listing Equipment Assignment
-    both via list and in detail used by Site Admin
-    """
-
-    queryset = EquipmentAssignment.objects.select_related(
-        "equipment", "user", "assigned_by"
-    )
     serializer_class = EquipmentAssignmentSerializer
-    permission_classes = [CanViewEquipmentAssignments]
+    permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
-
     filterset_class = EquipmentAssignmentFilter
+
+    def get_queryset(self):
+        qs = (
+            EquipmentAssignment.objects
+            .select_related(
+                "equipment",
+                "equipment__room",
+                "equipment__room__location",
+                "equipment__room__location__department",
+                "user",
+                "assigned_by",
+            )
+        )
+
+        active_role = getattr(
+            self.request.user,
+            "active_role",
+            None,
+        )
+
+        if not active_role:
+            return qs.none()
+
+        if active_role.role == "SITE_ADMIN":
+            return qs
+
+        if active_role.room:
+            return qs.filter(
+                equipment__room=active_role.room,
+            )
+
+        if active_role.location:
+            return qs.filter(
+                equipment__room__location=active_role.location,
+            )
+
+        if active_role.department:
+            return qs.filter(
+                equipment__room__location__department=active_role.department,
+            )
+
+        return qs.none()
 
     def get_object(self):
         equipment_public_id = self.kwargs.get("equipment_id")
 
+        queryset = self.filter_queryset(
+            self.get_queryset(),
+        )
+
         obj = get_object_or_404(
-            EquipmentAssignment,
+            queryset,
             equipment__public_id=equipment_public_id,
         )
 
-        self.check_object_permissions(self.request, obj)
+        self.check_object_permissions(
+            self.request,
+            obj,
+        )
+
         return obj
+
 
 class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
@@ -55,7 +124,8 @@ class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    required_permission = "assignments.create"
 
     def post(self, request):
         serializer = AssignEquipmentSerializer(data=request.data)
@@ -65,26 +135,34 @@ class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
         equipment = serializer.validated_data["equipment"]
         notes = serializer.validated_data.get("notes", "")
 
-        # ASSET AUTHORITY
-        self.check_object_permissions(request, equipment)
+        active_role = ensure_asset_is_in_active_role_scope(
+            request,
+            equipment,
+            label="Equipment",
+        )
 
-        # ASSIGNEE JURISDICTION
-        active_role = get_active_role(request.user)
         if not can_assign_asset_to_user(active_role, assignee):
             raise ValidationError(
                 "You may only assign equipment to users within your room jurisdiction."
             )
 
         with transaction.atomic():
+            equipment = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
 
-            #  Lock the equipment row 
-            equipment = (Equipment.objects.select_for_update().get(pk=equipment.pk))
+            # Re-check after row lock in case the equipment moved before mutation.
+            ensure_asset_is_in_active_role_scope(
+                request,
+                equipment,
+                label="Equipment",
+            )
 
-            # Final guard after lock
             if equipment.is_assigned:
                 raise ValidationError("This equipment is already assigned")
 
-            # OPTION 1: reuse or mutate assignment row
             assignment, created = EquipmentAssignment.objects.get_or_create(
                 equipment=equipment,
                 defaults={
@@ -104,7 +182,6 @@ class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
             else:
                 assignment.save()
 
-            # Domain event
             EquipmentEvent.objects.create(
                 equipment=equipment,
                 user=assignee,
@@ -113,7 +190,6 @@ class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
                 notes=notes or "Equipment assigned",
             )
 
-            # Audit log
             self.audit(
                 event_type=AuditLog.Events.ASSET_ASSIGNED,
                 target=equipment,
@@ -148,13 +224,13 @@ class AssignEquipmentView(AuditMixin, NotificationMixin, APIView):
         )
 
 
-
 class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     """
     Unassign (return) an equipment from a user.
     """
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    required_permission = "assignments.unassign"
 
     def post(self, request):
         serializer = UnassignEquipmentSerializer(data=request.data)
@@ -164,31 +240,38 @@ class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
         user = serializer.validated_data["user"]
         notes = serializer.validated_data.get("notes", "")
 
-        # ASSET AUTHORITY
-        self.check_object_permissions(request, equipment)
+        ensure_asset_is_in_active_role_scope(
+            request,
+            equipment,
+            label="Equipment",
+        )
 
         with transaction.atomic():
+            equipment = (
+                Equipment.objects
+                .select_for_update()
+                .get(pk=equipment.pk)
+            )
 
-            #  Lock equipment row
-            equipment = (Equipment.objects.select_for_update().get(pk=equipment.pk))
+            ensure_asset_is_in_active_role_scope(
+                request,
+                equipment,
+                label="Equipment",
+            )
 
-            # Re-resolve assignment AFTER lock
             assignment = equipment.active_assignment if equipment.is_assigned else None
             if not assignment:
                 raise ValidationError("No active assignment found")
-            
+
             if assignment.user != user:
                 raise ValidationError("Equipment is not assigned to this user")
-            
-            # Idempotency guard
+
             if assignment.returned_at is not None:
                 raise ValidationError("This equipment is already unassigned")
 
-            # Close assignment
             assignment.returned_at = timezone.now()
             assignment.save(update_fields=["returned_at"])
 
-            # Domain event
             EquipmentEvent.objects.create(
                 equipment=equipment,
                 user=user,
@@ -197,17 +280,17 @@ class UnassignEquipmentView(AuditMixin, NotificationMixin, APIView):
                 notes=notes or "Equipment returned",
             )
 
-            # Audit log
             self.audit(
-            event_type=AuditLog.Events.ASSET_UNASSIGNED,
-            target=equipment,
-            description=f"Unassigned from user {user.email}",
-            metadata={
-                "unassigned_from_public_id": user.public_id,
-                "unassigned_from_email": user.email,
-                "notes": notes,
-            },
-        )
+                event_type=AuditLog.Events.ASSET_UNASSIGNED,
+                target=equipment,
+                description=f"Unassigned from user {user.email}",
+                metadata={
+                    "unassigned_from_public_id": user.public_id,
+                    "unassigned_from_email": user.email,
+                    "notes": notes,
+                },
+            )
+
             self.notify(
                 recipient=user,
                 notif_type=AuditLog.Events.ASSET_UNASSIGNED,
@@ -237,7 +320,8 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
     Uses a single mutable EquipmentAssignment per equipment.
     """
 
-    permission_classes = [CanManageAssetCustody]
+    permission_classes = [RequiresPermission]
+    required_permission = "assignments.reassign"
 
     def post(self, request):
         serializer = ReassignEquipmentSerializer(data=request.data)
@@ -248,39 +332,42 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
         to_user = serializer.validated_data["to_user"]
         notes = serializer.validated_data.get("notes", "")
 
-     
-        self.check_object_permissions(request, equipment)
+        active_role = ensure_asset_is_in_active_role_scope(
+            request,
+            equipment,
+            label="Equipment",
+        )
 
-      
-        active_role = get_active_role(request.user)
         if not can_assign_asset_to_user(active_role, to_user):
             raise ValidationError(
                 "You may only reassign equipment to users within your room jurisdiction."
             )
 
         with transaction.atomic():
-
-       
             equipment = (
                 Equipment.objects
                 .select_for_update()
                 .get(pk=equipment.pk)
             )
 
-         
+            ensure_asset_is_in_active_role_scope(
+                request,
+                equipment,
+                label="Equipment",
+            )
+
             assignment = equipment.active_assignment if equipment.is_assigned else None
             if not assignment:
                 raise ValidationError("No active assignment found")
 
-            # Safety check
             if assignment.user != from_user:
                 raise ValidationError(
                     "Equipment is not assigned to from_user"
                 )
+
             if from_user == to_user:
                 raise ValidationError("Equipment is already assigned to this user")
 
-            # Domain event: returned from old user
             EquipmentEvent.objects.create(
                 equipment=equipment,
                 user=from_user,
@@ -289,7 +376,6 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
                 notes=notes or "Equipment reassigned",
             )
 
-            # Mutate existing assignment 
             assignment.user = to_user
             assignment.assigned_by = request.user
             assignment.assigned_at = timezone.now()
@@ -297,7 +383,6 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
             assignment.notes = notes
             assignment.save()
 
-            # Domain event: assigned to new user
             EquipmentEvent.objects.create(
                 equipment=equipment,
                 user=to_user,
@@ -306,7 +391,6 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
                 notes=notes or "Equipment reassigned",
             )
 
-            # Audit log 
             self.audit(
                 event_type=AuditLog.Events.ASSET_REASSIGNED,
                 target=equipment,
@@ -323,7 +407,6 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
                 },
             )
 
-            # notify users
             self.notify(
                 recipient=from_user,
                 notif_type=AuditLog.Events.ASSET_REASSIGNED,
@@ -337,7 +420,6 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
                 entity=equipment,
                 actor=request.user,
             )
-
 
             self.notify(
                 recipient=to_user,
@@ -361,25 +443,25 @@ class ReassignEquipmentView(AuditMixin, NotificationMixin, APIView):
             },
             status=status.HTTP_200_OK,
         )
-    
+
+
 class EquipmentEventHistoryViewset(viewsets.ReadOnlyModelViewSet):
     """
     Full chronological event timeline for a piece of equipment.
     """
     serializer_class = EquipmentEventSerializer
+    permission_classes = [IsAuthenticated]
     pagination_class = FlexiblePagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["occurred_at"]
-    # most recent first
-    ordering = ["-occurred_at"] 
+    ordering = ["-occurred_at"]
 
     def get_queryset(self):
         equipment_id = self.kwargs.get("public_id")
 
         return (
             EquipmentEvent.objects.filter(
-                equipment__public_id=equipment_id
+                equipment__public_id=equipment_id,
             )
             .select_related("user", "reported_by")
         )
-

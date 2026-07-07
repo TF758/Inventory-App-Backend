@@ -1,4 +1,7 @@
 from rest_framework import serializers
+from access.services.roles import RoleGovernanceService
+from access.hierachy import DEPARTMENT, LOCATION, ROOM, SITE
+from access.services.hierachy import HierarchyService
 from users.models.roles import RoleAssignment
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
@@ -86,21 +89,26 @@ class RoleReadSerializer(serializers.ModelSerializer):
             return f"{user.fname} {user.lname}"
         return user.email or "N/A"
 
+
 class RoleWriteSerializer(serializers.ModelSerializer):
     """
     Serializer for creating/updating RoleAssignment.
 
     Responsibilities:
-    - Validate data shape & consistency
-    - Enforce role ↔ scope compatibility
-    - Enforce exactly one scope
-    - Prevent duplicates
-    - NO authority decisions (handled by permissions / viewset)
+    - Validate data shape and consistency.
+    - Enforce role/scope compatibility.
+    - Enforce exactly one scope where required.
+    - Prevent duplicate assignments.
+
+    Does NOT determine:
+    - Permissions.
+    - Object-level authorization.
+    - Role governance.
     """
 
     user = serializers.SlugRelatedField(
         slug_field="public_id",
-        queryset=User.objects.all()
+        queryset=User.objects.all(),
     )
 
     department = serializers.SlugRelatedField(
@@ -108,7 +116,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         queryset=Department.objects.all(),
         required=False,
         allow_null=True,
-        default=None
+        default=None,
     )
 
     location = serializers.SlugRelatedField(
@@ -116,7 +124,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         queryset=Location.objects.all(),
         required=False,
         allow_null=True,
-        default=None
+        default=None,
     )
 
     room = serializers.SlugRelatedField(
@@ -124,7 +132,7 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         queryset=Room.objects.all(),
         required=False,
         allow_null=True,
-        default=None
+        default=None,
     )
 
     class Meta:
@@ -138,91 +146,223 @@ class RoleWriteSerializer(serializers.ModelSerializer):
             "assigned_by",
             "assigned_date",
         ]
-        read_only_fields = ["assigned_by", "assigned_date"]
-        validators = [] 
+
+        read_only_fields = [
+            "assigned_by",
+            "assigned_date",
+        ]
+
+        validators = []
 
     # -------------------------------------------------
-    # GLOBAL VALIDATION
+    # Helpers
     # -------------------------------------------------
 
-    def validate(self, attrs):
-        request = self.context.get("request")
-        acting_user = request.user if request else None
-        active_role = getattr(acting_user, "active_role", None)
+    @staticmethod
+    def _allowed_scope_levels(
+        role,
+    ):
+        allowed = set()
 
-        # -------- Resolve role --------
-        role = attrs.get("role") or getattr(self.instance, "role", None)
+        if HierarchyService.can_assign_to_site(
+            role,
+        ):
+            allowed.add(
+                SITE,
+            )
+
+        if HierarchyService.can_assign_to_department(
+            role,
+        ):
+            allowed.add(
+                DEPARTMENT,
+            )
+
+        if HierarchyService.can_assign_to_location(
+            role,
+        ):
+            allowed.add(
+                LOCATION,
+            )
+
+        if HierarchyService.can_assign_to_room(
+            role,
+        ):
+            allowed.add(
+                ROOM,
+            )
+
+        return allowed
+
+    # -------------------------------------------------
+    # Global validation
+    # -------------------------------------------------
+
+    def validate(
+        self,
+        attrs,
+    ):
+        role = attrs.get(
+            "role",
+            getattr(
+                self.instance,
+                "role",
+                None,
+            ),
+        )
+
         if not role:
-            raise serializers.ValidationError("Role must be provided.")
+            raise serializers.ValidationError({
+                "role": [
+                    "Role must be provided."
+                ]
+            })
 
-        # -------- Resolve existing scope --------
-        room = attrs.get("room", getattr(self.instance, "room", None))
-        location = attrs.get("location", getattr(self.instance, "location", None))
-        department = attrs.get("department", getattr(self.instance, "department", None))
+        target_user = attrs.get(
+            "user",
+            getattr(
+                self.instance,
+                "user",
+                None,
+            ),
+        )
 
-        # =================================================
-        # 🔑 NEW — Treat role change as full reassignment
-        # =================================================
-        if self.instance and role != self.instance.role:
-            room = None
-            location = None
-            department = None
+        if not target_user:
+            raise serializers.ValidationError({
+                "user": [
+                    "User must be provided."
+                ]
+            })
 
-        # Re-apply incoming scope after reset
-        room = attrs.get("room", room)
-        location = attrs.get("location", location)
-        department = attrs.get("department", department)
+        # Optional but recommended:
+        # a role assignment should not be moved
+        # from one user to another.
+        if (
+            self.instance
+            and "user" in attrs
+            and attrs["user"] != self.instance.user
+        ):
+            raise serializers.ValidationError({
+                "user": [
+                    "Role assignment user cannot be changed."
+                ]
+            })
 
-        # =================================================
-        # ISSUE 2 — ROLE ↔ SCOPE COMPATIBILITY
-        # =================================================
-        ROLE_SCOPE_MAP = {
-            "SITE": None,
-            "DEPARTMENT": "department",
-            "LOCATION": "location",
-            "ROOM": "room",
-        }
+        role_changed = (
+            self.instance
+            and role != self.instance.role
+        )
 
-        prefix = role.split("_")[0]
-        expected_scope = ROLE_SCOPE_MAP.get(prefix)
+        existing_room = None if role_changed else getattr(
+            self.instance,
+            "room",
+            None,
+        )
 
-        if expected_scope is not None:
-            for field, value in {
-                "department": department,
-                "location": location,
-                "room": room,
-            }.items():
-                if field != expected_scope and value is not None:
-                    raise serializers.ValidationError(
-                        f"{role} cannot be assigned with {field} scope."
-                    )
+        existing_location = None if role_changed else getattr(
+            self.instance,
+            "location",
+            None,
+        )
 
-        # =================================================
-        # ISSUE 3 — EXACTLY ONE SCOPE (or none for SITE)
-        # =================================================
+        existing_department = None if role_changed else getattr(
+            self.instance,
+            "department",
+            None,
+        )
+
+        room = attrs.get(
+            "room",
+            existing_room,
+        )
+
+        location = attrs.get(
+            "location",
+            existing_location,
+        )
+
+        department = attrs.get(
+            "department",
+            existing_department,
+        )
+
+        allowed_scope_levels = self._allowed_scope_levels(
+            role,
+        )
+
+        if not allowed_scope_levels:
+            raise serializers.ValidationError({
+                "role": [
+                    "Invalid role assignment configuration."
+                ]
+            })
+
         scope_values = {
-            "department": department,
-            "location": location,
-            "room": room,
+            DEPARTMENT: department,
+            LOCATION: location,
+            ROOM: room,
         }
 
-        non_null_scopes = [k for k, v in scope_values.items() if v is not None]
+        provided_scope_levels = [
+            level
+            for level, value in scope_values.items()
+            if value is not None
+        ]
 
-        if prefix == "SITE":
-            if non_null_scopes:
-                raise serializers.ValidationError(
-                    "SITE_ADMIN role must not have a scope."
-                )
+        # -------------------------------------------------
+        # Site-level roles
+        # -------------------------------------------------
+
+        if SITE in allowed_scope_levels and len(
+            allowed_scope_levels
+        ) == 1:
+
+            if provided_scope_levels:
+                raise serializers.ValidationError({
+                    "non_field_errors": [
+                        f"{role} must not have a department, "
+                        f"location, or room scope."
+                    ]
+                })
+
+            department = None
+            location = None
+            room = None
+
+        # -------------------------------------------------
+        # Scoped roles
+        # -------------------------------------------------
+
         else:
-            if len(non_null_scopes) != 1:
-                raise serializers.ValidationError(
-                    "Exactly one scope (department, location, or room) must be provided."
-                )
 
-        # =================================================
-        # Prevent duplicate role assignments
-        # =================================================
-        target_user = attrs.get("user") or getattr(self.instance, "user", None)
+            if len(provided_scope_levels) != 1:
+                raise serializers.ValidationError({
+                    "non_field_errors": [
+                        "Exactly one scope "
+                        "(department, location, or room) "
+                        "must be provided."
+                    ]
+                })
+
+            selected_scope_level = provided_scope_levels[0]
+
+            if selected_scope_level not in allowed_scope_levels:
+                scope_name = {
+                    DEPARTMENT: "department",
+                    LOCATION: "location",
+                    ROOM: "room",
+                }[selected_scope_level]
+
+                raise serializers.ValidationError({
+                    scope_name: [
+                        f"{role} cannot be assigned with "
+                        f"{scope_name} scope."
+                    ]
+                })
+
+        # -------------------------------------------------
+        # Prevent duplicate assignments
+        # -------------------------------------------------
 
         existing = RoleAssignment.objects.filter(
             user=target_user,
@@ -233,16 +373,18 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         )
 
         if self.instance:
-            existing = existing.exclude(pk=self.instance.pk)
+            existing = existing.exclude(
+                pk=self.instance.pk,
+            )
 
         if existing.exists():
             raise serializers.ValidationError({
                 "non_field_errors": [
-                    "User already has this role in the specified scope."
+                    "User already has this role "
+                    "in the specified scope."
                 ]
             })
 
-        # Final normalized attrs
         attrs.update({
             "department": department,
             "location": location,
@@ -252,21 +394,46 @@ class RoleWriteSerializer(serializers.ModelSerializer):
         return attrs
 
     # -------------------------------------------------
-    # CREATE / UPDATE
+    # Create
     # -------------------------------------------------
 
-    def create(self, validated_data):
-        request = self.context.get("request")
-        if request and request.user.is_authenticated:
+    def create(
+        self,
+        validated_data,
+    ):
+        request = self.context.get(
+            "request",
+        )
+
+        if (
+            request
+            and request.user.is_authenticated
+        ):
             validated_data["assigned_by"] = request.user
-        return super().create(validated_data)
 
-    def update(self, instance, validated_data):
-        # ISSUE 4 — Do NOT overwrite assigned_by on update
-        validated_data.pop("assigned_by", None)
-        return super().update(instance, validated_data)
+        return super().create(
+            validated_data,
+        )
 
+    # -------------------------------------------------
+    # Update
+    # -------------------------------------------------
 
+    def update(
+        self,
+        instance,
+        validated_data,
+    ):
+        validated_data.pop(
+            "assigned_by",
+            None,
+        )
+
+        return super().update(
+            instance,
+            validated_data,
+        )
+    
 __all__ = [
     "RoleReadSerializer",
     "RoleWriteSerializer",

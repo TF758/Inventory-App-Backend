@@ -1,6 +1,9 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
+from access.services.roles import RoleGovernanceService
+from core.permissions.users import RoleAssignmentPermission
+from access.hierachy import MANAGES_ALL
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -13,7 +16,6 @@ from django.shortcuts import get_object_or_404
 from core.pagination import  FlexiblePagination
 from django_filters.rest_framework import DjangoFilterBackend
 
-from core.permissions import RolePermission
 from django.db.models import Q
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
@@ -23,104 +25,149 @@ from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
     """
-    Handles listing, creating, retrieving, updating, and deleting RoleAssignment objects.
+    Handles listing, creating, retrieving, updating,
+    and deleting RoleAssignment objects.
+
+    Authorization model:
+    - RoleAssignmentPermission checks permission capability.
+    - RoleGovernanceService checks target role governance.
+    - RoleGovernanceService checks target assignment scope.
+    - RoleAssignment model validates final scope shape.
     """
+
     base_queryset = (
         RoleAssignment.objects
-        .select_related("user", "department", "location", "room")
-        .order_by("-assigned_date", "-id")
+        .select_related(
+            "user",
+            "department",
+            "location",
+            "room",
+        )
+        .order_by(
+            "-assigned_date",
+            "-id",
+        )
     )
+
     lookup_field = "public_id"
-    permission_classes = [RolePermission]
-    filter_backends = [DjangoFilterBackend]
+
+    permission_classes = [
+        RoleAssignmentPermission,
+    ]
+
+    filter_backends = [
+        DjangoFilterBackend,
+    ]
+
     filterset_class = RoleAssignmentFilter
     pagination_class = FlexiblePagination
 
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+        ]:
             return RoleWriteSerializer
+
         return RoleReadSerializer
 
-    
     def get_queryset(self):
         user = self.request.user
         qs = self.base_queryset
 
-        active = getattr(user, "active_role", None)
-
-        own_roles = qs.filter(user=user)
-
-        # SITE_ADMIN sees everything
-        if active and active.role == "SITE_ADMIN":
-            return qs
-
-        if not active:
-            return own_roles
-
-        active_rank = ROLE_HIERARCHY.get(active.role, -1)
-
-        # VIEWER / CLERK → own roles only
-        if active.role in ["ROOM_VIEWER", "ROOM_CLERK"]:
-            return own_roles
-
-        # DEPARTMENT_ADMIN
-        if active.role == "DEPARTMENT_ADMIN":
-            scoped = qs.filter(
-                Q(department=active.department)
-                | Q(location__department=active.department)
-                | Q(room__location__department=active.department)
-            ).exclude(
-                role__in=[
-                    r for r, rank in ROLE_HIERARCHY.items()
-                    if rank >= active_rank
-                ]
-            )
-            return (own_roles | scoped).distinct()
-
-        # LOCATION_ADMIN
-        if active.role == "LOCATION_ADMIN":
-            scoped = qs.filter(
-                Q(location=active.location)
-                | Q(room__location=active.location)
-            ).exclude(
-                role__in=[
-                    r for r, rank in ROLE_HIERARCHY.items()
-                    if rank >= active_rank
-                ]
-            )
-            return (own_roles | scoped).distinct()
-
-        # ROOM_ADMIN
-        if active.role == "ROOM_ADMIN":
-            scoped = qs.filter(room=active.room).exclude(
-                role__in=[
-                    r for r, rank in ROLE_HIERARCHY.items()
-                    if rank >= active_rank
-                ]
-            )
-            return (own_roles | scoped).distinct()
-
-        return own_roles
-
-
-    # ------------------------------
-    # Enforce permission before serializer.save()
-    # ------------------------------
-    def perform_create(self, serializer):
-        user = self.request.user
-        data = serializer.validated_data
-
-        # Pre-check permissions before saving
-        ensure_permission(
+        active_role = getattr(
             user,
-            data['role'],
-            data.get('room'),
-            data.get('location'),
-            data.get('department')
+            "active_role",
+            None,
         )
 
+        own_roles = qs.filter(
+            user=user,
+        )
+
+        if not active_role:
+            return own_roles
+
+        if active_role.role == "SITE_ADMIN":
+            return qs
+
+        manageable_roles = RoleGovernanceService.get_manageable_roles(
+            active_role,
+        )
+
+        if not manageable_roles:
+            return own_roles
+
+        scoped = qs
+
+        if manageable_roles != MANAGES_ALL:
+            scoped = scoped.filter(
+                role__in=manageable_roles,
+            )
+
+        if active_role.department_id:
+            scoped = scoped.filter(
+                Q(
+                    department_id=active_role.department_id,
+                )
+                | Q(
+                    location__department_id=active_role.department_id,
+                )
+                | Q(
+                    room__location__department_id=active_role.department_id,
+                )
+            )
+
+        elif active_role.location_id:
+            scoped = scoped.filter(
+                Q(
+                    location_id=active_role.location_id,
+                )
+                | Q(
+                    room__location_id=active_role.location_id,
+                )
+            )
+
+        elif active_role.room_id:
+            scoped = scoped.filter(
+                room_id=active_role.room_id,
+            )
+
+        else:
+            return own_roles
+
+        return (
+            own_roles
+            | scoped
+        ).distinct()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        active_role = getattr(
+            user,
+            "active_role",
+            None,
+        )
+
+        data = serializer.validated_data
+
+        if not RoleGovernanceService.can_assign(
+            active_role,
+            data["role"],
+            room=data.get("room"),
+            location=data.get("location"),
+            department=data.get("department"),
+        ):
+            raise PermissionDenied(
+                "You may not assign this role."
+            )
+
         try:
-            serializer.save(assigned_by=user)
+            serializer.save(
+                assigned_by=user,
+            )
 
         except IntegrityError:
             raise ValidationError({
@@ -131,18 +178,52 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         user = self.request.user
-        data = serializer.validated_data
 
-        ensure_permission(
+        active_role = getattr(
             user,
-            data.get('role', serializer.instance.role),
-            data.get('room', serializer.instance.room),
-            data.get('location', serializer.instance.location),
-            data.get('department', serializer.instance.department)
+            "active_role",
+            None,
         )
 
+        instance = serializer.instance
+        data = serializer.validated_data
+
+        target_role = data.get(
+            "role",
+            instance.role,
+        )
+
+        target_room = data.get(
+            "room",
+            instance.room,
+        )
+
+        target_location = data.get(
+            "location",
+            instance.location,
+        )
+
+        target_department = data.get(
+            "department",
+            instance.department,
+        )
+
+        if not RoleGovernanceService.can_update_assignment(
+            active_role,
+            instance,
+            new_role=target_role,
+            room=target_room,
+            location=target_location,
+            department=target_department,
+        ):
+            raise PermissionDenied(
+                "You may not modify this role assignment."
+            )
+
         try:
-            serializer.save(assigned_by=user)
+            serializer.save(
+                assigned_by=user,
+            )
 
         except IntegrityError:
             raise ValidationError({
@@ -152,16 +233,21 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             })
 
     def perform_destroy(self, instance):
-        user = self.request.user
-        ensure_permission(
-            user,
-            instance.role,
-            instance.room,
-            instance.location,
-            instance.department
+        active_role = getattr(
+            self.request.user,
+            "active_role",
+            None,
         )
-        instance.delete()
 
+        if not RoleGovernanceService.can_delete_assignment(
+            active_role,
+            instance,
+        ):
+            raise PermissionDenied(
+                "You may not delete this role assignment."
+            )
+
+        instance.delete()
 
 # --- User Roles List (current user or any user by public_id) ---
 class UserRoleList(ListAPIView):

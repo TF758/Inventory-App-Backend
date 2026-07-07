@@ -1,12 +1,36 @@
 # inventory/settings/logging.py
 
 from pathlib import Path
-from .base import env, BASE_DIR, LOG_TO_CONSOLE
+
+from .base import env, LOG_TO_CONSOLE
+
+
+# -------------------------------------------------
+# Core logging settings
+# -------------------------------------------------
 
 LOG_LEVEL = env(
     "LOG_LEVEL",
     default="INFO",
 )
+
+SERVICE_NAME = env(
+    "SERVICE_NAME",
+    default="app",
+)
+
+LOG_TO_FILE = env.bool(
+    "LOG_TO_FILE",
+    default=True,
+)
+
+LOG_FORMAT = env(
+    "LOG_FORMAT",
+    default="text",
+).lower()
+
+LOG_FORMATTER = "json" if LOG_FORMAT == "json" else "detailed"
+
 
 # -------------------------------------------------
 # Log file rotation settings
@@ -42,6 +66,7 @@ LOG_ERROR_BACKUP_COUNT = env.int(
     default=30,
 )
 
+
 # -------------------------------------------------
 # Log archive and cleanup settings
 # -------------------------------------------------
@@ -61,12 +86,80 @@ LOG_ARCHIVE_CRON = env(
     default="15 2 * * *",
 )
 
+
 # -------------------------------------------------
 # Logs directory
 # -------------------------------------------------
 
-LOGS_DIR = BASE_DIR / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
+LOGS_DIR = Path("/var/log/inventory")
+
+if LOG_TO_FILE:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# -------------------------------------------------
+# Handler definitions
+# -------------------------------------------------
+
+handlers = {}
+
+if LOG_TO_CONSOLE:
+    handlers["console"] = {
+        "class": "logging.StreamHandler",
+        "level": LOG_LEVEL,
+        "formatter": LOG_FORMATTER,
+        "filters": ["request_id"],
+    }
+
+if LOG_TO_FILE:
+    handlers["file"] = {
+        "class": "logging.handlers.TimedRotatingFileHandler",
+        "filename": str(LOGS_DIR / f"{SERVICE_NAME}.log"),
+        "when": LOG_FILE_WHEN,
+        "interval": LOG_FILE_INTERVAL,
+        "backupCount": LOG_FILE_BACKUP_COUNT,
+        "level": LOG_LEVEL,
+        "formatter": LOG_FORMATTER,
+        "filters": ["request_id"],
+        "encoding": "utf-8",
+    }
+
+    handlers["error_file"] = {
+        "class": "logging.handlers.TimedRotatingFileHandler",
+        "filename": str(LOGS_DIR / f"{SERVICE_NAME}.error.log"),
+        "when": LOG_ERROR_WHEN,
+        "interval": LOG_ERROR_INTERVAL,
+        "backupCount": LOG_ERROR_BACKUP_COUNT,
+        "level": "ERROR",
+        "formatter": LOG_FORMATTER,
+        "filters": ["request_id"],
+        "encoding": "utf-8",
+    }
+
+# Safety fallback:
+# Prevent Django from starting with an invalid empty handlers config.
+if not handlers:
+    handlers["null"] = {
+        "class": "logging.NullHandler",
+    }
+
+
+# -------------------------------------------------
+# Handler groups
+# -------------------------------------------------
+
+app_handlers = [
+    handler_name
+    for handler_name in ["console", "file", "error_file", "null"]
+    if handler_name in handlers
+]
+
+error_handlers = [
+    handler_name
+    for handler_name in ["console", "error_file", "null"]
+    if handler_name in handlers
+]
+
 
 # -------------------------------------------------
 # Logging configuration
@@ -82,8 +175,12 @@ LOGGING = {
             "format": (
                 "%(asctime)s | %(levelname)s | %(name)s | "
                 "%(filename)s:%(lineno)d (%(funcName)s) | "
-                "%(message)s | request_id=%(request_id)s"
+                "%(message)s | service=%(service_name)s | request_id=%(request_id)s"
             ),
+        },
+
+        "json": {
+            "()": "core.logging.JsonFormatter",
         },
     },
 
@@ -93,56 +190,54 @@ LOGGING = {
         },
     },
 
-    "handlers": {
-        **({
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "detailed",
-                "filters": ["request_id"],
-            }
-        } if LOG_TO_CONSOLE else {}),
-
-        "file": {
-            "class": "logging.handlers.TimedRotatingFileHandler",
-            "filename": str(LOGS_DIR / "app.log"),
-            "when": LOG_FILE_WHEN,
-            "interval": LOG_FILE_INTERVAL,
-            "backupCount": LOG_FILE_BACKUP_COUNT,
-            "level": LOG_LEVEL,
-            "formatter": "detailed",
-            "filters": ["request_id"],
-            "encoding": "utf-8",
-        },
-
-        "error_file": {
-            "class": "logging.handlers.TimedRotatingFileHandler",
-            "filename": str(LOGS_DIR / "error.log"),
-            "when": LOG_ERROR_WHEN,
-            "interval": LOG_ERROR_INTERVAL,
-            "backupCount": LOG_ERROR_BACKUP_COUNT,
-            "level": "ERROR",
-            "formatter": "detailed",
-            "filters": ["request_id"],
-            "encoding": "utf-8",
-        },
-    },
+    "handlers": handlers,
 
     "loggers": {
         "arms": {
-            "handlers": ["file", "error_file"] + (["console"] if LOG_TO_CONSOLE else []),
+            "handlers": app_handlers,
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+
+        "django": {
+            "handlers": app_handlers,
             "level": LOG_LEVEL,
             "propagate": False,
         },
 
         "django.request": {
-            "handlers": ["error_file"],
+            "handlers": error_handlers,
             "level": "ERROR",
+            "propagate": False,
+        },
+
+        "django.server": {
+            "handlers": error_handlers,
+            "level": "ERROR",
+            "propagate": False,
+        },
+
+        "django.db.backends": {
+            "handlers": error_handlers,
+            "level": "ERROR",
+            "propagate": False,
+        },
+
+        "daphne": {
+            "handlers": app_handlers,
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+
+        "celery": {
+            "handlers": app_handlers,
+            "level": LOG_LEVEL,
             "propagate": False,
         },
     },
 
     "root": {
-        "handlers": ["file", "error_file"],
+        "handlers": app_handlers,
         "level": LOG_LEVEL,
     },
 }

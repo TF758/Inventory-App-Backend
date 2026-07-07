@@ -2,85 +2,64 @@ from rest_framework.permissions import BasePermission
 from assignments.models.asset_assignment import AccessoryAssignment, ConsumableIssue, EquipmentAssignment
 from assets.models.assets import Equipment
 from agreements.models.agreements import AssetAgreement, AssetAgreementItem
+from access.services.access import AccessService
+from access.permissions.scoped import ScopedPermission
+from access.services.scope import ScopeService
 from .constants import ROLE_HIERARCHY
 from .helpers import get_active_role, has_asset_custody_scope, has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 from sites.models.sites import Department, Location, Room
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-
-class AssetPermission(BasePermission):
+class AssetPermission(
+    ScopedPermission,
+):
     """
-    Permission class for asset-related models:
-    Equipment, Component, Accessories, Consumables, etc.
+    Asset authorization.
 
-    - VIEWER roles cannot modify assets.
-    - Other roles can modify according to hierarchy and scope.
+    Permission checks are handled by AccessService
+    through ScopedPermission.
+
+    Object-level scope checks are delegated to
+    ScopeService so users can only interact with
+    assets that fall within their assigned
+    department/location/room hierarchy.
     """
 
-    method_role_map = {
-        "GET": "ROOM_VIEWER",
-        "POST": "ROOM_CLERK",
-        "PUT": "ROOM_CLERK",
-        "PATCH": "ROOM_CLERK",
-        "DELETE": "ROOM_ADMIN",
+    permission_map = {
+        "GET": "assets.view",
+        "POST": "assets.create",
+        "PUT": "assets.update",
+        "PATCH": "assets.update",
+        "DELETE": "assets.delete",
     }
 
-    
-    def has_permission(self, request, view):
-        active_role = getattr(request.user, "active_role", None)
+    def has_object_permission(
+        self,
+        request,
+        view,
+        obj,
+    ):
+        active_role = getattr(
+            request.user,
+            "active_role",
+            None,
+        )
+
         if not active_role:
             return False
 
-        # SITE_ADMIN bypass
-        if active_role.role == "SITE_ADMIN":
-            return True
-
-
-        if request.method in SAFE_METHODS:
-            return True
-
-        # WRITE: viewers can never write
-        if is_viewer_role(active_role.role):
-            return False
-
-        required_role = self.method_role_map.get(request.method)
-        if not required_role:
-            return False
-
-        return has_hierarchy_permission(active_role.role, required_role)
-
-    def has_object_permission(self, request, view, obj):
-            active_role = getattr(request.user, "active_role", None)
-            if not active_role:
-                return False
-
-            # SITE_ADMIN bypass
-            if active_role.role == "SITE_ADMIN":
-                return True
-
-            # Determine room for scope (supports nested assets)
-            room_for_scope = getattr(obj, "room", None)
-            if hasattr(obj, "equipment") and obj.equipment:
-                room_for_scope = obj.equipment.room
-
-            # READ: must be in scope
-            if request.method in SAFE_METHODS:
-                return True
-
-            # WRITE: viewers blocked (defensive)
-            if is_viewer_role(active_role.role):
-                return False
-
-            required_role = self.method_role_map.get(request.method)
-            if not required_role:
-                return False
-
-            return (
-                has_hierarchy_permission(active_role.role, required_role)
-                and is_in_scope(active_role, room=room_for_scope)
+        return (
+            self.has_permission(
+                request,
+                view,
             )
-
+            and ScopeService.can_access_asset(
+                active_role,
+                obj,
+            )
+        )
+    
 class CanManageAssetCustody(BasePermission):
     """
     Permission to assign / unassign / reassign equipment.
