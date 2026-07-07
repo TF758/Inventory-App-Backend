@@ -60,13 +60,19 @@ jobs:
   hadolint:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        dockerfile:
+          - Dockerfile
+          - Dockerfile.prod
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: Dockerfile
+          dockerfile: ${{ matrix.dockerfile }}
           failure-threshold: warning
 
   trivy-fs:
@@ -98,10 +104,11 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image
+      - name: Build production image
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.prod
           tags: inventory-api:ci
           outputs: type=docker,dest=/tmp/inventory-api.tar
           cache-from: type=gha
@@ -119,6 +126,14 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    env:
+      ENV_FILE: .env.staging
+      BACKEND_IMAGE: inventory-api
+      IMAGE_TAG: ci
+      APP_ENV: staging
+      DJANGO_ENV: prod
+      API_PORT: 8001
+
     steps:
       - uses: actions/checkout@v4
 
@@ -130,33 +145,189 @@ jobs:
       - name: Load image
         run: docker load -i inventory-api.tar
 
-      - name: Create CI environment file
+      - name: Verify image exists
+        run: docker image inspect inventory-api:ci
+
+      - name: Create staging-like CI environment file
         run: |
-          cat <<EOF > .env.dev
-          DJANGO_ENV=dev
-          DEBUG=True
-          SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars
+          cat <<EOF > .env.staging
+          DJANGO_ENV=prod
+          APP_ENV=staging
+          DEBUG=False
+          DJANGO_RELOAD=0
+          DJANGO_SERVER=asgi
 
-          POSTGRES_DB=inventory
-          POSTGRES_USER=inventory
-          POSTGRES_PASSWORD=inventory
+          SECRET_KEY=ci-staging-secret-key-for-testing-at-least-32-chars
 
-          DB_NAME=inventory
+          ALLOWED_HOSTS=localhost,127.0.0.1,api
+          FRONTEND_URL=http://localhost:5173
+          CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+          CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:8001
+
+          EMAIL_HOST=smtp.gmail.com
+          EMAIL_PORT=587
+          EMAIL_USE_TLS=True
+          EMAIL_HOST_USER=ci@example.com
+          EMAIL_HOST_PASSWORD=dummy-password
+
+          DB_NAME=inventory_staging
           DB_USER=inventory
           DB_PASSWORD=inventory
           DB_HOST=db
           DB_PORT=5432
 
+          POSTGRES_DB=inventory_staging
+          POSTGRES_USER=inventory
+          POSTGRES_PASSWORD=inventory
+
+          JWT_ACCESS_MINUTES=15
+          JWT_REFRESH_DAYS=1
+
+          THROTTLE_ANON=30/min
+          THROTTLE_USER=1000/hour
+          THROTTLE_LOGIN=6/min
+          THROTTLE_REFRESH=30/min
+          THROTTLE_EQUIPMENT=30/hour
+
           SESSION_IDLE_MINUTES=30
-          SESSION_ABSOLUTE_HOURS=8
+          SESSION_ABSOLUTE_HOURS=12
+
+          SESSION_COOKIE_SECURE=False
+          CSRF_COOKIE_SECURE=False
+          SECURE_SSL_REDIRECT=False
+          SECURE_HSTS_SECONDS=0
+          SECURE_HSTS_INCLUDE_SUBDOMAINS=False
+          SECURE_HSTS_PRELOAD=False
+
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REDIS_DB_CELERY=0
+          REDIS_DB_CHANNELS=1
+          REDIS_DB_REPORTS=5
+
+          REPORT_CACHE_TTL_SECONDS=900
+          REPORT_RETENTION_DAYS=7
+
+          NOTIF_INFO_AUTO_READ_DAYS=1
+          NOTIF_WARNING_AUTO_READ_DAYS=1
+          NOTIF_CRITICAL_AUTO_READ_DAYS=1
+
+          NOTIF_INFO_LIFETIME_DAYS=2
+          NOTIF_WARNING_LIFETIME_DAYS=2
+          NOTIF_CRITICAL_LIFETIME_DAYS=2
+
+          NOTIF_INFO_PURGE_DAYS=1
+          NOTIF_WARNING_PURGE_DAYS=1
+          NOTIF_CRITICAL_PURGE_DAYS=1
+
+          NOTIF_AUTO_READ_CRON="5 */3 * * *"
+          NOTIF_CLEANUP_CRON="20 */6 * * *"
+          NOTIF_SOFT_DELETE_CRON="10 */4 * * *"
+
+          TASKRUN_CLEANUP_CRON="10 */6 * * *"
+          TASKRUN_SUCCESS_RETENTION_DAYS=1
+          TASKRUN_SKIPPED_RETENTION_DAYS=1
+          TASKRUN_FAILED_RETENTION_DAYS=3
+
+          TIME_ZONE=America/St_Lucia
+          SNAPSHOT_SCHEMA_VERSION=1
+          DAILY_SYSTEM_METRICS_CRON="10 */12 * * *"
+
+          USERSESSION_CLEANUP_CRON="0 */8 * * *"
+          USERSESSION_EXPIRE_CRON="*/15 * * * *"
+
+          SESSION_EXPIRED_RETENTION_DAYS=1
+          SESSION_REVOKED_RETENTION_DAYS=2
+
+          LOG_LEVEL=INFO
+          LOG_FORMAT=json
+          LOG_TO_FILE=False
+          LOG_TO_CONSOLE=True
+
+          LOG_FILE_WHEN=midnight
+          LOG_FILE_INTERVAL=1
+          LOG_FILE_BACKUP_COUNT=30
+
+          LOG_ERROR_WHEN=midnight
+          LOG_ERROR_INTERVAL=1
+          LOG_ERROR_BACKUP_COUNT=30
+
+          LOG_ARCHIVE_AFTER_DAYS=1
+          LOG_DELETE_AFTER_DAYS=7
+          LOG_ARCHIVE_CRON="15 2 * * *"
           EOF
 
-      - name: Run Django deployment checks
+      - name: Start staging dependencies
         run: |
-          docker compose run --rm api \
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            up -d db redis
+
+      - name: Wait for database
+        run: |
+          until docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            exec -T db pg_isready -U inventory -d inventory_staging; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+
+      - name: Run Django staging checks
+        run: |
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            run --rm api \
+            python manage.py check \
+            --settings=inventory.settings.staging
+
+      - name: Run Django deploy checks
+        run: |
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            run --rm api \
             python manage.py check \
             --deploy \
-            --settings=inventory.settings.prod
+            --settings=inventory.settings.staging
+
+      - name: Run migrations
+        run: |
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            run --rm api \
+            python manage.py migrate --noinput
+
+      - name: Start full staging stack
+        run: |
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            up -d api worker beat
+
+      - name: Smoke test schema endpoint
+        run: |
+          sleep 5
+          curl -fsS http://localhost:8001/schema/ > /tmp/schema.yaml
+
+      - name: Show API logs on failure
+        if: failure()
+        run: |
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            logs --tail=150 api
+
+      - name: Shutdown services
+        if: always()
+        run: |
+          docker compose \
+            -f docker-compose.prod.yml \
+            -f docker-compose.staging.yml \
+            down -v
 
   tests:
     needs: deploy-check
@@ -178,20 +349,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: inventory-api-image
-
-      - name: Load image
-        run: docker load -i inventory-api.tar
-
-      - name: Create CI environment file
+      - name: Create CI dev environment file
         run: |
           cat <<EOF > .env.dev
           DJANGO_ENV=dev
+          APP_ENV=dev
           DEBUG=True
+          DJANGO_RELOAD=0
+          DJANGO_SERVER=dev
           SECRET_KEY=ci-secret-key-for-testing-at-least-32-chars
+
+          ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,api,testserver
+          FRONTEND_URL=http://localhost:5173
+          CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+          CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+          EMAIL_HOST=smtp.gmail.com
+          EMAIL_PORT=587
+          EMAIL_USE_TLS=True
+          EMAIL_HOST_USER=ci@example.com
+          EMAIL_HOST_PASSWORD=dummy-password
 
           POSTGRES_DB=inventory
           POSTGRES_USER=inventory
@@ -203,16 +380,79 @@ jobs:
           DB_HOST=db
           DB_PORT=5432
 
+          JWT_ACCESS_MINUTES=5
+          JWT_REFRESH_DAYS=1
+
+          THROTTLE_ANON=30/min
+          THROTTLE_USER=10000/hour
+          THROTTLE_LOGIN=10000/min
+          THROTTLE_REFRESH=30/min
+          THROTTLE_EQUIPMENT=30/hour
+
           SESSION_IDLE_MINUTES=30
           SESSION_ABSOLUTE_HOURS=8
+
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REDIS_DB_CELERY=0
+          REDIS_DB_CHANNELS=1
+          REDIS_DB_REPORTS=2
+
+          REPORT_CACHE_TTL_SECONDS=900
+          REPORT_RETENTION_DAYS=7
+
+          NOTIF_INFO_AUTO_READ_DAYS=1
+          NOTIF_WARNING_AUTO_READ_DAYS=1
+          NOTIF_CRITICAL_AUTO_READ_DAYS=1
+          NOTIF_INFO_LIFETIME_DAYS=2
+          NOTIF_WARNING_LIFETIME_DAYS=2
+          NOTIF_CRITICAL_LIFETIME_DAYS=2
+          NOTIF_INFO_PURGE_DAYS=1
+          NOTIF_WARNING_PURGE_DAYS=1
+          NOTIF_CRITICAL_PURGE_DAYS=1
+
+          NOTIF_AUTO_READ_CRON="5 */3 * * *"
+          NOTIF_CLEANUP_CRON="20 */6 * * *"
+          NOTIF_SOFT_DELETE_CRON="10 */4 * * *"
+          TASKRUN_CLEANUP_CRON="10 */6 * * *"
+
+          TASKRUN_SUCCESS_RETENTION_DAYS=1
+          TASKRUN_SKIPPED_RETENTION_DAYS=1
+          TASKRUN_FAILED_RETENTION_DAYS=3
+
+          TIME_ZONE=America/St_Lucia
+          SNAPSHOT_SCHEMA_VERSION=1
+          DAILY_SYSTEM_METRICS_CRON="10 */12 * * *"
+
+          USERSESSION_CLEANUP_CRON="0 */8 * * *"
+          USERSESSION_EXPIRE_CRON="*/15 * * * *"
+          SESSION_EXPIRED_RETENTION_DAYS=1
+          SESSION_REVOKED_RETENTION_DAYS=2
+
+          LOG_LEVEL=INFO
+          LOG_FORMAT=text
+          LOG_TO_FILE=True
+          LOG_TO_CONSOLE=False
+          LOG_FILE_WHEN=midnight
+          LOG_FILE_INTERVAL=1
+          LOG_FILE_BACKUP_COUNT=30
+          LOG_ERROR_WHEN=midnight
+          LOG_ERROR_INTERVAL=1
+          LOG_ERROR_BACKUP_COUNT=30
+          LOG_ARCHIVE_AFTER_DAYS=1
+          LOG_DELETE_AFTER_DAYS=7
+          LOG_ARCHIVE_CRON="15 2 * * *"
           EOF
+
+      - name: Build dev test image
+        run: docker compose build api
 
       - name: Start DB + Redis
         run: docker compose up -d db redis
 
       - name: Wait for database
         run: |
-          until docker compose exec -T db pg_isready -U inventory; do
+          until docker compose exec -T db pg_isready -U inventory -d inventory; do
             echo "Waiting for database..."
             sleep 2
           done
