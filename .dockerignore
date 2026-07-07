@@ -3,16 +3,18 @@
 
 .venv
 venv
+env
 
-__pycache__
-*.pyc
+__pycache__/
+*.py[cod]
 *.pyo
+*$py.class
 
 .env
 .env.*
-!.env.example
 
 coverage*
+.coverage
 htmlcov
 
 .pytest_cache
@@ -21,13 +23,20 @@ htmlcov
 
 localhost*.key
 localhost*.crt
+*.key
+*.crt
+*.pem
 
 gitleaks-working-tree.json
 
-docs
+docs/
 
+logs/
 *.log
 
-__pycache__/
-*.py[cod]
-*$py.class
+media/
+staticfiles/
+reports/
+
+*.sqlite3
+db.sqlite3
