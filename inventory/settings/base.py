@@ -15,14 +15,36 @@ DJANGO_ENV = os.environ.get(
     "dev" if IN_DOCKER else "local",
 )
 
+APP_ENV = os.environ.get(
+    "APP_ENV",
+    DJANGO_ENV,
+)
+
 env = environ.Env(DEBUG=(bool, False))
 
-env_file = BASE_DIR / f".env.{DJANGO_ENV}"
+explicit_env_file = os.environ.get("ENV_FILE")
+
+if explicit_env_file:
+    env_file = Path(explicit_env_file)
+    if not env_file.is_absolute():
+        env_file = BASE_DIR / env_file
+else:
+    env_file = BASE_DIR / f".env.{APP_ENV}"
 
 if env_file.exists():
-    environ.Env.read_env(env_file)
+    environ.Env.read_env(str(env_file))
 else:
-    print(f"Warning: env file not found: {env_file}")
+    # In deployed Docker/Render/Railway/etc, env vars may be injected directly
+    # and no .env file may exist inside the container.
+    if not os.environ.get("SECRET_KEY"):
+        print(f"Warning: env file not found: {env_file}")
+
+# Refresh after reading the env file.
+DJANGO_ENV = env("DJANGO_ENV", default=DJANGO_ENV)
+APP_ENV = env("APP_ENV", default=APP_ENV)
+
+APP_ENV = env("APP_ENV", default=DJANGO_ENV)
+
 
 SECRET_KEY = env("SECRET_KEY")
 
@@ -37,10 +59,11 @@ ALLOWED_HOSTS = env.list(
     default=["localhost", "127.0.0.1"]
 )
 
-FRONTEND_URL = os.environ.get(
+FRONTEND_URL = env(
     "FRONTEND_URL",
-    "http://localhost:5173"
+    default="http://localhost:5173",
 )
+
 
 ROOT_URLCONF = "inventory.urls"
 
@@ -77,7 +100,6 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
-    "django_extensions",
 
     "django_celery_results",
     "django_celery_beat",
@@ -139,10 +161,13 @@ MEDIA_ROOT.mkdir(exist_ok=True)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:8000",
-]
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ],
+)
 
 CORS_ALLOW_CREDENTIALS = True
 

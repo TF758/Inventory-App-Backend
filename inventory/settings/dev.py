@@ -6,6 +6,10 @@ EMAIL_BACKEND = (
     "django.core.mail.backends.console.EmailBackend"
 )
 
+INSTALLED_APPS += [
+    "django_extensions",
+]
+
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 

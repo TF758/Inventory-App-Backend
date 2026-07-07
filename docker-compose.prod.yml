@@ -4,72 +4,75 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "5"
 
+x-backend-image: &backend-image ${BACKEND_IMAGE:-inventory-api}:${IMAGE_TAG:-local}
+
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-
-    command: daphne -b 0.0.0.0 -p 8000 inventory.asgi:application
-
-    ports:
-      - "8000:8000"
+    image: *backend-image
+    command: sh -c "daphne -b 0.0.0.0 -p $${PORT:-8000} inventory.asgi:application"
 
     env_file:
-      - .env.prod
+      - ${ENV_FILE:-.env.staging}
 
     environment:
       SERVICE_NAME: api
+      APP_ENV: ${APP_ENV:-staging}
+      PORT: ${CONTAINER_PORT:-8000}
       LOG_TO_CONSOLE: "True"
       LOG_TO_FILE: "False"
 
+    ports:
+      - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
+
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
     restart: unless-stopped
     logging: *default-logging
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-
+    image: *backend-image
     command: celery -A inventory worker -l info
 
     env_file:
-      - .env.prod
+      - ${ENV_FILE:-.env.staging}
 
     environment:
       SERVICE_NAME: worker
+      APP_ENV: ${APP_ENV:-staging}
       LOG_TO_CONSOLE: "True"
       LOG_TO_FILE: "False"
 
     depends_on:
-      - redis
-      - api
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
 
     restart: unless-stopped
     logging: *default-logging
 
   beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-
+    image: *backend-image
     command: celery -A inventory beat -l info
 
     env_file:
-      - .env.prod
+      - ${ENV_FILE:-.env.staging}
 
     environment:
       SERVICE_NAME: beat
+      APP_ENV: ${APP_ENV:-staging}
       LOG_TO_CONSOLE: "True"
       LOG_TO_FILE: "False"
 
     depends_on:
-      - redis
-      - api
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
 
     restart: unless-stopped
     logging: *default-logging
@@ -78,10 +81,20 @@ services:
     image: postgres:15
 
     env_file:
-      - .env.prod
+      - ${ENV_FILE:-.env.staging}
 
     volumes:
       - inventory_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER:-inventory} -d $${POSTGRES_DB:-inventory}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
     restart: unless-stopped
     logging: *default-logging

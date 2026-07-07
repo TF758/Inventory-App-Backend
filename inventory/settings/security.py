@@ -6,23 +6,32 @@ from .base import env, DEBUG, IS_TESTING
 # Cookie / Security Settings
 # -------------------------------------------------
 
-if DEBUG or IS_TESTING:
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
+default_secure = not (DEBUG or IS_TESTING)
 
-    SESSION_COOKIE_SAMESITE = "Lax"
-    CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = env.bool(
+    "SESSION_COOKIE_SECURE",
+    default=default_secure,
+)
 
-    SECURE_SSL_REDIRECT = False
+CSRF_COOKIE_SECURE = env.bool(
+    "CSRF_COOKIE_SECURE",
+    default=default_secure,
+)
 
-else:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = env(
+    "SESSION_COOKIE_SAMESITE",
+    default="None" if default_secure else "Lax",
+)
 
-    SESSION_COOKIE_SAMESITE = "None"
-    CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = env(
+    "CSRF_COOKIE_SAMESITE",
+    default="None" if default_secure else "Lax",
+)
 
-    SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = env.bool(
+    "SECURE_SSL_REDIRECT",
+    default=default_secure,
+)
 
 # -------------------------------------------------
 # Additional Security Headers

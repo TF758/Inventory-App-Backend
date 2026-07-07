@@ -27,3 +27,7 @@ gitleaks-working-tree.json
 docs
 
 *.log
+
+__pycache__/
+*.py[cod]
+*$py.class
