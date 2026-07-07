@@ -1,6 +1,4 @@
 # reports/models.py
-from tkinter.messagebox import CANCEL
-
 from django.conf import settings
 from django.db import models
 from django.utils import timezone

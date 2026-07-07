@@ -11,7 +11,9 @@ from assignments.models.asset_assignment import ReturnRequest, ReturnRequestItem
 from core.models.sessions import UserSession
 from core.models.security import PasswordResetEvent
 from sites.models.sites import Department, Location, Room
-from users.factories.user_factories import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class AdminMetricsOverview(APIView):
