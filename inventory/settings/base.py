@@ -183,6 +183,16 @@ CORS_ALLOW_HEADERS = [
 
 CORS_EXPOSE_HEADERS = [
     "Content-Disposition",
+    "X-User-Scope-Cache",
+    "X-User-Scope-Cache-User",
+    "X-User-Scope-Cache-Active-Role",
+    "X-User-Scope-Cache-Namespace",
+    "X-User-Scope-Cache-Generation",
+    "X-User-Scope-Cache-Request",
+    "X-User-Scope-Cache-TTL",
+    "X-User-Scope-Cache-Age",
+    "X-User-Scope-Cache-SQL-Queries",
+    "X-User-Scope-Cache-Elapsed-MS",
 ]
 
 SNAPSHOT_SCHEMA_VERSION = env.int(
