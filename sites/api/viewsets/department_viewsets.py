@@ -22,6 +22,7 @@ from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
 from access.permissions.base import RequiresPermission
 from access.permissions.sites import DepartmentContextPermission, DepartmentPermission
+from core.mixins.caching.site_option_invalidation import SiteOptionInvalidationMixin
 from sites.site_filters import AreaUserFilter, DepartmentFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
@@ -30,6 +31,7 @@ from users.api.serializers.users import UserAreaSerializer
 from sites.models.sites import Department, Location, Room, UserPlacement
 from sites.api.serializers.departments import DepartmentComponentSerializer, DepartmentListSerializer, DepartmentLocationsLightSerializer, DepartmentSerializer, DepartmentWriteSerializer
 from sites.api.serializers.rooms import RoomSerializer
+
 
 class DepartmentDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [DepartmentContextPermission]
@@ -43,8 +45,10 @@ class DepartmentDashboardView(AreaDashboardMixin, APIView):
         department = get_object_or_404(Department, public_id=public_id)
         return Response(self.build_dashboard(department))
 
-class DepartmentViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+class DepartmentViewSet( SiteOptionInvalidationMixin, AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
     """ViewSet for managing Department objects"""
+
+    site_option_cache_resource = "department"
 
     lookup_field = "public_id"
     permission_classes = [DepartmentPermission]

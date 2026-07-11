@@ -6,7 +6,8 @@ from django.db import transaction
 from rest_framework.exceptions import PermissionDenied
 
 
-from core.user_scope_cache import UserScopeCacheService
+
+from core.services.user_scope_cache import UserScopeCacheService
 from users.models.roles import RoleAssignment
 from users.models.users import User
 

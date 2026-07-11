@@ -21,6 +21,8 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from core.permissions.constants import ROLE_HIERARCHY
 from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer, RoleWriteSerializer
+from access.services.active_roles import ActiveRoleService
+from core.services.user_scope_cache import UserScopeCacheService
 
 # --- Role Assignments CRUD ---
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
@@ -221,8 +223,16 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            serializer.save(
+            updated_assignment = serializer.save(
                 assigned_by=user,
+            )
+
+            UserScopeCacheService.invalidate_user_on_commit(
+                updated_assignment.user.public_id,
+                reason=(
+                    "role_assignment_updated:"
+                    f"{updated_assignment.public_id}"
+                ),
             )
 
         except IntegrityError:
@@ -247,7 +257,18 @@ class RoleAssignmentViewSet(viewsets.ModelViewSet):
                 "You may not delete this role assignment."
             )
 
+        affected_user_public_id = instance.user.public_id
+        affected_role_public_id = instance.public_id
+
         instance.delete()
+
+        UserScopeCacheService.invalidate_user_on_commit(
+            affected_user_public_id,
+            reason=(
+                "role_assignment_deleted:"
+                f"{affected_role_public_id}"
+            ),
+        )
 
 # --- User Roles List (current user or any user by public_id) ---
 class UserRoleList(ListAPIView):
@@ -288,12 +309,17 @@ class ActiveRoleViewSet(viewsets.GenericViewSet):
     def update(self, request, *args, **kwargs):
         role_id = kwargs.get("role_id")
         if not role_id:
-            return Response({"detail": "Role ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Role ID is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        role = get_object_or_404(RoleAssignment, public_id=role_id)
-        if role.user != request.user:
-            raise PermissionDenied("Cannot activate a role not assigned to you.")
+        role = ActiveRoleService.switch_active_role(
+            user=request.user,
+            role_public_id=role_id,
+        )
 
-        request.user.active_role = role
-        request.user.save(update_fields=["active_role"])
-        return Response({"active_role": role.public_id})
+        return Response(
+            {"active_role": role.public_id},
+            status=status.HTTP_200_OK,
+        )
