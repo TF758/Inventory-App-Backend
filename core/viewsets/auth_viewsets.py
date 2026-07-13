@@ -28,6 +28,7 @@ from core.filters import SiteNameChangeHistoryFilter
 from core.serializers.audit import SiteNameChangeSerializer, SiteRelocationSerializer
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
+from sites.services.option_cache import SiteOptionCacheService
 
 
 class SecuritySettingsAPIView(APIView):
@@ -378,6 +379,14 @@ class SiteNameChangeAPIView( AuditMixin, NotificationMixin, GenericAPIView ):
         obj.name = new_name
         obj.save(update_fields=["name"])
 
+        SiteOptionCacheService.invalidate_on_commit(
+            reason=(
+                f"{site_type}_renamed:"
+                f"object={obj.public_id}:"
+                f"actor={request.user.public_id}"
+            ),
+        )
+
         # --------------------
         # Record site name-change history
         # --------------------
@@ -526,6 +535,17 @@ class SiteRelocationAPIView(AuditMixin, NotificationMixin, GenericAPIView):
 
         else:
             raise ValidationError("Invalid site_type.")
+        
+
+        SiteOptionCacheService.invalidate_on_commit(
+            reason=(
+        f"{site_type}_relocated:"
+        f"object={obj.public_id}:"
+        f"from={getattr(from_parent, 'public_id', None)}:"
+        f"to={target.public_id}:"
+        f"actor={request.user.public_id}"
+            ),
+        )
 
         # --------------------
         # Record relocation history
