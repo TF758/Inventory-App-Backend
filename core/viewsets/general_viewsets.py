@@ -396,256 +396,317 @@ class SessionTokenLoginView(TokenObtainPairView):
 
         return response 
     
+
+
 class RefreshAPIView(APIView):
+    """
+    Rotate the session refresh token and return a new access token.
+
+    Concurrency policy
+    ------------------
+    Browser tabs share the same HttpOnly refresh cookie. Two tabs can therefore
+    submit the same current refresh token at nearly the same time.
+
+    This view serializes refreshes for one session with select_for_update().
+    If a request presents the immediately previous token within the configured
+    grace period and from the same user agent, it is treated as a benign
+    concurrency collision and receives HTTP 409 instead of revoking the session
+    family.
+
+    Previous-token use outside the grace period remains refresh-token reuse and
+    revokes the full session family.
+    """
+
     permission_classes = [AllowAny]
-    authentication_classes = []
+    authentication_classes: list = []
     throttle_classes = [RefreshTokenThrottle]
 
-    def get_client_ip(self, request):
-        xff = request.META.get("HTTP_X_FORWARDED_FOR")
-        if xff:
-            return xff.split(",")[0].strip()
+    @staticmethod
+    def _client_ip(request) -> str | None:
+        forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
         return request.META.get("REMOTE_ADDR")
 
+    @staticmethod
+    def _invalid_session_response(*, delete_cookie: bool = True) -> Response:
+        response = Response(
+            {
+                "code": "INVALID_SESSION",
+                "detail": "Invalid or expired session.",
+            },
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+        if delete_cookie:
+            response.delete_cookie("refresh", path="/")
+
+        return response
+
+    @staticmethod
+    def _refresh_conflict_response() -> Response:
+        response = Response(
+            {
+                "code": "REFRESH_CONFLICT",
+                "detail": (
+                    "Another browser tab refreshed this session. "
+                    "Retry the refresh request."
+                ),
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+        response["Retry-After"] = "1"
+        return response
+
+    @staticmethod
+    def _revoke_family(session: UserSession, *, reason: str) -> None:
+        UserSession.objects.filter(
+            session_family=session.session_family,
+        ).update(status=UserSession.Status.REVOKED)
+
+        AuditLog.objects.create(
+            event_type=AuditLog.Events.SESSION_REVOKED,
+            user=session.user,
+            user_public_id=str(session.user.public_id),
+            user_email=session.user.email,
+            metadata={
+                "reason": reason,
+                "family": str(session.session_family),
+            },
+        )
+
     def post(self, request):
+        raw_refresh = request.COOKIES.get("refresh")
+
+        if not raw_refresh:
+            return self._invalid_session_response()
 
         try:
-            raw_refresh = request.COOKIES.get("refresh")
-
-            if not raw_refresh:
-                return Response(
-                    {"detail": "Invalid or expired session."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-
             hashed_refresh = UserSession.hash_token(raw_refresh)
+        except Exception:
+            logger.exception(
+                "refresh_token_hashing_failed",
+                extra={"has_refresh_cookie": True},
+            )
+            return Response(
+                {
+                    "code": "REFRESH_INTERNAL_ERROR",
+                    "detail": "Internal server error.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-            ip = self.get_client_ip(request)
-            user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
+        now = timezone.now()
+        ip_address = self._client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
+        request_user_agent_hash = UserSession.hash_user_agent(user_agent)
 
-            # ----------------------------------------
-            # Locate session
-            # ----------------------------------------
-            try:
-                session = UserSession.objects.get(
-                    Q(refresh_token_hash=hashed_refresh)
-                    | Q(previous_refresh_token_hash=hashed_refresh),
-                    status=UserSession.Status.ACTIVE,
-                )
-            except UserSession.DoesNotExist:
-                return Response(
-                    {"detail": "Invalid or expired session."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
+        grace_seconds = int(
+            getattr(settings, "REFRESH_REUSE_GRACE_SECONDS", 5)
+        )
+        grace_period = timedelta(seconds=max(grace_seconds, 0))
 
-            now = timezone.now()
+        new_raw_refresh = secrets.token_urlsafe(64)
+        new_refresh_hash = UserSession.hash_token(new_raw_refresh)
 
-            # ----------------------------------------
-            # Refresh token reuse detection
-            # ----------------------------------------
-            if session.previous_refresh_token_hash == hashed_refresh:
+        try:
+            with transaction.atomic():
+                try:
+                    session = (
+                        UserSession.objects
+                        # PostgreSQL cannot apply FOR UPDATE to the nullable
+                        # side of the user__active_role OUTER JOIN. Lock only
+                        # the UserSession row while still eagerly loading the
+                        # related user and active role.
+                        .select_for_update(of=("self",))
+                        .select_related("user", "user__active_role")
+                        .get(
+                            Q(refresh_token_hash=hashed_refresh)
+                            | Q(previous_refresh_token_hash=hashed_refresh),
+                            status=UserSession.Status.ACTIVE,
+                        )
+                    )
+                except UserSession.DoesNotExist:
+                    return self._invalid_session_response()
 
-                # revoke entire family
-                UserSession.objects.filter(
-                    session_family=session.session_family
-                ).update(status=UserSession.Status.REVOKED)
-
-                AuditLog.objects.create(
-                    event_type=AuditLog.Events.SESSION_REVOKED,
-                    user=session.user,
-                    metadata={"reason": "refresh_token_reuse", "family": str(session.session_family)},
-                )
-
-                resp = Response(
-                    {"detail": "Invalid or expired session."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-                resp.delete_cookie("refresh", path="/")
-                return resp
-
-            # ----------------------------------------
-            # Expiration checks
-            # ----------------------------------------
-            if session.absolute_expires_at <= now or session.expires_at <= now:
-
-                session.status = UserSession.Status.EXPIRED
-                session.save(update_fields=["status"])
-
-                AuditLog.objects.create(
-                    event_type=AuditLog.Events.SESSION_EXPIRED,
-                    user=session.user,
-                    user_public_id=str(session.user.public_id),
-                    user_email=session.user.email,
+                is_previous_token = (
+                    session.previous_refresh_token_hash == hashed_refresh
                 )
 
-                resp = Response(
-                    {"detail": "Invalid or expired session."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-                resp.delete_cookie("refresh", path="/")
-                return resp
-
-            # ----------------------------------------
-            # User-agent binding
-            # ----------------------------------------
-            req_ua_hash = UserSession.hash_user_agent(user_agent)
-
-            if session.user_agent_hash and session.user_agent_hash != req_ua_hash:
-
-                session.status = UserSession.Status.REVOKED
-                session.save(update_fields=["status"])
-
-                AuditLog.objects.create(
-                    event_type=AuditLog.Events.SESSION_REVOKED,
-                    user=session.user,
-                    metadata={"reason": "user_agent_mismatch"},
+                same_user_agent = (
+                    not session.user_agent_hash
+                    or session.user_agent_hash == request_user_agent_hash
                 )
 
-                resp = Response(
-                    {"detail": "Invalid or expired session."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-                resp.delete_cookie("refresh", path="/")
-                return resp
+                # A previous token from another user agent is not considered a
+                # normal same-browser tab collision.
+                if is_previous_token and not same_user_agent:
+                    self._revoke_family(
+                        session,
+                        reason="refresh_token_reuse_user_agent_mismatch",
+                    )
+                    return self._invalid_session_response()
 
-            user = session.user
-
-            # ----------------------------------------
-            # Locked account handling
-            # ----------------------------------------
-            if user.is_locked:
-
-                UserSession.objects.filter(
-                    user=user,
-                    status=UserSession.Status.ACTIVE,
-                ).update(status=UserSession.Status.REVOKED)
-
-                AuditLog.objects.create(
-                    event_type=AuditLog.Events.SESSION_REVOKED,
-                    user=user,
-                    metadata={"reason": "account_locked"},
-                )
-
-                resp = Response(
-                    {
-                        "detail": "Your account has been locked. Please contact your administrator."
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-                resp.delete_cookie("refresh", path="/")
-                return resp
-
-            # ----------------------------------------
-            # Rotate refresh token
-            # ----------------------------------------
-            new_raw_refresh = secrets.token_urlsafe(64)
-            new_hash = UserSession.hash_token(new_raw_refresh)
-
-            try:
-                with transaction.atomic():
-
-                    session.previous_refresh_token_hash = session.refresh_token_hash
-                    session.refresh_token_hash = new_hash
-
-                    # refresh idle timeout
-                    session.expires_at = now + get_session_idle_timeout()
-
-                    # update session activity metadata
-                    session.last_ip_address = ip
-
-                    session.last_used_at = now
-
-                    session.save(
-                        update_fields=[
-                            "previous_refresh_token_hash",
-                            "refresh_token_hash",
-                            "expires_at",
-                            "last_ip_address",
-                            "last_used_at",
-                        ]
+                # The immediately previous token may arrive from a sibling tab
+                # that sent its request before the first tab rotated the cookie.
+                if is_previous_token:
+                    within_grace = (
+                        session.last_used_at is not None
+                        and now - session.last_used_at <= grace_period
                     )
 
-            except Exception:
-                logger.exception(
-                    "refresh_token_rotation_failed",
-                    extra={
-                        "session_id": str(session.id),
-                        "user_id": session.user_id,
-                    },
+                    if within_grace and same_user_agent:
+                        return self._refresh_conflict_response()
+
+                    self._revoke_family(
+                        session,
+                        reason="refresh_token_reuse",
+                    )
+                    return self._invalid_session_response()
+
+                # Current-token requests still remain bound to the session's
+                # original browser user agent.
+                if not same_user_agent:
+                    session.status = UserSession.Status.REVOKED
+                    session.save(update_fields=["status"])
+
+                    AuditLog.objects.create(
+                        event_type=AuditLog.Events.SESSION_REVOKED,
+                        user=session.user,
+                        user_public_id=str(session.user.public_id),
+                        user_email=session.user.email,
+                        metadata={"reason": "user_agent_mismatch"},
+                    )
+
+                    return self._invalid_session_response()
+
+                if (
+                    session.absolute_expires_at <= now
+                    or session.expires_at <= now
+                ):
+                    session.status = UserSession.Status.EXPIRED
+                    session.save(update_fields=["status"])
+
+                    AuditLog.objects.create(
+                        event_type=AuditLog.Events.SESSION_EXPIRED,
+                        user=session.user,
+                        user_public_id=str(session.user.public_id),
+                        user_email=session.user.email,
+                    )
+
+                    return self._invalid_session_response()
+
+                user = session.user
+
+                if user.is_locked:
+                    UserSession.objects.filter(
+                        user=user,
+                        status=UserSession.Status.ACTIVE,
+                    ).update(status=UserSession.Status.REVOKED)
+
+                    AuditLog.objects.create(
+                        event_type=AuditLog.Events.SESSION_REVOKED,
+                        user=user,
+                        user_public_id=str(user.public_id),
+                        user_email=user.email,
+                        metadata={"reason": "account_locked"},
+                    )
+
+                    response = Response(
+                        {
+                            "code": "ACCOUNT_LOCKED",
+                            "detail": (
+                                "Your account has been locked. "
+                                "Please contact your administrator."
+                            ),
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                    response.delete_cookie("refresh", path="/")
+                    return response
+
+                # Rotate while the row remains locked. No second request can
+                # read the same session state and perform a competing rotation.
+                session.previous_refresh_token_hash = (
+                    session.refresh_token_hash
                 )
-                return Response(
-                    {"detail": "Internal server error."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                session.refresh_token_hash = new_refresh_hash
+                session.expires_at = now + get_session_idle_timeout()
+                session.last_ip_address = ip_address
+                session.last_used_at = now
+
+                session.save(
+                    update_fields=[
+                        "previous_refresh_token_hash",
+                        "refresh_token_hash",
+                        "expires_at",
+                        "last_ip_address",
+                        "last_used_at",
+                    ]
                 )
 
-            # ----------------------------------------
-            # Generate access token
-            # ----------------------------------------
-            try:
                 access_token = AccessToken.for_user(user)
-                access_token.set_exp(lifetime=get_access_token_lifetime())
+                access_token.set_exp(
+                    lifetime=get_access_token_lifetime(),
+                )
+                access_token["public_id"] = str(user.public_id)
+                access_token["session_id"] = str(session.id)
+                access_token["idle_exp"] = int(
+                    session.expires_at.timestamp()
+                )
+                access_token["abs_exp"] = int(
+                    session.absolute_expires_at.timestamp()
+                )
+                access_token["role_id"] = (
+                    user.active_role.public_id
+                    if user.active_role
+                    else None
+                )
 
-            except Exception:
-                logger.exception(
-                    "access_token_generation_failed",
-                    extra={
-                        "session_id": str(session.id),
-                        "user_id": user.pk,
+                response = Response(
+                    {
+                        "access": str(access_token),
+                        "public_id": str(user.public_id),
+                        "role_id": (
+                            user.active_role.public_id
+                            if user.active_role
+                            else None
+                        ),
                     },
-                )
-                return Response(
-                    {"detail": "Internal server error."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    status=status.HTTP_200_OK,
                 )
 
-            access_token["public_id"] = str(user.public_id)
-            access_token["session_id"] = str(session.id)
-            access_token["idle_exp"] = int(session.expires_at.timestamp())
-            access_token["abs_exp"] = int(session.absolute_expires_at.timestamp())
-            access_token["role_id"] = (
-                user.active_role.public_id if user.active_role else None
-            )
-
-            # ----------------------------------------
-            # Response
-            # ----------------------------------------
-            response = Response(
-                {
-                    "access": str(access_token),
-                    "public_id": str(user.public_id),
-                    "role_id": (
-                        user.active_role.public_id if user.active_role else None
+                response.set_cookie(
+                    key="refresh",
+                    value=new_raw_refresh,
+                    httponly=True,
+                    secure=settings.SESSION_COOKIE_SECURE,
+                    samesite=settings.SESSION_COOKIE_SAMESITE,
+                    path="/",
+                    max_age=int(
+                        (
+                            session.absolute_expires_at - now
+                        ).total_seconds()
                     ),
-                },
-                status=status.HTTP_200_OK,
-            )
+                )
 
-            response.set_cookie(
-                key="refresh",
-                value=new_raw_refresh,
-                httponly=True,
-                secure=settings.SESSION_COOKIE_SECURE,
-                samesite=settings.SESSION_COOKIE_SAMESITE,
-                path="/",
-                max_age=int(get_session_absolute_lifetime().total_seconds()),
-            )
-
-            return response
+                return response
 
         except Exception:
             logger.exception(
                 "refresh_flow_failed",
                 extra={
-                    "has_refresh_cookie": bool(request.COOKIES.get("refresh")),
+                    "has_refresh_cookie": bool(raw_refresh),
                 },
             )
 
             return Response(
-                {"detail": "Internal server error."},
+                {
+                    "code": "REFRESH_INTERNAL_ERROR",
+                    "detail": "Internal server error.",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        
+            )      
 class LogoutAPIView(APIView):
     permission_classes = []
     authentication_classes = []
