@@ -303,7 +303,15 @@ class ChangePasswordView(APIView):
             status=status.HTTP_200_OK,
         )
 
-        # Optionally clear the refresh cookie
+        # Clear only the refresh cookie selected by this authenticated
+        # session. Other accounts in the same browser profile keep their own
+        # session-specific cookies. The legacy shared cookie is also removed
+        # during the migration period.
+        session_id = request.auth.get("session_id") if request.auth else None
+
+        if session_id:
+            response.delete_cookie(f"refresh_{session_id}", path="/")
+
         response.delete_cookie("refresh", path="/")
 
         return response
@@ -741,6 +749,7 @@ class SessionActivityAPIView(APIView):
         return Response(
             {
                 "ok": True,
+                "session_id": str(session.id),
                 "idle_exp": int(session.expires_at.timestamp()),
                 "abs_exp": int(session.absolute_expires_at.timestamp()),
             },
