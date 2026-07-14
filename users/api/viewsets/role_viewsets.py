@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from access.services.roles import RoleGovernanceService
 from core.permissions.users import RoleAssignmentPermission
 from access.hierachy import MANAGES_ALL
+from users.services.active_roles import ActiveRoleService
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
 from users.models.users import User
@@ -21,7 +22,7 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from core.permissions.constants import ROLE_HIERARCHY
 from users.api.serializers.roles import ActiveRoleSerializer, RoleReadSerializer, RoleWriteSerializer
-from access.services.active_roles import ActiveRoleService
+
 from core.services.user_scope_cache import UserScopeCacheService
 
 # --- Role Assignments CRUD ---

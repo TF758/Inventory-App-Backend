@@ -179,6 +179,7 @@ CORS_ALLOW_HEADERS = [
     "origin",
     "Content-Disposition",
     "x-device-name",
+    "x-session-id",
 ]
 
 CORS_EXPOSE_HEADERS = [
