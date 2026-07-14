@@ -1,32 +1,63 @@
-import token
-from rest_framework_simplejwt.views import TokenObtainPairView
-from core.serializers.general import SessionTokenLoginViewSerializer, PasswordResetRequestSerializer
+import secrets
+import uuid
+from datetime import timedelta
+
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import status
-from core.models.sessions import UserSession
-from django.utils import timezone
-from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.views import APIView
-import secrets
-from django.db import IntegrityError, transaction
-from rest_framework.exceptions import APIException
-from core.utils.tokens import PasswordResetToken
-from core.serializers.auth import PasswordResetConfirmSerializer
-from core.throttling import LoginThrottle, PasswordResetThrottle, RefreshTokenThrottle
-from rest_framework.exceptions import Throttled
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+from core.logging import get_logger
 from core.mixins import AuditMixin
 from core.models.audit import AuditLog
-from django.db.models import Q
-from django.conf import settings
+from core.models.sessions import UserSession
 from core.security_policy import *
-from core.logging import get_logger
+from core.serializers.auth import PasswordResetConfirmSerializer
+from core.serializers.general import (
+    PasswordResetRequestSerializer,
+    SessionTokenLoginViewSerializer,
+)
+from core.services.security.login_failures import (
+    is_temporarily_locked,
+    register_failed_login,
+    reset_failed_logins,
+    validate_user_not_locked,
+)
+from core.throttling import LoginThrottle, RefreshTokenThrottle
+from core.utils.tokens import PasswordResetToken
 from users.models import User
-from core.services.security.login_failures import validate_user_not_locked, register_failed_login, reset_failed_logins, is_temporarily_locked
-from rest_framework.exceptions import AuthenticationFailed
 
 
 logger = get_logger(__name__)
+
+SESSION_ID_HEADER = "X-Session-ID"
+REFRESH_COOKIE_PREFIX = "refresh_"
+LEGACY_REFRESH_COOKIE_NAME = "refresh"
+
+
+def refresh_cookie_name(session_id: uuid.UUID | str) -> str:
+    """Return the HttpOnly refresh-cookie name for one selected session."""
+    return f"{REFRESH_COOKIE_PREFIX}{session_id}"
+
+
+def parse_session_id(request) -> uuid.UUID | None:
+    """Read and strictly validate the non-secret session selector header."""
+    raw_session_id = request.headers.get(SESSION_ID_HEADER)
+
+    if not raw_session_id:
+        return None
+
+    try:
+        return uuid.UUID(str(raw_session_id).strip())
+    except (TypeError, ValueError, AttributeError):
+        return None
+
 
 class SessionTokenLoginView(TokenObtainPairView):
 
@@ -366,6 +397,7 @@ class SessionTokenLoginView(TokenObtainPairView):
 
         response_data = {
             "access": access_token,
+            "session_id": str(session.id),
             "public_id": str(user.public_id),
             "role_id": (
                 user.active_role.public_id
@@ -381,8 +413,10 @@ class SessionTokenLoginView(TokenObtainPairView):
             status=status.HTTP_200_OK,
         )
 
+        cookie_name = refresh_cookie_name(session.id)
+
         response.set_cookie(
-            key="refresh",
+            key=cookie_name,
             value=raw_refresh,
             httponly=True,
             secure=settings.SESSION_COOKIE_SECURE,
@@ -394,27 +428,27 @@ class SessionTokenLoginView(TokenObtainPairView):
             ),
         )
 
-        return response 
+        # Remove the former shared cookie during the migration to
+        # session-specific refresh credentials.
+        response.delete_cookie(LEGACY_REFRESH_COOKIE_NAME, path="/")
+
+        return response
     
 
 
 class RefreshAPIView(APIView):
     """
-    Rotate the session refresh token and return a new access token.
+    Rotate one selected session's refresh token and return a new access token.
 
-    Concurrency policy
-    ------------------
-    Browser tabs share the same HttpOnly refresh cookie. Two tabs can therefore
-    submit the same current refresh token at nearly the same time.
+    The frontend supplies the non-secret session selector in X-Session-ID.
+    The raw refresh credential remains in the matching session-specific
+    HttpOnly cookie, refresh_<session_id>. The selector alone never
+    authenticates the request.
 
-    This view serializes refreshes for one session with select_for_update().
-    If a request presents the immediately previous token within the configured
-    grace period and from the same user agent, it is treated as a benign
-    concurrency collision and receives HTTP 409 instead of revoking the session
-    family.
-
-    Previous-token use outside the grace period remains refresh-token reuse and
-    revokes the full session family.
+    Refreshes for the same session are serialized with select_for_update().
+    An immediately previous token from the same user agent and inside the
+    configured grace period returns HTTP 409 so a sibling tab can retry using
+    the cookie installed by the winning refresh response.
     """
 
     permission_classes = [AllowAny]
@@ -429,22 +463,27 @@ class RefreshAPIView(APIView):
         return request.META.get("REMOTE_ADDR")
 
     @staticmethod
-    def _invalid_session_response(*, delete_cookie: bool = True) -> Response:
+    def _invalid_session_response(
+        *,
+        cookie_name: str | None = None,
+        code: str = "INVALID_SESSION",
+        detail: str = "Invalid or expired session.",
+    ) -> Response:
         response = Response(
             {
-                "code": "INVALID_SESSION",
-                "detail": "Invalid or expired session.",
+                "code": code,
+                "detail": detail,
             },
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
-        if delete_cookie:
-            response.delete_cookie("refresh", path="/")
+        if cookie_name:
+            response.delete_cookie(cookie_name, path="/")
 
         return response
 
     @staticmethod
-    def _refresh_conflict_response() -> Response:
+    def _refresh_conflict_response(session_id: uuid.UUID) -> Response:
         response = Response(
             {
                 "code": "REFRESH_CONFLICT",
@@ -452,6 +491,7 @@ class RefreshAPIView(APIView):
                     "Another browser tab refreshed this session. "
                     "Retry the refresh request."
                 ),
+                "session_id": str(session_id),
             },
             status=status.HTTP_409_CONFLICT,
         )
@@ -472,21 +512,36 @@ class RefreshAPIView(APIView):
             metadata={
                 "reason": reason,
                 "family": str(session.session_family),
+                "session_id": str(session.id),
             },
         )
 
     def post(self, request):
-        raw_refresh = request.COOKIES.get("refresh")
+        session_id = parse_session_id(request)
+
+        if session_id is None:
+            return self._invalid_session_response(
+                code="INVALID_SESSION_ID",
+                detail=(
+                    f"A valid {SESSION_ID_HEADER} header is required."
+                ),
+            )
+
+        cookie_name = refresh_cookie_name(session_id)
+        raw_refresh = request.COOKIES.get(cookie_name)
 
         if not raw_refresh:
-            return self._invalid_session_response()
+            return self._invalid_session_response(cookie_name=cookie_name)
 
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
         except Exception:
             logger.exception(
                 "refresh_token_hashing_failed",
-                extra={"has_refresh_cookie": True},
+                extra={
+                    "session_id": str(session_id),
+                    "has_refresh_cookie": True,
+                },
             )
             return Response(
                 {
@@ -506,49 +561,75 @@ class RefreshAPIView(APIView):
         )
         grace_period = timedelta(seconds=max(grace_seconds, 0))
 
-        new_raw_refresh = secrets.token_urlsafe(64)
-        new_refresh_hash = UserSession.hash_token(new_raw_refresh)
+        try:
+            new_raw_refresh = secrets.token_urlsafe(64)
+            new_refresh_hash = UserSession.hash_token(new_raw_refresh)
+        except Exception:
+            logger.exception(
+                "new_refresh_token_generation_failed",
+                extra={"session_id": str(session_id)},
+            )
+            return Response(
+                {
+                    "code": "REFRESH_INTERNAL_ERROR",
+                    "detail": "Internal server error.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         try:
             with transaction.atomic():
                 try:
                     session = (
                         UserSession.objects
-                        # PostgreSQL cannot apply FOR UPDATE to the nullable
-                        # side of the user__active_role OUTER JOIN. Lock only
-                        # the UserSession row while still eagerly loading the
-                        # related user and active role.
+                        # Lock only UserSession. user__active_role may require
+                        # an OUTER JOIN because active_role is nullable.
                         .select_for_update(of=("self",))
                         .select_related("user", "user__active_role")
-                        .get(
-                            Q(refresh_token_hash=hashed_refresh)
-                            | Q(previous_refresh_token_hash=hashed_refresh),
-                            status=UserSession.Status.ACTIVE,
-                        )
+                        .get(id=session_id)
                     )
                 except UserSession.DoesNotExist:
-                    return self._invalid_session_response()
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
 
-                is_previous_token = (
-                    session.previous_refresh_token_hash == hashed_refresh
+                if session.status != UserSession.Status.ACTIVE:
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
+
+                is_current_token = secrets.compare_digest(
+                    session.refresh_token_hash,
+                    hashed_refresh,
                 )
+                is_previous_token = bool(
+                    session.previous_refresh_token_hash
+                ) and secrets.compare_digest(
+                    session.previous_refresh_token_hash,
+                    hashed_refresh,
+                )
+
+                # The selector identifies a row, but only the matching cookie
+                # proves possession of that session's refresh credential.
+                if not is_current_token and not is_previous_token:
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
 
                 same_user_agent = (
                     not session.user_agent_hash
                     or session.user_agent_hash == request_user_agent_hash
                 )
 
-                # A previous token from another user agent is not considered a
-                # normal same-browser tab collision.
                 if is_previous_token and not same_user_agent:
                     self._revoke_family(
                         session,
                         reason="refresh_token_reuse_user_agent_mismatch",
                     )
-                    return self._invalid_session_response()
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
 
-                # The immediately previous token may arrive from a sibling tab
-                # that sent its request before the first tab rotated the cookie.
                 if is_previous_token:
                     within_grace = (
                         session.last_used_at is not None
@@ -556,16 +637,16 @@ class RefreshAPIView(APIView):
                     )
 
                     if within_grace and same_user_agent:
-                        return self._refresh_conflict_response()
+                        return self._refresh_conflict_response(session_id)
 
                     self._revoke_family(
                         session,
                         reason="refresh_token_reuse",
                     )
-                    return self._invalid_session_response()
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
 
-                # Current-token requests still remain bound to the session's
-                # original browser user agent.
                 if not same_user_agent:
                     session.status = UserSession.Status.REVOKED
                     session.save(update_fields=["status"])
@@ -575,10 +656,15 @@ class RefreshAPIView(APIView):
                         user=session.user,
                         user_public_id=str(session.user.public_id),
                         user_email=session.user.email,
-                        metadata={"reason": "user_agent_mismatch"},
+                        metadata={
+                            "reason": "user_agent_mismatch",
+                            "session_id": str(session.id),
+                        },
                     )
 
-                    return self._invalid_session_response()
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
 
                 if (
                     session.absolute_expires_at <= now
@@ -592,9 +678,12 @@ class RefreshAPIView(APIView):
                         user=session.user,
                         user_public_id=str(session.user.public_id),
                         user_email=session.user.email,
+                        metadata={"session_id": str(session.id)},
                     )
 
-                    return self._invalid_session_response()
+                    return self._invalid_session_response(
+                        cookie_name=cookie_name,
+                    )
 
                 user = session.user
 
@@ -609,7 +698,10 @@ class RefreshAPIView(APIView):
                         user=user,
                         user_public_id=str(user.public_id),
                         user_email=user.email,
-                        metadata={"reason": "account_locked"},
+                        metadata={
+                            "reason": "account_locked",
+                            "session_id": str(session.id),
+                        },
                     )
 
                     response = Response(
@@ -622,11 +714,10 @@ class RefreshAPIView(APIView):
                         },
                         status=status.HTTP_403_FORBIDDEN,
                     )
-                    response.delete_cookie("refresh", path="/")
+                    response.delete_cookie(cookie_name, path="/")
                     return response
 
-                # Rotate while the row remains locked. No second request can
-                # read the same session state and perform a competing rotation.
+                # Rotate only the selected row while it remains locked.
                 session.previous_refresh_token_hash = (
                     session.refresh_token_hash
                 )
@@ -666,6 +757,7 @@ class RefreshAPIView(APIView):
                 response = Response(
                     {
                         "access": str(access_token),
+                        "session_id": str(session.id),
                         "public_id": str(user.public_id),
                         "role_id": (
                             user.active_role.public_id
@@ -677,17 +769,25 @@ class RefreshAPIView(APIView):
                 )
 
                 response.set_cookie(
-                    key="refresh",
+                    key=cookie_name,
                     value=new_raw_refresh,
                     httponly=True,
                     secure=settings.SESSION_COOKIE_SECURE,
                     samesite=settings.SESSION_COOKIE_SAMESITE,
                     path="/",
-                    max_age=int(
-                        (
-                            session.absolute_expires_at - now
-                        ).total_seconds()
+                    max_age=max(
+                        0,
+                        int(
+                            (
+                                session.absolute_expires_at - now
+                            ).total_seconds()
+                        ),
                     ),
+                )
+
+                response.delete_cookie(
+                    LEGACY_REFRESH_COOKIE_NAME,
+                    path="/",
                 )
 
                 return response
@@ -696,6 +796,7 @@ class RefreshAPIView(APIView):
             logger.exception(
                 "refresh_flow_failed",
                 extra={
+                    "session_id": str(session_id),
                     "has_refresh_cookie": bool(raw_refresh),
                 },
             )
@@ -706,28 +807,63 @@ class RefreshAPIView(APIView):
                     "detail": "Internal server error.",
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )      
-class LogoutAPIView(APIView):
-    permission_classes = []
-    authentication_classes = []
+            )
 
-    def get_client_ip(self, request):
+
+class LogoutAPIView(APIView):
+    """Revoke and clear only the session selected by X-Session-ID."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @staticmethod
+    def get_client_ip(request) -> str | None:
         xff = request.META.get("HTTP_X_FORWARDED_FOR")
         if xff:
             return xff.split(",")[0].strip()
         return request.META.get("REMOTE_ADDR")
 
+    @staticmethod
+    def _success_response(
+        *,
+        session_id: uuid.UUID,
+        cookie_name: str,
+    ) -> Response:
+        response = Response(
+            {
+                "detail": "Successfully logged out.",
+                "session_id": str(session_id),
+            },
+            status=status.HTTP_200_OK,
+        )
+        response.delete_cookie(cookie_name, path="/")
+        return response
+
     def post(self, request):
+        session_id = parse_session_id(request)
 
-        raw_refresh = request.COOKIES.get("refresh")
-
-        if not raw_refresh:
-            response = Response(
-                {"detail": "Successfully logged out."},
-                status=status.HTTP_200_OK,
+        if session_id is None:
+            return Response(
+                {
+                    "code": "INVALID_SESSION_ID",
+                    "detail": (
+                        f"A valid {SESSION_ID_HEADER} header is required."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            response.delete_cookie("refresh", path="/")
-            return response
+
+        cookie_name = refresh_cookie_name(session_id)
+        raw_refresh = request.COOKIES.get(cookie_name)
+
+        # Logout is idempotent, but the session selector alone is never enough
+        # to revoke a row. Without the matching cookie, only clear that cookie
+        # name from the browser and report success.
+        if not raw_refresh:
+            return self._success_response(
+                session_id=session_id,
+                cookie_name=cookie_name,
+            )
 
         try:
             hashed_refresh = UserSession.hash_token(raw_refresh)
@@ -735,7 +871,8 @@ class LogoutAPIView(APIView):
             logger.exception(
                 "logout_refresh_token_hashing_failed",
                 extra={
-                    "has_refresh_cookie": bool(raw_refresh),
+                    "session_id": str(session_id),
+                    "has_refresh_cookie": True,
                 },
             )
             return Response(
@@ -745,75 +882,86 @@ class LogoutAPIView(APIView):
 
         ip = self.get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
+        session = None
+        revoked_now = False
 
         try:
             with transaction.atomic():
+                try:
+                    session = (
+                        UserSession.objects
+                        .select_for_update(of=("self",))
+                        .select_related("user")
+                        .get(id=session_id)
+                    )
+                except UserSession.DoesNotExist:
+                    return self._success_response(
+                        session_id=session_id,
+                        cookie_name=cookie_name,
+                    )
 
-                session = UserSession.objects.select_for_update().get(
-                    Q(refresh_token_hash=hashed_refresh)
-                    | Q(previous_refresh_token_hash=hashed_refresh)
+                current_matches = secrets.compare_digest(
+                    session.refresh_token_hash,
+                    hashed_refresh,
+                )
+                previous_matches = bool(
+                    session.previous_refresh_token_hash
+                ) and secrets.compare_digest(
+                    session.previous_refresh_token_hash,
+                    hashed_refresh,
                 )
 
-                # Idempotent logout
-                if session.status != UserSession.Status.ACTIVE:
-                    response = Response(
-                        {"detail": "Successfully logged out."},
-                        status=status.HTTP_200_OK,
+                # A known selector with the wrong cookie does not authorize
+                # revocation. Preserve idempotent logout semantics without
+                # affecting any other session.
+                if not current_matches and not previous_matches:
+                    return self._success_response(
+                        session_id=session_id,
+                        cookie_name=cookie_name,
                     )
-                    response.delete_cookie("refresh", path="/")
-                    return response
 
-                session.status = UserSession.Status.REVOKED
-                session.last_ip_address = ip
-                session.save(update_fields=["status", "last_ip_address"])
-
-        except UserSession.DoesNotExist:
-            response = Response(
-                {"detail": "Successfully logged out."},
-                status=status.HTTP_200_OK,
-            )
-            response.delete_cookie("refresh", path="/")
-            return response
+                if session.status == UserSession.Status.ACTIVE:
+                    session.status = UserSession.Status.REVOKED
+                    session.last_ip_address = ip
+                    session.save(
+                        update_fields=["status", "last_ip_address"]
+                    )
+                    revoked_now = True
 
         except Exception:
             logger.exception(
                 "logout_session_revoke_failed",
-                extra={
-                    "session_id": str(getattr(session, "id", None)),
-                },
+                extra={"session_id": str(session_id)},
             )
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Audit log
-        try:
-            AuditLog.objects.create(
-                event_type=AuditLog.Events.LOGOUT,
-                user=session.user,
-                user_public_id=str(session.user.public_id),
-                user_email=session.user.email,
-                ip_address=ip,
-                user_agent=user_agent,
-            )
-        except Exception:
-            logger.warning(
-            "logout_audit_log_failed",
-            extra={
-                "user_id": session.user_id,
-                "session_id": str(session.id),
-            },
+        if session is not None and revoked_now:
+            try:
+                AuditLog.objects.create(
+                    event_type=AuditLog.Events.LOGOUT,
+                    user=session.user,
+                    user_public_id=str(session.user.public_id),
+                    user_email=session.user.email,
+                    ip_address=ip,
+                    user_agent=user_agent,
+                    metadata={"session_id": str(session.id)},
+                )
+            except Exception:
+                logger.warning(
+                    "logout_audit_log_failed",
+                    extra={
+                        "user_id": session.user_id,
+                        "session_id": str(session.id),
+                    },
+                )
+
+        return self._success_response(
+            session_id=session_id,
+            cookie_name=cookie_name,
         )
-
-        response = Response(
-            {"detail": "Successfully logged out."},
-            status=status.HTTP_200_OK,
-        )
-
-        response.delete_cookie("refresh", path="/")
-
-        return response
 
 
 class PasswordResetRequestView(AuditMixin, APIView):
