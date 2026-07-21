@@ -7,103 +7,116 @@ x-logging: &default-logging
 x-backend-image: &backend-image ${BACKEND_IMAGE:-inventory-api}:${IMAGE_TAG:-local}
 
 services:
-  api:
+  release:
     image: *backend-image
-    command: sh -c "daphne -b 0.0.0.0 -p $${PORT:-8000} inventory.asgi:application"
-
-    env_file:
-      - ${ENV_FILE:-.env.staging}
-
+    command: >-
+      sh -c "python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput"
     environment:
-      SERVICE_NAME: api
-      APP_ENV: ${APP_ENV:-staging}
-      PORT: ${CONTAINER_PORT:-8000}
+      SERVICE_NAME: release
       LOG_TO_CONSOLE: "True"
       LOG_TO_FILE: "False"
-
-    ports:
-      - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
-
+    volumes:
+      - inventory_media:/app/media
+      - inventory_reports:/app/reports
+      - inventory_staticfiles:/app/staticfiles
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
 
+  api:
+    image: *backend-image
+    command: sh -c "daphne -b 0.0.0.0 -p $${PORT:-8000} inventory.asgi:application"
+    environment:
+      SERVICE_NAME: api
+      PORT: ${CONTAINER_PORT:-8000}
+      LOG_TO_CONSOLE: "True"
+      LOG_TO_FILE: "False"
+    volumes:
+      - inventory_media:/app/media
+      - inventory_reports:/app/reports
+      - inventory_staticfiles:/app/staticfiles:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:$${PORT:-8000}/health/ready/', timeout=5)"
+      interval: 15s
+      timeout: 6s
+      retries: 8
+      start_period: 30s
     restart: unless-stopped
     logging: *default-logging
 
   worker:
     image: *backend-image
     command: celery -A inventory worker -l info
-
-    env_file:
-      - ${ENV_FILE:-.env.staging}
-
     environment:
       SERVICE_NAME: worker
-      APP_ENV: ${APP_ENV:-staging}
       LOG_TO_CONSOLE: "True"
       LOG_TO_FILE: "False"
-
+    volumes:
+      - inventory_media:/app/media
+      - inventory_reports:/app/reports
     depends_on:
-      redis:
-        condition: service_started
       db:
         condition: service_healthy
-
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     logging: *default-logging
 
   beat:
     image: *backend-image
     command: celery -A inventory beat -l info
-
-    env_file:
-      - ${ENV_FILE:-.env.staging}
-
     environment:
       SERVICE_NAME: beat
-      APP_ENV: ${APP_ENV:-staging}
       LOG_TO_CONSOLE: "True"
       LOG_TO_FILE: "False"
-
     depends_on:
-      redis:
-        condition: service_started
       db:
         condition: service_healthy
-
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     logging: *default-logging
 
   db:
     image: postgres:15
-
-    env_file:
-      - ${ENV_FILE:-.env.staging}
-
     volumes:
       - inventory_postgres_data:/var/lib/postgresql/data
-
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER:-inventory} -d $${POSTGRES_DB:-inventory}",
-        ]
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
       interval: 10s
       timeout: 5s
-      retries: 5
-
+      retries: 10
     restart: unless-stopped
     logging: *default-logging
 
   redis:
     image: redis:7-alpine
-
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
     logging: *default-logging
 
 volumes:
   inventory_postgres_data:
+  inventory_media:
+  inventory_reports:
+  inventory_staticfiles:

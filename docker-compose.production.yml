@@ -1,12 +1,43 @@
 name: inventory-production
 
+x-production-env: &production-env
+  APP_ENV: production
+  DJANGO_ENV: prod
+  DJANGO_SETTINGS_MODULE: inventory.settings.prod
+
 services:
+  release:
+    env_file:
+      - .env.production
+    environment: *production-env
+
   api:
-    environment:
-      APP_ENV: production
+    env_file:
+      - .env.production
+    environment: *production-env
     ports:
       - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
+
+  worker:
+    env_file:
+      - .env.production
+    environment: *production-env
+
+  beat:
+    env_file:
+      - .env.production
+    environment: *production-env
+
+  db:
+    env_file:
+      - .env.production
 
 volumes:
   inventory_postgres_data:
     name: inventory_production_postgres_data
+  inventory_media:
+    name: inventory_production_media
+  inventory_reports:
+    name: inventory_production_reports
+  inventory_staticfiles:
+    name: inventory_production_staticfiles

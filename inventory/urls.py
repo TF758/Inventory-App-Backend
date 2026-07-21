@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path, include
 
+from core.health import liveness, readiness
+
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -8,6 +10,9 @@ from drf_spectacular.views import (
 )
 
 urlpatterns = [
+    path("health/live/", liveness, name="health-live"),
+    path("health/ready/", readiness, name="health-ready"),
+
     path("admin/", admin.site.urls),
 
     path("", include("django_prometheus.urls")),

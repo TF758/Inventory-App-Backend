@@ -1,12 +1,43 @@
 name: inventory-staging
 
+x-staging-env: &staging-env
+  APP_ENV: staging
+  DJANGO_ENV: prod
+  DJANGO_SETTINGS_MODULE: inventory.settings.staging
+
 services:
+  release:
+    env_file:
+      - .env.staging
+    environment: *staging-env
+
   api:
-    environment:
-      APP_ENV: staging
+    env_file:
+      - .env.staging
+    environment: *staging-env
     ports:
-      - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
+      - "${API_PORT:-8001}:${CONTAINER_PORT:-8000}"
+
+  worker:
+    env_file:
+      - .env.staging
+    environment: *staging-env
+
+  beat:
+    env_file:
+      - .env.staging
+    environment: *staging-env
+
+  db:
+    env_file:
+      - .env.staging
 
 volumes:
   inventory_postgres_data:
     name: inventory_staging_postgres_data
+  inventory_media:
+    name: inventory_staging_media
+  inventory_reports:
+    name: inventory_staging_reports
+  inventory_staticfiles:
+    name: inventory_staging_staticfiles
