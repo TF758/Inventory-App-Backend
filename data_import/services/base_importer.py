@@ -110,7 +110,7 @@ class BaseAssetImporter:
             if self.job and index % 10 == 0:
                 self.job.refresh_from_db()
 
-                if self.job.status == "CANCELLED":
+                if self.job.status == self.job.Status.CANCELLED:
                     break
 
             if self._is_blank_row(raw_row):

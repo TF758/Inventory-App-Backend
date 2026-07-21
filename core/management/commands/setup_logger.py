@@ -64,7 +64,7 @@ class Command(BaseCommand):
 
         upsert_cron_task(
             name="Archive logs (cron)",
-            task="core.tasks.archive_logs.archive_logs",
+            task="core.tasks.logs.archive_logs",
             cron_expr=settings.LOG_ARCHIVE_CRON,
         )
 

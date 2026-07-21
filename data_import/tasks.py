@@ -1,6 +1,7 @@
 
 from celery import shared_task
 from data_import.services.import_builder import build_asset_import
+from django.db import transaction
 from django.utils import timezone
 from reporting.tasks.reports import generate_report_task
 from reporting.models.reports import ReportJob
@@ -13,11 +14,27 @@ logger = logging.getLogger(__name__)
 
 @shared_task(bind=True)
 def run_asset_import_task(self, report_job_id):
-    job = ReportJob.objects.select_related("user").get(id=report_job_id)
+    with transaction.atomic():
+        job = (
+            ReportJob.objects
+            .select_for_update()
+            .select_related("user")
+            .get(id=report_job_id)
+        )
 
-    job.status = ReportJob.Status.RUNNING
-    job.started_at = timezone.now()
-    job.save(update_fields=["status", "started_at"])
+        if job.status == ReportJob.Status.CANCELLED:
+            logger.info(
+                "asset_import_cancelled_before_start",
+                extra={
+                    "job_id": job.id,
+                    "user_id": job.user_id,
+                },
+            )
+            return
+
+        job.status = ReportJob.Status.RUNNING
+        job.started_at = timezone.now()
+        job.save(update_fields=["status", "started_at"])
 
     params = job.params
 

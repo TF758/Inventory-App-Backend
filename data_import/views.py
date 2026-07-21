@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from data_import.tasks import run_asset_import_task
 from data_import.utils import store_import_upload
 from data_import.serializers import AssetImportRequestSerializer
@@ -151,13 +152,33 @@ class AssetImportCancelView(APIView):
             report_type=ReportJob.ReportType.ASSET_IMPORT,
         )
 
-        if job.status in ["COMPLETED", "FAILED"]:
+        terminal_statuses = {
+            ReportJob.Status.DONE,
+            ReportJob.Status.FAILED,
+            ReportJob.Status.CANCELLED,
+        }
+
+        if job.status in terminal_statuses:
             return Response(
                 {"detail": "Job already finished."},
-                status=400,
+                status=status.HTTP_409_CONFLICT,
             )
 
-        job.status = "CANCELLED"
-        job.save()
+        updated = ReportJob.objects.filter(
+            pk=job.pk,
+            status__in=[
+                ReportJob.Status.PENDING,
+                ReportJob.Status.RUNNING,
+            ],
+        ).update(
+            status=ReportJob.Status.CANCELLED,
+            finished_at=timezone.now(),
+        )
 
-        return Response({"status": "cancelled"})
+        if not updated:
+            return Response(
+                {"detail": "Job could not be cancelled."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response({"status": ReportJob.Status.CANCELLED})

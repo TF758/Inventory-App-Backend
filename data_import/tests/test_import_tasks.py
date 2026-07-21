@@ -60,3 +60,20 @@ class AssetImportTaskTests(TestCase):
 
         with self.assertRaises(Exception):
             run_asset_import_task(job.id)
+    @patch("data_import.tasks.build_asset_import")
+    def test_cancelled_import_is_not_started(self, mock_build_import):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            status=ReportJob.Status.CANCELLED,
+            params={
+                "asset_type": "equipment",
+                "stored_file_name": "test.csv",
+            },
+        )
+
+        run_asset_import_task(job.id)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ReportJob.Status.CANCELLED)
+        mock_build_import.assert_not_called()

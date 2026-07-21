@@ -129,3 +129,34 @@ class AssetImportAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+    def test_cancel_pending_import(self):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            params={"asset_type": "equipment", "stored_file_name": "test.csv"},
+        )
+
+        response = self.client.post(
+            reverse("asset-import-cancel", args=[job.public_id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        job.refresh_from_db()
+        self.assertEqual(job.status, ReportJob.Status.CANCELLED)
+        self.assertIsNotNone(job.finished_at)
+
+    def test_cancel_finished_import_returns_conflict(self):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            status=ReportJob.Status.DONE,
+            params={"asset_type": "equipment", "stored_file_name": "test.csv"},
+        )
+
+        response = self.client.post(
+            reverse("asset-import-cancel", args=[job.public_id])
+        )
+
+        self.assertEqual(response.status_code, 409)
+        job.refresh_from_db()
+        self.assertEqual(job.status, ReportJob.Status.DONE)
