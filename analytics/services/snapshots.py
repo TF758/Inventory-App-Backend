@@ -23,6 +23,14 @@ from django.db.models import F, ExpressionWrapper, DurationField, Avg, Max
 
 from analytics.models.metrics import DailyAuthMetrics, DailyReturnMetrics, DailySystemMetrics
 from analytics.models.snapshots import DailyDepartmentSnapshot
+from analytics.utils.utils.cache import (
+    AUTH_METRICS,
+    DEPARTMENT_SNAPSHOTS,
+    RETURN_METRICS,
+    SYSTEM_METRICS,
+    AnalyticsCacheDependency,
+    AnalyticsCacheService,
+)
 from decimal import Decimal
 from django.db.models import DecimalField
 
@@ -200,6 +208,12 @@ def generate_daily_system_metrics(for_date=None):
             
         )
 
+    if created:
+        AnalyticsCacheService.invalidate_on_commit(
+            AnalyticsCacheDependency(SYSTEM_METRICS),
+            reason=f"daily_system_metrics_created:{for_date.isoformat()}",
+        )
+
     return created
 
 
@@ -329,6 +343,18 @@ def generate_daily_department_snapshot(
             },
         )
 
+    if created:
+        AnalyticsCacheService.invalidate_on_commit(
+            AnalyticsCacheDependency(
+                DEPARTMENT_SNAPSHOTS,
+                identity=str(department.pk),
+            ),
+            reason=(
+                "daily_department_snapshot_created:"
+                f"department={department.pk}:date={snapshot_date.isoformat()}"
+            ),
+        )
+
     return created
 
 def generate_daily_return_metrics(for_date=None):
@@ -410,6 +436,12 @@ def generate_daily_return_metrics(for_date=None):
 
                 "schema_version": settings.SNAPSHOT_SCHEMA_VERSION,
             },
+        )
+
+    if created:
+        AnalyticsCacheService.invalidate_on_commit(
+            AnalyticsCacheDependency(RETURN_METRICS),
+            reason=f"daily_return_metrics_created:{for_date.isoformat()}",
         )
 
     return created
@@ -514,6 +546,12 @@ def generate_daily_auth_metrics(for_date=None):
                 "expired_password_resets":
                     PasswordResetEvent.objects.filter( used_at__isnull=True, expires_at__lt=now ).count(),
             },
+        )
+
+    if created:
+        AnalyticsCacheService.invalidate_on_commit(
+            AnalyticsCacheDependency(AUTH_METRICS),
+            reason=f"daily_auth_metrics_created:{for_date.isoformat()}",
         )
 
     return created

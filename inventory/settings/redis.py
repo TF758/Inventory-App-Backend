@@ -66,7 +66,38 @@ CACHES = {
         "KEY_PREFIX": "arms",
         "TIMEOUT": 1800,
     },
+    # Analytics stays isolated in the existing reports Redis database while
+    # using Django's cache API for native serialization and fail-open handling.
+    "reports": {
+        "BACKEND": (
+            "django.core.cache.backends.redis.RedisCache"
+        ),
+        "LOCATION": REDIS_REPORTS_URL,
+        "KEY_PREFIX": "arms:analytics",
+        "TIMEOUT": 86400,
+    },
 }
+
+ANALYTICS_CACHE_ALIAS = env(
+    "ANALYTICS_CACHE_ALIAS",
+    default="reports",
+)
+
+# Generations control freshness. TTL primarily reclaims unreachable old keys.
+ANALYTICS_CACHE_TIMEOUT = env.int(
+    "ANALYTICS_CACHE_TIMEOUT",
+    default=86400,
+)
+
+ANALYTICS_CACHE_LOCK_TIMEOUT = env.int(
+    "ANALYTICS_CACHE_LOCK_TIMEOUT",
+    default=30,
+)
+
+ANALYTICS_CACHE_LOCK_WAIT_MS = env.int(
+    "ANALYTICS_CACHE_LOCK_WAIT_MS",
+    default=200,
+)
 
 
 SITES_OPTION_CACHE_ALIAS = "default"

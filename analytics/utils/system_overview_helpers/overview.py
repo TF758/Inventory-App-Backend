@@ -1,5 +1,8 @@
 from analytics.utils.system_overview_helpers.kpis import build_system_kpis
-from analytics.utils.utils.cache import get_cached_section
+from analytics.utils.utils.cache import (
+    get_cached_section,
+    get_cached_system_kpis,
+)
 
 
 def get_system_overview(*, days: int, granularity: str, sections: list[str]):
@@ -15,6 +18,6 @@ def get_system_overview(*, days: int, granularity: str, sections: list[str]):
             charts[section] = data
 
     return {
-        "kpis": build_system_kpis(),
+        "kpis": get_cached_system_kpis(builder=build_system_kpis),
         "charts": charts,
     }
