@@ -57,26 +57,47 @@ REDIS_CACHE_URL = (
 # Django application cache
 # -------------------------------------------------
 
-CACHES = {
-    "default": {
-        "BACKEND": (
-            "django.core.cache.backends.redis.RedisCache"
-        ),
-        "LOCATION": REDIS_CACHE_URL,
-        "KEY_PREFIX": "arms",
-        "TIMEOUT": 1800,
-    },
-    # Analytics stays isolated in the existing reports Redis database while
-    # using Django's cache API for native serialization and fail-open handling.
-    "reports": {
-        "BACKEND": (
-            "django.core.cache.backends.redis.RedisCache"
-        ),
-        "LOCATION": REDIS_REPORTS_URL,
-        "KEY_PREFIX": "arms:analytics",
-        "TIMEOUT": 86400,
-    },
-}
+if IS_TESTING:
+    # Tests must not depend on an external Redis service. Separate locations
+    # preserve the production cache-alias boundaries.
+    CACHES = {
+        "default": {
+            "BACKEND": (
+                "django.core.cache.backends.locmem.LocMemCache"
+            ),
+            "LOCATION": "arms-tests-default",
+            "TIMEOUT": 1800,
+        },
+        "reports": {
+            "BACKEND": (
+                "django.core.cache.backends.locmem.LocMemCache"
+            ),
+            "LOCATION": "arms-tests-reports",
+            "TIMEOUT": 86400,
+        },
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": (
+                "django.core.cache.backends.redis.RedisCache"
+            ),
+            "LOCATION": REDIS_CACHE_URL,
+            "KEY_PREFIX": "arms",
+            "TIMEOUT": 1800,
+        },
+        # Analytics stays isolated in the existing reports Redis database while
+        # using Django's cache API for native serialization and fail-open
+        # handling.
+        "reports": {
+            "BACKEND": (
+                "django.core.cache.backends.redis.RedisCache"
+            ),
+            "LOCATION": REDIS_REPORTS_URL,
+            "KEY_PREFIX": "arms:analytics",
+            "TIMEOUT": 86400,
+        },
+    }
 
 ANALYTICS_CACHE_ALIAS = env(
     "ANALYTICS_CACHE_ALIAS",

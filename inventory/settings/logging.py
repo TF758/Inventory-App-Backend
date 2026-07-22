@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .base import env, LOG_TO_CONSOLE
+from .base import env, IS_TESTING, LOG_TO_CONSOLE
 
 
 # -------------------------------------------------
@@ -19,10 +19,16 @@ SERVICE_NAME = env(
     default="app",
 )
 
-LOG_TO_FILE = env.bool(
-    "LOG_TO_FILE",
-    default=True,
-)
+# Parallel test workers must not share rotating file handlers. Tests also
+# intentionally exercise error paths, so suppress application logging there.
+if IS_TESTING:
+    LOG_TO_CONSOLE = False
+    LOG_TO_FILE = False
+else:
+    LOG_TO_FILE = env.bool(
+        "LOG_TO_FILE",
+        default=True,
+    )
 
 LOG_FORMAT = env(
     "LOG_FORMAT",
