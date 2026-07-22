@@ -35,10 +35,10 @@ compose=(
 )
 
 "${compose[@]}" config --quiet
-"${compose[@]}" pull api worker beat release
+"${compose[@]}" pull api worker worker-imports worker-reports beat release
 "${compose[@]}" up -d db redis
 "${compose[@]}" run --rm release
-"${compose[@]}" up -d api worker beat
+"${compose[@]}" up -d api worker worker-imports worker-reports beat
 
 health_url="http://127.0.0.1:${API_PORT}/health/ready/"
 
@@ -53,7 +53,7 @@ for attempt in $(seq 1 30); do
   sleep 5
 done
 
-"${compose[@]}" logs --tail=200 api worker beat >&2
+"${compose[@]}" logs --tail=200 api worker worker-imports worker-reports beat >&2
 
 echo "Deployment did not become ready: $health_url" >&2
 exit 1

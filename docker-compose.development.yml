@@ -23,6 +23,16 @@ services:
       - .env.dev
     environment: *development-env
 
+  worker-imports:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
+  worker-reports:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
   beat:
     env_file:
       - .env.dev

@@ -23,6 +23,16 @@ services:
       - .env.staging
     environment: *staging-env
 
+  worker-imports:
+    env_file:
+      - .env.staging
+    environment: *staging-env
+
+  worker-reports:
+    env_file:
+      - .env.staging
+    environment: *staging-env
+
   beat:
     env_file:
       - .env.staging

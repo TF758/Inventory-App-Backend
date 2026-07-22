@@ -13,6 +13,9 @@ services:
       sh -c "python manage.py check --deploy --fail-level ERROR &&
       python manage.py check_storage &&
       python manage.py migrate --noinput &&
+      python manage.py setup_logger &&
+      python manage.py setup_db_cleaners &&
+      python manage.py check_celery_tasks &&
       python manage.py collectstatic --noinput"
     environment:
       SERVICE_NAME: release
@@ -66,7 +69,7 @@ services:
 
   worker:
     image: *backend-image
-    command: celery -A inventory worker -l info
+    command: celery -A inventory worker -l info -Q default,maintenance
     environment:
       SERVICE_NAME: worker
       LOG_TO_CONSOLE: "True"
@@ -79,6 +82,45 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    stop_grace_period: 2m
+    restart: unless-stopped
+    logging: *default-logging
+
+  worker-imports:
+    image: *backend-image
+    command: celery -A inventory worker -l info -Q imports
+    environment:
+      SERVICE_NAME: worker-imports
+      LOG_TO_CONSOLE: "True"
+      LOG_TO_FILE: "False"
+    volumes:
+      - inventory_media:/app/media
+      - inventory_reports:/app/reports
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 2m
+    restart: unless-stopped
+    logging: *default-logging
+
+  worker-reports:
+    image: *backend-image
+    command: celery -A inventory worker -l info -Q reports
+    environment:
+      SERVICE_NAME: worker-reports
+      LOG_TO_CONSOLE: "True"
+      LOG_TO_FILE: "False"
+    volumes:
+      - inventory_media:/app/media
+      - inventory_reports:/app/reports
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 2m
     restart: unless-stopped
     logging: *default-logging
 

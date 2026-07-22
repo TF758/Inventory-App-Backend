@@ -23,6 +23,16 @@ services:
       - .env.production
     environment: *production-env
 
+  worker-imports:
+    env_file:
+      - .env.production
+    environment: *production-env
+
+  worker-reports:
+    env_file:
+      - .env.production
+    environment: *production-env
+
   beat:
     env_file:
       - .env.production

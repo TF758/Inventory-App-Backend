@@ -289,7 +289,7 @@ jobs:
           docker compose \
             -f docker-compose.prod.yml \
             -f docker-compose.staging.yml \
-            up -d api worker beat
+            up -d api worker worker-imports worker-reports beat
       - name: Poll readiness endpoint
         run: |
           for attempt in $(seq 1 30); do
@@ -306,7 +306,7 @@ jobs:
           docker compose \
             -f docker-compose.prod.yml \
             -f docker-compose.staging.yml \
-            logs --tail=200 api worker beat release
+            logs --tail=200 api worker worker-imports worker-reports beat release
       - name: Shutdown services
         if: always()
         run: |

@@ -31,7 +31,7 @@ services:
 
   worker:
     build: .
-    command: celery -A inventory worker -l info
+    command: celery -A inventory worker -l info -Q default,maintenance
     volumes:
       - .:/app
       - ./logs:/var/log/inventory
@@ -39,6 +39,42 @@ services:
       - .env.dev
     environment:
       SERVICE_NAME: worker
+      APP_ENV: dev
+      DJANGO_SETTINGS_MODULE: inventory.settings.dev
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-imports:
+    build: .
+    command: celery -A inventory worker -l info -Q imports
+    volumes:
+      - .:/app
+      - ./logs:/var/log/inventory
+    env_file:
+      - .env.dev
+    environment:
+      SERVICE_NAME: worker-imports
+      APP_ENV: dev
+      DJANGO_SETTINGS_MODULE: inventory.settings.dev
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-reports:
+    build: .
+    command: celery -A inventory worker -l info -Q reports
+    volumes:
+      - .:/app
+      - ./logs:/var/log/inventory
+    env_file:
+      - .env.dev
+    environment:
+      SERVICE_NAME: worker-reports
       APP_ENV: dev
       DJANGO_SETTINGS_MODULE: inventory.settings.dev
     depends_on:
