@@ -1,6 +1,6 @@
 # inventory/settings/security.py
 
-from .base import env, DEBUG, IS_TESTING
+from .base import APP_ENV, DEBUG, IS_TESTING, env
 
 # -------------------------------------------------
 # Cookie / Security Settings
@@ -31,6 +31,35 @@ CSRF_COOKIE_SAMESITE = env(
 SECURE_SSL_REDIRECT = env.bool(
     "SECURE_SSL_REDIRECT",
     default=default_secure,
+)
+
+# -------------------------------------------------
+# Operational endpoint boundaries
+# -------------------------------------------------
+
+WEBSOCKET_ALLOW_QUERY_TOKEN = env.bool(
+    "WEBSOCKET_ALLOW_QUERY_TOKEN",
+    default=APP_ENV in {"dev", "local"},
+)
+
+API_DOCS_ENABLED = env.bool(
+    "API_DOCS_ENABLED",
+    default=APP_ENV in {"dev", "local", "staging"},
+)
+
+API_DOCS_PUBLIC = env.bool(
+    "API_DOCS_PUBLIC",
+    default=APP_ENV in {"dev", "local"},
+)
+
+METRICS_ALLOW_PUBLIC = env.bool(
+    "METRICS_ALLOW_PUBLIC",
+    default=APP_ENV in {"dev", "local"},
+)
+
+METRICS_BEARER_TOKEN = env(
+    "METRICS_BEARER_TOKEN",
+    default="",
 )
 
 # -------------------------------------------------
