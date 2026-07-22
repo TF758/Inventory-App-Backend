@@ -26,7 +26,7 @@ class AssetImportAPITests(TestCase):
 
         self.client.force_authenticate(user=self.user)
 
-    @patch("data_import.views.run_asset_import_task.delay")
+    @patch("data_import.views.enqueue_report_job")
     def test_asset_import_happy_path(self, mock_task):
 
         csv = SimpleUploadedFile(
