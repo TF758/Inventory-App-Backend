@@ -5,6 +5,7 @@ import uuid
 from rest_framework.test import APIClient
 from users.factories.user_factories import UserFactory
 from reporting.models.reports import ReportJob
+from reporting.api.serializers.reports import ReportJobSerializer
 
 
 
@@ -60,7 +61,34 @@ class DownloadReportTests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 409)
-        self.assertEqual(response.json()["error"], "Generation failed")
+        self.assertEqual(
+            response.json(),
+            {
+                "detail": "Report generation failed.",
+                "error": "Report generation failed.",
+            },
+        )
+        self.assertNotContains(
+            response,
+            "Generation failed",
+            status_code=409,
+        )
+
+
+    def test_report_serializer_does_not_expose_internal_error(self):
+
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.USER_SUMMARY,
+            status=ReportJob.Status.FAILED,
+            params={},
+            error="database password appeared in an exception",
+        )
+
+        payload = ReportJobSerializer(job).data
+
+        self.assertEqual(payload["error"], "Report generation failed.")
+        self.assertNotIn("database password", payload["error"])
 
     # -------------------------------------------------
     # File Missing

@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from reporting.tasks.reports import generate_report_task
 from reporting.models.reports import ReportJob
+from reporting.services.job_errors import IMPORT_FAILURE_MESSAGE
 import logging
 from django.core.files.storage import default_storage
 
@@ -81,12 +82,14 @@ def run_asset_import_task(self, report_job_id):
                 "job_id": job.id,
                 "user_id": job.user_id,
             },
+            exc_info=True,
         )
 
         job.status = ReportJob.Status.FAILED
         job.finished_at = timezone.now()
-        job.error = str(exc)
+        job.error = IMPORT_FAILURE_MESSAGE
         job.result_payload = {
+            "public_error": IMPORT_FAILURE_MESSAGE,
             "summary": {
                 "total_rows": 0,
                 "imported_rows": 0,
@@ -94,7 +97,7 @@ def run_asset_import_task(self, report_job_id):
                 "failed_rows": 0,
             },
             "issues": [],
-            "fatal_error": str(exc),
+            "fatal_error": IMPORT_FAILURE_MESSAGE,
         }
         job.save(update_fields=["status", "finished_at", "error", "result_payload"])
 
@@ -110,8 +113,9 @@ def run_asset_import_task(self, report_job_id):
 
         job.status = ReportJob.Status.FAILED
         job.finished_at = timezone.now()
-        job.error = f"Unexpected import error: {exc}"
+        job.error = IMPORT_FAILURE_MESSAGE
         job.result_payload = {
+            "public_error": IMPORT_FAILURE_MESSAGE,
             "summary": {
                 "total_rows": 0,
                 "imported_rows": 0,
@@ -119,7 +123,7 @@ def run_asset_import_task(self, report_job_id):
                 "failed_rows": 0,
             },
             "issues": [],
-            "fatal_error": "Unexpected import error.",
+            "fatal_error": IMPORT_FAILURE_MESSAGE,
         }
         job.save(update_fields=["status", "finished_at", "error", "result_payload"])
 

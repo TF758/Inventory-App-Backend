@@ -160,3 +160,31 @@ class AssetImportAPITests(TestCase):
         self.assertEqual(response.status_code, 409)
         job.refresh_from_db()
         self.assertEqual(job.status, ReportJob.Status.DONE)
+
+    def test_failed_import_status_does_not_expose_internal_error(self):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            status=ReportJob.Status.FAILED,
+            params={
+                "asset_type": "equipment",
+                "stored_file_name": "test.csv",
+            },
+            error="database password appeared in an exception",
+            result_payload={
+                "fatal_error": "database password appeared in an exception",
+            },
+        )
+
+        response = self.client.get(
+            reverse("asset-import-status", args=[job.public_id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["error"], "Import processing failed.")
+        self.assertEqual(
+            response.json()["fatal_error"],
+            "Import processing failed.",
+        )
+        self.assertNotContains(response, "database password")
+

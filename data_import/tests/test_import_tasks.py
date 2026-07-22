@@ -60,6 +60,15 @@ class AssetImportTaskTests(TestCase):
 
         with self.assertRaises(Exception):
             run_asset_import_task(job.id)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ReportJob.Status.FAILED)
+        self.assertEqual(job.error, "Import processing failed.")
+        self.assertEqual(
+            job.result_payload["fatal_error"],
+            "Import processing failed.",
+        )
+        self.assertNotIn("Import failed", str(job.result_payload))
     @patch("data_import.tasks.build_asset_import")
     def test_cancelled_import_is_not_started(self, mock_build_import):
         job = ReportJob.objects.create(

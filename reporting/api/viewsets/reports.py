@@ -16,6 +16,7 @@ from access.permissions.base import RequiresPermission
 from reporting.api.serializers.reports import ReportJobSerializer
 from reporting.filters import ReportJobFilter
 from reporting.models.reports import ReportJob
+from reporting.services.job_errors import public_job_error
 
 
 
@@ -40,10 +41,11 @@ class DownloadReport(APIView):
             )
 
         if job.status == ReportJob.Status.FAILED:
+            client_error = public_job_error(job)
             return JsonResponse(
                 {
-                    "detail": "Report generation failed.",
-                    "error": job.error,
+                    "detail": client_error,
+                    "error": client_error,
                 },
                 status=409,
             )

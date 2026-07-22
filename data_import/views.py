@@ -15,6 +15,7 @@ from core.mixins import AuditMixin, NotificationMixin
 from core.models.audit import AuditLog
 from access.permissions.base import RequiresPermission
 from reporting.models.reports import ReportJob
+from reporting.services.job_errors import public_job_error
 import csv
 from django.http import HttpResponse
 
@@ -94,13 +95,15 @@ class AssetImportStatusView(APIView):
 
         payload = job.result_payload or {}
 
+        client_error = public_job_error(job) or None
+
         return Response({
             "job_id": job.public_id,
             "status": job.status,
             "summary": payload.get("summary"),
             "issues": payload.get("issues", []),
-            "error": job.error,
-            "fatal_error": payload.get("fatal_error"),
+            "error": client_error,
+            "fatal_error": client_error,
         })
 
 class AssetImportErrorDownloadView(APIView):

@@ -10,6 +10,7 @@ import time
 from core.models.tasks import ScheduledTaskRun
 from reporting.report_registry import REPORT_DEFINITIONS
 from reporting.models.reports import ReportJob
+from reporting.services.job_errors import REPORT_FAILURE_MESSAGE
 from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming
 from reporting.utils.report_payload import wrap_report_payload
 
@@ -187,12 +188,12 @@ def generate_report_task(self, report_job_id: int):
         if job:
             with transaction.atomic():
                 job.status = ReportJob.Status.FAILED
-                job.error = str(exc)
+                job.error = REPORT_FAILURE_MESSAGE
                 job.finished_at = timezone.now()
                 job.save(update_fields=["status", "error", "finished_at"])
 
         run.status = ScheduledTaskRun.Status.FAILED
-        run.message = str(exc)
+        run.message = REPORT_FAILURE_MESSAGE
 
         raise
 
