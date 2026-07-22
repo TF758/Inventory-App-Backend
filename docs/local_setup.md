@@ -28,6 +28,21 @@ Running locally means you'll need to set up:
 
 ---
 
+
+## Local Docker TLS certificates
+
+The repository no longer tracks the local TLS private key or certificate. If you
+use the optional Docker Nginx service, create untracked files named
+`localhost.key` and `localhost.crt` in the repository root before starting it.
+Use a local development certificate tool such as `mkcert`; never reuse these
+files outside local development and never force-add them to Git.
+
+Existing developers can keep their current local files. The security patch uses
+`git rm --cached`, so it removes them from version control without deleting the
+working copies.
+
+---
+
 ## Quick Start (Recommended)
 
 ````bash

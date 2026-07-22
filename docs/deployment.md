@@ -90,3 +90,40 @@ through manual workflow dispatch but does not automatically deploy.
 
 Production should use a required reviewer in the GitHub `production`
 environment.
+
+## Production security boundaries
+
+Staging and production force the following controls regardless of conflicting
+environment values:
+
+- DRF Basic Authentication is disabled.
+- WebSocket JWTs are rejected from query strings. Use the `jwt` WebSocket
+  subprotocol pair instead.
+- Prometheus metrics are not public. Set `METRICS_BEARER_TOKEN` and send it as
+  `Authorization: Bearer <token>` from the scraper. An empty token disables the
+  endpoint.
+- API documentation is never public. Staging may enable staff-only docs with
+  `API_DOCS_ENABLED=True`; production disables docs by default.
+- WebSocket origins are checked against `ALLOWED_HOSTS`.
+
+Production also validates HTTPS origins during `python manage.py check --deploy`.
+Use only `https://` values for `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, and
+`CSRF_TRUSTED_ORIGINS`, and never use `*` in `ALLOWED_HOSTS`.
+
+The staging and production Compose overlays bind the API port to `127.0.0.1` so
+clients cannot bypass the trusted reverse proxy and forge proxy security headers.
+The internal production health check sends `X-Forwarded-Proto: https` so Django
+can keep `SECURE_SSL_REDIRECT=True` without redirecting the container probe. The
+external reverse proxy must strip any incoming `X-Forwarded-Proto` value and set
+its own trusted value.
+
+### Metrics scraper example
+
+```bash
+curl \
+  -H "Authorization: Bearer ${METRICS_BEARER_TOKEN}" \
+  https://api.example.com/metrics
+```
+
+Do not put the metrics token in URLs, Compose files, source control, or logs.
+
