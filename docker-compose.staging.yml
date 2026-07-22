@@ -16,7 +16,7 @@ services:
       - .env.staging
     environment: *staging-env
     ports:
-      - "${API_PORT:-8001}:${CONTAINER_PORT:-8000}"
+      - "127.0.0.1:${API_PORT:-8001}:${CONTAINER_PORT:-8000}"
 
   worker:
     env_file:
