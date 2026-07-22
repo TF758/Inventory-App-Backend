@@ -35,3 +35,25 @@ REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
     ]
     if authentication_class != basic_authentication_class
 ]
+
+# Keep test and CI file operations isolated from developer worktrees and
+# container-local paths while exercising the same named storage aliases used
+# by production code.
+STORAGE_BACKEND = "memory"
+STORAGE_SHARED = True
+STORAGE_IS_DISTRIBUTED = False
+STORAGE_IS_SHARED = True
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+    },
+    "reports": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage."
+            "CompressedManifestStaticFilesStorage"
+        ),
+    },
+}

@@ -10,6 +10,7 @@ from .email import *
 
 from .sessions import *
 from .security import *
+from .storage import *
 
 from .reports import *
 from .notifications import *

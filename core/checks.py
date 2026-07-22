@@ -115,4 +115,81 @@ def production_boundary_checks(app_configs, **kwargs):
                 )
                 break
 
+    storage_aliases = getattr(settings, "STORAGES", {})
+    missing_aliases = {"default", "reports"} - set(storage_aliases)
+    if missing_aliases:
+        messages.append(
+            Error(
+                "Required Django storage aliases are missing: "
+                + ", ".join(sorted(missing_aliases)),
+                id="inventory.E010",
+            )
+        )
+
+    storage_backend = getattr(
+        settings,
+        "STORAGE_BACKEND",
+        "filesystem",
+    )
+
+    if storage_backend not in {"filesystem", "s3"}:
+        messages.append(
+            Error(
+                "STORAGE_BACKEND must be 'filesystem' or 's3'.",
+                id="inventory.E011",
+            )
+        )
+    elif storage_backend == "filesystem":
+        if not getattr(settings, "STORAGE_SHARED", False):
+            messages.append(
+                Error(
+                    "Filesystem storage is not declared shared across "
+                    "API and worker services.",
+                    id="inventory.E012",
+                )
+            )
+
+        if environment == "production":
+            messages.append(
+                Warning(
+                    "Production is using single-host shared filesystem "
+                    "storage. Use the S3 backend before adding replicas "
+                    "or multiple Docker hosts.",
+                    id="inventory.W002",
+                )
+            )
+    elif not getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""):
+        messages.append(
+            Error(
+                "AWS_STORAGE_BUCKET_NAME is required for S3 storage.",
+                id="inventory.E013",
+            )
+        )
+
+    if storage_backend == "s3" and environment == "production":
+        endpoint_url = getattr(settings, "AWS_S3_ENDPOINT_URL", "")
+        if endpoint_url and urlparse(endpoint_url).scheme != "https":
+            messages.append(
+                Error(
+                    "AWS_S3_ENDPOINT_URL must use HTTPS in production.",
+                    id="inventory.E014",
+                )
+            )
+
+        if not getattr(settings, "AWS_S3_USE_SSL", True):
+            messages.append(
+                Error(
+                    "AWS_S3_USE_SSL must be enabled in production.",
+                    id="inventory.E015",
+                )
+            )
+
+        if not getattr(settings, "AWS_S3_VERIFY", True):
+            messages.append(
+                Error(
+                    "AWS_S3_VERIFY must be enabled in production.",
+                    id="inventory.E016",
+                )
+            )
+
     return messages

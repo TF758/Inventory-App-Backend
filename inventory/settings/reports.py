@@ -1,9 +1,6 @@
 # inventory/settings/reports.py
 
-from .base import BASE_DIR, env
-
-REPORTS_DIR = BASE_DIR / "reports"
-REPORTS_DIR.mkdir(exist_ok=True)
+from .base import env
 
 REPORT_RETENTION_DAYS = env.int(
     "REPORT_RETENTION_DAYS",

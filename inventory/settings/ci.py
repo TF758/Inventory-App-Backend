@@ -26,3 +26,25 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_HSTS_SECONDS = 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
+
+# Keep test and CI file operations isolated from developer worktrees and
+# container-local paths while exercising the same named storage aliases used
+# by production code.
+STORAGE_BACKEND = "memory"
+STORAGE_SHARED = True
+STORAGE_IS_DISTRIBUTED = False
+STORAGE_IS_SHARED = True
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+    },
+    "reports": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage."
+            "CompressedManifestStaticFilesStorage"
+        ),
+    },
+}
