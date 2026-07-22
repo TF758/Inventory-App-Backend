@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from access.permissions.base import RequiresPermission
 from reporting.api.serializers.site_reports import SiteAssetRequestSerializer, SiteAuditLogRequestSerializer
 from reporting.models.reports import ReportJob
-from reporting.tasks.reports import generate_report_task
+from reporting.services.job_dispatch import enqueue_report_job
 
 
 
@@ -27,7 +27,7 @@ class SiteAssetExcelReportAPIView(APIView):
             params=serializer.validated_data,
         )
 
-        generate_report_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         return Response(
             {
@@ -54,7 +54,7 @@ class SiteAuditLogReportAPIView(APIView):
             params=serializer.validated_data,
         )
 
-        generate_report_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         return Response(
             {

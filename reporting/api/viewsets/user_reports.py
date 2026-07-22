@@ -9,7 +9,7 @@ from core.models.audit import AuditLog
 from access.permissions.base import RequiresPermission
 from reporting.api.serializers.user_report import UserAuditHistoryReportRequestSerializer, UserLoginHistoryReportRequestSerializer, UserSummaryReportRequestSerializer
 from reporting.models.reports import ReportJob
-from reporting.tasks.reports import generate_report_task
+from reporting.services.job_dispatch import enqueue_report_job
 from reporting.utils.resolve_audit_date_range import resolve_audit_date_range
 from reporting.utils.excel_renderer import estimate_excel_size_mb
 
@@ -49,7 +49,7 @@ class UserSummaryReport(APIView):
             params=serializer.validated_data,
         )
 
-        generate_report_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         return Response(
             {
@@ -103,7 +103,7 @@ class UserAuditHistoryReport(APIView):
         # Queue Async Job
         # -------------------------------------------------
 
-        generate_report_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         return Response(
             {
@@ -282,7 +282,7 @@ class UserLoginHistoryReport(APIView):
             params=params,
         )
 
-        generate_report_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         return Response(
             {

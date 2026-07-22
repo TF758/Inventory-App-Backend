@@ -9,7 +9,7 @@ from rest_framework import status
 from access.permissions.base import RequiresPermission
 from reporting.api.serializers.asset_reports import AssetHistoryReportRequestSerializer
 from reporting.models.reports import ReportJob
-from reporting.tasks.reports import generate_report_task
+from reporting.services.job_dispatch import enqueue_report_job
 
 
 class AssetHistoryReport(APIView):
@@ -56,7 +56,7 @@ class AssetHistoryReport(APIView):
             params=serializer.data,
         )
 
-        generate_report_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         return Response(
             {
