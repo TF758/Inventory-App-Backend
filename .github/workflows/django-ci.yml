@@ -125,6 +125,10 @@ jobs:
           LOG_TO_CONSOLE=True
           LOG_TO_FILE=False
           TIME_ZONE=America/St_Lucia
+          STORAGE_BACKEND=filesystem
+          STORAGE_SHARED=True
+          MEDIA_ROOT=/app/media
+          REPORTS_DIR=/app/reports
           EOF
 
       - name: Build test image
@@ -251,6 +255,10 @@ jobs:
           LOG_TO_CONSOLE=True
           LOG_TO_FILE=False
           TIME_ZONE=America/St_Lucia
+          STORAGE_BACKEND=filesystem
+          STORAGE_SHARED=True
+          MEDIA_ROOT=/app/media
+          REPORTS_DIR=/app/reports
           EOF
       - name: Validate merged Compose configuration
         run: |

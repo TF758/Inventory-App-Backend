@@ -10,7 +10,9 @@ services:
   release:
     image: *backend-image
     command: >-
-      sh -c "python manage.py migrate --noinput &&
+      sh -c "python manage.py check --deploy --fail-level ERROR &&
+      python manage.py check_storage &&
+      python manage.py migrate --noinput &&
       python manage.py collectstatic --noinput"
     environment:
       SERVICE_NAME: release
