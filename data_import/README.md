@@ -4,6 +4,8 @@
 
 The `data_import` app provides a scalable pipeline for importing large batches of equipment, accessories, and consumables via CSV uploads.
 
+Uploaded source files are stored through Django default storage, allowing the API and Celery workers to use the same filesystem volume or S3-compatible bucket.
+
 ---
 
 ## Overview

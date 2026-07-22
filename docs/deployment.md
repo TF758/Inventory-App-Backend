@@ -33,20 +33,53 @@ worker and beat services are started only after the release step succeeds.
 ./scripts/release.sh production
 ```
 
-The script polls `/health/ready/` and fails if PostgreSQL, Redis or migrations are
-not ready.
+The release service runs deployment checks plus `check_storage` before migrations.
+The storage check writes, reads, and deletes a private probe object through both
+the `default` and `reports` aliases. The script then polls `/health/ready/` and
+fails if PostgreSQL, Redis or migrations are not ready.
 
-## Shared storage
+## Durable application storage
 
-The Compose deployment uses environment-specific Docker volumes for:
+Imports and generated reports use Django's named `STORAGES` configuration. The
+API and Celery workers therefore use storage keys rather than container-local
+absolute paths.
 
-- Uploaded import files (`/app/media`)
-- Generated reports (`/app/reports`)
-- Collected static files (`/app/staticfiles`)
+The supported modes are:
 
-This resolves API/worker filesystem isolation on one Docker host. For multiple
-hosts or replicas, replace the media and report volumes with shared object
-storage before scaling horizontally.
+- `STORAGE_BACKEND=filesystem`: local development or a single Docker host.
+  `STORAGE_SHARED=True` is mandatory in staging and production, and the API and
+  worker services must mount the same durable `inventory_media` and
+  `inventory_reports` volumes.
+- `STORAGE_BACKEND=s3`: recommended for staging and production. This supports
+  AWS S3 and S3-compatible services such as MinIO, Cloudflare R2 and DigitalOcean
+  Spaces through `AWS_S3_ENDPOINT_URL`.
+
+The default storage alias holds import uploads under `MEDIA_STORAGE_PREFIX`. The
+`reports` alias stores generated workbooks under `REPORT_STORAGE_PREFIX`. Objects
+remain private and are streamed through authenticated API endpoints; clients do
+not receive bucket URLs.
+
+Production deployment checks reject an unknown backend, missing named aliases,
+unshared filesystem storage, missing S3 bucket names, non-HTTPS production S3
+endpoints, or disabled S3 TLS verification. Single-host filesystem storage is
+accepted in production with a warning, but must be replaced before adding API or
+worker replicas on another host.
+
+### Moving existing files to object storage
+
+No database migration is required because `ReportJob.report_file` and pending
+import parameters already contain relative storage keys. Before switching an
+environment from filesystem storage to S3:
+
+1. Stop new imports and report generation, then allow active jobs to finish.
+2. Copy `/app/media/` into the bucket's `MEDIA_STORAGE_PREFIX` path.
+3. Copy `/app/reports/` into the bucket's `REPORT_STORAGE_PREFIX` path.
+4. Configure the S3 variables in the environment file.
+5. Run the release step and verify an existing report download plus a new import.
+6. Retain the old volumes until the new storage has been validated and backed up.
+
+Static files remain on the `inventory_staticfiles` volume and are served by
+WhiteNoise; they are not part of application upload storage.
 
 ## Database backup and restore
 
