@@ -120,6 +120,12 @@ class Command(BaseCommand):
             cron_expr=settings.REPORT_DELETE_CRON,
         )
 
+        upsert_task(
+            name="DB Maintenance: recover stale report jobs",
+            task="core.tasks.job_recovery.recover_stale_report_jobs",
+            cron_expr=settings.JOB_RECOVERY_CRON,
+        )
+
         # -------------------------------
         # Summary
         # -------------------------------

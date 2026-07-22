@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from core.models.tasks import ScheduledTaskRun
+from data_import.utils import delete_import_upload
 from reporting.models.reports import ReportJob
 from reporting.services.storage import delete_report
 
@@ -40,7 +41,7 @@ def delete_old_reports(self):
                     ReportJob.Status.RUNNING,
                 ]
             )
-            .only("id", "report_file")
+            .only("id", "report_file", "report_type", "params")
             .iterator(chunk_size=100)
         )
 
@@ -59,6 +60,18 @@ def delete_old_reports(self):
                     },
                 )
                 continue
+
+            if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
+                try:
+                    delete_import_upload(
+                        (job.params or {}).get("stored_file_name", "")
+                    )
+                except Exception:
+                    logger.exception(
+                        "report_retention_import_upload_delete_failed",
+                        extra={"job_id": job.id},
+                    )
+                    continue
 
             deleted, _ = (
                 ReportJob.objects

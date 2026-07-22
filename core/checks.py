@@ -192,4 +192,84 @@ def production_boundary_checks(app_configs, **kwargs):
                 )
             )
 
+    if settings.IMPORT_TASK_SOFT_TIME_LIMIT >= settings.IMPORT_TASK_TIME_LIMIT:
+        messages.append(
+            Error(
+                "IMPORT_TASK_SOFT_TIME_LIMIT must be lower than "
+                "IMPORT_TASK_TIME_LIMIT.",
+                id="inventory.E017",
+            )
+        )
+
+    if settings.REPORT_TASK_SOFT_TIME_LIMIT >= settings.REPORT_TASK_TIME_LIMIT:
+        messages.append(
+            Error(
+                "REPORT_TASK_SOFT_TIME_LIMIT must be lower than "
+                "REPORT_TASK_TIME_LIMIT.",
+                id="inventory.E018",
+            )
+        )
+
+    longest_lease_interval = max(
+        settings.IMPORT_TASK_TIME_LIMIT,
+        settings.REPORT_TASK_TIME_LIMIT,
+        settings.TASK_RETRY_MAX_DELAY_SECONDS,
+    )
+    if settings.JOB_STALE_AFTER_SECONDS <= longest_lease_interval:
+        messages.append(
+            Error(
+                "JOB_STALE_AFTER_SECONDS must exceed every job hard time "
+                "limit and the maximum retry delay so recovery cannot take "
+                "over active or scheduled work.",
+                id="inventory.E019",
+            )
+        )
+
+    if (
+        settings.TASK_RETRY_BASE_DELAY_SECONDS <= 0
+        or settings.TASK_RETRY_MAX_DELAY_SECONDS
+        < settings.TASK_RETRY_BASE_DELAY_SECONDS
+    ):
+        messages.append(
+            Error(
+                "Task retry delays must be positive and the maximum delay "
+                "must not be lower than the base delay.",
+                id="inventory.E021",
+            )
+        )
+
+    minimum_attempts = max(
+        settings.IMPORT_TASK_MAX_RETRIES,
+        settings.REPORT_TASK_MAX_RETRIES,
+    ) + 1
+    if settings.JOB_MAX_ATTEMPTS < minimum_attempts:
+        messages.append(
+            Error(
+                "JOB_MAX_ATTEMPTS must allow the initial delivery plus all "
+                f"configured Celery retries ({minimum_attempts}).",
+                id="inventory.E022",
+            )
+        )
+
+    required_routes = {
+        "data_import.tasks.*": "imports",
+        "reporting.tasks.*": "reports",
+        "core.tasks.job_recovery.*": "maintenance",
+    }
+    configured_routes = getattr(settings, "CELERY_TASK_ROUTES", {})
+    invalid_routes = [
+        task_pattern
+        for task_pattern, expected_queue in required_routes.items()
+        if configured_routes.get(task_pattern, {}).get("queue")
+        != expected_queue
+    ]
+    if invalid_routes:
+        messages.append(
+            Error(
+                "Required Celery task routes are missing or incorrect: "
+                + ", ".join(invalid_routes),
+                id="inventory.E020",
+            )
+        )
+
     return messages
