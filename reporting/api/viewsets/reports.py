@@ -1,30 +1,28 @@
-import json
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404
-import redis
-from rest_framework import viewsets
-from django.conf import settings
-from django.http import Http404, JsonResponse, HttpResponse
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-import json
 from django_filters.rest_framework import DjangoFilterBackend
-from django.http import FileResponse
-from core.pagination import FlexiblePagination
-from rest_framework import mixins, viewsets, permissions
-import os
+from rest_framework import mixins, viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+
 from access.permissions.base import RequiresPermission
+from core.pagination import FlexiblePagination
 from reporting.api.serializers.reports import ReportJobSerializer
 from reporting.filters import ReportJobFilter
 from reporting.models.reports import ReportJob
 from reporting.services.job_errors import public_job_error
-
+from reporting.services.storage import (
+    delete_report,
+    open_report,
+    report_download_name,
+    report_exists,
+)
 
 
 class DownloadReport(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, public_id: str):
-
         job = get_object_or_404(
             ReportJob,
             public_id=public_id,
@@ -53,24 +51,23 @@ class DownloadReport(APIView):
         if not job.report_file:
             raise Http404("Report file not available.")
 
-        file_path = settings.REPORTS_DIR / job.report_file
-
-        if not file_path.exists():
+        if not report_exists(job.report_file):
             raise Http404("Report file not found.")
-        
-
 
         return FileResponse(
-            open(file_path, "rb"),
+            open_report(job.report_file),
             as_attachment=True,
-            filename=job.report_file,
+            filename=report_download_name(job.report_file),
         )
-    
-class MyReportJobViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet, ):
-    """
-    Users can view and delete their own reports.
-    Deleting a report removes the associated file.
-    """
+
+
+class MyReportJobViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Users can view and delete their own reports."""
 
     serializer_class = ReportJobSerializer
     permission_classes = [IsAuthenticated]
@@ -87,38 +84,29 @@ class MyReportJobViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixi
         )
 
     def perform_destroy(self, instance):
-        """
-        Delete report file from disk when deleting the job.
-        """
-
-        if instance.report_file:
-            file_path = os.path.join(settings.REPORTS_DIR, instance.report_file)
-
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
+        delete_report(instance.report_file)
         instance.delete()
 
 
-class ReportJobAdminViewSet( mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet, ):
+class ReportJobAdminViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = ReportJobSerializer
-
-    permission_classes = [ RequiresPermission ]
-    required_permission = ( "reports.manage" )
-    
+    permission_classes = [RequiresPermission]
+    required_permission = "reports.manage"
     pagination_class = FlexiblePagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = ReportJobFilter
     lookup_field = "public_id"
-
-    queryset = ReportJob.objects.select_related("user").order_by("-created_at")
+    queryset = (
+        ReportJob.objects
+        .select_related("user")
+        .order_by("-created_at")
+    )
 
     def perform_destroy(self, instance):
-
-        if instance.report_file:
-            file_path = os.path.join(settings.REPORTS_DIR, instance.report_file)
-
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
+        delete_report(instance.report_file)
         instance.delete()

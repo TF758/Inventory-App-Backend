@@ -246,5 +246,5 @@ trivy-image.json
 !.env.staging.example
 !.env.production.example
 # Runtime-generated reports and database backups
-reports/
+/reports/
 backups/

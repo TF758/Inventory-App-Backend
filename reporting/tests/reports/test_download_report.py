@@ -1,11 +1,12 @@
 from django.test import TestCase
+from django.core.files.base import ContentFile
 from django.urls import reverse
-from django.conf import settings
 import uuid
 from rest_framework.test import APIClient
 from users.factories.user_factories import UserFactory
 from reporting.models.reports import ReportJob
 from reporting.api.serializers.reports import ReportJobSerializer
+from reporting.services.storage import delete_report, get_report_storage
 
 
 
@@ -117,16 +118,17 @@ class DownloadReportTests(TestCase):
     def test_download_success(self):
 
         filename = f"test_report_{uuid.uuid4().hex}.xlsx"
-        file_path = settings.REPORTS_DIR / filename
-
-        file_path.write_bytes(b"test report content")
+        stored_name = get_report_storage().save(
+            filename,
+            ContentFile(b"test report content"),
+        )
 
         job = ReportJob.objects.create(
             user=self.user,
             report_type=ReportJob.ReportType.USER_SUMMARY,
             status=ReportJob.Status.DONE,
             params={},
-            report_file=filename,
+            report_file=stored_name,
         )
 
         url = reverse("download-report", args=[job.public_id])
@@ -142,7 +144,7 @@ class DownloadReportTests(TestCase):
         # release file lock
         b"".join(response.streaming_content)
 
-        file_path.unlink()
+        delete_report(stored_name)
         # -------------------------------------------------
     # Ownership Protection
     # -------------------------------------------------

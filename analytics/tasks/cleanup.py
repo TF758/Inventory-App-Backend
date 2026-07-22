@@ -1,13 +1,14 @@
+import logging
 import time
 from datetime import timedelta
-from pathlib import Path
+
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
+
 from core.models.tasks import ScheduledTaskRun
-from django.db import transaction
 from reporting.models.reports import ReportJob
-import logging
+from reporting.services.storage import delete_report
 
 logger = logging.getLogger(__name__)
 
@@ -25,41 +26,55 @@ def delete_old_reports(self):
     )
 
     try:
-        cutoff = timezone.now() - timedelta(days=settings.REPORT_RETENTION_DAYS)
-
-        old_jobs = ReportJob.objects.filter(
-            finished_at__lt=cutoff
-        ).exclude(
-            status__in=[
-                ReportJob.Status.PENDING,
-                ReportJob.Status.RUNNING,
-            ]
+        cutoff = (
+            timezone.now()
+            - timedelta(days=settings.REPORT_RETENTION_DAYS)
         )
 
-        with transaction.atomic():
+        old_jobs = (
+            ReportJob.objects
+            .filter(finished_at__lt=cutoff)
+            .exclude(
+                status__in=[
+                    ReportJob.Status.PENDING,
+                    ReportJob.Status.RUNNING,
+                ]
+            )
+            .only("id", "report_file")
+            .iterator(chunk_size=100)
+        )
 
-            old_jobs = (
+        for job in old_jobs:
+            try:
+                if delete_report(job.report_file):
+                    deleted_files += 1
+            except Exception:
+                # Keep the database row so a later cleanup run can retry the
+                # remote object deletion instead of orphaning the file.
+                logger.exception(
+                    "report_retention_object_delete_failed",
+                    extra={
+                        "job_id": job.id,
+                        "report_file": job.report_file,
+                    },
+                )
+                continue
+
+            deleted, _ = (
                 ReportJob.objects
-                .select_for_update(skip_locked=True)
-                .filter(finished_at__lt=cutoff)
+                .filter(
+                    pk=job.pk,
+                    finished_at__lt=cutoff,
+                )
                 .exclude(
                     status__in=[
                         ReportJob.Status.PENDING,
                         ReportJob.Status.RUNNING,
                     ]
                 )
+                .delete()
             )
-
-            for job in old_jobs:
-
-                if job.report_file:
-                    file_path = Path(settings.REPORTS_DIR) / job.report_file
-
-                    if file_path.exists():
-                        file_path.unlink()
-                        deleted_files += 1
-
-                job.delete()
+            if deleted:
                 deleted_jobs += 1
 
         run.status = ScheduledTaskRun.Status.SUCCESS
@@ -73,7 +88,7 @@ def delete_old_reports(self):
         run.message = str(exc)
 
         logger.exception(
-        "delete_old_reports_failed",
+            "delete_old_reports_failed",
             extra={
                 "task": "delete_old_reports",
             },

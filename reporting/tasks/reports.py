@@ -11,6 +11,7 @@ from core.models.tasks import ScheduledTaskRun
 from reporting.report_registry import REPORT_DEFINITIONS
 from reporting.models.reports import ReportJob
 from reporting.services.job_errors import REPORT_FAILURE_MESSAGE
+from reporting.services.storage import delete_report, save_report
 from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming
 from reporting.utils.report_payload import wrap_report_payload
 
@@ -20,7 +21,6 @@ from datetime import datetime
 from django.utils.timezone import is_aware
 
 import logging
-from django.core.files.storage import default_storage
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ def generate_report_task(self, report_job_id: int):
 
     notifier = NotificationMixin()
     job = None
+    stored_report_name = ""
 
     try:
         job = ReportJob.objects.select_related("user").get(id=report_job_id)
@@ -133,12 +134,12 @@ def generate_report_task(self, report_job_id: int):
         )
         filename = f"{filename}.xlsx"
 
-        file_path = settings.REPORTS_DIR / filename
+        stored_report_name = save_report(
+            filename,
+            buffer.getvalue(),
+        )
 
-        with open(file_path, "wb") as f:
-            f.write(buffer.getvalue())
-
-        job.report_file = filename
+        job.report_file = stored_report_name
 
         # ---------------------------------
         # Mark complete
@@ -184,6 +185,18 @@ def generate_report_task(self, report_job_id: int):
                 "user_id": getattr(job, "user_id", None),
             },
         )
+
+        if stored_report_name:
+            try:
+                delete_report(stored_report_name)
+            except Exception:
+                logger.exception(
+                    "failed_report_object_cleanup_failed",
+                    extra={
+                        "job_id": getattr(job, "id", None),
+                        "report_file": stored_report_name,
+                    },
+                )
 
         if job:
             with transaction.atomic():

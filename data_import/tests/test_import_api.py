@@ -1,6 +1,7 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.storage import default_storage
 from unittest.mock import patch
 from django.urls import reverse
 
@@ -49,6 +50,9 @@ class AssetImportAPITests(TestCase):
 
         self.assertIsNotNone(job)
         self.assertEqual(job.report_type, ReportJob.ReportType.ASSET_IMPORT)
+        stored_file_name = job.params["stored_file_name"]
+        self.assertTrue(default_storage.exists(stored_file_name))
+        self.addCleanup(default_storage.delete, stored_file_name)
 
         mock_task.assert_called_once()
 

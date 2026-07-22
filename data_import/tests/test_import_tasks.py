@@ -1,4 +1,6 @@
 from django.test import TestCase
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from unittest.mock import patch
 from data_import.tasks import run_asset_import_task
 from users.factories.user_factories import UserFactory
@@ -42,7 +44,35 @@ class AssetImportTaskTests(TestCase):
 
         mock_build_import.assert_called_once()
         mock_generate_report.assert_called_once()
-    
+
+
+    @patch("data_import.tasks.generate_report_task.delay")
+    @patch("data_import.tasks.build_asset_import")
+    def test_completed_import_deletes_stored_upload(
+        self,
+        mock_build_import,
+        mock_generate_report,
+    ):
+        mock_build_import.return_value = {
+            "summary": {"imported_rows": 1}
+        }
+        stored_file_name = default_storage.save(
+            "imports/source/task-cleanup.csv",
+            ContentFile(b"name\nLaptop"),
+        )
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            params={
+                "asset_type": "equipment",
+                "stored_file_name": stored_file_name,
+            },
+        )
+
+        run_asset_import_task(job.id)
+
+        self.assertFalse(default_storage.exists(stored_file_name))
+        mock_generate_report.assert_called_once_with(job.id)
 
     @patch("data_import.tasks.build_asset_import")
     def test_import_failure_raises(self, mock_build_import):
