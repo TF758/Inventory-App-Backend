@@ -1,15 +1,23 @@
-from analytics.utils.system_overview_helpers.assets import build_department_accessory_trends, build_department_asset_trends
-from analytics.utils.system_overview_helpers.kpis import build_department_kpis
-from analytics.utils.system_overview_helpers.returns import build_department_return_flow_trends, build_department_return_state_trends
-from analytics.utils.system_overview_helpers.valuation import build_department_asset_value_trends
-from sites.models.sites import Department
-from datetime import timedelta
-
-from django.db.models import Max, Subquery, OuterRef, Sum
-from django.utils import timezone
+from django.db.models import Max, OuterRef, Subquery
 
 from analytics.models.snapshots import DailyDepartmentSnapshot
-from analytics.utils.analytics_helpers import percentage_delta, truncate_date
+from analytics.utils.analytics_helpers import truncate_date
+from analytics.utils.system_overview_helpers.assets import (
+    build_department_accessory_trends,
+    build_department_asset_trends,
+)
+from analytics.utils.system_overview_helpers.kpis import build_department_kpis
+from analytics.utils.system_overview_helpers.returns import (
+    build_department_return_flow_trends,
+    build_department_return_state_trends,
+)
+from analytics.utils.system_overview_helpers.valuation import (
+    build_department_asset_value_trends,
+)
+from analytics.utils.utils.cache import (
+    get_cached_department_kpis,
+    get_cached_department_section,
+)
 from analytics.utils.utils.viewset_helpers import get_snapshot_range_start
 
 
@@ -58,6 +66,7 @@ def build_department_consumable_trends(*, department, days, granularity):
         for row in qs
     ]
 
+
 def build_department_user_trends(*, department, days, granularity):
     start = get_snapshot_range_start(
         model=DailyDepartmentSnapshot,
@@ -101,66 +110,41 @@ def build_department_user_trends(*, department, days, granularity):
     ]
 
 
-
-
+DEPARTMENT_SECTION_BUILDERS = {
+    "users": build_department_user_trends,
+    "assets": build_department_asset_trends,
+    "consumables": build_department_consumable_trends,
+    "accessories": build_department_accessory_trends,
+    "return_state": build_department_return_state_trends,
+    "return_flow": build_department_return_flow_trends,
+    "asset_value": build_department_asset_value_trends,
+}
 
 
 def get_department_overview(*, department, days, granularity, sections):
     charts = {}
 
-    if "users" in sections:
-        charts["users"] = build_department_user_trends(
-            department=department,
-            days=days,
-            granularity=granularity,
-        )
+    # Keep the original response ordering and silently ignore unknown sections.
+    for section, builder in DEPARTMENT_SECTION_BUILDERS.items():
+        if section not in sections:
+            continue
 
-    if "assets" in sections:
-        charts["assets"] = build_department_asset_trends(
+        charts[section] = get_cached_department_section(
             department=department,
+            section=section,
             days=days,
             granularity=granularity,
-        )
-
-    if "consumables" in sections:
-        charts["consumables"] = build_department_consumable_trends(
-            department=department,
-            days=days,
-            granularity=granularity,
-        )
-
-    if "accessories" in sections:
-        charts["accessories"] = build_department_accessory_trends(
-            department=department,
-            days=days,
-            granularity=granularity,
-        )
-
-    if "return_state" in sections:
-        charts["return_state"] = build_department_return_state_trends(
-            department=department,
-            days=days,
-            granularity=granularity,
-        )
-
-    if "return_flow" in sections:
-        charts["return_flow"] = build_department_return_flow_trends(
-            department=department,
-            days=days,
-            granularity=granularity,
-        )
-    
-    if "asset_value" in sections:
-        charts["asset_value"] = (
-            build_department_asset_value_trends(
+            builder=lambda builder=builder: builder(
                 department=department,
                 days=days,
                 granularity=granularity,
-            )
+            ),
         )
-            
 
     return {
-        "kpis": build_department_kpis(department=department),
+        "kpis": get_cached_department_kpis(
+            department=department,
+            builder=lambda: build_department_kpis(department=department),
+        ),
         "charts": charts,
     }

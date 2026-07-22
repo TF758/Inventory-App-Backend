@@ -45,7 +45,11 @@ class SessionTokenLoginViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("refresh", response.cookies)
+
+        session_id = response.json()["session_id"]
+        cookie_name = f"refresh_{session_id}"
+
+        self.assertIn(cookie_name, response.cookies)
         self.assertTrue(UserSession.objects.filter(user=user).exists())
 
     def test_concurrent_logins_create_separate_sessions(self):
@@ -151,11 +155,11 @@ class SessionTokenLoginViewTests(TestCase):
         
 @mock.patch(
     "core.viewsets.general_viewsets.SessionTokenLoginView.throttle_classes",
-    new=[]
+    new=[],
 )
 @mock.patch(
     "core.viewsets.general_viewsets.RefreshAPIView.throttle_classes",
-    new=[]
+    new=[],
 )
 class RefreshTokenViewTests(TestCase):
 
@@ -168,6 +172,9 @@ class RefreshTokenViewTests(TestCase):
         self.user.set_password("StrongPass123!")
         self.user.save()
 
+        self.session_id = None
+        self.refresh_cookie_name = None
+
     def _login(self):
         response = self.client.post(
             self.login_url,
@@ -176,105 +183,128 @@ class RefreshTokenViewTests(TestCase):
             HTTP_USER_AGENT=TEST_UA,
             REMOTE_ADDR="127.0.0.1",
         )
-        self.assertEqual(response.status_code, 200)
-        self.client.cookies["refresh"] = response.cookies["refresh"].value
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.session_id = response.json()["session_id"]
+        self.refresh_cookie_name = f"refresh_{self.session_id}"
+
+        self.assertIn(self.refresh_cookie_name, response.cookies)
         return response
+
+    def _refresh(self, *, user_agent=TEST_UA):
+        self.assertIsNotNone(self.session_id)
+        return self.client.post(
+            self.refresh_url,
+            format="json",
+            HTTP_USER_AGENT=user_agent,
+            HTTP_X_SESSION_ID=str(self.session_id),
+        )
 
     # ------------------- HAPPY PATH -------------------
 
     def test_refresh_successful_returns_new_access_and_cookie(self):
         self._login()
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
+        response = self._refresh()
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.json())
-        self.assertIn("refresh", response.cookies)
+        self.assertIn(self.refresh_cookie_name, response.cookies)
 
     def test_refresh_extends_idle_expiry(self):
         self._login()
 
+        response = self._refresh()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         session = UserSession.objects.get(user=self.user)
-        old_expiry = session.expires_at
-
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        session.refresh_from_db()
         expected = timezone.now() + get_session_idle_timeout()
         self.assertAlmostEqual(
             session.expires_at.timestamp(),
             expected.timestamp(),
-            delta=5,  # seconds
+            delta=5,
         )
 
     def test_refresh_rotates_token_and_invalidates_old_one(self):
         login_response = self._login()
-        old_cookie = login_response.cookies["refresh"].value
+        old_cookie = login_response.cookies[self.refresh_cookie_name].value
+
+        response = self._refresh()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        new_cookie = response.cookies[self.refresh_cookie_name].value
+
+        # A sibling request using the immediately previous token receives a
+        # retryable conflict during the configured grace period.
+        self.client.cookies[self.refresh_cookie_name] = old_cookie
+        conflict_response = self._refresh()
+        self.assertEqual(conflict_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(conflict_response.json()["code"], "REFRESH_CONFLICT")
 
         session = UserSession.objects.get(user=self.user)
-        
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
+        self.assertEqual(session.status, UserSession.Status.ACTIVE)
+
+        # Reuse after the grace period revokes the session family.
+        grace_seconds = int(
+            getattr(settings, "REFRESH_REUSE_GRACE_SECONDS", 5)
         )
-        self.assertEqual(response.status_code, 200)
+        session.last_used_at = timezone.now() - timedelta(
+            seconds=max(grace_seconds, 0) + 1
+        )
+        session.save(update_fields=["last_used_at"])
 
-        new_cookie = response.cookies["refresh"].value
-
-        # Old cookie must fail
-        self.client.cookies["refresh"] = old_cookie
-        response2 = self.client.post(self.refresh_url, format="json", HTTP_USER_AGENT=TEST_UA)
-        self.assertEqual(response2.status_code, 401)
+        self.client.cookies[self.refresh_cookie_name] = old_cookie
+        reused_response = self._refresh()
+        self.assertEqual(
+            reused_response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
         session.refresh_from_db()
         self.assertEqual(session.status, UserSession.Status.REVOKED)
 
-        # New cookie should ALSO fail after revocation
-        self.client.cookies["refresh"] = new_cookie
-        response3 = self.client.post(self.refresh_url, format="json", HTTP_USER_AGENT=TEST_UA)
-        self.assertEqual(response3.status_code, 401)
-
+        # The rotated token also fails after the family has been revoked.
+        self.client.cookies[self.refresh_cookie_name] = new_cookie
+        revoked_response = self._refresh()
+        self.assertEqual(
+            revoked_response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     # ------------------- FAILURE MODES -------------------
 
-    def test_missing_refresh_cookie_returns_401(self):
+    def test_missing_session_id_header_returns_401(self):
         response = self.client.post(
             self.refresh_url,
             format="json",
             HTTP_USER_AGENT=TEST_UA,
         )
-        self.assertEqual(response.status_code, 401)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.json()["code"], "INVALID_SESSION_ID")
+
+    def test_missing_refresh_cookie_returns_401(self):
+        self._login()
+        self.client.cookies.pop(self.refresh_cookie_name, None)
+
+        response = self._refresh()
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_invalid_refresh_cookie_returns_401(self):
         self._login()
-        self.client.cookies["refresh"] = "invalid"
+        self.client.cookies[self.refresh_cookie_name] = "invalid"
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
-        self.assertEqual(response.status_code, 401)
+        response = self._refresh()
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_user_agent_mismatch_revokes_session(self):
         self._login()
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT="evil-agent",
-        )
-        self.assertEqual(response.status_code, 401)
+        response = self._refresh(user_agent="evil-agent")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         session = UserSession.objects.get(user=self.user)
         self.assertEqual(session.status, UserSession.Status.REVOKED)
@@ -284,12 +314,12 @@ class RefreshTokenViewTests(TestCase):
     def test_access_token_includes_expected_claims(self):
         self._login()
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
+        response = self._refresh()
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+            response.data,
         )
-        self.assertEqual(response.status_code, 200)
 
         token = AccessToken(response.json()["access"])
         session = UserSession.objects.get(user=self.user)
@@ -303,14 +333,10 @@ class RefreshTokenViewTests(TestCase):
     def test_refresh_cookie_has_secure_flags(self):
         self._login()
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
-        self.assertEqual(response.status_code, 200)
+        response = self._refresh()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        cookie = response.cookies["refresh"]
+        cookie = response.cookies[self.refresh_cookie_name]
         self.assertEqual(bool(cookie["secure"]), settings.SESSION_COOKIE_SECURE)
         self.assertEqual(cookie["samesite"], settings.SESSION_COOKIE_SAMESITE)
         self.assertTrue(cookie["httponly"])
@@ -323,13 +349,9 @@ class RefreshTokenViewTests(TestCase):
         session.absolute_expires_at = timezone.now() - timedelta(seconds=1)
         session.save(update_fields=["absolute_expires_at"])
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
+        response = self._refresh()
 
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         session.refresh_from_db()
         self.assertEqual(session.status, UserSession.Status.EXPIRED)
@@ -341,13 +363,9 @@ class RefreshTokenViewTests(TestCase):
         session.status = UserSession.Status.REVOKED
         session.save(update_fields=["status"])
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
+        response = self._refresh()
 
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_access_token_rejected_when_session_expired(self):
         login_response = self._login()
@@ -362,20 +380,16 @@ class RefreshTokenViewTests(TestCase):
         protected_url = reverse("departments")
         response = self.client.get(protected_url)
 
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_refresh_fails_for_locked_user(self):
         self._login()
         self.user.is_locked = True
         self.user.save(update_fields=["is_locked"])
 
-        response = self.client.post(
-            self.refresh_url,
-            format="json",
-            HTTP_USER_AGENT=TEST_UA,
-        )
+        response = self._refresh()
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 class SecurityPolicyTests(TestCase):
 

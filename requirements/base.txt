@@ -1,6 +1,7 @@
-Django==5.2.15
+Django==5.2.16
 
 channels_redis==4.2.1
+redis==5.2.1
 daphne==4.2.2
 
 django-celery-beat==2.8.1
@@ -29,3 +30,4 @@ service-identity==24.2.0
 tqdm==4.67.1
 
 whitenoise==6.11.0
+

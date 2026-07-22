@@ -11,6 +11,7 @@ from assets.api.serializers.equipment import EquipmentSerializer
 from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFilter, EquipmentFilter
 from access.permissions.base import RequiresPermission
 from access.permissions.sites import RoomContextPermission, RoomPermission
+from core.mixins.caching.site_option_invalidation import SiteOptionInvalidationMixin
 from sites.site_filters import AreaUserFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
 from users.models.roles import RoleAssignment
@@ -31,7 +32,6 @@ from assets.models.assets import Accessory, Component, Consumable, Equipment, Eq
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 
-
 class RoomDashboardView(AreaDashboardMixin, APIView):
     permission_classes = [RoomContextPermission]
 
@@ -42,7 +42,8 @@ class RoomDashboardView(AreaDashboardMixin, APIView):
         room = get_object_or_404(Room, public_id=public_id)
         return Response(self.build_dashboard(room))
     
-class RoomViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+class RoomViewSet( SiteOptionInvalidationMixin, AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
+    site_option_cache_resource = "room"
     lookup_field = "public_id"
     permission_classes = [RoomPermission]
 

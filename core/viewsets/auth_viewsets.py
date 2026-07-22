@@ -28,6 +28,7 @@ from core.filters import SiteNameChangeHistoryFilter
 from core.serializers.audit import SiteNameChangeSerializer, SiteRelocationSerializer
 from users.models.users import User
 from sites.models.sites import Department, Location, Room
+from sites.services.option_cache import SiteOptionCacheService
 
 
 class SecuritySettingsAPIView(APIView):
@@ -302,7 +303,15 @@ class ChangePasswordView(APIView):
             status=status.HTTP_200_OK,
         )
 
-        # Optionally clear the refresh cookie
+        # Clear only the refresh cookie selected by this authenticated
+        # session. Other accounts in the same browser profile keep their own
+        # session-specific cookies. The legacy shared cookie is also removed
+        # during the migration period.
+        session_id = request.auth.get("session_id") if request.auth else None
+
+        if session_id:
+            response.delete_cookie(f"refresh_{session_id}", path="/")
+
         response.delete_cookie("refresh", path="/")
 
         return response
@@ -377,6 +386,14 @@ class SiteNameChangeAPIView( AuditMixin, NotificationMixin, GenericAPIView ):
 
         obj.name = new_name
         obj.save(update_fields=["name"])
+
+        SiteOptionCacheService.invalidate_on_commit(
+            reason=(
+                f"{site_type}_renamed:"
+                f"object={obj.public_id}:"
+                f"actor={request.user.public_id}"
+            ),
+        )
 
         # --------------------
         # Record site name-change history
@@ -526,6 +543,17 @@ class SiteRelocationAPIView(AuditMixin, NotificationMixin, GenericAPIView):
 
         else:
             raise ValidationError("Invalid site_type.")
+        
+
+        SiteOptionCacheService.invalidate_on_commit(
+            reason=(
+        f"{site_type}_relocated:"
+        f"object={obj.public_id}:"
+        f"from={getattr(from_parent, 'public_id', None)}:"
+        f"to={target.public_id}:"
+        f"actor={request.user.public_id}"
+            ),
+        )
 
         # --------------------
         # Record relocation history
@@ -721,6 +749,7 @@ class SessionActivityAPIView(APIView):
         return Response(
             {
                 "ok": True,
+                "session_id": str(session.id),
                 "idle_exp": int(session.expires_at.timestamp()),
                 "abs_exp": int(session.absolute_expires_at.timestamp()),
             },

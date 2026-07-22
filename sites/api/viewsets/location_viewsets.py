@@ -9,6 +9,7 @@ from assets.asset_filters import AccessoryFilter, ComponentFilter, ConsumableFil
 from access.permissions.base import RequiresPermission
 from access.permissions.sites import LocationContextPermission, LocationPermission
 from access.permissions.assets import AssetPermission
+from core.mixins.caching.site_option_invalidation import SiteOptionInvalidationMixin
 from sites.api.serializers.rooms import RoomReadSerializer
 from sites.site_filters import AreaUserFilter, LocationFilter, RoomFilter
 from users.users_filters import RoleAssignmentFilter
@@ -33,6 +34,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count
 
 
+
 class LocationDashboardView(AreaDashboardMixin, APIView):
 
     permission_classes = [LocationContextPermission]
@@ -45,8 +47,10 @@ class LocationDashboardView(AreaDashboardMixin, APIView):
         location = get_object_or_404(Location, public_id=public_id)
         return Response(self.build_dashboard(location))
 
-class LocationViewSet(AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet):
+class LocationViewSet( SiteOptionInvalidationMixin, AuditMixin, ScopeFilterMixin, viewsets.ModelViewSet, ):
     """ViewSet for managing Location objects"""
+
+    site_option_cache_resource = "location"
 
     lookup_field = "public_id"
     permission_classes = [LocationPermission]

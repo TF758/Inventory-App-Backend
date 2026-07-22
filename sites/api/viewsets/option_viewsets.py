@@ -5,8 +5,10 @@ from rest_framework import mixins, viewsets
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 
+
 from core.mixins import ScopeFilterMixin
 from core.pagination import FlexiblePagination
+from core.mixins.caching.user_scope_list_cache import UserScopeListCacheMixin
 from sites.api.serializers.option_serializers import (
     DepartmentOptionSerializer,
     LocationOptionSerializer,
@@ -15,87 +17,33 @@ from sites.api.serializers.option_serializers import (
 from sites.models.sites import Department, Location, Room
 
 
-class DepartmentOptionViewSet(
-    ScopeFilterMixin,
-    mixins.ListModelMixin,
-    viewsets.GenericViewSet,
-):
-    """
-    Minimal scoped department options for frontend selectors.
-
-    This endpoint is not a replacement for DepartmentViewSet.
-    It returns lightweight option data only.
-
-    Security model:
-    - Requires authentication.
-    - Uses ScopeFilterMixin to restrict results to the active role scope.
-    - Does not expose retrieve/create/update/delete actions.
-    """
+class DepartmentOptionViewSet( UserScopeListCacheMixin, ScopeFilterMixin, mixins.ListModelMixin, viewsets.GenericViewSet, ):
+    scope_cache_namespace = "department-options"
 
     permission_classes = [IsAuthenticated]
     serializer_class = DepartmentOptionSerializer
     pagination_class = FlexiblePagination
-
-    queryset = (
-        Department.objects
-        .all()
-        .order_by("name")
-    )
-
-    filter_backends = [
-        DjangoFilterBackend,
-        SearchFilter,
-    ]
-
-    search_fields = [
-        "name",
-    ]
+    queryset = Department.objects.all().order_by("name")
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ["name"]
 
 
-class LocationOptionViewSet(
-    ScopeFilterMixin,
-    mixins.ListModelMixin,
-    viewsets.GenericViewSet,
-):
-    """
-    Minimal scoped location options for frontend selectors.
-
-    This endpoint is not a replacement for LocationViewSet.
-    It returns lightweight option data only.
-
-    Optional filters:
-    - department_id: department public_id
-
-    Security model:
-    - Requires authentication.
-    - Uses ScopeFilterMixin to restrict results to the active role scope.
-    - Does not expose retrieve/create/update/delete actions.
-    """
+class LocationOptionViewSet( UserScopeListCacheMixin, ScopeFilterMixin, mixins.ListModelMixin, viewsets.GenericViewSet, ):
+    scope_cache_namespace = "location-options"
 
     permission_classes = [IsAuthenticated]
     serializer_class = LocationOptionSerializer
     pagination_class = FlexiblePagination
-
     queryset = (
-        Location.objects
-        .select_related("department")
+        Location.objects.select_related("department")
         .all()
         .order_by("name")
     )
-
-    filter_backends = [
-        DjangoFilterBackend,
-        SearchFilter,
-    ]
-
-    search_fields = [
-        "name",
-        "department__name",
-    ]
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    search_fields = ["name", "department__name"]
 
     def get_queryset(self):
         queryset = super().get_queryset()
-
         department_id = self.request.query_params.get("department_id")
 
         if department_id:
@@ -106,46 +54,21 @@ class LocationOptionViewSet(
         return queryset
 
 
-class RoomOptionViewSet(
-    ScopeFilterMixin,
-    mixins.ListModelMixin,
-    viewsets.GenericViewSet,
-):
-    """
-    Minimal scoped room options for frontend selectors.
-
-    This endpoint is not a replacement for RoomViewSet.
-    It returns lightweight option data only.
-
-    Optional filters:
-    - department_id: department public_id
-    - location_id: location public_id
-
-    Security model:
-    - Requires authentication.
-    - Uses ScopeFilterMixin to restrict results to the active role scope.
-    - Does not expose retrieve/create/update/delete actions.
-    """
+class RoomOptionViewSet( UserScopeListCacheMixin, ScopeFilterMixin, mixins.ListModelMixin, viewsets.GenericViewSet, ):
+    scope_cache_namespace = "room-options"
 
     permission_classes = [IsAuthenticated]
     serializer_class = RoomOptionSerializer
     pagination_class = FlexiblePagination
-
     queryset = (
-        Room.objects
-        .select_related(
+        Room.objects.select_related(
             "location",
             "location__department",
         )
         .all()
         .order_by("name")
     )
-
-    filter_backends = [
-        DjangoFilterBackend,
-        SearchFilter,
-    ]
-
+    filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = [
         "name",
         "location__name",
@@ -154,7 +77,6 @@ class RoomOptionViewSet(
 
     def get_queryset(self):
         queryset = super().get_queryset()
-
         department_id = self.request.query_params.get("department_id")
         location_id = self.request.query_params.get("location_id")
 
