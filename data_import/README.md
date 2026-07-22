@@ -117,8 +117,8 @@ class AssetImportCreateView(APIView):
             },
         )
 
-        # Queue async task
-        run_asset_import_task.delay(job.id)
+        # Reserve a task id before publishing to prevent duplicate sends.
+        enqueue_report_job(job.id)
 
         return Response({"job_id": job.public_id}, status=202)
 ```
@@ -126,29 +126,34 @@ class AssetImportCreateView(APIView):
 ### Async Task
 
 ```python
-@shared_task
-def run_asset_import_task(job_id):
-    job = ReportJob.objects.get(id=job_id)
-    job.status = ReportJob.Status.RUNNING
-    job.started_at = timezone.now()
-    job.save()
+@shared_task(
+    bind=True,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def run_asset_import_task(self, job_id):
+    task_id = request_task_id(self)
+    claim = claim_job(
+        job_id,
+        task_id,
+        redelivered=request_is_redelivered(self),
+    )
+    if not claim.claimed:
+        return {"status": "skipped", "reason": claim.reason}
 
-    try:
-        result = build_asset_import(
-            asset_type=job.params["asset_type"],
-            stored_file_name=job.params["stored_file_name"],
-            generated_by=job.user,
-            job=job,
-        )
+    result = build_asset_import(
+        asset_type=claim.job.params["asset_type"],
+        stored_file_name=claim.job.params["stored_file_name"],
+        generated_by=claim.job.user,
+        job=claim.job,
+    )
 
-        job.result_payload = result
-        job.status = ReportJob.Status.DONE
-    except Exception as e:
-        job.error = str(e)
-        job.status = ReportJob.Status.FAILED
-    finally:
-        job.finished_at = timezone.now()
-        job.save()
+    prepare_import_report_handoff(
+        claim.job.id,
+        task_id,
+        result_payload=result,
+    )
+    enqueue_report_job(claim.job.id)
 ```
 
 ### Importer Factory
@@ -261,3 +266,18 @@ python manage.py test data_import
 - [Reporting](../reporting/README.md)
 - [Core Models](../core/README.md)
 - [API Overview](../README.md)
+
+## Retry and cancellation behavior
+
+Asset imports execute on the `imports` queue under a database-backed job lease.
+Duplicate deliveries are ignored while another task owns a current lease. A
+redelivery with the same Celery task id can resume after a worker loss.
+
+Transient infrastructure failures may be retried, while validation failures are
+made terminal immediately. The source upload is retained while a retry is
+pending and deleted after successful import handoff, cancellation, terminal
+failure, or exhausted stale-job recovery.
+
+Once row processing succeeds, the result payload is committed before report
+rendering is queued. A retry or recovery after that point dispatches only the
+report phase and does not repeat database imports.

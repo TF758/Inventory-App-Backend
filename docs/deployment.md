@@ -160,3 +160,75 @@ curl \
 
 Do not put the metrics token in URLs, Compose files, source control, or logs.
 
+
+## Background-job reliability and recovery
+
+P1.3 separates asynchronous work into four Celery queues:
+
+- `default` for short general-purpose tasks such as email delivery.
+- `imports` for CSV ingestion and database writes.
+- `reports` for workbook generation and durable report storage.
+- `maintenance` for cleanup, snapshots, log maintenance, and stale-job recovery.
+
+Compose runs dedicated `worker-imports` and `worker-reports` services. The
+existing `worker` service consumes `default,maintenance`. Keep all three worker
+services running; starting only the general worker will leave import and report
+messages queued.
+
+Import and report tasks use late acknowledgement, reject messages when a worker
+process is lost, use a prefetch multiplier of one, and have task-specific soft
+and hard time limits. The hard limits must remain lower than
+`JOB_STALE_AFTER_SECONDS`; the deployment check rejects unsafe combinations that
+could let recovery take over a task that is still allowed to run.
+
+`ReportJob.task_id`, `attempt_count`, and `heartbeat_at` form a database-backed
+execution lease. A second delivery cannot execute an active job owned by another
+task id. Redelivery of the same task id can resume safely, and report writes use
+execution-scoped storage keys so a stale worker cannot delete replacement
+output. Import retries rely on database duplicate checks and never repeat the
+import phase after a result payload has been committed.
+
+Run the migration included with P1.3 before starting the new workers:
+
+```bash
+python manage.py migrate
+```
+
+Configure the recovery schedule with `JOB_RECOVERY_CRON`. The release service
+installs or updates the Beat entry after migrations; it can also be refreshed
+manually with:
+
+```bash
+python manage.py setup_logger
+python manage.py setup_db_cleaners
+```
+
+The recovery task requeues jobs whose worker lease has expired, dispatches jobs
+left pending after a broker outage, and moves jobs to a client-safe failed state
+when `JOB_MAX_ATTEMPTS` is exhausted. Abandoned import uploads are removed when a
+cancelled or exhausted import becomes terminal.
+
+Before every release, validate that enabled database Beat entries still point to
+registered Celery tasks:
+
+```bash
+python manage.py check_celery_tasks
+```
+
+The production Compose release service runs `setup_db_cleaners` and then this
+registry check automatically after migrations and before application services
+are promoted. A misspelled or removed enabled task causes the release to stop.
+
+Useful operational checks:
+
+```bash
+celery -A inventory inspect ping
+celery -A inventory inspect active_queues
+celery -A inventory inspect active
+python manage.py check --deploy --fail-level ERROR
+python manage.py check_celery_tasks
+```
+
+During a worker deployment, Docker allows a two-minute graceful shutdown. Work
+that cannot finish before the container stops is redelivered and then reconciled
+through the job lease and recovery task.
