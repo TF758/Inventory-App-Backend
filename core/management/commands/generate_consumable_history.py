@@ -1,10 +1,10 @@
 import random
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
-
 from tqdm import tqdm
 
 from assignments.models.asset_assignment import (
@@ -12,10 +12,13 @@ from assignments.models.asset_assignment import (
     ConsumableIssue,
 )
 from assets.models.assets import Consumable
-from users.models.users import User
 
+
+User = get_user_model()
 
 FAKE_EVENTS_PER_CONSUMABLE = 50
+BATCH_SIZE = 1000
+EVENT_BATCH_SIZE = 2000
 
 SCENARIOS = {
     "issued_active": 0.30,
@@ -25,6 +28,17 @@ SCENARIOS = {
     "expired": 0.05,
     "restocked": 0.10,
     "adjusted": 0.05,
+}
+
+ISSUE_SCENARIOS = {
+    "issued_active",
+    "issued_used",
+    "partial_used",
+}
+
+OPEN_ISSUE_SCENARIOS = {
+    "issued_active",
+    "partial_used",
 }
 
 SEGMENTS_PER_CONSUMABLE = (2, 4)
@@ -41,26 +55,55 @@ def pick_scenario():
     )[0]
 
 
+def pick_user_without_open_issue(users, consumable_id, open_issue_pairs):
+    """Return a user who does not already have an open issue for this item."""
+
+    # Random attempts are normally enough because the local seed has many users.
+    for _ in range(min(25, len(users))):
+        user = random.choice(users)
+        if (consumable_id, user.pk) not in open_issue_pairs:
+            return user
+
+    # Deterministic fallback guarantees correctness if random attempts collide.
+    start = random.randrange(len(users))
+    for offset in range(len(users)):
+        user = users[(start + offset) % len(users)]
+        if (consumable_id, user.pk) not in open_issue_pairs:
+            return user
+
+    return None
+
+
 class Command(BaseCommand):
     help = "Purge and regenerate consumable issue & event history (bulk optimized)"
 
     def handle(self, *args, **kwargs):
-
         users = list(User.objects.filter(is_active=True))
         consumables = list(Consumable.objects.all())
+
+        if not users:
+            self.stdout.write(self.style.ERROR("No active users found; nothing generated."))
+            return
+
+        if not consumables:
+            self.stdout.write(self.style.ERROR("No consumables found; nothing generated."))
+            return
 
         event_rows = []
         issue_rows = []
         consumables_to_update = set()
 
+        # Tracks only rows that will remain open (returned_at is NULL).
+        # This mirrors unique_open_issue_per_user_consumable before bulk insertion.
+        open_issue_pairs = set()
+
         self.stdout.write(self.style.WARNING("Purging consumable history…"))
 
         with transaction.atomic():
-            ConsumableIssue.objects.all().delete()
             ConsumableEvent.objects.all().delete()
+            ConsumableIssue.objects.all().delete()
 
         self.stdout.write(self.style.WARNING("Existing consumable history purged."))
-
         self.stdout.write(
             self.style.MIGRATE_HEADING(
                 f"Generating history for {len(consumables):,} consumables"
@@ -68,29 +111,25 @@ class Command(BaseCommand):
         )
 
         for consumable in tqdm(consumables, desc="Processing consumables"):
-
             current_time = timezone.now() - timedelta(
                 days=random.randint(300, 1500)
             )
-
             segments = random.randint(*SEGMENTS_PER_CONSUMABLE)
 
             for _ in range(segments):
-
                 scenario = pick_scenario()
-                user = random.choice(users)
+                event_user = random.choice(users)
 
                 if consumable.quantity == 0:
                     restock_qty = random.randint(15, 40)
-
                     consumable.quantity += restock_qty
                     consumables_to_update.add(consumable)
 
                     event_rows.append(
                         ConsumableEvent(
                             consumable=consumable,
-                            user=user,
-                            reported_by=user,
+                            user=event_user,
+                            reported_by=event_user,
                             event_type=ConsumableEvent.EventType.RESTOCKED,
                             quantity=restock_qty,
                             quantity_change=restock_qty,
@@ -98,157 +137,172 @@ class Command(BaseCommand):
                             notes="Initial stock",
                         )
                     )
-
                     current_time = next_time(current_time)
 
-                if scenario.startswith("issued"):
-
-                    qty = min(random.randint(1, 5), consumable.quantity)
-
-                    if qty > 0:
-
-                        issue = ConsumableIssue(
-                            consumable=consumable,
-                            user=user,
-                            quantity=qty,
-                            issued_quantity=qty,
-                            assigned_at=current_time,
-                            assigned_by=user,
-                            purpose="Generated historical issue",
+                if scenario in ISSUE_SCENARIOS:
+                    if scenario == "partial_used":
+                        if consumable.quantity < 2:
+                            current_time = next_time(current_time)
+                            continue
+                        issued_quantity = min(
+                            random.randint(2, 5),
+                            consumable.quantity,
+                        )
+                    else:
+                        issued_quantity = min(
+                            random.randint(1, 5),
+                            consumable.quantity,
                         )
 
-                        issue_rows.append(issue)
+                    if issued_quantity <= 0:
+                        current_time = next_time(current_time)
+                        continue
 
-                        consumable.quantity -= qty
-                        consumables_to_update.add(consumable)
+                    if scenario in OPEN_ISSUE_SCENARIOS:
+                        user = pick_user_without_open_issue(
+                            users,
+                            consumable.pk,
+                            open_issue_pairs,
+                        )
+                        if user is None:
+                            # Every active user already has an open issue for this item.
+                            current_time = next_time(current_time)
+                            continue
+                    else:
+                        user = event_user
 
+                    issued_at = current_time
+                    remaining_quantity = issued_quantity
+                    closed_at = None
+                    used_quantity = 0
+
+                    if scenario == "issued_used":
+                        used_quantity = issued_quantity
+                        remaining_quantity = 0
+                        closed_at = next_time(issued_at)
+                    elif scenario == "partial_used":
+                        used_quantity = random.randint(1, issued_quantity - 1)
+                        remaining_quantity = issued_quantity - used_quantity
+
+                    issue = ConsumableIssue(
+                        consumable=consumable,
+                        user=user,
+                        quantity=remaining_quantity,
+                        issued_quantity=issued_quantity,
+                        assigned_at=issued_at,
+                        assigned_by=user,
+                        returned_at=closed_at,
+                        purpose="Generated historical issue",
+                    )
+                    issue_rows.append(issue)
+
+                    if scenario in OPEN_ISSUE_SCENARIOS:
+                        open_issue_pairs.add((consumable.pk, user.pk))
+
+                    # Stock leaves inventory when it is issued. Later use events do not
+                    # reduce inventory again because those units are already off shelf.
+                    consumable.quantity -= issued_quantity
+                    consumables_to_update.add(consumable)
+
+                    event_rows.append(
+                        ConsumableEvent(
+                            consumable=consumable,
+                            issue=issue,
+                            user=user,
+                            reported_by=user,
+                            event_type=ConsumableEvent.EventType.ISSUED,
+                            quantity=issued_quantity,
+                            quantity_change=-issued_quantity,
+                            occurred_at=issued_at,
+                            notes=f"Issued {issued_quantity} units",
+                        )
+                    )
+
+                    if scenario in {"issued_used", "partial_used"}:
+                        used_at = closed_at or next_time(issued_at)
                         event_rows.append(
                             ConsumableEvent(
                                 consumable=consumable,
                                 issue=issue,
                                 user=user,
                                 reported_by=user,
-                                event_type=ConsumableEvent.EventType.ISSUED,
-                                quantity=qty,
-                                quantity_change=-qty,
-                                occurred_at=current_time,
-                                notes=f"Issued {qty} units",
+                                event_type=ConsumableEvent.EventType.USED,
+                                quantity=used_quantity,
+                                quantity_change=0,
+                                occurred_at=used_at,
+                                notes=f"Used {used_quantity} units",
                             )
                         )
-
-                        if scenario == "issued_used":
-
-                            current_time = next_time(current_time)
-
-                            event_rows.append(
-                                ConsumableEvent(
-                                    consumable=consumable,
-                                    issue=issue,
-                                    user=user,
-                                    reported_by=user,
-                                    event_type=ConsumableEvent.EventType.USED,
-                                    quantity=qty,
-                                    quantity_change=0,
-                                    occurred_at=current_time,
-                                    notes=f"Used {qty} units",
-                                )
-                            )
-
-                        elif scenario == "partial_used":
-
-                            used = random.randint(1, qty - 1)
-
-                            current_time = next_time(current_time)
-
-                            event_rows.append(
-                                ConsumableEvent(
-                                    consumable=consumable,
-                                    issue=issue,
-                                    user=user,
-                                    reported_by=user,
-                                    event_type=ConsumableEvent.EventType.USED,
-                                    quantity=used,
-                                    quantity_change=0,
-                                    occurred_at=current_time,
-                                    notes=f"Used {used} units",
-                                )
-                            )
+                        current_time = used_at
 
                 elif scenario == "condemned":
-
-                    qty = min(random.randint(1, 5), consumable.quantity)
-
-                    consumable.quantity -= qty
-                    consumables_to_update.add(consumable)
-
-                    event_rows.append(
-                        ConsumableEvent(
-                            consumable=consumable,
-                            user=user,
-                            reported_by=user,
-                            event_type=ConsumableEvent.EventType.CONDEMNED,
-                            quantity=qty,
-                            quantity_change=-qty,
-                            occurred_at=current_time,
-                            notes="Condemned stock",
+                    quantity = min(random.randint(1, 5), consumable.quantity)
+                    if quantity > 0:
+                        consumable.quantity -= quantity
+                        consumables_to_update.add(consumable)
+                        event_rows.append(
+                            ConsumableEvent(
+                                consumable=consumable,
+                                user=event_user,
+                                reported_by=event_user,
+                                event_type=ConsumableEvent.EventType.CONDEMNED,
+                                quantity=quantity,
+                                quantity_change=-quantity,
+                                occurred_at=current_time,
+                                notes="Condemned stock",
+                            )
                         )
-                    )
 
                 elif scenario == "expired":
-
-                    qty = min(random.randint(1, 5), consumable.quantity)
-
-                    consumable.quantity -= qty
-                    consumables_to_update.add(consumable)
-
-                    event_rows.append(
-                        ConsumableEvent(
-                            consumable=consumable,
-                            user=user,
-                            reported_by=user,
-                            event_type=ConsumableEvent.EventType.EXPIRED,
-                            quantity=qty,
-                            quantity_change=-qty,
-                            occurred_at=current_time,
-                            notes="Expired stock",
+                    quantity = min(random.randint(1, 5), consumable.quantity)
+                    if quantity > 0:
+                        consumable.quantity -= quantity
+                        consumables_to_update.add(consumable)
+                        event_rows.append(
+                            ConsumableEvent(
+                                consumable=consumable,
+                                user=event_user,
+                                reported_by=event_user,
+                                event_type=ConsumableEvent.EventType.EXPIRED,
+                                quantity=quantity,
+                                quantity_change=-quantity,
+                                occurred_at=current_time,
+                                notes="Expired stock",
+                            )
                         )
-                    )
 
                 elif scenario == "restocked":
-
-                    qty = random.randint(10, 30)
-
-                    consumable.quantity += qty
+                    quantity = random.randint(10, 30)
+                    consumable.quantity += quantity
                     consumables_to_update.add(consumable)
-
                     event_rows.append(
                         ConsumableEvent(
                             consumable=consumable,
-                            user=user,
-                            reported_by=user,
+                            user=event_user,
+                            reported_by=event_user,
                             event_type=ConsumableEvent.EventType.RESTOCKED,
-                            quantity=qty,
-                            quantity_change=qty,
+                            quantity=quantity,
+                            quantity_change=quantity,
                             occurred_at=current_time,
                             notes="Supplier delivery",
                         )
                     )
 
                 elif scenario == "adjusted":
-
-                    delta = random.choice([-3, -2, -1, 1, 2, 3])
-
-                    consumable.quantity = max(0, consumable.quantity + delta)
+                    requested_delta = random.choice([-3, -2, -1, 1, 2, 3])
+                    previous_quantity = consumable.quantity
+                    consumable.quantity = max(0, previous_quantity + requested_delta)
+                    actual_delta = consumable.quantity - previous_quantity
                     consumables_to_update.add(consumable)
 
                     event_rows.append(
                         ConsumableEvent(
                             consumable=consumable,
-                            user=user,
-                            reported_by=user,
+                            user=event_user,
+                            reported_by=event_user,
                             event_type=ConsumableEvent.EventType.ADJUSTED,
-                            quantity=abs(delta),
-                            quantity_change=delta,
+                            quantity=abs(actual_delta),
+                            quantity_change=actual_delta,
                             occurred_at=current_time,
                             notes="Inventory recount adjustment",
                         )
@@ -256,12 +310,10 @@ class Command(BaseCommand):
 
                 current_time = next_time(current_time)
 
-            # fake events
-
+            # Extra display-only activity. These rows deliberately do not create or
+            # modify issues, so they cannot violate issue constraints.
             for _ in range(FAKE_EVENTS_PER_CONSUMABLE):
-
                 current_time += timedelta(minutes=random.randint(5, 240))
-
                 event_rows.append(
                     ConsumableEvent(
                         consumable=consumable,
@@ -281,28 +333,36 @@ class Command(BaseCommand):
                     )
                 )
 
-        # bulk writes
-
         self.stdout.write(self.style.MIGRATE_HEADING("Writing history to database…"))
 
         with transaction.atomic():
-
             if issue_rows:
-                ConsumableIssue.objects.bulk_create(issue_rows, batch_size=1000)
+                ConsumableIssue.objects.bulk_create(
+                    issue_rows,
+                    batch_size=BATCH_SIZE,
+                )
 
             if event_rows:
-                ConsumableEvent.objects.bulk_create(event_rows, batch_size=2000)
+                ConsumableEvent.objects.bulk_create(
+                    event_rows,
+                    batch_size=EVENT_BATCH_SIZE,
+                )
 
             if consumables_to_update:
                 Consumable.objects.bulk_update(
                     list(consumables_to_update),
                     ["quantity"],
-                    batch_size=1000,
+                    batch_size=BATCH_SIZE,
                 )
+
+        open_issue_count = sum(1 for issue in issue_rows if issue.returned_at is None)
+        closed_issue_count = len(issue_rows) - open_issue_count
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Consumable history generation complete 🎉 "
-                f"({len(event_rows):,} events)"
+                "Consumable history generation complete 🎉\n"
+                f"- Issues: {len(issue_rows):,} "
+                f"({open_issue_count:,} open, {closed_issue_count:,} closed)\n"
+                f"- Events: {len(event_rows):,}"
             )
         )
