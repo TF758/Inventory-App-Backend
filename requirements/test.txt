@@ -6,3 +6,5 @@ factory_boy==3.3.3
 Faker==37.12.0
 
 pytest==9.0.3
+
+tblib==3.2.2

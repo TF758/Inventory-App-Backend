@@ -133,6 +133,32 @@ class WebSocketTokenBoundaryTests(SimpleTestCase):
         )
 
 
+@override_settings(
+    STORAGE_BACKEND="filesystem",
+    STORAGE_SHARED=True,
+    STORAGE_IS_DISTRIBUTED=False,
+    STORAGE_IS_SHARED=True,
+    STORAGES={
+        "default": {
+            "BACKEND": (
+                "django.core.files.storage.FileSystemStorage"
+            ),
+            "OPTIONS": {
+                "location": settings.MEDIA_ROOT,
+                "base_url": settings.MEDIA_URL,
+            },
+        },
+        "reports": {
+            "BACKEND": (
+                "django.core.files.storage.FileSystemStorage"
+            ),
+            "OPTIONS": {
+                "location": settings.REPORTS_DIR,
+            },
+        },
+        "staticfiles": settings.STORAGES["staticfiles"],
+    },
+)
 class DeploymentSecurityCheckTests(SimpleTestCase):
     def test_staging_security_boundaries_pass(self):
         rest_framework = {
