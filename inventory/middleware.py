@@ -1,6 +1,8 @@
 from urllib.parse import parse_qs
+
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 
 
@@ -8,20 +10,7 @@ class JWTAuthMiddleware(BaseMiddleware):
     async def __call__(self, scope, receive, send):
         scope["user"] = await self.get_anonymous_user()
 
-        token = None
-
-        # --- Preferred: Sec-WebSocket-Protocol ---
-        subprotocols = scope.get("subprotocols", [])
-        if len(subprotocols) == 2 and subprotocols[0] == "jwt":
-            token = subprotocols[1]
-
-        # --- Fallback: query string ---
-        if not token:
-            query_string = scope.get("query_string", b"").decode()
-            params = parse_qs(query_string)
-            token_list = params.get("token")
-            if token_list:
-                token = token_list[0]
+        token = self.extract_token(scope)
 
         if token:
             user = await self.get_user(token)
@@ -30,6 +19,22 @@ class JWTAuthMiddleware(BaseMiddleware):
 
         return await super().__call__(scope, receive, send)
 
+    @staticmethod
+    def extract_token(scope):
+        """Resolve JWTs without exposing them in production URLs."""
+
+        subprotocols = scope.get("subprotocols", [])
+        if len(subprotocols) == 2 and subprotocols[0] == "jwt":
+            return subprotocols[1]
+
+        if not settings.WEBSOCKET_ALLOW_QUERY_TOKEN:
+            return None
+
+        query_string = scope.get("query_string", b"").decode()
+        params = parse_qs(query_string)
+        token_list = params.get("token")
+        return token_list[0] if token_list else None
+
     @database_sync_to_async
     def get_anonymous_user(self):
         return AnonymousUser()
@@ -37,8 +42,8 @@ class JWTAuthMiddleware(BaseMiddleware):
     @database_sync_to_async
     def get_user(self, raw_token):
         from core.authentication import SessionJWTAuthentication
-        from rest_framework_simplejwt.exceptions import InvalidToken
         from rest_framework.exceptions import AuthenticationFailed
+        from rest_framework_simplejwt.exceptions import InvalidToken
 
         auth = SessionJWTAuthentication()
 

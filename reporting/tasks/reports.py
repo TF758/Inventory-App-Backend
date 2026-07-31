@@ -1,61 +1,97 @@
 import io
-import json
-from celery import shared_task
-from django.utils import timezone
-from django.db import transaction
-from core.mixins import NotificationMixin
-from django.conf import settings
-import redis
+import logging
 import time
-from core.models.tasks import ScheduledTaskRun
-from reporting.report_registry import REPORT_DEFINITIONS
-from reporting.models.reports import ReportJob
-from reporting.utils.excel_renderer import render_workbook, render_workbook_streaming
-from reporting.utils.report_payload import wrap_report_payload
-
-redis_reports_client = redis.Redis.from_url(settings.REDIS_REPORTS_URL)
-
 from datetime import datetime
+
+from celery import shared_task
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
 from django.utils.timezone import is_aware
 
-import logging
-from django.core.files.storage import default_storage
+from core.mixins import NotificationMixin
+from core.models.tasks import ScheduledTaskRun
+from core.task_reliability import (
+    is_transient_task_error,
+    request_is_redelivered,
+    request_task_id,
+    retry_countdown,
+)
+from reporting.models.reports import ReportJob
+from reporting.report_registry import REPORT_DEFINITIONS
+from reporting.services.job_errors import REPORT_FAILURE_MESSAGE
+from reporting.services.job_state import (
+    JobLeaseLost,
+    claim_job,
+    mark_job_failed,
+    prepare_job_retry,
+    touch_job,
+)
+from reporting.services.storage import delete_report, save_report
+from reporting.utils.report_payload import wrap_report_payload
+from reporting.utils.excel_renderer import (
+    render_workbook,
+    render_workbook_streaming,
+)
 
 logger = logging.getLogger(__name__)
 
+
 def normalize_datetimes(obj):
-    """
-    Recursively remove timezone information from datetime objects.
-
-    Excel (openpyxl) cannot handle timezone-aware datetimes, so
-    any tz-aware datetime must be converted to a naive datetime.
-
-    This function walks nested structures (dicts/lists) and
-    normalizes any datetime values found.
-    """
+    """Recursively convert timezone-aware datetimes for openpyxl."""
     if isinstance(obj, dict):
-        return {k: normalize_datetimes(v) for k, v in obj.items()}
+        return {key: normalize_datetimes(value) for key, value in obj.items()}
     if isinstance(obj, list):
-        return [normalize_datetimes(v) for v in obj]
-    if isinstance(obj, datetime):
-        if is_aware(obj):
-            return obj.replace(tzinfo=None)
-        return obj
+        return [normalize_datetimes(value) for value in obj]
+    if isinstance(obj, datetime) and is_aware(obj):
+        return obj.replace(tzinfo=None)
     return obj
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True)
+
+
+def require_job_lease(job_id: int, task_id: str) -> None:
+    if not touch_job(job_id, task_id):
+        raise JobLeaseLost(
+            "Report execution lease is no longer owned by this task."
+        )
+
+
+@shared_task(
+    bind=True,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=settings.REPORT_TASK_MAX_RETRIES,
+    soft_time_limit=settings.REPORT_TASK_SOFT_TIME_LIMIT,
+    time_limit=settings.REPORT_TASK_TIME_LIMIT,
+)
 def generate_report_task(self, report_job_id: int):
     start_ts = time.monotonic()
-
-    run = ScheduledTaskRun.objects.create(
-        task_name="generate_report_task",
-        status=ScheduledTaskRun.Status.STARTED,
-    )
-
+    task_id = request_task_id(self)
     notifier = NotificationMixin()
     job = None
+    stored_report_name = ""
+    run = None
 
     try:
-        job = ReportJob.objects.select_related("user").get(id=report_job_id)
+        run = ScheduledTaskRun.objects.create(
+            task_name="generate_report_task",
+            status=ScheduledTaskRun.Status.STARTED,
+        )
+        try:
+            claim = claim_job(
+                report_job_id,
+                task_id,
+                redelivered=request_is_redelivered(self),
+            )
+        except ReportJob.DoesNotExist:
+            run.status = ScheduledTaskRun.Status.SKIPPED
+            run.message = "Report job no longer exists."
+            return {"status": "missing"}
+
+        job = claim.job
+        if not claim.claimed:
+            run.status = ScheduledTaskRun.Status.SKIPPED
+            run.message = f"Report execution skipped: {claim.reason}."
+            return {"status": "skipped", "reason": claim.reason}
 
         definition = REPORT_DEFINITIONS.get(job.report_type)
         if not definition:
@@ -63,116 +99,149 @@ def generate_report_task(self, report_job_id: int):
 
         builder = definition["builder"]
         renderer = definition["renderer"]
-
-        # ---------------------------------
-        # Mark job running
-        # ---------------------------------
-        with transaction.atomic():
-            job.status = ReportJob.Status.RUNNING
-            job.started_at = timezone.now()
-            job.save(update_fields=["status", "started_at"])
-
-        # ---------------------------------
-        # Build payload
-        # ---------------------------------
         builder_params = definition["param_map"](job.params, job.user)
 
         if job.report_type == ReportJob.ReportType.ASSET_IMPORT:
             payload = job.result_payload
+            if not (
+                isinstance(payload, dict)
+                and "meta" in payload
+                and "data" in payload
+            ):
+                payload = wrap_report_payload(
+                    report_type=job.report_type,
+                    data=payload or {},
+                    extra_meta={
+                        "generated_by": job.user.get_username(),
+                        "asset_type": job.params.get("asset_type"),
+                        "original_file_name": job.params.get(
+                            "original_file_name",
+                            "",
+                        ),
+                    },
+                )
         else:
             payload = builder(**builder_params)
 
+        require_job_lease(job.id, task_id)
         payload = normalize_datetimes(payload)
 
         if payload is None:
             raise RuntimeError("Report payload is empty")
-
-        # ---------------------------------
-        # Enforce schema
-        # ---------------------------------
         if not isinstance(payload, dict):
             raise RuntimeError("Report payload must be a dict")
-
-        if "meta" not in payload:
-            raise RuntimeError("Report payload missing 'meta'")
-
-        if "data" not in payload:
-            raise RuntimeError("Report payload missing 'data'")
-
-        if not isinstance(payload["meta"], dict):
-            raise RuntimeError("'meta' must be a dict")
-
-        if not isinstance(payload["data"], dict):
-            raise RuntimeError("'data' must be a dict")
+        if not isinstance(payload.get("meta"), dict):
+            raise RuntimeError("Report payload missing a valid 'meta' object")
+        if not isinstance(payload.get("data"), dict):
+            raise RuntimeError("Report payload missing a valid 'data' object")
 
         payload["meta"].setdefault("report_type", job.report_type)
         payload["meta"].setdefault("generated_by", job.user.get_username())
         payload["meta"].setdefault("schema_version", 1)
 
-        # ---------------------------------
-        # Render workbook
-        # ---------------------------------
         workbook_spec = renderer(payload)
+        require_job_lease(job.id, task_id)
 
         if definition.get("streaming", False):
-            wb = render_workbook_streaming(workbook_spec)
+            workbook = render_workbook_streaming(workbook_spec)
         else:
-            wb = render_workbook(workbook_spec)
+            workbook = render_workbook(workbook_spec)
 
-        # ---------------------------------
-        # Save file
-        # ---------------------------------
         buffer = io.BytesIO()
-        wb.save(buffer)
+        workbook.save(buffer)
         buffer.seek(0)
+        require_job_lease(job.id, task_id)
 
         filename = settings.REPORT_FILENAME_TEMPLATE.format(
             report_type=job.report_type,
             public_id=job.public_id,
         )
-        filename = f"{filename}.xlsx"
+        # Store each execution under its own key. A stale worker can then
+        # clean up only the object it created without deleting the successful
+        # output produced by a replacement task. The basename remains the
+        # user-facing download filename.
+        stored_report_name = save_report(
+            f"{job.public_id}/{task_id}/{filename}.xlsx",
+            buffer.getvalue(),
+        )
 
-        file_path = settings.REPORTS_DIR / filename
-
-        with open(file_path, "wb") as f:
-            f.write(buffer.getvalue())
-
-        job.report_file = filename
-
-        # ---------------------------------
-        # Mark complete
-        # ---------------------------------
         with transaction.atomic():
-            job.status = ReportJob.Status.DONE
-            job.finished_at = timezone.now()
+            locked_job = (
+                ReportJob.objects
+                .select_for_update()
+                .select_related("user")
+                .get(pk=job.pk)
+            )
 
-            job.save(
+            if locked_job.status == ReportJob.Status.CANCELLED:
+                raise JobLeaseLost("Report was cancelled before completion.")
+
+            if (
+                locked_job.status != ReportJob.Status.RUNNING
+                or locked_job.task_id != task_id
+            ):
+                raise JobLeaseLost(
+                    "Report execution lease changed before completion."
+                )
+
+            locked_job.status = ReportJob.Status.DONE
+            locked_job.finished_at = timezone.now()
+            locked_job.report_file = stored_report_name
+            locked_job.error = ""
+            locked_job.heartbeat_at = None
+            locked_job.task_id = ""
+            locked_job.save(
                 update_fields=[
                     "status",
                     "finished_at",
                     "report_file",
+                    "error",
+                    "heartbeat_at",
+                    "task_id",
                 ]
             )
 
-            if not job.notification_sent:
+            if not locked_job.notification_sent:
                 notifier.notify(
-                    recipient=job.user,
+                    recipient=locked_job.user,
                     notif_type="report_ready",
                     level="info",
                     title="Your report is ready",
-                    message="Go to your reports page to download the report.",
-                    entity=job,
+                    message=(
+                        "Go to your reports page to download the report."
+                    ),
+                    entity=locked_job,
                     meta={
-                        "report_type": job.report_type,
-                        "report_public_id": job.public_id,
+                        "report_type": locked_job.report_type,
+                        "report_public_id": locked_job.public_id,
                     },
                 )
-
-                job.notification_sent = True
-                job.save(update_fields=["notification_sent"])
+                locked_job.notification_sent = True
+                locked_job.save(update_fields=["notification_sent"])
 
         run.status = ScheduledTaskRun.Status.SUCCESS
         run.message = f"ReportJob {job.public_id} completed"
+        return {"status": "done", "report_file": stored_report_name}
+
+    except JobLeaseLost:
+        if stored_report_name:
+            try:
+                delete_report(stored_report_name)
+            except Exception:
+                logger.exception(
+                    "report_lease_lost_object_cleanup_failed",
+                    extra={"job_id": getattr(job, "id", None)},
+                )
+        run.status = ScheduledTaskRun.Status.SKIPPED
+        run.message = "Report execution lease was released."
+        logger.warning(
+            "generate_report_task_lease_lost",
+            extra={
+                "job_id": getattr(job, "id", report_job_id),
+                "task_id": task_id,
+            },
+        )
+        return {"status": "lease_lost"}
 
     except Exception as exc:
         logger.exception(
@@ -181,21 +250,73 @@ def generate_report_task(self, report_job_id: int):
                 "job_id": getattr(job, "id", None),
                 "report_type": getattr(job, "report_type", None),
                 "user_id": getattr(job, "user_id", None),
+                "task_id": task_id,
             },
         )
 
-        if job:
-            with transaction.atomic():
-                job.status = ReportJob.Status.FAILED
-                job.error = str(exc)
-                job.finished_at = timezone.now()
-                job.save(update_fields=["status", "error", "finished_at"])
+        if stored_report_name:
+            try:
+                delete_report(stored_report_name)
+            except Exception:
+                logger.exception(
+                    "failed_report_object_cleanup_failed",
+                    extra={
+                        "job_id": getattr(job, "id", None),
+                        "report_file": stored_report_name,
+                    },
+                )
 
-        run.status = ScheduledTaskRun.Status.FAILED
-        run.message = str(exc)
+        retries = int(getattr(self.request, "retries", 0) or 0)
+        if (
+            is_transient_task_error(exc)
+            and retries < settings.REPORT_TASK_MAX_RETRIES
+        ):
+            lease_owned = True
+            if job is not None:
+                try:
+                    lease_owned = prepare_job_retry(job.id, task_id)
+                except Exception:
+                    # A retry uses the same task id. If the database is
+                    # temporarily unavailable, the next delivery can safely
+                    # resume this lease or skip itself after a takeover.
+                    lease_owned = True
+                    logger.exception(
+                        "report_retry_lease_refresh_failed",
+                        extra={"job_id": job.id, "task_id": task_id},
+                    )
 
+            if lease_owned:
+                if run is not None:
+                    run.status = ScheduledTaskRun.Status.SKIPPED
+                    run.message = (
+                        "Transient report failure; retry scheduled."
+                    )
+                raise self.retry(
+                    exc=exc,
+                    countdown=retry_countdown(self),
+                )
+
+        if job is not None:
+            mark_job_failed(
+                job.id,
+                task_id,
+                message=REPORT_FAILURE_MESSAGE,
+            )
+
+        if run is not None:
+            run.status = ScheduledTaskRun.Status.FAILED
+            run.message = REPORT_FAILURE_MESSAGE
         raise
 
     finally:
-        run.duration_ms = int((time.monotonic() - start_ts) * 1000)
-        run.save()
+        if run is not None:
+            run.duration_ms = int((time.monotonic() - start_ts) * 1000)
+            try:
+                run.save()
+            except Exception:
+                # Audit persistence must never replace the job result or a
+                # Celery Retry exception with a secondary database error.
+                logger.exception(
+                    "generate_report_task_run_log_save_failed",
+                    extra={"job_id": getattr(job, "id", report_job_id)},
+                )

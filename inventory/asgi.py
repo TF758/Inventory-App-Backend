@@ -1,29 +1,32 @@
 import os
-import django
+
+from settings_selector import resolve_settings_module
 
 os.environ.setdefault(
     "DJANGO_SETTINGS_MODULE",
-    os.getenv(
-        "DJANGO_SETTINGS_MODULE",
-        "inventory.settings"
-    )
+    resolve_settings_module(default_environment="dev"),
 )
+
+import django
 
 django.setup()
 
-from channels.routing import ProtocolTypeRouter, URLRouter
-from django.core.asgi import get_asgi_application
 from channels.auth import AuthMiddlewareStack
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.security.websocket import AllowedHostsOriginValidator
+from django.core.asgi import get_asgi_application
 
-from inventory.middleware import JWTAuthMiddleware
 from core.routing import websocket_urlpatterns
+from inventory.middleware import JWTAuthMiddleware
 
 
-application = ProtocolTypeRouter({
-    "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
-        JWTAuthMiddleware(
-            URLRouter(websocket_urlpatterns)
-        )
-    ),
-})
+application = ProtocolTypeRouter(
+    {
+        "http": get_asgi_application(),
+        "websocket": AllowedHostsOriginValidator(
+            AuthMiddlewareStack(
+                JWTAuthMiddleware(URLRouter(websocket_urlpatterns))
+            )
+        ),
+    }
+)

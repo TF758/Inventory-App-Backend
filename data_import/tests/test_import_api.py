@@ -1,6 +1,7 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.storage import default_storage
 from unittest.mock import patch
 from django.urls import reverse
 
@@ -25,7 +26,7 @@ class AssetImportAPITests(TestCase):
 
         self.client.force_authenticate(user=self.user)
 
-    @patch("data_import.views.run_asset_import_task.delay")
+    @patch("data_import.views.enqueue_report_job")
     def test_asset_import_happy_path(self, mock_task):
 
         csv = SimpleUploadedFile(
@@ -49,6 +50,9 @@ class AssetImportAPITests(TestCase):
 
         self.assertIsNotNone(job)
         self.assertEqual(job.report_type, ReportJob.ReportType.ASSET_IMPORT)
+        stored_file_name = job.params["stored_file_name"]
+        self.assertTrue(default_storage.exists(stored_file_name))
+        self.addCleanup(default_storage.delete, stored_file_name)
 
         mock_task.assert_called_once()
 
@@ -129,3 +133,62 @@ class AssetImportAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+    def test_cancel_pending_import(self):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            params={"asset_type": "equipment", "stored_file_name": "test.csv"},
+        )
+
+        response = self.client.post(
+            reverse("asset-import-cancel", args=[job.public_id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        job.refresh_from_db()
+        self.assertEqual(job.status, ReportJob.Status.CANCELLED)
+        self.assertIsNotNone(job.finished_at)
+
+    def test_cancel_finished_import_returns_conflict(self):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            status=ReportJob.Status.DONE,
+            params={"asset_type": "equipment", "stored_file_name": "test.csv"},
+        )
+
+        response = self.client.post(
+            reverse("asset-import-cancel", args=[job.public_id])
+        )
+
+        self.assertEqual(response.status_code, 409)
+        job.refresh_from_db()
+        self.assertEqual(job.status, ReportJob.Status.DONE)
+
+    def test_failed_import_status_does_not_expose_internal_error(self):
+        job = ReportJob.objects.create(
+            user=self.user,
+            report_type=ReportJob.ReportType.ASSET_IMPORT,
+            status=ReportJob.Status.FAILED,
+            params={
+                "asset_type": "equipment",
+                "stored_file_name": "test.csv",
+            },
+            error="database password appeared in an exception",
+            result_payload={
+                "fatal_error": "database password appeared in an exception",
+            },
+        )
+
+        response = self.client.get(
+            reverse("asset-import-status", args=[job.public_id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["error"], "Import processing failed.")
+        self.assertEqual(
+            response.json()["fatal_error"],
+            "Import processing failed.",
+        )
+        self.assertNotContains(response, "database password")
+

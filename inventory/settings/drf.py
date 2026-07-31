@@ -1,4 +1,21 @@
-from .base import env, IS_TESTING
+from .base import APP_ENV, IS_TESTING, env
+
+
+ENABLE_BASIC_AUTH = env.bool(
+    "ENABLE_BASIC_AUTH",
+    default=APP_ENV in {"dev", "local"},
+)
+
+authentication_classes = [
+    "core.authentication.SessionJWTAuthentication",
+    "rest_framework_simplejwt.authentication.JWTAuthentication",
+    "rest_framework.authentication.SessionAuthentication",
+]
+
+if ENABLE_BASIC_AUTH:
+    authentication_classes.append(
+        "rest_framework.authentication.BasicAuthentication"
+    )
 
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS":
@@ -9,12 +26,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
     ],
 
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.authentication.SessionJWTAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
-    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": authentication_classes,
 
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -30,9 +42,15 @@ REST_FRAMEWORK = {
         "user": env("THROTTLE_USER", default="1000/hour"),
         "login": env("THROTTLE_LOGIN", default="5/min"),
         "token_refresh": env("THROTTLE_REFRESH", default="30/min"),
-        "password_reset": env("THROTTLE_PASSWORD_RESET", default="3/hour"),
+        "password_reset": env(
+            "THROTTLE_PASSWORD_RESET",
+            default="3/hour",
+        ),
         "user_read": env("THROTTLE_USER_READ", default="1000/hour"),
-        "equipment_action": env("THROTTLE_EQUIPMENT", default="30/hour"),
+        "equipment_action": env(
+            "THROTTLE_EQUIPMENT",
+            default="30/hour",
+        ),
         "admin_action": env("THROTTLE_ADMIN", default="100/hour"),
     },
 

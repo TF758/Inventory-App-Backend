@@ -28,6 +28,21 @@ Running locally means you'll need to set up:
 
 ---
 
+
+## Local Docker TLS certificates
+
+The repository no longer tracks the local TLS private key or certificate. If you
+use the optional Docker Nginx service, create untracked files named
+`localhost.key` and `localhost.crt` in the repository root before starting it.
+Use a local development certificate tool such as `mkcert`; never reuse these
+files outside local development and never force-add them to Git.
+
+Existing developers can keep their current local files. The security patch uses
+`git rm --cached`, so it removes them from version control without deleting the
+working copies.
+
+---
+
 ## Quick Start (Recommended)
 
 ````bash
@@ -486,3 +501,40 @@ Inventory-App-Backend/
 - [Assets Documentation](assets/assets.md) — Asset models
 - [Users Documentation](users/users.md) — User & role management
 - [Core Tests](core_tests.md) — Test coverage analysis
+
+## Running the separated Celery queues
+
+The development Compose stack starts three workers:
+
+```bash
+docker compose up api worker worker-imports worker-reports beat
+```
+
+Their queue assignments are:
+
+```text
+worker          default,maintenance
+worker-imports  imports
+worker-reports  reports
+```
+
+For a non-Compose local setup, run each process in a separate terminal:
+
+```bash
+celery -A inventory worker -l info -Q default,maintenance
+celery -A inventory worker -l info -Q imports
+celery -A inventory worker -l info -Q reports
+celery -A inventory beat -l info
+```
+
+After migrations, install the recovery schedule and verify all enabled Beat task
+names:
+
+```bash
+python manage.py setup_logger
+python manage.py setup_db_cleaners
+python manage.py check_celery_tasks
+```
+
+Do not set `JOB_STALE_AFTER_SECONDS` below either hard task time limit. The
+recommended development defaults match the example environment files.

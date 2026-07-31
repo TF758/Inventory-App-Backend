@@ -10,6 +10,9 @@ urlpatterns = [
     path( "asset-import/<str:job_id>/", AssetImportStatusView.as_view(), name="asset-import-status", ),
 
     path( "asset-import/<str:job_id>/download/", AssetImportErrorDownloadView.as_view(), name="asset-import-download", ),
-    path( "asset-import/<str:job_id>/cancel/", AssetImportCancelView.as_view(),
-)
+    path(
+        "asset-import/<str:job_id>/cancel/",
+        AssetImportCancelView.as_view(),
+        name="asset-import-cancel",
+    ),
 ]

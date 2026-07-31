@@ -255,3 +255,16 @@ python manage.py test reporting
 - [Users](../users/README.md)
 - [Core Models](../core/README.md)
 - [API Overview](../README.md)
+
+## Execution leases and recovery
+
+Each report job records the Celery `task_id`, `attempt_count`, and
+`heartbeat_at`. These fields prevent concurrent duplicate rendering and allow
+`recover_stale_report_jobs` to requeue work left behind by a terminated worker.
+Completed jobs are idempotently skipped, retries retain their lease for the
+next delivery with the same task id, and client-visible failures remain
+sanitized.
+
+Report generation is routed to the `reports` queue. The stale threshold must be
+longer than the report hard time limit, and the recovery Beat task must be
+installed with `python manage.py setup_db_cleaners`.

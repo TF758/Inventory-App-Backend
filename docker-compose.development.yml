@@ -1,0 +1,53 @@
+name: inventory-development
+
+x-development-env: &development-env
+  APP_ENV: development
+  DJANGO_ENV: dev
+  DJANGO_SETTINGS_MODULE: inventory.settings.dev
+
+services:
+  release:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
+  api:
+    env_file:
+      - .env.dev
+    environment: *development-env
+    ports:
+      - "${API_PORT:-8000}:${CONTAINER_PORT:-8000}"
+
+  worker:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
+  worker-imports:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
+  worker-reports:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
+  beat:
+    env_file:
+      - .env.dev
+    environment: *development-env
+
+  db:
+    env_file:
+      - .env.dev
+
+volumes:
+  inventory_postgres_data:
+    name: inventory_development_postgres_data
+  inventory_media:
+    name: inventory_development_media
+  inventory_reports:
+    name: inventory_development_reports
+  inventory_staticfiles:
+    name: inventory_development_staticfiles

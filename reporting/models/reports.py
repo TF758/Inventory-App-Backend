@@ -48,11 +48,22 @@ class ReportJob(PublicIDModel):
 
     notification_sent = models.BooleanField(default=False)
 
+    # Celery execution lease. The task id identifies the worker delivery that
+    # currently owns this job; heartbeat_at lets the recovery task distinguish
+    # active work from a worker that disappeared.
+    task_id = models.CharField(max_length=255, blank=True, db_index=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    heartbeat_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     class Meta:
         indexes = [
             models.Index(fields=["user", "status"]),
             models.Index(fields=["user", "report_type"]),
             models.Index(fields=["created_at"]),
+            models.Index(
+                fields=["status", "heartbeat_at"],
+                name="report_job_status_hb_idx",
+            ),
         ]
 
     def __str__(self):

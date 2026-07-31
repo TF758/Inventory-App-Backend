@@ -3,12 +3,15 @@ from dataclasses import dataclass, field
 
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.utils import timezone
 from sites.models.sites import Room
 from core.permissions.helpers import has_hierarchy_permission, is_admin_role, is_in_scope, is_viewer_role
 import pandas as pd
 import io
 
+from core.task_reliability import is_transient_task_error
 from data_import.utils import load_and_normalize_csv
+from reporting.services.job_state import JobLeaseLost
 
 @dataclass
 class ImportRowIssue:
@@ -76,7 +79,7 @@ class BaseAssetImporter:
         # -----------------------------
         with default_storage.open(stored_file_name, "rb") as f:
             df = load_and_normalize_csv(f)
-        
+
         # print("Detected columns:", df.columns.tolist())
 
         headers = set(df.columns)
@@ -106,12 +109,27 @@ class BaseAssetImporter:
         # -----------------------------
         for index, raw_row in enumerate(rows, start=2):
 
-            # cancellation check every 10 rows
+            # Refresh the execution lease and observe cancellation in bounded
+            # intervals without adding a query for every imported row.
             if self.job and index % 10 == 0:
+                updated = (
+                    self.job.__class__.objects
+                    .filter(
+                        pk=self.job.pk,
+                        status=self.job.Status.RUNNING,
+                        task_id=self.job.task_id,
+                    )
+                    .update(heartbeat_at=timezone.now())
+                )
                 self.job.refresh_from_db()
 
-                if self.job.status == "CANCELLED":
+                if self.job.status == self.job.Status.CANCELLED:
                     break
+
+                if not updated:
+                    raise JobLeaseLost(
+                        "Import execution lease is no longer owned by this task."
+                    )
 
             if self._is_blank_row(raw_row):
                 continue
@@ -165,7 +183,16 @@ class BaseAssetImporter:
             except ValueError as exc:
                 result.add_failed(index, str(exc), raw_row)
 
+            except JobLeaseLost:
+                raise
+
             except Exception as exc:
+                # Infrastructure failures must reach the Celery task so the
+                # whole import can be retried. Treat only genuine row-level
+                # data errors as part of the import result.
+                if is_transient_task_error(exc):
+                    raise
+
                 result.add_failed(
                     index,
                     f"Unexpected error: {exc}",
@@ -234,7 +261,7 @@ class BaseAssetImporter:
         # Must be admin role
         if not is_admin_role(role_name):
             raise PermissionError("Only admin roles can import assets.")
-        
+
         # Clerks cannot import
         if role_name == "ROOM_CLERK":
             raise PermissionError("Room clerks cannot import assets.")

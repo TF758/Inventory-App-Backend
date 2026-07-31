@@ -22,7 +22,8 @@ RUN addgroup --system app && \
 
 COPY . .
 
-RUN chown -R app:app /app
+RUN mkdir -p /app/media /app/reports /app/staticfiles && \
+    chown -R app:app /app
 
 USER app
 

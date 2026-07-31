@@ -16,6 +16,8 @@ django-cors-headers==4.7.0
 django-environ==0.11.2
 django-filter==25.1
 
+django-storages[s3]==1.14.6
+
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.29.0
 

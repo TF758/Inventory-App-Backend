@@ -10,14 +10,18 @@ class ReportJobAdmin(admin.ModelAdmin):
         "user",
         "report_type",
         "status",
+        "attempt_count",
         "created_at",
         "finished_at",
+        "heartbeat_at",
+        "task_id",
         "download_link",
     )
 
     list_filter = (
         "report_type",
         "status",
+        "attempt_count",
         "created_at",
     )
 
@@ -33,6 +37,9 @@ class ReportJobAdmin(admin.ModelAdmin):
         "created_at",
         "started_at",
         "finished_at",
+        "heartbeat_at",
+        "task_id",
+        "attempt_count",
         "download_link",
         "params",
         "error",
@@ -52,11 +59,14 @@ class ReportJobAdmin(admin.ModelAdmin):
                 "created_at",
                 "started_at",
                 "finished_at",
+                "heartbeat_at",
             )
         }),
         ("Report", {
             "fields": (
                 "download_link",
+                "task_id",
+                "attempt_count",
                 "params",
                 "error",
             )

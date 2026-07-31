@@ -1,19 +1,15 @@
-"""
-WSGI config for inventory project.
-
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
-"""
+"""WSGI config for the inventory project."""
 
 import os
 
 from django.core.wsgi import get_wsgi_application
 
+from settings_selector import resolve_settings_module
+
+
 os.environ.setdefault(
     "DJANGO_SETTINGS_MODULE",
-    "inventory.settings"
+    resolve_settings_module(default_environment="dev"),
 )
 
 application = get_wsgi_application()

@@ -1,3 +1,5 @@
+from celery import current_app
+import logging
 from rest_framework import status, viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,16 +9,19 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from data_import.tasks import run_asset_import_task
-from data_import.utils import store_import_upload
+from django.utils import timezone
+from data_import.utils import delete_import_upload, store_import_upload
 from data_import.serializers import AssetImportRequestSerializer
 from core.mixins import AuditMixin, NotificationMixin
 from core.models.audit import AuditLog
 from access.permissions.base import RequiresPermission
 from reporting.models.reports import ReportJob
+from reporting.services.job_errors import public_job_error
+from reporting.services.job_dispatch import enqueue_report_job
 import csv
 from django.http import HttpResponse
 
+logger = logging.getLogger(__name__)
 
 
 class AssetImportCreateView(NotificationMixin, AuditMixin, APIView):
@@ -43,7 +48,7 @@ class AssetImportCreateView(NotificationMixin, AuditMixin, APIView):
             },
         )
 
-        run_asset_import_task.delay(job.id)
+        enqueue_report_job(job.id)
 
         self.notify(
             recipient=request.user,
@@ -93,13 +98,15 @@ class AssetImportStatusView(APIView):
 
         payload = job.result_payload or {}
 
+        client_error = public_job_error(job) or None
+
         return Response({
             "job_id": job.public_id,
             "status": job.status,
             "summary": payload.get("summary"),
             "issues": payload.get("issues", []),
-            "error": job.error,
-            "fatal_error": payload.get("fatal_error"),
+            "error": client_error,
+            "fatal_error": client_error,
         })
 
 class AssetImportErrorDownloadView(APIView):
@@ -151,13 +158,58 @@ class AssetImportCancelView(APIView):
             report_type=ReportJob.ReportType.ASSET_IMPORT,
         )
 
-        if job.status in ["COMPLETED", "FAILED"]:
+        terminal_statuses = {
+            ReportJob.Status.DONE,
+            ReportJob.Status.FAILED,
+            ReportJob.Status.CANCELLED,
+        }
+
+        if job.status in terminal_statuses:
             return Response(
                 {"detail": "Job already finished."},
-                status=400,
+                status=status.HTTP_409_CONFLICT,
             )
 
-        job.status = "CANCELLED"
-        job.save()
+        active_task_id = job.task_id
+        updated = ReportJob.objects.filter(
+            pk=job.pk,
+            status__in=[
+                ReportJob.Status.PENDING,
+                ReportJob.Status.RUNNING,
+            ],
+        ).update(
+            status=ReportJob.Status.CANCELLED,
+            finished_at=timezone.now(),
+            heartbeat_at=None,
+            task_id="",
+        )
 
-        return Response({"status": "cancelled"})
+        if not updated:
+            return Response(
+                {"detail": "Job could not be cancelled."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if active_task_id:
+            try:
+                current_app.control.revoke(
+                    active_task_id,
+                    terminate=False,
+                )
+            except Exception:
+                logger.exception(
+                    "asset_import_task_revoke_failed",
+                    extra={"job_id": job.id},
+                )
+
+        try:
+            delete_import_upload(
+                (job.params or {}).get("stored_file_name", "")
+            )
+        except Exception:
+            logger.exception(
+                "asset_import_cancel_upload_cleanup_failed",
+                extra={"job_id": job.id},
+            )
+
+        return Response({"status": ReportJob.Status.CANCELLED})
