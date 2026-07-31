@@ -360,13 +360,17 @@ jobs:
         shell: bash
         run: |
           image="${REGISTRY}/${IMAGE_NAME}"
+          image="${image,,}"
           immutable_tag="sha-${GITHUB_SHA}"
 
           case "${GITHUB_REF_NAME}" in
             dev) environment_tag="development" ;;
             staging) environment_tag="staging" ;;
             main) environment_tag="production" ;;
-            *) echo "Unsupported release branch: ${GITHUB_REF_NAME}" >&2; exit 2 ;;
+            *)
+              echo "Unsupported release branch: ${GITHUB_REF_NAME}" >&2
+              exit 2
+              ;;
           esac
 
           docker tag inventory-api:ci "${image}:${immutable_tag}"
